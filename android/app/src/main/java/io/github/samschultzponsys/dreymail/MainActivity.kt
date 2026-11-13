@@ -139,7 +139,13 @@ class MainActivity : Activity() {
         }
 
         if (Prefs.serverUrl(this) == null) askForServer() else open(intent)
-        Handler(Looper.getMainLooper()).postDelayed({ Updater.check(this, manual = false) }, 8000)
+        // Updates are checked in onResume (at start, and when coming back after a while).
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Updater.resumePendingInstall(this)
+        Updater.checkIfDue(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -209,7 +215,12 @@ class MainActivity : Activity() {
     /** window.DreyMailAndroid: what the web app may ask of the phone. Only the server's pages may use it. */
     inner class Bridge {
         @JavascriptInterface
-        fun info(): String = JSONObject().put("version", BuildConfig.VERSION_NAME).put("installKind", "android").toString()
+        fun info(): String = JSONObject()
+            .put("version", BuildConfig.VERSION_NAME)
+            .put("installKind", "android")
+            // The phone's font size setting: the web app sizes its interface to match.
+            .put("fontScale", resources.configuration.fontScale.toDouble())
+            .toString()
 
         @JavascriptInterface
         fun setAccounts(json: String) {

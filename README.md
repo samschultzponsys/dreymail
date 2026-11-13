@@ -8,7 +8,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up).
      Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps).
      Modified by samschultzponsys, 2026-11-13: v1.8 (Android app).
-     Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached). -->
+     Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached).
+     Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -32,7 +33,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.9**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.0**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -119,7 +120,15 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   being force-inverted, with a per-message toggle.
 - Notifications for new mail on phones and desktops (Web Push), and an unread badge on the app
   icon. Install DreyMail as an app (PWA) from the browser; see [Notifications](#notifications).
-- On phones, a floating Compose button sits on the message list.
+- On phones, a floating Compose button sits on the message list. Compose writes from the account
+  you're in (the first account in "All inboxes"); the From menu switches it.
+- **Phones, tablets and foldables.** Phones show one pane at a time. Tablets and unfolded
+  foldables show the message list on the left and the open message on the right, with the
+  folders in a slide-in drawer. Desktops show all three columns.
+- **Interface size** per device (Settings → General): Automatic is larger in the Android app and
+  follows the phone's font size; or pick 90–150%.
+- **Your name** (Settings → General) is shown at the bottom left; typed in lower case it is
+  capitalised for you.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
 
@@ -216,8 +225,10 @@ browser to install apps when Android asks). It asks for your DreyMail server's a
   grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
 - **Private.** Notifications are end-to-end encrypted to the phone (Web Push encryption,
   RFC 8291): Google relays only ciphertext.
-- **Updates.** The app checks for a newer release when it starts and from Settings → General, and
-  downloads the new APK; Android updates in place and keeps your login.
+- **Updates built in.** The app checks for a newer release when it starts, when you come back to it
+  after a few hours, and from Settings → General. "Update now" downloads it inside the app (with a
+  progress notification) and opens Android's install screen; the first time, Android asks you to
+  allow DreyMail to install updates. Your login and settings stay.
 
 **One-time setup** (administrator): create a free Firebase project and enter its values in
 Settings → Android. The page walks you through it (about 10 minutes). Or set them in the

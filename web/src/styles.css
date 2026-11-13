@@ -7,7 +7,8 @@
    Modified by samschultzponsys, 2026-11-13: administration styles.
    Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
    Modified by samschultzponsys, 2026-11-13: spacing and element fixes.
-   Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings. */
+   Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
+   Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -144,7 +145,8 @@ svg { flex-shrink: 0; }
 .app {
   display: grid;
   grid-template-columns: 240px minmax(320px, 400px) 1fr;
-  height: 100dvh;
+  /* Divided by the interface size (CSS zoom scales viewport units too). */
+  height: calc(100dvh / var(--ui-zoom, 1));
   overflow: hidden;
 }
 .pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -338,7 +340,7 @@ svg { flex-shrink: 0; }
 .menu button:hover { background: var(--hover); }
 .menu .menu-label { padding: 6px 10px 2px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .overlay { position: fixed; inset: 0; z-index: 40; background: rgba(10, 10, 8, 0.38); display: grid; place-items: center; padding: 16px; }
-.dialog { width: min(640px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.dialog { width: min(640px, 100%); max-height: calc(100dvh / var(--ui-zoom, 1) - 32px); display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; }
 .dialog-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .dialog-head h2 { flex: 1; margin: 0; font-size: 16px; }
 .dialog-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
@@ -362,7 +364,7 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 
 /* ---- composer ------------------------------------------------------------- */
 .composer {
-  position: fixed; z-index: 35; right: 20px; bottom: 0; width: min(680px, calc(100vw - 40px)); height: min(640px, calc(100dvh - 40px));
+  position: fixed; z-index: 35; right: 20px; bottom: 0; width: min(680px, calc(100vw / var(--ui-zoom, 1) - 40px)); height: min(640px, calc(100dvh / var(--ui-zoom, 1) - 40px));
   display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px 14px 0 0; box-shadow: var(--shadow-lg);
 }
@@ -402,7 +404,7 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .login-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
 .login-divider::before, .login-divider::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
 
-.mobile-only { display: none !important; }
+.mobile-only, .phone-only, .drawer-backdrop { display: none !important; }
 
 /* ---- responsive ------------------------------------------------------------ */
 @media (max-width: 1100px) {
@@ -412,12 +414,10 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 @media (min-width: 1101px) {
   .app:has(.sidebar.rail) { grid-template-columns: 60px minmax(320px, 400px) 1fr; }
 }
-@media (max-width: 860px) {
-  .app { grid-template-columns: 1fr; position: relative; }
-  .app:has(.sidebar.rail) { grid-template-columns: 1fr; }
+/* Phones, tablets and foldables (DreyMail): the folders are a drawer, not a column. */
+@media (max-width: 1024px) {
   .mobile-only { display: inline-grid !important; }
   .desktop-only { display: none !important; }
-  /* The collapsed rail is a desktop-only affordance; on phone the drawer always shows full labels. */
   .sidebar.rail { width: auto; }
   .sidebar.rail .name,
   .sidebar.rail .sidebar-footer .who { display: revert; }
@@ -430,6 +430,25 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   .sidebar.rail .nav-heading { justify-content: flex-start; padding: 4px 8px; }
   .sidebar.rail .nav-heading svg { display: revert; }
   .sidebar.rail .sidebar-footer { flex-direction: row; gap: 4px; padding: 8px; }
+}
+
+/* Tablets and unfolded foldables: message list on the left, the open message on the right; the
+   folder drawer slides in over them. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .app, .app:has(.sidebar.rail) { grid-template-columns: minmax(300px, 40%) 1fr; position: relative; }
+  .app .sidebar {
+    position: absolute; top: 0; bottom: 0; left: 0; z-index: 30; width: min(320px, 85%);
+    box-shadow: var(--shadow-lg); transform: translateX(-105%); transition: transform 0.2s ease; visibility: hidden;
+  }
+  .app[data-view='nav'] .sidebar { transform: none; visibility: visible; }
+  .app[data-view='nav'] .drawer-backdrop { display: block !important; position: absolute; inset: 0; z-index: 25; background: rgba(0, 0, 0, 0.35); }
+}
+
+/* Phones: one pane at a time. */
+@media (max-width: 640px) {
+  .app { grid-template-columns: 1fr; position: relative; }
+  .app:has(.sidebar.rail) { grid-template-columns: 1fr; }
+  .phone-only { display: inline-grid !important; }
   /* Hidden panes stay laid out (visibility, not display:none) so the list keeps its scroll
      position while a message is open. */
   .app .pane { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
@@ -451,6 +470,9 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   .msg-head:not(.open) .msg-to { white-space: nowrap; }
   .composer, .composer.maximized { inset: 0; width: auto; height: auto; border-radius: 0; }
   .grid2, .grid3 { grid-template-columns: 1fr; }
+}
+/* Touch screens: checkboxes always visible (no hover). */
+@media (pointer: coarse) {
   .row-check input { opacity: 1; }
 }
 
@@ -536,3 +558,20 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .fab:active { transform: scale(0.96); }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
 .textarea { height: auto; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 12px; resize: vertical; }
+
+/* A narrow message pane (tablets, foldables, small windows) gets the compact sender header too,
+   whatever the screen size: name only, tap it for the address and recipients. */
+.reader { container-type: inline-size; container-name: reader; }
+@container reader (max-width: 560px) {
+  .reader-body { padding: 14px; gap: 10px; }
+  .msg-from-toggle { cursor: pointer; }
+  .msg-head:not(.open) .msg-from { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg-head:not(.open) .addr,
+  .msg-head:not(.open) .msg-to:not(.has-account),
+  .msg-head:not(.open) .msg-to .acct-name { display: none; }
+  .msg-head:not(.open) .msg-to .acct-tag { padding: 0; border: 0; }
+  .msg-head:not(.open) .msg-to { white-space: nowrap; }
+  .msg-head { flex-wrap: wrap; row-gap: 2px; }
+  /* The date gets its own line under the sender, so the name isn't cut short. */
+  .msg-date { font-size: 12px; order: 3; flex-basis: 100%; padding-left: 52px; }
+}

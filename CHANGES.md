@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v2.0): tablets and foldables, interface size, your name, in-app Android updates
+
+- **Layouts:** three tiers (`web/src/styles.css`, `web/src/App.tsx`, `web/src/components/Reader.tsx`):
+  phones (≤ 640 px) one pane at a time; tablets and unfolded foldables (641–1024 px) message list
+  left, message right, folders in a slide-in drawer with a backdrop; desktops three columns. A
+  narrow message pane gets the compact sender header (container query).
+- **Interface size** per device (new `web/src/uiScale.ts`; `web/src/main.tsx`, Settings →
+  General): Automatic is 115 % in the Android app times the phone's font scale, 110 % on touch
+  phones, 100 % elsewhere; viewport-sized lengths are divided by `--ui-zoom`.
+- **Your name:** `users.display_name` (not overwritten by OIDC), `PUT /api/me/name` with
+  capitalisation of lower-case input, `Me.displayName`; shown bottom-left, falling back to the
+  login name with a capital letter (`server/src/db.ts`, `server/src/routes/api.ts`,
+  `shared/types.ts`, `web/src/App.tsx`, `web/src/api.ts`, `web/src/components/SettingsDialog.tsx`).
+  Tests: `server/test/name.test.ts`.
+- **Android:** in-app updates (download with Android's download manager, then the install screen;
+  asks for the install permission once), re-check when the app comes back after 6 hours; the
+  bridge reports the phone's font scale (`android/.../Updater.kt`, `MainActivity.kt`,
+  `AndroidManifest.xml`).
+
 ## 2026-11-13 (v1.9): first release with the Android app attached
 
 - The repository's Android signing secrets are set, so the Release workflow now builds and

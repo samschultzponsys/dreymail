@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
+// Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
@@ -213,7 +214,7 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
   return (
     <section className="pane reader">
       <div className="reader-toolbar">
-        <button className="icon-btn mobile-only" onClick={onBack} title="Back">
+        <button className="icon-btn phone-only" onClick={onBack} title="Back">
           <ArrowLeft size={18} />
         </button>
         {isDrafts ? (

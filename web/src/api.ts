@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: administration API calls.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
+// Modified by samschultzponsys, 2026-11-13: your name; interface size.
 
 import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
 
@@ -58,6 +59,7 @@ let freshUntil = 0;
 export const api = {
   me: () => request<Me>('GET', '/api/me'),
   savePreferences: (p: Preferences) => request<Preferences>('PUT', '/api/preferences', p),
+  saveName: (name: string) => request<{ name: string }>('PUT', '/api/me/name', { name }),
   logout: () => request<{ redirect: string }>('POST', '/auth/logout'),
   authMethods: () => request<AuthMethods>('GET', '/auth/methods'),
   passwordLogin: (username: string, password: string) => request<{ ok: true }>('POST', '/auth/password/login', { username, password }),

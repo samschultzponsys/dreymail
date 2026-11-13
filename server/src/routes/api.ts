@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: signature API (list, create, update, delete).
 // Modified by samschultzponsys, 2026-11-13: Me.admin.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: your name; interface size.
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -86,6 +87,12 @@ export const prefsSchema = z.object({
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),
 });
+
+/** Collapses spaces and, for all-lowercase input, capitalises each word. Mixed case is kept (McDonald). */
+export function capitalizeName(input: string): string {
+  const name = input.replace(/\s+/g, ' ').trim();
+  return name === name.toLowerCase() ? name.replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, ch: string) => sep + ch.toUpperCase()) : name;
+}
 
 export const signatureSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -203,13 +210,23 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     const u = req.user!;
     return {
       id: u.id,
-      name: u.name,
+      name: u.displayName || u.name,
+      displayName: u.displayName,
       email: u.email,
       preferences: u.preferences,
       hasPassword: u.hasPassword,
       accountDefaults: accountDefaultsFor(config.accountDefaults, templateValues(u)),
       admin: isAdmin(config, u),
     };
+  });
+
+  /** Settings → General → Your name. Lowercase input is capitalised ("sam schultz" → "Sam Schultz"). */
+  app.put('/api/me/name', async (req, reply) => {
+    const body = z.object({ name: z.string().max(100) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Name is too long' });
+    const name = capitalizeName(body.data.name);
+    store.setDisplayName(uid(req), name);
+    return { name };
   });
 
   const passwordChangeSchema = z.object({ current: z.string().max(1000), next: passwordSchema });

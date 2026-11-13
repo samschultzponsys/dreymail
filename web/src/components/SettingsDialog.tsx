@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: Android: change server.
+// Modified by samschultzponsys, 2026-11-13: your name; interface size.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -15,6 +16,7 @@ import { useEffect, useState } from 'react';
 import type { DomainName, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
 import { desktopBridge } from '../desktop';
+import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { androidBridge, androidInfo } from '../android';
@@ -99,6 +101,8 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
                   ))}
                 </div>
               </div>
+              <YourName />
+              <InterfaceSize />
               <div>
                 <label className="label">Messages per page</label>
                 <select className="select" value={v.pageSize} onChange={(e) => void save({ ...v, pageSize: Number(e.target.value) })}>
@@ -483,3 +487,76 @@ function AndroidNotifications() {
     </div>
   );
 }
+
+/** Interface size for this device only. */
+function InterfaceSize() {
+  const [scale, setScale] = useState<UiScale>(savedUiScale);
+  return (
+    <div>
+      <label className="label" htmlFor="ui-scale">
+        Interface size
+      </label>
+      <select
+        id="ui-scale"
+        className="select"
+        value={String(scale)}
+        onChange={(e) => {
+          const next: UiScale = e.target.value === 'auto' ? 'auto' : Number(e.target.value);
+          setScale(next);
+          saveUiScale(next);
+        }}
+      >
+        {UI_SCALES.map((o) => (
+          <option key={String(o.value)} value={String(o.value)}>
+            {o.label}
+            {o.value === 'auto' ? ` (${Math.round(effectiveUiScale('auto') * 100)}%)` : ''}
+          </option>
+        ))}
+      </select>
+      <div className="hint">For this device only. Automatic is larger in the Android app and follows your phone’s font size.</div>
+    </div>
+  );
+}
+
+/** Settings → General → Your name: shown at the bottom left (and to administrators). */
+function YourName() {
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ['me'], queryFn: api.me, staleTime: Infinity });
+  const [value, setValue] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const current = value ?? me.data?.displayName ?? '';
+  const save = async () => {
+    if (value === null || value === (me.data?.displayName ?? '')) return;
+    try {
+      const { name } = await api.saveName(value);
+      setValue(name);
+      setStatus('Saved');
+      await qc.invalidateQueries({ queryKey: ['me'] });
+    } catch (err) {
+      setStatus((err as Error).message);
+    }
+  };
+  return (
+    <div>
+      <label className="label" htmlFor="your-name">
+        Your name
+      </label>
+      <input
+        id="your-name"
+        className="input"
+        style={{ maxWidth: 340 }}
+        value={current}
+        maxLength={100}
+        placeholder="First name, or first and last"
+        onChange={(e) => {
+          setValue(e.target.value);
+          setStatus(null);
+        }}
+        onBlur={() => void save()}
+        onKeyDown={(e) => e.key === 'Enter' && void save()}
+      />
+      <div className="hint">{status ?? 'Shown at the bottom left. Typed in lower case, it is capitalised for you.'}</div>
+    </div>
+  );
+}
+

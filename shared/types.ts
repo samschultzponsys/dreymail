@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: Signature types.
 // Modified by samschultzponsys, 2026-11-13: notify event for the desktop app.
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
+// Modified by samschultzponsys, 2026-11-13: your name; interface size.
 
 // Types shared between the server API and the web client.
 
@@ -282,7 +283,10 @@ export interface PushSubscriptionInput {
 
 export interface Me {
   id: string;
+  /** What to call the user: their chosen name, else the provider's name (DreyMail). */
   name: string;
+  /** The name they set in Settings → General ('' if none). */
+  displayName: string;
   email: string;
   preferences: Preferences;
   /** Signs in with a username and password, so can change it in Settings. */

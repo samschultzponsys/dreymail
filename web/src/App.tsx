@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-13: phone Compose button.
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
+// Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +37,13 @@ import { removesFromList, swipeToAction, type Direction, type UndoStep } from '.
 import { formatSnoozeTime } from './snooze';
 import { planRun, runFor, runSpeed, type PaneView } from './squirrel';
 import { refKey, toRef } from './util';
+
+/** Bottom-left name: the user's chosen name, else their login name with a capital first letter. */
+export function userLabel(me: { name: string; displayName: string; email: string }): string {
+  if (me.displayName) return me.displayName;
+  const n = me.name || me.email;
+  return n ? n.charAt(0).toUpperCase() + n.slice(1) : '';
+}
 
 export function App() {
   const qc = useQueryClient();
@@ -105,7 +113,7 @@ export function App() {
     shownView.current = view;
     const kind = runFor(from, view);
     if (!kind) return;
-    const speed = runSpeed(transitionPref, matchMedia('(max-width: 860px)').matches, matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const speed = runSpeed(transitionPref, matchMedia('(max-width: 640px)').matches, matchMedia('(prefers-reduced-motion: reduce)').matches);
     setRun(speed ? { id: ++runId.current, plan: planRun(kind, window.innerWidth, window.innerHeight, speed), from, to: view } : null);
   }, [view, transitionPref]);
   // While running back to the folder, the message stays up underneath rather than the empty reader.
@@ -501,6 +509,8 @@ export function App() {
 
   return (
     <div className="app" data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
+      {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
+      <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
         accounts={accounts}
         showUnified={unifiedInbox}
@@ -518,7 +528,7 @@ export function App() {
         onAccounts={() => openOverlay('accounts')}
         onSettings={() => openOverlay('settings')}
         onLogout={() => void logout()}
-        userLabel={me.data!.name || me.data!.email}
+        userLabel={userLabel(me.data!)}
         onCloseNav={() => closeOverlay('nav')}
       />
       <MessageList

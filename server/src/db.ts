@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-13: rekeyFrom for the one-time data upgrade.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
+// Modified by samschultzponsys, 2026-11-13: your name; interface size.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -133,6 +134,12 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS fcm_tokens_user ON fcm_tokens(user_id);`,
+  // DreyMail: the name a user chose for themselves (Settings → General). Kept apart from `name`,
+  // which an OIDC provider overwrites at every sign-in.
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'display_name')) db.exec("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT '';");
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -163,6 +170,8 @@ export interface User {
   hasPassword: boolean;
   /** Administrator (DreyMail): manages users and sign-in settings. */
   admin: boolean;
+  /** The name the user chose (DreyMail); empty to use `name`. */
+  displayName: string;
   createdAt: number;
 }
 
@@ -286,7 +295,19 @@ export class Store {
 
   getUser(id: string): User | null {
     const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(id) as
-      | { id: string; issuer: string; subject: string; email: string; name: string; username: string; preferences: string; password_hash: string | null; is_admin: number; created_at: number }
+      | {
+          id: string;
+          issuer: string;
+          subject: string;
+          email: string;
+          name: string;
+          username: string;
+          preferences: string;
+          password_hash: string | null;
+          is_admin: number;
+          created_at: number;
+          display_name: string;
+        }
       | undefined;
     if (!row) return null;
     let prefs: Partial<Preferences> = {};
@@ -306,7 +327,12 @@ export class Store {
       hasPassword: row.password_hash !== null,
       admin: row.is_admin === 1,
       createdAt: row.created_at,
+      displayName: row.display_name ?? '',
     };
+  }
+
+  setDisplayName(userId: string, name: string) {
+    this.db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, userId);
   }
 
   // ---- administration (DreyMail) -------------------------------------------
