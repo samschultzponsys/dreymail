@@ -1,0 +1,57 @@
+# DreyMail. Copyright (C) 2026 samschultzponsys.
+# Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+#
+# Desktop builds. CI passes the release version in the file names (DreyMail-1.7-x86_64.rpm, ...)
+# with --config.artifactName; see .github/workflows/release.yml.
+appId: io.github.samschultzponsys.dreymail
+productName: DreyMail
+copyright: Copyright (C) 2026 samschultzponsys. Based on Ratatoskr by Magnus Pihl. AGPL-3.0-only.
+# Releases are uploaded by the Release workflow, not by electron-builder.
+publish: []
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.cjs
+  - preload.cjs
+  - update.cjs
+  - setup.html
+  - build/icon.png
+extraResources:
+  - from: ../LICENSE
+    to: LICENSE
+  - from: ../NOTICE
+    to: NOTICE
+linux:
+  category: Network;Email
+  icon: build/icon.png
+  executableName: dreymail
+  synopsis: DreyMail desktop app
+  maintainer: samschultzponsys
+  target: [deb, rpm, flatpak]
+  desktop:
+    entry:
+      StartupWMClass: DreyMail
+deb:
+  packageName: dreymail
+rpm:
+  packageName: dreymail
+flatpak:
+  runtimeVersion: '24.08'
+  baseVersion: '24.08'
+  finishArgs:
+    - --share=network
+    - --share=ipc
+    - --socket=x11
+    - --socket=wayland
+    - --device=dri
+    - --talk-name=org.freedesktop.Notifications
+    - --talk-name=org.kde.StatusNotifierWatcher
+win:
+  icon: build/icon.png
+  target: [nsis]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: DreyMail

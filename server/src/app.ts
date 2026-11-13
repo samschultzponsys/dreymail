@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: sign-in settings service and administration routes.
 // Modified by samschultzponsys, 2026-11-13: dreymail.db and the one-time data upgrade.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: new-mail notifications also go to open sessions (desktop app).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,6 +31,8 @@ import { registerApiRoutes } from './routes/api.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { LoginSettings } from './loginSettings.js';
 import { DB_FILE, moveOldDataFiles, rekeyOldSecrets } from './upgrade.js';
+import { buildNotification, buildSnoozeNotification, type NotificationPayload } from './push/notify.js';
+import type { NotificationContent } from '../../shared/types.js';
 import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
 
@@ -147,18 +150,35 @@ export async function buildApp(
       }),
     log: (msg, extra) => app.log.warn(extra ?? {}, msg),
   });
+  /** The same notification Web Push gets, to open sessions (shown by the desktop app). */
+  const liveNotify = (
+    userId: string,
+    accountId: string,
+    build: (account: { id: string; name: string }, content: NotificationContent) => NotificationPayload | null,
+  ) => {
+    const user = store.getUser(userId);
+    const account = store.listAccounts(userId).find((a) => a.id === accountId);
+    const n = user && account ? build(account, user.preferences.notificationContent) : null;
+    if (n) pool.onEvent(userId, { type: 'notify', accountId, title: n.title, body: n.body, tag: n.tag, url: n.url });
+  };
   const snooze = new SnoozeService({
     store,
     mail,
     maxMessageBytes: config.maxMessageBytes,
-    notify: (userId, accountId, messages) => push.notifySnoozeEnded(userId, accountId, messages),
+    notify: (userId, accountId, messages) => {
+      liveNotify(userId, accountId, (account, content) => buildSnoozeNotification(account, messages, content));
+      return push.notifySnoozeEnded(userId, accountId, messages);
+    },
     emit: (userId, event) => pool.onEvent(userId, event),
     log: (msg, extra) => app.log.warn(extra ?? {}, msg),
   });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
     const fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));
-    if (fresh.length > 0) void push.notifyNewMail(userId, accountId, fresh);
+    if (fresh.length > 0) {
+      liveNotify(userId, accountId, (account, content) => buildNotification(account, fresh, content));
+      void push.notifyNewMail(userId, accountId, fresh);
+    }
   };
   // Mail read (or moved away) elsewhere: close its notifications on the user's devices.
   pool.onInboxChanged = (userId, accountId) => push.inboxChanged(userId, accountId);

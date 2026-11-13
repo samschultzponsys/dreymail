@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: the whole UI takes on the open account's colour.
 // Modified by samschultzponsys, 2026-11-13: passes admin to Settings.
 // Modified by samschultzponsys, 2026-11-13: phone Compose button.
+// Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,8 @@ import type { MessageAction, MessageDetail, MessageRef, MessageSummary } from '.
 import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
-import { accountPalette, ACCOUNT_PALETTE_VARS } from './accountTheme';
+import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme';
+import { accountIcon, desktopBridge } from './desktop';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
@@ -21,7 +23,7 @@ import { quotableDetail, Reader, replyTarget, type ReplyKind } from './component
 import { SettingsDialog } from './components/SettingsDialog';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
-import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useTheme, useToasts, type SnoozeEndedEvent } from './hooks';
+import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
 import { PENDING_MAILTO_KEY, parseMailto } from './mailto';
 import { blankComposer, composerFor, composerForMailto } from './replies';
 import { useRouter, type Location } from './router';
@@ -38,7 +40,8 @@ export function App() {
   const me = useMe();
   const loggedIn = !!me.data;
   const theme = useTheme(me.data?.preferences.theme);
-  const accountsQ = useAccounts();
+  // Only once signed in: asked earlier it fails with 401 and wouldn't be asked again after login.
+  const accountsQ = useAccounts(loggedIn);
   const accounts = useMemo(() => (loggedIn ? (accountsQ.data ?? []) : []), [accountsQ.data, loggedIn]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const folders = useFolders(loggedIn && accounts.length > 0);
@@ -178,7 +181,26 @@ export function App() {
     },
     [push, go],
   );
-  useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded);
+  // Desktop app: new mail as a native notification in the account's colour, while the window
+  // isn't in front (browsers get Web Push instead).
+  const onNotify = useCallback(
+    (ev: NotifyEvent) => {
+      const bridge = desktopBridge();
+      if (!bridge || (document.visibilityState === 'visible' && document.hasFocus())) return;
+      const color = accountMap.get(ev.accountId)?.color ?? BRAND_CYAN;
+      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(color) });
+    },
+    [accountMap],
+  );
+  useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify);
+  useEffect(() => {
+    desktopBridge()?.onOpen((url) => {
+      const target = notificationTarget(url, window.location.origin);
+      if (!target) return;
+      const u = new URL(target, window.location.origin);
+      go(parseLocation(u.pathname, u.search));
+    });
+  }, [go]);
 
   // Notifications: register the service worker, keep this device's subscription current, and
   // follow taps on a notification while the app is already open.

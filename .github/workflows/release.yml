@@ -2,6 +2,7 @@
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: release on push to main when package.json carries a new
 # MAJOR.MINOR version; image goes to ghcr.io/samschultzponsys/dreymail; every release gets a GitHub Release.
+# Modified by samschultzponsys, 2026-11-13: desktop apps (deb, rpm, flatpak, Windows installer) built and attached to each release.
 name: Release
 
 # Every push to main runs the tests. When package.json carries a version that has no tag yet
@@ -33,6 +34,9 @@ jobs:
     permissions:
       contents: write
       packages: write
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      publish: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,3 +103,71 @@ jobs:
           --title "DreyMail v$VERSION"
           --generate-notes
           --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\` (also \`latest\`). See CHANGES.md for the dated change log."
+
+  # ---- desktop apps, attached to the GitHub Release just created ------------------------------
+  # File names carry the version: DreyMail-1.7-amd64.deb, DreyMail-1.7-x86_64.rpm,
+  # DreyMail-1.7-x86_64.flatpak, DreyMail-Setup-1.7-x64.exe. Release assets are free on GitHub.
+  desktop-linux:
+    needs: release
+    if: needs.release.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Use the release version
+        run: npm version "$(node -p "require('../package.json').version")" --no-git-tag-version --allow-same-version
+      - run: npm ci
+      - name: Build deb and rpm
+        run: |
+          sudo apt-get update && sudo apt-get install -y rpm
+          npx electron-builder --linux deb rpm --x64 --publish never "--config.artifactName=DreyMail-${VERSION}-\${arch}.\${ext}"
+      - name: Build flatpak
+        # Needs Flathub; a hiccup there must not hold back the other packages.
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          npx electron-builder --linux flatpak --x64 --publish never "--config.artifactName=DreyMail-${VERSION}-\${arch}.\${ext}"
+      - name: Attach to the release
+        run: gh release upload "v$VERSION" dist/*.deb dist/*.rpm $(ls dist/*.flatpak 2>/dev/null) --clobber --repo "$GITHUB_REPOSITORY"
+
+  desktop-windows:
+    needs: release
+    if: needs.release.outputs.publish == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Use the release version
+        run: npm version "$(node -p "require('../package.json').version")" --no-git-tag-version --allow-same-version
+      - run: npm ci
+      - name: Build the installer
+        run: npx electron-builder --win nsis --x64 --publish never "--config.nsis.artifactName=DreyMail-Setup-${VERSION}-\${arch}.\${ext}"
+      - name: Attach to the release
+        run: gh release upload "v$VERSION" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
+

@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
+// Modified by samschultzponsys, 2026-11-13: refetch everything after signing in (accounts stayed empty until a reload).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -26,7 +27,8 @@ export function Login() {
     setError(null);
     try {
       await (registering ? api.register(username, password) : api.passwordLogin(username, password));
-      await qc.invalidateQueries({ queryKey: ['me'] });
+      // Everything asked before signing in failed with 401: ask again now.
+      await qc.invalidateQueries();
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

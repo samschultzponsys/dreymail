@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: desktop-app sessions ask for new-mail notifications.
 
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
@@ -49,7 +50,9 @@ export function isWsOriginAllowed(
 export function parseClientEvent(data: unknown): ClientEvent | null {
   try {
     const ev = JSON.parse(String(data)) as Partial<ClientEvent>;
-    if (ev?.type === 'presence' && typeof ev.active === 'boolean') return { type: 'presence', active: ev.active };
+    if (ev?.type === 'presence' && typeof ev.active === 'boolean') {
+      return ev.notifications === true ? { type: 'presence', active: ev.active, notifications: true } : { type: 'presence', active: ev.active };
+    }
   } catch {
     /* not JSON */
   }
@@ -76,6 +79,7 @@ export async function registerWebSocket(
 ): Promise<LiveSessions> {
   const sockets = new Map<string, Set<WebSocket>>();
   const active = new WeakSet<WebSocket>();
+  const notifying = new WeakSet<WebSocket>();
 
   pool.onEvent = (userId: string, event: ServerEvent) => {
     const payload = JSON.stringify(event);
@@ -105,12 +109,18 @@ export async function registerWebSocket(
       clearInterval(ping);
       set.delete(socket);
       if (set.size === 0) sockets.delete(user.id);
+      if (notifying.delete(socket)) pool.setLiveNotify(user.id, false);
       pool.unwatch(user.id);
     });
     socket.on('message', (data) => {
       const ev = parseClientEvent(data);
       if (ev?.active) active.add(socket);
       else if (ev) active.delete(socket);
+      // Desktop app: report new mail to it, once per socket.
+      if (ev?.notifications && !notifying.has(socket)) {
+        notifying.add(socket);
+        pool.setLiveNotify(user.id, true);
+      }
     });
   });
 

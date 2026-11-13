@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference (All inboxes on/off).
 // Modified by samschultzponsys, 2026-11-13: Signature types.
+// Modified by samschultzponsys, 2026-11-13: notify event for the desktop app.
 
 // Types shared between the server API and the web client.
 
@@ -350,10 +351,20 @@ export type ServerEvent =
   | { type: 'reset'; accountId: string; folder: string }
   /** A snoozed message is back in the inbox (uid is null if the server couldn't tell). */
   | { type: 'snoozeEnded'; accountId: string; uidValidity: string; uid: number | null; from: string; subject: string }
+  /**
+   * A notification about new (or woken) mail, for the DreyMail desktop app, which shows it as a
+   * native notification in the account's colour. Browsers use Web Push instead and ignore this.
+   */
+  | { type: 'notify'; accountId: string; title: string; body: string; tag: string; url: string }
   | { type: 'hello' };
 
 /**
  * Sent by the browser over the WebSocket: whether the app is in front of the user right now
  * (visible and focused). Phone notifications are skipped while any session is active.
  */
-export type ClientEvent = { type: 'presence'; active: boolean };
+export type ClientEvent = {
+  type: 'presence';
+  active: boolean;
+  /** DreyMail desktop app: this session shows its own notifications for new mail. */
+  notifications?: boolean;
+};

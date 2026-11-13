@@ -13,6 +13,30 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.7): desktop apps for Linux and Windows
+
+- **Desktop app** (new `desktop/`: Electron shell `main.cjs`, `preload.cjs`, first-run
+  `setup.html`, packaging `electron-builder.yml`): DreyMail in its own window, tray icon (closing
+  keeps it running), menu (change server, check for updates, source code, about). Only the
+  server's pages may use the bridge; links in mail open in the browser.
+- **Colour-coded notifications:** the server now also sends each new-mail and snooze-ended
+  notification to open sessions (`notify` event; `server/src/app.ts`, `shared/types.ts`). Desktop
+  sessions ask for new-mail checks even without Web Push (`ImapPool.setLiveNotify` in
+  `server/src/imap/pool.ts`, `server/src/routes/ws.ts`). The web app shows them through the
+  desktop bridge with the envelope drawn in the account colour (new `web/src/desktop.ts`;
+  `web/src/App.tsx`, `web/src/hooks.ts`).
+- **Updater** (`desktop/update.cjs`, tested in `web/test/desktopUpdate.test.ts`): checks the latest
+  GitHub release on every start and on demand; detects flatpak / deb / rpm / Windows installs
+  and gives the exact upgrade (command copied, download opened; Windows downloads and runs the
+  installer). Settings → General shows the desktop version with "Check for updates".
+- **Builds:** the Release workflow builds `DreyMail-X.Y-amd64.deb`, `DreyMail-X.Y-x86_64.rpm`,
+  `DreyMail-X.Y-x86_64.flatpak` and `DreyMail-Setup-X.Y-x64.exe` and attaches them to the GitHub
+  Release (`.github/workflows/release.yml`). The Docker image leaves `desktop/` out
+  (`.dockerignore`).
+- **Fix (upstream bug):** after signing in, the account list could stay empty until a reload; it
+  was asked for before sign-in and not again after (`web/src/components/Login.tsx`,
+  `web/src/App.tsx`, `web/src/hooks.ts`).
+
 ## 2026-11-13 (v1.6): spacing and element clean-up
 
 From a screenshot pass on desktop and phone, light and dark:

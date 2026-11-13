@@ -1,17 +1,20 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: useSignatures.
+// Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
+// Modified by samschultzponsys, 2026-11-13: useAccounts can wait for sign-in.
 
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientEvent, MessageAction, MessageRef, MessageSummary, Preferences, ServerEvent } from '../../shared/types';
 import { api, type MailboxSel } from './api';
+import { desktopBridge } from './desktop';
 import { actionsPending, fetchMessageList, runMessageAction, updateMessageLists, type ActionOutcome } from './messageActions';
 import { closeNotifications } from './push';
 import { applyThemeColor } from './themeColor';
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: api.me, retry: false, staleTime: Infinity });
-export const useAccounts = () => useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: 60_000 });
+export const useAccounts = (enabled = true) => useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: 60_000, enabled });
 export const useSignatures = (enabled = true) => useQuery({ queryKey: ['signatures'], queryFn: api.signatures, staleTime: 60_000, enabled });
 export const useFolders = (enabled: boolean) =>
   useQuery({ queryKey: ['folders'], queryFn: api.folders, enabled, staleTime: 30_000, refetchInterval: 120_000 });
@@ -57,11 +60,15 @@ const isActive = () => document.visibilityState === 'visible' && document.hasFoc
 export type SnoozeEndedEvent = Extract<ServerEvent, { type: 'snoozeEnded' }>;
 
 /** One WebSocket per browser session; reconnects with backoff. Reports presence to the server. */
-export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEndedEvent) => void) {
+export type NotifyEvent = Extract<ServerEvent, { type: 'notify' }>;
+
+export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEndedEvent) => void, onNotify?: (ev: NotifyEvent) => void) {
   const qc = useQueryClient();
   const timer = useRef<number | null>(null);
   const snoozeEnded = useRef(onSnoozeEnded);
   snoozeEnded.current = onSnoozeEnded;
+  const notify = useRef(onNotify);
+  notify.current = onNotify;
   useEffect(() => {
     if (!enabled) return;
     let ws: WebSocket | null = null;
@@ -78,7 +85,9 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
       }, 400);
     };
     const sendPresence = () => {
-      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'presence', active: isActive() } satisfies ClientEvent));
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'presence', active: isActive(), ...(desktopBridge() ? { notifications: true } : {}) } satisfies ClientEvent));
+      }
     };
     const presenceEvents = ['visibilitychange', 'focus', 'blur'] as const;
     for (const ev of presenceEvents) window.addEventListener(ev, sendPresence);
@@ -93,6 +102,7 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
         if (ev.type === 'reset') void qc.resetQueries({ queryKey: ['messages'] });
         else if (ev.type === 'mailbox') refresh();
         else if (ev.type === 'snoozeEnded') snoozeEnded.current?.(ev);
+        else if (ev.type === 'notify') notify.current?.(ev);
       };
       ws.onclose = (e) => {
         if (stopped || e.code === 4401) return;

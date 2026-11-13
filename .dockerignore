@@ -1,3 +1,5 @@
+# dreymail .dockerignore. Copyright (C) 2026 samschultzponsys; part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr). AGPL-3.0-only, see LICENSE and NOTICE.
+# Modified by samschultzponsys, 2026-11-13: leave the desktop app out of the image.
 node_modules
 dist
 data
@@ -9,3 +11,4 @@ coverage
 *.db
 *.sqlite*
 server/test
+desktop

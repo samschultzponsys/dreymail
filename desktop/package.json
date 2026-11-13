@@ -1,0 +1,19 @@
+{
+  "name": "dreymail-desktop",
+  "productName": "DreyMail",
+  "version": "1.7.0",
+  "description": "DreyMail desktop app: your self-hosted DreyMail in its own window, with native notifications.",
+  "homepage": "https://github.com/samschultzponsys/dreymail",
+  "author": "samschultzponsys",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0"
+  }
+}

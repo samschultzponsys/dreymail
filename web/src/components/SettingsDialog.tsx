@@ -5,12 +5,14 @@
 // Modified by samschultzponsys, 2026-11-13: tabs (General, Signatures, Notifications, Images, Password).
 // Modified by samschultzponsys, 2026-11-13: Users and Sign-in tabs for administrators.
 // Modified by samschultzponsys, 2026-11-13: label capitalization.
+// Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { DomainName, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
+import { desktopBridge } from '../desktop';
 import { SignaturesSettings } from './SignaturesSettings';
 import { SignInAdmin, UsersAdmin } from './AdminSettings';
 import { handlerTemplate } from '../mailto';
@@ -155,6 +157,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
                 <div className="hint">On phones, the squirrel runs across the screen when you open the menu or a message.</div>
               </div>
               <EmailLinks />
+              <DesktopApp />
             </>
           )}
           {tab === 'signatures' && <SignaturesSettings />}
@@ -416,6 +419,26 @@ function Notifications({ prefs, save }: { prefs: Preferences; save: (p: Preferen
       </div>
       {info && <div className="hint">{info}</div>}
       {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/** Settings → General, in the DreyMail desktop app only: its version and an update check. */
+function DesktopApp() {
+  const bridge = desktopBridge();
+  if (!bridge) return null;
+  return (
+    <div>
+      <label className="label">Desktop app</label>
+      <div className="row-buttons">
+        <span>
+          DreyMail {bridge.version} <span className="muted">({bridge.installKind})</span>
+        </span>
+        <button className="btn" onClick={() => bridge.checkForUpdates()}>
+          Check for updates
+        </button>
+      </div>
+      <div className="hint">Updates are also checked every time the app starts.</div>
     </div>
   );
 }

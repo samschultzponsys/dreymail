@@ -5,7 +5,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs).
      Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings).
      Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes).
-     Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up). -->
+     Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up).
+     Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -29,10 +30,10 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.6**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.7**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
-inboxes", signatures per account or shared, and administration (users, OIDC sign-in) in the app. Settings
-are organised in tabs. What's planned is in
+inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
+apps for Linux (flatpak, deb, rpm) and Windows with colour-coded notifications and an updater. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -170,6 +171,31 @@ the data directory on start (it `chown`s it when anything in it belongs to someo
 (e.g. `002`) sets the permissions of the files it creates. Starting the container with `--user`
 (`user:` in Compose) also works; then it runs as that user, ignores `PUID`/`PGID` and changes no
 ownership.
+
+## Desktop apps (Linux and Windows)
+
+Every release has desktop apps attached, with the version in the file name:
+
+| File | For | Install |
+| --- | --- | --- |
+| `DreyMail-1.7-x86_64.flatpak` | any Linux with Flatpak | `flatpak install --user ./DreyMail-1.7-x86_64.flatpak` |
+| `DreyMail-1.7-amd64.deb` | Debian, Ubuntu, Mint | `sudo apt install ./DreyMail-1.7-amd64.deb` |
+| `DreyMail-1.7-x86_64.rpm` | Fedora, openSUSE | `sudo dnf install ./DreyMail-1.7-x86_64.rpm` |
+| `DreyMail-Setup-1.7-x64.exe` | Windows 10/11 | run it (it isn't code-signed yet, so Windows SmartScreen asks: *More info → Run anyway*) |
+
+The app asks for your DreyMail server's address once (change it later under *DreyMail → Change
+server…*) and then shows DreyMail in its own window:
+
+- **Notifications in each account's colour.** New mail pops up as a native notification whose
+  icon is the envelope in that account's colour, so you see at a glance which inbox it's for.
+  Click it to open the message. Closing the window keeps DreyMail running in the tray, so
+  notifications keep coming; *Quit* from the tray or menu stops it.
+- **Updates.** The app checks for a newer release every time it starts, and on demand (*DreyMail →
+  Check for updates…*, the tray menu, or Settings → General). It knows how it was installed and
+  shows the exact upgrade for that: the flatpak, apt or dnf command (copied to your clipboard,
+  with the download opened), or on Windows it downloads the new installer and runs it.
+- Links in mail open in your normal browser; the window only shows your DreyMail server and its
+  sign-in. *Help → Source code* links to this repository.
 
 ## Upgrading to 1.5 (new names)
 

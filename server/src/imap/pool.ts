@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: new mail is also reported for open desktop-app sessions.
+
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
 import type { AccountSecret, Store } from '../db.js';
@@ -48,6 +52,8 @@ export class ImapPool {
   private readonly watchers = new Map<string, Map<string, Watcher>>();
   private readonly watchRefs = new Map<string, number>();
   private readonly background = new Set<string>();
+  /** Open sessions that show their own notifications (the desktop app), per user. */
+  private readonly liveNotify = new Map<string, number>();
   private readonly sweeper: NodeJS.Timeout;
   onEvent: (userId: string, event: ServerEvent) => void = () => {};
   onNewMail: (userId: string, accountId: string, messages: NewMail[]) => void = () => {};
@@ -222,6 +228,27 @@ export class ImapPool {
     }
   }
 
+  /** Report new mail (onNewMail) for this user: notifications on a device, or a desktop app open. */
+  private wantsNewMail(userId: string): boolean {
+    return this.background.has(userId) || (this.liveNotify.get(userId) ?? 0) > 0;
+  }
+
+  /**
+   * A live session that shows its own notifications (the desktop app) opened or closed. Reference
+   * counted. While any is open, new mail is reported even without Web Push.
+   */
+  setLiveNotify(userId: string, on: boolean) {
+    const before = this.liveNotify.get(userId) ?? 0;
+    const after = Math.max(0, before + (on ? 1 : -1));
+    if (after) this.liveNotify.set(userId, after);
+    else this.liveNotify.delete(userId);
+    if (before === 0 && after > 0 && !this.background.has(userId)) {
+      // Start from now: don't report mail that arrived while nothing was listening.
+      this.store.clearInboxState(userId);
+      for (const [accountId, w] of this.watchers.get(userId) ?? []) if (w.client?.usable) this.checkNewMail(userId, accountId, w, w.client);
+    }
+  }
+
   /** True while the account's INBOX watcher is connected (so every change there is reported). */
   isWatching(userId: string, accountId: string): boolean {
     const w = this.watchers.get(userId)?.get(accountId);
@@ -291,7 +318,7 @@ export class ImapPool {
       w.uidValidity = uv;
       w.backoffMs = 5_000;
       // Also reports mail that arrived while disconnected (or while the server was down).
-      if (this.background.has(userId)) this.checkNewMail(userId, accountId, w, client);
+      if (this.wantsNewMail(userId)) this.checkNewMail(userId, accountId, w, client);
       this.onWatching(userId, accountId);
       const changed = () => {
         emit({ type: 'mailbox', accountId, folder });
@@ -299,7 +326,7 @@ export class ImapPool {
       };
       client.on('exists', () => {
         changed();
-        if (this.background.has(userId)) this.checkNewMail(userId, accountId, w, client);
+        if (this.wantsNewMail(userId)) this.checkNewMail(userId, accountId, w, client);
       });
       const inboxChanged = () => {
         changed();
@@ -327,7 +354,7 @@ export class ImapPool {
    */
   private checkNewMail(userId: string, accountId: string, w: Watcher, client: ImapFlow) {
     w.checking = w.checking.then(async () => {
-      if (w.stopped || w.client !== client || !this.background.has(userId)) return;
+      if (w.stopped || w.client !== client || !this.wantsNewMail(userId)) return;
       const mailbox = client.mailbox;
       if (!mailbox || mailbox.path !== 'INBOX') return;
       const uidValidity = mailbox.uidValidity.toString();
