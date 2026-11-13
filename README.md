@@ -1,6 +1,7 @@
 <!-- Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
-     Modified by samschultzponsys, 2026-11-13: rewritten for dreymail (credits, quick start, releasing); upstream docs kept and rebranded. -->
-<p align="center"><img src="branding/dreymail-icon.svg" alt="" width="128" height="128"></p>
+     Modified by samschultzponsys, 2026-11-13: rewritten for dreymail (credits, quick start, releasing); upstream docs kept and rebranded.
+     Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent). -->
+<p align="center"><img src="branding/dreymail-icon.svg" alt="dreymail icon" width="128" height="128"></p>
 
 # dreymail
 
@@ -23,7 +24,8 @@ author. dreymail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.0**, a rebrand of upstream with unchanged behaviour. What's planned is in
+Current version: **1.1**. It's upstream's feature set with dreymail's own look: a cyan envelope in
+an indigo drey as the icon, and cyan as the accent colour. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does

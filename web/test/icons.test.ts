@@ -1,3 +1,7 @@
+// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: tests for dreymail's cyan nest icon and cyan accent instead of the squirrel.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -84,50 +88,52 @@ describe('app icons', () => {
     expect(opaque).toBeGreaterThan(500);
   });
 
-  it('the icons draw the squirrel in the app accent orange on its pale accent tint, against a dark trunk', () => {
+  it('the icons draw the cyan envelope (the app accent) in an indigo nest on night navy', () => {
     const css = fs.readFileSync(path.resolve(import.meta.dirname, '../src/styles.css'), 'utf8');
     const token = (name: string) => css.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1]!;
-    for (const file of ['favicon.svg', '../icons-src/icon.svg', '../icons-src/full-bleed.svg']) {
+    for (const file of ['brand-night.svg', '../icons-src/icon.svg', '../icons-src/full-bleed.svg']) {
       const svg = read(file).toString('utf8');
-      expect(svg).toMatch(new RegExp(`<path d="[^"]+" fill="${token('accent-fill')}"/>`));
-      expect(svg).toContain(`fill="${token('accent-soft')}"`);
-      expect(svg).toContain('fill="#3a1d10"');
+      expect(svg).toContain(`<rect x="262" y="250" width="500" height="350" rx="35" fill="${token('accent-fill')}"/>`);
+      expect(svg).toContain('fill="#141b34"');
+      expect(svg).toContain('fill="#3b47a8"');
     }
   });
 
-  it('the maskable icon shows the orange squirrel, the dark trunk and the pale background', () => {
+  it('the maskable icon shows the navy background, the cyan envelope and the indigo nest', () => {
     const { width, px } = decodePng(read('icons/icon-maskable-512.png'));
     const rgb = (x: number, y: number) => [...px.subarray((y * width + x) * 4, (y * width + x) * 4 + 3)];
-    expect(rgb(60, 256)).toEqual([0x3a, 0x1d, 0x10]);
-    expect(rgb(480, 256)).toEqual([0xfd, 0xee, 0xe6]);
-    expect(rgb(260, 300)).toEqual([0xc2, 0x41, 0x0c]);
+    expect(rgb(10, 10)).toEqual([0x14, 0x1b, 0x34]);
+    expect(rgb(256, 170)).toEqual([0x22, 0xd3, 0xee]);
+    expect(rgb(200, 300)).toEqual([0x3b, 0x47, 0xa8]);
   });
 
-  it('no light seam shows where the trunk meets the icon border', () => {
-    const { width, px } = decodePng(read('icons/icon-512.png'));
-    const at = (x: number, y: number) => [...px.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)];
-    // Down the trunk column from the top edge, and across the trunk at the bottom: every opaque pixel is bark.
-    const probes = [...Array.from({ length: 120 }, (_, y) => [120, y]), ...Array.from({ length: 120 }, (_, i) => [120, 511 - i])];
-    for (const [x, y] of probes) {
-      const [r, g, b, a] = at(x!, y!);
-      if (a === 255) expect([r, g, b]).toEqual([0x3a, 0x1d, 0x10]);
-    }
+  it('the "any" icon is a rounded tile: transparent corners, opaque navy inside', () => {
+    const { width, px, alpha } = decodePng(read('icons/icon-512.png'));
+    expect(alpha(0, 0)).toBe(0);
+    expect(alpha(511, 511)).toBe(0);
+    expect([...px.subarray((256 * width + 20) * 4, (256 * width + 20) * 4 + 4)]).toEqual([0x14, 0x1b, 0x34, 255]);
   });
 
-  it('the animated squirrel and the Compose button use the icon orange in both light and dark themes', () => {
+  it('the animated squirrel and the Compose button use the icon cyan, with navy labels, in both themes', () => {
     const css = fs.readFileSync(path.resolve(import.meta.dirname, '../src/styles.css'), 'utf8');
-    const dark = css.slice(css.indexOf("[data-theme='dark']"), css.indexOf('}', css.indexOf("[data-theme='dark']")));
-    expect(css.match(/--accent-fill:[^;]*;/g)).toEqual(['--accent-fill: #c2410c;']);
+    const dark = css.slice(css.indexOf("[data-theme='dark'] {"), css.indexOf('}', css.indexOf("[data-theme='dark'] {")));
+    expect(css.match(/--accent-fill:[^;]*;/g)).toEqual(['--accent-fill: #22d3ee;']);
     expect(css.match(/--squirrel:[^;]*;/g)).toEqual(['--squirrel: var(--accent-fill);']);
     expect(css).toMatch(/\.btn\.primary \{ background: var\(--accent-fill\);/);
-    // White label on the dark orange, in both themes.
-    expect(css.match(/--accent-text:[^;]*;/g)).toEqual(['--accent-text: #ffffff;']);
+    expect(css.match(/--accent-text:[^;]*;/g)).toEqual(['--accent-text: #141b34;']);
     expect(dark).not.toContain('--accent-fill');
   });
 
-  it('the favicon is the squirrel icon, not the old envelope', () => {
+  it('the favicon is the dreymail nest and follows the system light/dark setting', () => {
     const svg = read('favicon.svg').toString('utf8');
-    expect(svg).toContain('<title>Ratatoskr</title>');
-    expect(svg).not.toContain('M14 22l18 13 18-13');
+    expect(svg).toContain('<title>dreymail</title>');
+    expect(svg).toContain('@media (prefers-color-scheme: dark)');
+    expect(svg).toContain('fill="#22d3ee"');
+    expect(svg).not.toContain('M 562,566'); // upstream's squirrel
+  });
+
+  it('the in-app logo has a day and a night version', () => {
+    expect(read('brand-day.svg').toString('utf8')).toContain('fill="#e8ecff"');
+    expect(read('brand-night.svg').toString('utf8')).toContain('fill="#141b34"');
   });
 });

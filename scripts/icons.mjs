@@ -1,40 +1,86 @@
-// Regenerates the app icons from web/icons-src/original.svg (squirrel + trunk, 1254x1254).
-// Writes the SVG variants to web/icons-src/ and web/public/favicon.svg, and the PNGs to web/public/icons/.
-// The rasterizer is not a project dependency:  npm i --no-save @resvg/resvg-js && node scripts/icons.mjs
+// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: draws dreymail's icon (a cyan envelope in an indigo drey) instead of
+// upstream's squirrel; adds day/night variants and an adaptive favicon.
+//
+// Regenerates every app icon from the artwork defined below (1024x1024 units).
+// Writes the SVG variants to web/icons-src/, branding/ and web/public/ (favicon, in-app brand marks), and the PNGs to
+// web/public/icons/. The rasterizer is not a project dependency:
+//   npm i --no-save @resvg/resvg-js && node scripts/icons.mjs
 import fs from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
 
 const SRC = 'web/icons-src';
 const OUT = 'web/public/icons';
-// Squirrel in the app's accent orange (--accent), on its pale accent tint (--accent-soft), against a dark bark trunk.
-const BG = '#fdeee6';
-const FG = '#c2410c';
-const TRUNK = '#3a1d10';
-const BORDER = 56;
-const RADIUS = 270;
 
-const original = fs.readFileSync(`${SRC}/original.svg`, 'utf8');
-const d = original.match(/<path d="([^"]+)"/)[1].replace(/\s+/g, ' ').trim();
-const svg = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254"';
+// The envelope is the app accent (--accent-fill in web/src/styles.css); its fold line is the night navy.
+const CYAN = '#22d3ee';
+const NAVY = '#141b34';
+const NIGHT = { bg: NAVY, edge: '#2c3766', flap: NAVY, twig: '#6c7bd9', bowl: '#3b47a8', weave: '#6c7bd9', rim: '#5562c8' };
+const DAY = { bg: '#e8ecff', edge: '#c9d0f5', flap: NAVY, twig: '#3b47a8', bowl: '#3b47a8', weave: '#7f8be6', rim: '#2f3a96' };
 
-// The trunk is widened to fill everything left of the squirrel and runs past the frame; being dark, it outlines the
-// orange squirrel even at favicon size. The art is shrunk to clear the border and to stay inside the 80% safe circle
-// that maskable icons are cropped to.
-const art = `<g transform="translate(627 627) scale(0.84) translate(-627 -627)"><rect x="-400" y="-400" width="863" height="2054" fill="${TRUNK}"/><path d="${d}" fill="${FG}"/></g>`;
-const tile = `x="${BORDER / 2}" y="${BORDER / 2}" width="${1254 - BORDER}" height="${1254 - BORDER}" rx="${RADIUS - BORDER / 2}"`;
+const ENVELOPE_RECT = 'x="262" y="250" width="500" height="350" rx="35"';
+const FLAP = 'M 290 280 L 512 432 L 734 280';
+const TWIGS = ['M 130 500 L 262 560', 'M 150 610 L 270 590', 'M 894 498 L 760 560', 'M 880 620 L 756 592'];
+const BOWL = 'M 168 548 C 300 600 724 600 856 548 C 850 760 700 864 512 864 C 324 864 174 760 168 548 Z';
+const WEAVE = [
+  'M 200 610 C 360 680 640 690 830 600',
+  'M 220 690 C 400 760 640 760 800 680',
+  'M 280 770 C 420 830 620 830 740 760',
+  'M 230 600 C 330 720 470 800 620 846',
+  'M 800 610 C 700 730 560 800 400 846',
+];
+const RIM = 'M 160 548 C 300 606 724 606 864 548';
+const TILT = 'rotate(-9 512 425)';
+
+const art = (p) =>
+  `<g transform="${TILT}"><rect ${ENVELOPE_RECT} fill="${CYAN}"/>` +
+  `<path d="${FLAP}" fill="none" stroke="${p.flap}" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></g>` +
+  `<g stroke="${p.twig}" stroke-width="26" stroke-linecap="round">${TWIGS.map((d) => `<path d="${d}"/>`).join('')}</g>` +
+  `<path d="${BOWL}" fill="${p.bowl}"/>` +
+  `<g stroke="${p.weave}" stroke-width="18" stroke-linecap="round" fill="none">${WEAVE.map((d) => `<path d="${d}"/>`).join('')}</g>` +
+  `<path d="${RIM}" fill="none" stroke="${p.rim}" stroke-width="40" stroke-linecap="round"/>`;
+
+const svg = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"';
+const TILE = 'x="8" y="8" width="1008" height="1008" rx="216"';
+// Rounded tile with a thin lighter edge, so the dark tile still stands out on a dark page.
+const tile = (p) => `<svg ${svg}><title>dreymail</title><rect ${TILE} fill="${p.bg}" stroke="${p.edge}" stroke-width="16"/>${art(p)}</svg>\n`;
+// Full bleed, opaque: launchers apply their own mask, so the art shrinks into the 80% safe circle.
+const fullBleed = `<svg ${svg}><title>dreymail</title><rect width="1024" height="1024" fill="${NIGHT.bg}"/><g transform="translate(512 512) scale(0.88) translate(-512 -540)">${art(NIGHT)}</g></svg>\n`;
+// Notification badge: Android only uses the alpha channel, so a white silhouette on transparent, with the fold line
+// cut out of the envelope.
+const badge =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="110 133 804 804"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">` +
+  `<g transform="${TILT}"><rect ${ENVELOPE_RECT} fill="#fff"/><path d="${FLAP}" fill="none" stroke="#000" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/></g>` +
+  `<path d="${RIM}" fill="none" stroke="#000" stroke-width="90" stroke-linecap="round"/></mask></defs>` +
+  `<g fill="#fff"><rect width="1024" height="1024" mask="url(#m)"/><path d="${BOWL}"/></g>` +
+  `<g stroke="#fff" stroke-width="26" stroke-linecap="round">${TWIGS.map((d) => `<path d="${d}"/>`).join('')}</g></svg>\n`;
+
+// Browser tab icon: follows the system light/dark setting (day tile in light, night tile in dark).
+const cls = (p) =>
+  `.bg{fill:${p.bg};stroke:${p.edge}}.fl{stroke:${p.flap}}.tw{stroke:${p.twig}}.bw{fill:${p.bowl}}.wv{stroke:${p.weave}}.rm{stroke:${p.rim}}`;
+const adaptive =
+  `<svg ${svg}><title>dreymail</title><style>${cls(DAY)}@media (prefers-color-scheme: dark){${cls(NIGHT)}}</style>` +
+  `<rect class="bg" ${TILE} stroke-width="16"/>` +
+  `<g transform="${TILT}"><rect ${ENVELOPE_RECT} fill="${CYAN}"/><path class="fl" d="${FLAP}" fill="none" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></g>` +
+  `<g class="tw" stroke-width="26" stroke-linecap="round">${TWIGS.map((d) => `<path d="${d}"/>`).join('')}</g>` +
+  `<path class="bw" d="${BOWL}"/>` +
+  `<g class="wv" stroke-width="18" stroke-linecap="round" fill="none">${WEAVE.map((d) => `<path d="${d}"/>`).join('')}</g>` +
+  `<path class="rm" d="${RIM}" fill="none" stroke-width="40" stroke-linecap="round"/></svg>\n`;
 
 const variants = {
-  // Rounded tile with a border: favicon and the "any" purpose icons. The art is clipped to the middle of the border
-  // and the border is stroked on top, so the clip's anti-aliased edge is hidden instead of leaking background through
-  // as a light seam between trunk and border.
-  'icon.svg': `<svg ${svg}><title>Ratatoskr</title><defs><clipPath id="c"><rect ${tile}/></clipPath></defs><rect ${tile} fill="${BG}"/><g clip-path="url(#c)">${art}</g><rect ${tile} fill="none" stroke="${TRUNK}" stroke-width="${BORDER}"/></svg>\n`,
-  // Full bleed, opaque: for launchers that apply their own mask (Android maskable, iOS home screen).
-  'full-bleed.svg': `<svg ${svg}><title>Ratatoskr</title><rect width="1254" height="1254" fill="${BG}"/>${art}</svg>\n`,
-  // Notification badge: Android only uses the alpha channel, so a white silhouette on transparent.
-  'badge.svg': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="116 100 1040 1040"><g fill="#fff"><rect x="390" y="118" width="73" height="1018"/><path d="${d}"/></g></svg>\n`,
+  'icon.svg': tile(NIGHT),
+  'icon-day.svg': tile(DAY),
+  'full-bleed.svg': fullBleed,
+  'badge.svg': badge,
 };
 for (const [name, content] of Object.entries(variants)) fs.writeFileSync(`${SRC}/${name}`, content);
-fs.writeFileSync('web/public/favicon.svg', variants['icon.svg']);
+fs.writeFileSync('web/public/favicon.svg', adaptive);
+// In-app logo (sidebar, login): CSS shows the one matching the app's own theme.
+fs.writeFileSync('web/public/brand-night.svg', variants['icon.svg']);
+fs.writeFileSync('web/public/brand-day.svg', variants['icon-day.svg']);
+fs.writeFileSync('branding/dreymail-icon.svg', variants['icon.svg']);
+fs.writeFileSync('branding/dreymail-icon-day.svg', variants['icon-day.svg']);
 
 const pngs = [
   ['icon.svg', 'icon-192.png', 192],
@@ -48,3 +94,4 @@ for (const [src, out, size] of pngs) {
   fs.writeFileSync(`${OUT}/${out}`, png);
   console.log(`${OUT}/${out}`);
 }
+fs.writeFileSync('branding/dreymail-icon-512.png', new Resvg(variants['icon.svg'], { fitTo: { mode: 'width', value: 512 } }).render().asPng());

@@ -1,6 +1,7 @@
 // Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "dreymail".
+// Modified by samschultzponsys, 2026-11-13: day/night dreymail logo instead of the favicon.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -41,7 +42,8 @@ export function Login() {
   return (
     <div className="login">
       <div className="login-card">
-        <img className="brand-mark" src="/favicon.svg" alt="" />
+        <img className="brand-mark day" src="/brand-day.svg" alt="" />
+        <img className="brand-mark night" src="/brand-night.svg" alt="" />
         <h1>dreymail</h1>
         <div className="muted">Your mail, from any IMAP server.</div>
         {methods.isLoading && <div className="muted">Loading…</div>}
