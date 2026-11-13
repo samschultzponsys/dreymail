@@ -8,7 +8,8 @@
    Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
    Modified by samschultzponsys, 2026-11-13: spacing and element fixes.
    Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
-   Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size. */
+   Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
+   Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -575,3 +576,19 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   /* The date gets its own line under the sender, so the name isn't cut short. */
   .msg-date { font-size: 12px; order: 3; flex-basis: 100%; padding-left: 52px; }
 }
+
+/* ---- DreyMail: version and changelog ------------------------------------------------------- */
+.version-btn { position: relative; border: 0; background: none; font: inherit; font-size: 11px; color: var(--muted); padding: 2px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.version-btn:hover { background: var(--hover); color: var(--text); }
+.version-btn.has-update { color: var(--accent); font-weight: 600; }
+.update-dot { position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 2px var(--bg-sidebar); animation: dm-blink 1.4s ease-in-out infinite; }
+@keyframes dm-blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.25; transform: scale(0.75); } }
+@media (prefers-reduced-motion: reduce) { .update-dot { animation: none; } }
+.sidebar.rail .version-btn { display: none; }
+.changelog h3 { margin: 18px 0 4px; font-size: 15px; }
+.changelog h3:first-of-type { margin-top: 4px; }
+.changelog h4 { margin: 10px 0 2px; font-size: 13px; }
+.changelog ul { margin: 4px 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+.changelog p { margin: 4px 0; font-size: 13px; color: var(--text-2); }
+.changelog code { font-size: 12px; padding: 0 4px; border-radius: 4px; background: var(--surface-2); }
+.update-banner { padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid var(--accent-fill); font-size: 13px; }

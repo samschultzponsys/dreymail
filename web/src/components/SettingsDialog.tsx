@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: Android: change server.
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -102,6 +103,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
                 </div>
               </div>
               <YourName />
+              <FullNameToggle v={v} save={save} />
               <InterfaceSize />
               <div>
                 <label className="label">Messages per page</label>
@@ -557,6 +559,16 @@ function YourName() {
       />
       <div className="hint">{status ?? 'Shown at the bottom left. Typed in lower case, it is capitalised for you.'}</div>
     </div>
+  );
+}
+
+/** Settings → General: first name only (default) or the full name at the bottom left. */
+function FullNameToggle({ v, save }: { v: Preferences; save: (p: Preferences) => Promise<void> }) {
+  return (
+    <label className="check">
+      <input type="checkbox" checked={v.showFullName} onChange={(e) => void save({ ...v, showFullName: e.target.checked })} />
+      Show my full name at the bottom left (otherwise only the first name)
+    </label>
   );
 }
 

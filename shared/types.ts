@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: notify event for the desktop app.
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 // Types shared between the server API and the web client.
 
@@ -257,6 +258,8 @@ export interface Preferences {
   contactPhotos: boolean;
   /** Show the unified "All inboxes" view. Off: every account stays separate and the app opens on the first account. */
   unifiedInbox: boolean;
+  /** Bottom left shows the full name; off (default) shows only the first name. */
+  showFullName: boolean;
 }
 
 /**
@@ -326,6 +329,14 @@ export interface LoginSettingsInput {
   label: string;
   passwordLogin: boolean;
   registration: Registration;
+}
+
+/** GET /api/version (DreyMail). */
+export interface VersionInfo {
+  /** This server's version, e.g. "2.0". */
+  version: string;
+  /** A newer release exists (administrators only; null for others or when unknown). */
+  update: { version: string; url: string } | null;
 }
 
 /** Settings → Android (administrators): Firebase for the Android app's notifications. */

@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -39,9 +40,9 @@ import { planRun, runFor, runSpeed, type PaneView } from './squirrel';
 import { refKey, toRef } from './util';
 
 /** Bottom-left name: the user's chosen name, else their login name with a capital first letter. */
-export function userLabel(me: { name: string; displayName: string; email: string }): string {
-  if (me.displayName) return me.displayName;
-  const n = me.name || me.email;
+export function userLabel(me: { name: string; displayName: string; email: string }, full = false): string {
+  let n = me.displayName || me.name || me.email.split('@')[0] || '';
+  if (!full) n = n.split(/\s+/)[0] ?? n;
   return n ? n.charAt(0).toUpperCase() + n.slice(1) : '';
 }
 
@@ -528,7 +529,8 @@ export function App() {
         onAccounts={() => openOverlay('accounts')}
         onSettings={() => openOverlay('settings')}
         onLogout={() => void logout()}
-        userLabel={userLabel(me.data!)}
+        userLabel={userLabel(me.data!, me.data!.preferences.showFullName)}
+        userFullName={userLabel(me.data!, true)}
         onCloseNav={() => closeOverlay('nav')}
       />
       <MessageList

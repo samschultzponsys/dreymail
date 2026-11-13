@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -155,6 +156,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   screenTransitions: 'fast',
   contactPhotos: true,
   unifiedInbox: true,
+  showFullName: false,
 };
 
 export interface User {

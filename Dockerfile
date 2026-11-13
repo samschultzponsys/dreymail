@@ -2,6 +2,7 @@
 # Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+# Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 # ---- base: runtime OS plus the entrypoint that drops to PUID:PGID ------------
 # Its own stage so the entrypoint tests can build it without compiling the app.
@@ -36,7 +37,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY package.json ./
+COPY package.json CHANGES.md ./
 RUN mkdir -p /data && chown node:node /data
 # Starts as root only long enough for the entrypoint to chown /data, then runs as PUID:PGID
 # (default 1000:1000, the `node` user).

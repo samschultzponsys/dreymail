@@ -9,7 +9,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps).
      Modified by samschultzponsys, 2026-11-13: v1.8 (Android app).
      Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached).
-     Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates). -->
+     Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates).
+     Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -33,7 +34,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.0**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.1**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -127,8 +128,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   folders in a slide-in drawer. Desktops show all three columns.
 - **Interface size** per device (Settings → General): Automatic is larger in the Android app and
   follows the phone's font size; or pick 90–150%.
-- **Your name** (Settings → General) is shown at the bottom left; typed in lower case it is
-  capitalised for you.
+- **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
+  "Show my full name"); typed in lower case it is capitalised for you.
+- **Version and what's new.** The server's version sits next to your name; click it for the
+  changelog. When a newer image is released, administrators see a blinking dot on it and the
+  changelog says how to update (redeploy the stack in Arcane). The server checks GitHub at most
+  every 6 hours; `DREYMAIL_UPDATE_CHECK=false` turns that off.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
 

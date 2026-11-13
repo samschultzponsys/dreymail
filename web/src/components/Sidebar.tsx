@@ -3,7 +3,9 @@
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 // Modified by samschultzponsys, 2026-11-13: hides "All inboxes" when turned off in Settings.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
+import { useQuery } from '@tanstack/react-query';
 import {
   AlarmClock,
   Archive,
@@ -26,7 +28,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { AccountFolders, AccountView, FolderView, SpecialUse } from '../../../shared/types';
-import type { MailboxSel } from '../api';
+import { api, type MailboxSel } from '../api';
+import { ChangelogDialog } from './ChangelogDialog';
 
 const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
   inbox: <Inbox size={16} />,
@@ -57,6 +60,8 @@ function depth(f: FolderView): number {
 interface Props {
   /** Show the "All inboxes" entry (Settings → All inboxes). */
   showUnified: boolean;
+  /** Full name, for the tooltip when only the first name is shown. */
+  userFullName: string;
   accounts: AccountView[];
   folders: AccountFolders[] | undefined;
   sel: MailboxSel;
@@ -69,7 +74,10 @@ interface Props {
   onCloseNav: () => void;
 }
 
-export function Sidebar({ accounts, showUnified, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav }: Props) {
+  // Server version (bottom left) and, for administrators, whether a newer image is out.
+  const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
+  const [showLog, setShowLog] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
   useEffect(() => localStorage.setItem('navRail', rail ? '1' : '0'), [rail]);
@@ -148,9 +156,20 @@ export function Sidebar({ accounts, showUnified, folders, sel, onSelect, onCompo
         })}
       </nav>
       <div className="sidebar-footer">
-        <span className="who name" title={userLabel}>
+        <span className="who name" title={userFullName}>
           {userLabel}
         </span>
+        {version.data && (
+          <button
+            className={`version-btn name ${version.data.update ? 'has-update' : ''}`}
+            onClick={() => setShowLog(true)}
+            title={version.data.update ? `DreyMail ${version.data.update.version} is available. Click for what's new.` : "What's new"}
+          >
+            v{version.data.version}
+            {version.data.update && <span className="update-dot" aria-label="Update available" />}
+          </button>
+        )}
+        {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}
         <button className="icon-btn" title="Accounts" onClick={onAccounts}>
           <UserCog size={17} />
         </button>

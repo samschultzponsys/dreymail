@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-14 (v2.1): version, update dot and changelog at the bottom left
+
+- Bottom left shows the first name only (new preference `showFullName`, Settings → General) and
+  the server version; the version opens "What's new" (new `web/src/components/ChangelogDialog.tsx`,
+  a small renderer for this file, which now ships in the image: `Dockerfile`).
+- Update notice for administrators: new `server/src/version.ts` checks GitHub's latest release at
+  most every 6 hours (`DREYMAIL_UPDATE_CHECK=false` turns it off, `server/src/config.ts`);
+  `GET /api/version` and `GET /api/changelog` (`server/src/routes/api.ts`, `server/src/app.ts`,
+  `shared/types.ts`). A blinking dot on the version when a newer image exists
+  (`web/src/components/Sidebar.tsx`, `web/src/styles.css`, `web/src/App.tsx`, `web/src/api.ts`).
+- Tests: `server/test/version.test.ts`, `web/test/changelog.test.ts`, `web/test/sidebar.test.ts`.
+
 ## 2026-11-13 (v2.0): tablets and foldables, interface size, your name, in-app Android updates
 
 - **Layouts:** three tiers (`web/src/styles.css`, `web/src/App.tsx`, `web/src/components/Reader.tsx`):

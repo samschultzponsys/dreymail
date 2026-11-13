@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: new-mail notifications also go to open sessions (desktop app).
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -89,6 +90,8 @@ export async function buildApp(
     pushTransport?: PushTransport;
     /** Replaces HTTP calls to Google for the Android app's notifications (tests only). */
     fcmFetch?: FetchLike;
+    /** Replaces the GitHub release check (tests only). */
+    updates?: { get(): Promise<{ version: string; url: string } | null> };
     /** Replaces the DNS check of push service hosts (tests only). */
     pushHostCheck?: (host: string) => Promise<void>;
     /** Where the mail cache lives, null for none. Defaults to cache.db in the data directory (memory with `store`). */
@@ -226,6 +229,7 @@ export async function buildApp(
     pushHostCheck: opts.pushHostCheck,
     fetchImage: opts.fetchImage,
     avatars: opts.avatars,
+    updates: opts.updates,
   });
   await registerAdminRoutes(app, { config, store, sessions, login, pool, mail, firebase });
   registerAndroidPushRoutes(app, { store, pool, firebase });

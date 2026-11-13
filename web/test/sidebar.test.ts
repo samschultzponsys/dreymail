@@ -1,3 +1,8 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: renders inside a QueryClientProvider (the sidebar shows the version).
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -13,8 +18,13 @@ const noop = () => {};
 
 function render(folders: Parameters<typeof Sidebar>[0]['folders']) {
   return renderToStaticMarkup(
-    createElement(Sidebar, {
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(Sidebar, {
       accounts: [account],
+      showUnified: true,
+      userFullName: 'me',
       folders,
       sel: { accountId: 'a1', folder: 'INBOX' },
       onSelect: noop,
@@ -24,7 +34,8 @@ function render(folders: Parameters<typeof Sidebar>[0]['folders']) {
       onLogout: noop,
       userLabel: 'me',
       onCloseNav: noop,
-    }),
+      }),
+    ),
   );
 }
 

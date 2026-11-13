@@ -5,10 +5,11 @@
 // Modified by samschultzponsys, 2026-11-13: Me.admin.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef } from '../../../shared/types.js';
+import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef, VersionInfo } from '../../../shared/types.js';
 import { accountDefaultsFor, withDefaultPassword, type TemplateValues } from '../accountDefaults.js';
 import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
@@ -23,6 +24,7 @@ import type { Sessions } from '../auth/session.js';
 import { ComposeError, type ComposeService } from '../mail/send.js';
 import { sanitizeOutgoingHtml } from '../mail/compose.js';
 import { isAdmin } from './admin.js';
+import { isNewer, readChangelog, serverVersion, UpdateChecker } from '../version.js';
 import { SnoozeError, type SnoozeService } from '../mail/snooze.js';
 import { PushSubscriptionError, validateSubscription, type PushService } from '../push/service.js';
 
@@ -86,6 +88,7 @@ export const prefsSchema = z.object({
   screenTransitions: z.enum(['off', 'fast', 'medium', 'slow']).default('fast'),
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),
+  showFullName: z.boolean().default(false),
 });
 
 /** Collapses spaces and, for all-lowercase input, capitalises each word. Mixed case is kept (McDonald). */
@@ -156,6 +159,8 @@ export interface ApiDeps {
   fetchImage?: (url: string) => Promise<RemoteImage>;
   /** Replaces the contact picture lookup (tests only). */
   avatars?: AvatarService;
+  /** Replaces the GitHub release check (tests only). */
+  updates?: Pick<UpdateChecker, 'get'>;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
@@ -219,6 +224,17 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       admin: isAdmin(config, u),
     };
   });
+
+  // ---- version and changelog (DreyMail) ----------------------------------------------
+
+  const version = serverVersion();
+  const updates = deps.updates ?? new UpdateChecker(config.updateCheck);
+  let changelog: string | null = null;
+  app.get('/api/version', async (req): Promise<VersionInfo> => {
+    const latest = isAdmin(config, req.user!) ? await updates.get() : null;
+    return { version, update: latest && isNewer(latest.version, version) ? latest : null };
+  });
+  app.get('/api/changelog', async () => ({ markdown: (changelog ??= readChangelog()) }));
 
   /** Settings → General → Your name. Lowercase input is capitalised ("sam schultz" → "Sam Schultz"). */
   app.put('/api/me/name', async (req, reply) => {

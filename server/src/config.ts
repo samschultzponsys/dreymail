@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: DREYMAIL_* environment variables; old names are rejected.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -64,6 +65,8 @@ export interface Config {
   loginEnv: LoginEnv;
   /** Usernames or emails that are always administrators (DREYMAIL_ADMIN_USERS), lower case. */
   adminUsers: string[];
+  /** Check GitHub for a newer DreyMail release (DREYMAIL_UPDATE_CHECK, default on). */
+  updateCheck: boolean;
   /** Firebase (Android app notifications) set in the environment; overrides the UI. */
   firebaseEnv: { serviceAccount?: string; apiKey?: string; appId?: string; senderId?: string };
 }
@@ -208,6 +211,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     vapidSubject,
     accountDefaults,
     loginEnv: loginEnvFrom(env, passwordLogin, registration),
+    updateCheck: bool(env.DREYMAIL_UPDATE_CHECK, true),
     firebaseEnv: {
       ...(env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT ? { serviceAccount: env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT } : {}),
       ...(env.DREYMAIL_FIREBASE_API_KEY ? { apiKey: env.DREYMAIL_FIREBASE_API_KEY } : {}),

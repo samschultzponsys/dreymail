@@ -5,8 +5,9 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
+// Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -60,6 +61,8 @@ export const api = {
   me: () => request<Me>('GET', '/api/me'),
   savePreferences: (p: Preferences) => request<Preferences>('PUT', '/api/preferences', p),
   saveName: (name: string) => request<{ name: string }>('PUT', '/api/me/name', { name }),
+  version: () => request<VersionInfo>('GET', '/api/version'),
+  changelog: () => request<{ markdown: string }>('GET', '/api/changelog'),
   logout: () => request<{ redirect: string }>('POST', '/auth/logout'),
   authMethods: () => request<AuthMethods>('GET', '/auth/methods'),
   passwordLogin: (username: string, password: string) => request<{ ok: true }>('POST', '/auth/password/login', { username, password }),
