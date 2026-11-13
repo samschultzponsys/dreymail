@@ -1,26 +1,38 @@
-# Example deployment. Put a TLS-terminating reverse proxy in front (see README).
+# Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+# Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+# Modified by samschultzponsys, 2026-11-13: dreymail image; inline environment (no .env file), bind
+# mount, PUID/PGID 99:100, no published ports, external reverse-proxy network.
+#
+# Example deployment (e.g. as an Arcane stack). Everything is inline: there is no .env file.
+# The container publishes no ports; it joins an external network shared with your reverse proxy,
+# which serves it over HTTPS and forwards to dreymail:8080.
+# The RATATOSKR_* variable names are kept from upstream so existing deployments keep working.
 services:
-  ratatoskr:
-    image: ghcr.io/OWNER/ratatoskr:latest   # replace OWNER, or build locally with `build: .`
+  dreymail:
+    image: ghcr.io/samschultzponsys/dreymail:latest
+    container_name: dreymail
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8080:8080"
     environment:
-      RATATOSKR_BASE_URL: https://mail.example.com
-      RATATOSKR_SECRET_KEY: ${RATATOSKR_SECRET_KEY:?set RATATOSKR_SECRET_KEY in .env}
-      RATATOSKR_TRUST_PROXY: "true"
-      OIDC_ISSUER_URL: https://auth.example.com/application/o/ratatoskr/
-      OIDC_CLIENT_ID: ratatoskr
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET in .env}
-      # OIDC_LABEL: Authentik
-      # Also allow username/password login next to OIDC (it's the default without OIDC_*):
-      # RATATOSKR_PASSWORD_LOGIN: "true"
-      # RATATOSKR_REGISTRATION: first   # open | first | closed
-      # User and group that run the server and own /data (default 1000:1000):
-      # PUID: "1000"
-      # PGID: "1000"
+      - PUID=99
+      - PGID=100
+      - RATATOSKR_BASE_URL=https://mail.example.com
+      # At least 32 characters: openssl rand -base64 48. Changing it later makes stored
+      # account passwords unreadable.
+      - RATATOSKR_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
+      - RATATOSKR_TRUST_PROXY=true
+      # OpenID Connect login (leave these out for username/password login):
+      - OIDC_ISSUER_URL=https://auth.example.com/application/o/dreymail/
+      - OIDC_CLIENT_ID=dreymail
+      - OIDC_CLIENT_SECRET=replace-with-the-client-secret
+      # - OIDC_LABEL=Authentik
+      # Also allow username/password login next to OIDC:
+      # - RATATOSKR_PASSWORD_LOGIN=true
+      # - RATATOSKR_REGISTRATION=first   # open | first | closed
+    networks:
+      - customnetex
     volumes:
-      - ratatoskr-data:/data
+      - /mnt/nvme2tbadata/dockerstatic/dreymail:/data
 
-volumes:
-  ratatoskr-data:
+networks:
+  customnetex:
+    external: true

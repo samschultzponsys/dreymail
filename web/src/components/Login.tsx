@@ -1,3 +1,7 @@
+// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "dreymail".
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api';
@@ -38,7 +42,7 @@ export function Login() {
     <div className="login">
       <div className="login-card">
         <img className="brand-mark" src="/favicon.svg" alt="" />
-        <h1>Ratatoskr</h1>
+        <h1>dreymail</h1>
         <div className="muted">Your mail, from any IMAP server.</div>
         {methods.isLoading && <div className="muted">Loading…</div>}
         {methods.error && <div className="error-text">Could not reach the server: {(methods.error as Error).message}</div>}

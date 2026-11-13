@@ -1,3 +1,7 @@
+// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "dreymail".
+
 import crypto from 'node:crypto';
 import type { NotificationContent, PushSubscriptionInput } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -236,7 +240,7 @@ export class PushService {
   async sendTest(userId: string): Promise<number> {
     return this.send(
       userId,
-      { title: 'Ratatoskr', body: 'Notifications work on this device.', tag: 'test', url: '/' },
+      { title: 'dreymail', body: 'Notifications work on this device.', tag: 'test', url: '/' },
       300,
     );
   }

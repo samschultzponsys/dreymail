@@ -1,8 +1,36 @@
-# Ratatoskr
+<!-- Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
+     Modified by samschultzponsys, 2026-11-13: rewritten for dreymail (credits, quick start, releasing); upstream docs kept and rebranded. -->
+<p align="center"><img src="branding/dreymail-icon.svg" alt="" width="128" height="128"></p>
+
+# dreymail
+
+*Pronounced "DRAY-mail". A drey is a squirrel's nest.*
+
+A self-hosted webmail portal for my own Gmail and Purelymail accounts (or any IMAP/SMTP
+account), for desktop browsers and Android.
+
+## Credits / Origin
+
+dreymail is based on **[Ratatoskr](https://github.com/magnuspihl/Ratatoskr)** by **Magnus Pihl**
+and contributors, licensed under the GNU AGPL v3.0. It started from upstream commit
+[`e2abaa4`](https://github.com/magnuspihl/Ratatoskr/commit/e2abaa4c585a2e0edc8a09b082208941c32afcdc)
+(2026-10-27). The full upstream history is kept in this repository. Nearly all of the code and
+documentation below is Magnus's work. dreymail's changes are listed in [`CHANGES.md`](CHANGES.md).
+
+dreymail is an independent project. It is **not affiliated with or endorsed by** the original
+author. dreymail stays under the same license, AGPL-3.0-only; see [License](#license) and
+[`NOTICE`](NOTICE).
+
+## Status
+
+Current version: **1.0**, a rebrand of upstream with unchanged behaviour. What's planned is in
+[`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
+
+## What it does
 
 A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**.
 
-- **Your mail server stays the source of truth.** Ratatoskr keeps users, their encrypted account
+- **Your mail server stays the source of truth.** dreymail keeps users, their encrypted account
   settings and preferences (plus, for notifications, push subscriptions and the newest INBOX UID
   already notified about, and for snoozed mail, folder, UID and wake-up time) in one SQLite file.
   To be quick, it also keeps an encrypted, disposable copy of each account's newest INBOX and Sent
@@ -51,9 +79,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used
   addresses. Special-use folders (`\Sent`, `\Drafts`, `\Trash`, `\Archive`, `\Junk`) are detected
   with name fallbacks.
-- `mailto:` links open a new message in Ratatoskr: in plain-text mail directly, in HTML mail in a
+- `mailto:` links open a new message in dreymail: in plain-text mail directly, in HTML mail in a
   new tab (clicks inside the sandboxed message frame can't be caught). Settings → "Open email links
-  with Ratatoskr" makes the browser send `mailto:` links on any website here too; the installed app
+  with dreymail" makes the browser send `mailto:` links on any website here too; the installed app
   (PWA) registers for them on its own where the browser supports it. Only recipients, subject and
   a plain-text body are taken from a link, and nothing is sent until you press Send.
 - Server-side IMAP search in the current folder, or across all inboxes in the unified view.
@@ -61,39 +89,61 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   dark styling. Heavily designed mail (newsletters) is shown on a light "paper" card instead of
   being force-inverted, with a per-message toggle.
 - Notifications for new mail on phones and desktops (Web Push), and an unread badge on the app
-  icon. Install Ratatoskr as an app (PWA) from the browser; see [Notifications](#notifications).
+  icon. Install dreymail as an app (PWA) from the browser; see [Notifications](#notifications).
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
 
-## Quick start (Docker)
+## Quick start (Docker Compose)
 
-1. Register an OIDC client at your identity provider (see [OIDC setup](#oidc-setup)). To use
-   username/password login only, skip this and drop the `OIDC_*` lines in step 3.
-2. Create a `.env` next to `docker-compose.yml`:
+dreymail is configured with environment variables written inline in the compose file (no `.env`
+file). This example is how I run it: an Arcane-managed stack on Unraid, a bind mount, `PUID`/`PGID`
+`99:100`, no published ports, and an external network shared with the reverse proxy.
 
-   ```sh
-   RATATOSKR_SECRET_KEY=$(openssl rand -base64 48)
-   OIDC_CLIENT_SECRET=the-client-secret-from-your-provider
-   ```
+```yaml
+services:
+  dreymail:
+    image: ghcr.io/samschultzponsys/dreymail:latest
+    container_name: dreymail
+    restart: unless-stopped
+    environment:
+      - PUID=99
+      - PGID=100
+      - RATATOSKR_BASE_URL=https://mail.example.com
+      - RATATOSKR_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
+      - RATATOSKR_TRUST_PROXY=true
+      - OIDC_ISSUER_URL=https://auth.example.com/application/o/dreymail/
+      - OIDC_CLIENT_ID=dreymail
+      - OIDC_CLIENT_SECRET=replace-with-the-client-secret
+    networks:
+      - customnetex
+    volumes:
+      - /mnt/nvme2tbadata/dockerstatic/dreymail:/data
 
-3. Adjust `RATATOSKR_BASE_URL` and `OIDC_*` in [`docker-compose.yml`](docker-compose.yml), then run:
+networks:
+  customnetex:
+    external: true
+```
 
-   ```sh
-   docker compose up -d
-   ```
+1. Register an OIDC client at your identity provider (see [OIDC setup](#oidc-setup)), or drop the
+   `OIDC_*` lines to use username/password login.
+2. Generate the secret key with `openssl rand -base64 48` and set `RATATOSKR_BASE_URL`.
+3. Point your reverse proxy at `dreymail:8080`, open `https://mail.example.com`, sign in, and add
+   your first mail account.
 
-4. Put a TLS-terminating reverse proxy in front (see below), open `https://mail.example.com`,
-   sign in, and add your first mail account.
+The variables still use the upstream `RATATOSKR_*` names so existing deployments keep working.
+Renaming them, with the old names still accepted, is on the [roadmap](ROADMAP.md). So is a
+settings page for all configuration (OIDC and the rest), with compose environment values
+overriding what's set there.
 
-Images are published to `ghcr.io/<owner>/ratatoskr` when a release is made (see
-[Releasing](#releasing)), tagged with the version (`1.2.3`, `1.2`, `1` from 1.0.0 on) and
-`latest`. You can also build it yourself with `docker build -t ratatoskr .`.
+Images are published to `ghcr.io/samschultzponsys/dreymail` for every release (see
+[Releasing](#releasing)), tagged with the version (`1.0`, `1.1`, …) and `latest`. You can also
+build it yourself with `docker build -t dreymail .`.
 
-The server runs as user and group `1000:1000` and takes over the data directory on start (it
-`chown`s it when anything in it belongs to someone else). To run as someone else, set `PUID` and
-`PGID`, e.g. `99` and `100` (`nobody:users`) for an unRAID appdata folder. `UMASK` (e.g. `002`)
-sets the permissions of the files it creates. Starting the container with `--user` (`user:` in
-Compose) also works; then it runs as that user, ignores `PUID`/`PGID` and changes no ownership.
+The server runs as user and group `1000:1000` unless `PUID`/`PGID` say otherwise, and takes over
+the data directory on start (it `chown`s it when anything in it belongs to someone else). `UMASK`
+(e.g. `002`) sets the permissions of the files it creates. Starting the container with `--user`
+(`user:` in Compose) also works; then it runs as that user, ignores `PUID`/`PGID` and changes no
+ownership.
 
 ## Configuration
 
@@ -167,7 +217,7 @@ account at a different host, they have to enter that host's password themselves.
 
 ### Notifications
 
-Ratatoskr is an installable web app (PWA) and can send notifications for new mail through the
+dreymail is an installable web app (PWA) and can send notifications for new mail through the
 browsers' standard Web Push services. No native app, no Firebase or Apple developer account and
 no extra configuration are needed. The push keys (VAPID) are derived from
 `RATATOSKR_SECRET_KEY`. HTTPS is required.
@@ -177,7 +227,7 @@ Each user turns notifications on per device in **Settings → Notifications**:
 - **Android** (Chrome, Firefox, Edge, Samsung Internet) and **desktop browsers**: turn the switch on.
   Installing the app ("Add to Home screen" / "Install app") is optional.
 - **iPhone and iPad** (iOS/iPadOS 16.4 or newer): open the site in Safari, tap *Share → Add to
-  Home Screen*, open Ratatoskr from the Home Screen, then turn the switch on. A Safari tab can't
+  Home Screen*, open dreymail from the Home Screen, then turn the switch on. A Safari tab can't
   receive notifications.
 
 What you get:
@@ -190,7 +240,7 @@ What you get:
   account name. The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
   through Apple's, Google's or Mozilla's push service.
 - Notifications close themselves on all your devices once their messages are read or moved out of
-  the inbox, in Ratatoskr or in any other mail client (within the 24 hours a notification is
+  the inbox, in dreymail or in any other mail client (within the 24 hours a notification is
   kept, and not across a server restart). Not on iPhone and iPad: Apple revokes notifications for
   sites that send pushes which show nothing.
 - The app icon shows the number of unread messages across all inboxes, where the platform
@@ -210,10 +260,10 @@ notifications on that device.
 
 ### Snooze
 
-Snoozing moves a message to the account's **Snoozed** folder until the time you pick. Ratatoskr
+Snoozing moves a message to the account's **Snoozed** folder until the time you pick. dreymail
 uses the folder the server marks as Snoozed (the IMAP `\Snoozed` attribute from RFC 9979), or a
 folder named "Snoozed", and creates one if there is none. IMAP has no way to store *when* a message
-should come back, so Ratatoskr keeps the wake-up time in its database and runs the timer itself.
+should come back, so dreymail keeps the wake-up time in its database and runs the timer itself.
 
 When the time comes, the message goes back to INBOX as unread, with the current time as its arrival
 date, so it is at the top of the list. Messages larger than `RATATOSKR_MAX_MESSAGE_MB` are moved
@@ -226,7 +276,7 @@ back as they are and keep their old date. Then:
 In the Snoozed folder each message shows when it comes back. Open one to **Unsnooze** it (back to
 the inbox right away) or snooze it again to change the time. A snooze can be undone from the
 notice that confirms it. Snoozes that came due while the server was down are handled when it
-starts. A message you move out of the Snoozed folder yourself, in Ratatoskr or another mail app,
+starts. A message you move out of the Snoozed folder yourself, in dreymail or another mail app,
 stays where you put it.
 
 ### Login
@@ -264,8 +314,8 @@ bindings/policies to decide who may log in.
 **Keycloak:** create a client with *Client authentication* on and *Standard flow* enabled. The
 issuer URL looks like `https://auth.example.com/realms/<realm>`.
 
-Anyone your provider lets through can use Ratatoskr. Users are identified by issuer and `sub`
-claim, and each user sees only the mail accounts they added themselves. Ratatoskr uses PKCE,
+Anyone your provider lets through can use dreymail. Users are identified by issuer and `sub`
+claim, and each user sees only the mail accounts they added themselves. dreymail uses PKCE,
 `state` and `nonce`, and supports RP-initiated logout if the provider advertises an
 `end_session_endpoint`.
 
@@ -291,13 +341,13 @@ claim, and each user sees only the mail accounts they added themselves. Ratatosk
 
   Caddy and Traefik proxy WebSockets automatically.
 - Allow request bodies at least as large as `RATATOSKR_MAX_UPLOAD_MB` (plus a little overhead).
-- Serve Ratatoskr on its own (sub)domain, not under a path prefix.
+- Serve dreymail on its own (sub)domain, not under a path prefix.
 
 ### Mail cache
 
 Asking the mail server for everything on every click is slow: one page of a folder takes several
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
-searches that some servers are slow at. So Ratatoskr keeps a copy of the newest messages
+searches that some servers are slow at. So dreymail keeps a copy of the newest messages
 (`RATATOSKR_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder:
 sender, subject, snippet, flags and the headers that tie conversations together. It also keeps the
 content of messages you have opened, and loads the newest unread ones ahead, up to
@@ -319,7 +369,7 @@ The mail server stays the source of truth:
   mail server.
 - The copy is disposable. It is a separate file (`cache.db`), and anything wrong with it (a damaged
   file, an entry that doesn't decrypt, another secret key, a new format) just empties it, or the
-  folder concerned, and it is filled again from the server. Deleting the file while Ratatoskr is
+  folder concerned, and it is filled again from the server. Deleting the file while dreymail is
   stopped is always safe.
 
 What is stored and how: subjects, addresses, snippets, Message-IDs, References and message content
@@ -418,11 +468,20 @@ logins always return to that one host.
 
 ### Releasing
 
-Pushes to `main` only run CI. To publish, open **Actions → Release → Run workflow** and pick a
-bump: `patch`, `minor` or `major` off the newest `v*` tag (the first release starts from 0.0.0).
-The workflow runs all tests, pushes the image tagged with the version and `latest`, and creates
-the `vX.Y.Z` tag and a GitHub Release with generated notes. For a specific version, push the tag
-yourself instead: `git tag v1.2.3 && git push origin v1.2.3`.
+Versions have two parts, `MAJOR.MINOR`, and roll over after `.9`: `1.0`, `1.1`, … `1.9`, `2.0`.
+`package.json` holds the version as `MAJOR.MINOR.0` because npm needs three parts.
+
+Every push to `main` runs the **Release** workflow. It always runs the tests. When the version in
+`package.json` has no `v` tag yet, it also pushes the image (tagged with the version and
+`latest`), then creates the `vX.Y` tag and a GitHub Release with generated notes. To release:
+
+```sh
+scripts/release-version.sh next      # prints the next version, e.g. 1.1
+# set package.json and package-lock.json to 1.1.0, add the CHANGES.md entry, commit, push to main
+```
+
+Pull requests and other branches run the **CI** workflow (tests only). Both stay within GitHub's
+free tier for public repositories.
 
 ### Architecture
 
@@ -461,8 +520,8 @@ folders use the same cursors, so a page can come from the cache and the next fro
 - Live updates (IDLE) cover each account's INBOX. Other folders refresh when you open them, when
   the window regains focus, and every couple of minutes.
 - Sent copies are appended without the Bcc header.
-- Snoozing is a Ratatoskr feature: other mail apps see the messages in the Snoozed folder, but only
-  Ratatoskr brings them back, and only while it is running (late ones come back when it starts).
+- Snoozing is a dreymail feature: other mail apps see the messages in the Snoozed folder, but only
+  dreymail brings them back, and only while it is running (late ones come back when it starts).
   A woken message is a new copy in INBOX, so it gets a new UID.
 - No OAuth2 IMAP (XOAUTH2 for Gmail/Microsoft 365). Use app passwords where the provider
   supports them.
@@ -470,5 +529,7 @@ folders use the same cursors, so a page can come from the cache and the next fro
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you run a modified
+dreymail is licensed under the [GNU Affero General Public License v3.0](LICENSE)
+(AGPL-3.0-only), the same license as dreymail. See [`NOTICE`](NOTICE) for the attribution
+requirements and [`CHANGES.md`](CHANGES.md) for what changed from upstream. If you run a modified
 version as a service for others, you must offer them its source code.

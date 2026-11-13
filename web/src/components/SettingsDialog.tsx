@@ -1,3 +1,7 @@
+// Part of dreymail, a modified version of dreymail (https://github.com/magnuspihl/dreymail),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "dreymail" to "dreymail".
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -235,7 +239,7 @@ function ImageDomains() {
   );
 }
 
-/** Ask the browser to open mailto: links (on any website) in Ratatoskr. */
+/** Ask the browser to open mailto: links (on any website) in dreymail. */
 function EmailLinks() {
   const [asked, setAsked] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,7 +261,7 @@ function EmailLinks() {
       {supported ? (
         <>
           <button className="btn" onClick={register}>
-            Open email links with Ratatoskr
+            Open email links with dreymail
           </button>
           <div className="hint">
             {asked
@@ -268,7 +272,7 @@ function EmailLinks() {
       ) : (
         <div className="hint">
           {window.isSecureContext
-            ? 'This browser can’t send mailto: links on other websites to Ratatoskr. Links in your mail still open a new message here.'
+            ? 'This browser can’t send mailto: links on other websites to dreymail. Links in your mail still open a new message here.'
             : 'Opening mailto: links from other websites needs the app to be served over HTTPS.'}
         </div>
       )}
@@ -324,8 +328,8 @@ function Notifications({ prefs, save }: { prefs: Preferences; save: (p: Preferen
       <label className="label">Notifications</label>
       {availability === 'needs-install' && (
         <div className="hint">
-          On iPhone and iPad, notifications only work once Ratatoskr is on your Home Screen. Tap the Share button, choose
-          “Add to Home Screen”, then open Ratatoskr from there and come back here.
+          On iPhone and iPad, notifications only work once dreymail is on your Home Screen. Tap the Share button, choose
+          “Add to Home Screen”, then open dreymail from there and come back here.
         </div>
       )}
       {availability === 'denied' && (
@@ -364,7 +368,7 @@ function Notifications({ prefs, save }: { prefs: Preferences; save: (p: Preferen
         </select>
       </div>
       <div className="hint">
-        You get a notification for new unread mail in your inboxes while Ratatoskr isn’t open in front of you. Notifications pass through
+        You get a notification for new unread mail in your inboxes while dreymail isn’t open in front of you. Notifications pass through
         Apple’s or Google’s push service, encrypted so that only your device can read them.
       </div>
       {info && <div className="hint">{info}</div>}
