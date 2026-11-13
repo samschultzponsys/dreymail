@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail cyan first in the preset account colours; more presets.
+
 import type { Address, MessageRef, MessageSummary } from '../../shared/types';
 
 export const toRef = (m: Pick<MessageSummary, 'accountId' | 'folder' | 'uid' | 'uidValidity'>): MessageRef => ({
@@ -70,4 +74,5 @@ export function prefixSubject(prefix: 'Re' | 'Fwd', subject: string): string {
   return re.test(subject) ? subject : `${prefix}: ${subject}`;
 }
 
-export const ACCOUNT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+/** Preset account colours; the first (DreyMail cyan) goes to the first account. Any other colour can be picked too. */
+export const ACCOUNT_COLORS = ['#22d3ee', '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#f59e0b', '#a3e635', '#10b981', '#14b8a6'];

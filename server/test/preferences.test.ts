@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: tests for the All inboxes preference.
+
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFERENCES } from '../src/db.js';
 import { prefsSchema } from '../src/routes/api.js';
@@ -25,5 +29,16 @@ describe('contact pictures preference', () => {
   it('can be turned off', () => {
     expect(prefsSchema.parse({ ...base, contactPhotos: false }).contactPhotos).toBe(false);
     expect(prefsSchema.safeParse({ ...base, contactPhotos: 'no' }).success).toBe(false);
+  });
+});
+
+describe('all inboxes preference', () => {
+  it('is on by default and stays on when saved by a client that does not know about it yet', () => {
+    expect(DEFAULT_PREFERENCES.unifiedInbox).toBe(true);
+    expect(prefsSchema.parse(base).unifiedInbox).toBe(true);
+  });
+  it('can be turned off', () => {
+    expect(prefsSchema.parse({ ...base, unifiedInbox: false }).unifiedInbox).toBe(false);
+    expect(prefsSchema.safeParse({ ...base, unifiedInbox: 'no' }).success).toBe(false);
   });
 });

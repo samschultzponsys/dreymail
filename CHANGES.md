@@ -13,7 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
-## v1.2 (in progress)
+## 2026-11-13 (v1.2): DreyMail name, account colours, All inboxes switch
+
+### All inboxes on/off
+- New preference `unifiedInbox` (default on), in Settings as "Show “All inboxes”". Off: the
+  sidebar hides "All inboxes" and the app opens on the first account's inbox. Files:
+  `shared/types.ts`, `server/src/db.ts`, `server/src/routes/api.ts`, `web/src/App.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `server/test/preferences.test.ts`.
+
+### Account colours
+- The first account defaults to DreyMail cyan; ten presets (no browns) plus a colour wheel for any
+  colour (`web/src/util.ts`, `web/src/components/AccountsDialog.tsx`, `web/src/styles.css`).
+- While one account is open, the whole app takes on its colour: buttons, accent text, unread dots,
+  selection, focus rings, a light tint on the page and sidebar, and the browser/Android bar. Text
+  and button labels are adjusted to stay at 4.5:1 contrast for any colour. Message content is not
+  tinted. New `web/src/accountTheme.ts` and `web/test/accountTheme.test.ts`; changes in
+  `web/src/App.tsx` and `web/src/themeColor.ts`.
+
 
 ### Name: DreyMail
 - The product name is now written **DreyMail** everywhere people read it: page and app title,

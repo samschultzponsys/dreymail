@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: colour wheel (any colour) next to the preset swatches.
+
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
@@ -162,9 +166,25 @@ function AccountForm({
             <label className="label">Colour</label>
             <div className="swatches">
               {ACCOUNT_COLORS.map((c) => (
-                <button key={c} className={`swatch ${v.color === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setV({ ...v, color: c })} title={c} />
+                <button
+                  key={c}
+                  type="button"
+                  className={`swatch ${v.color.toLowerCase() === c ? 'on' : ''}`}
+                  style={{ background: c }}
+                  onClick={() => setV({ ...v, color: c })}
+                  title={c}
+                  aria-label={`Colour ${c}`}
+                />
               ))}
+              <label
+                className={`swatch custom ${ACCOUNT_COLORS.includes(v.color.toLowerCase()) ? '' : 'on'}`}
+                title="Pick any colour"
+                style={ACCOUNT_COLORS.includes(v.color.toLowerCase()) ? undefined : { boxShadow: `inset 0 0 0 5px ${v.color}` }}
+              >
+                <input type="color" value={v.color} onChange={(e) => setV({ ...v, color: e.target.value })} aria-label="Pick any colour" />
+              </label>
             </div>
+            <div className="hint">The whole app takes on this colour while the account is open.</div>
           </div>
         </div>
         <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} onChange={(imap) => setV({ ...v, imap })} />

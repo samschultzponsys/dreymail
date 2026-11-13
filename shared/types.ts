@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: unifiedInbox preference (All inboxes on/off).
+
 // Types shared between the server API and the web client.
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
@@ -247,6 +251,8 @@ export interface Preferences {
   screenTransitions: TransitionSpeed;
   /** Show senders' pictures (Gravatar, Libravatar, their domain's icon) instead of initials. */
   contactPhotos: boolean;
+  /** Show the unified "All inboxes" view. Off: every account stays separate and the app opens on the first account. */
+  unifiedInbox: boolean;
 }
 
 /** A browser's Web Push subscription, as produced by PushSubscription.toJSON(). */

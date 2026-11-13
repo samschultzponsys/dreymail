@@ -1,6 +1,7 @@
 <!-- Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
      Modified by samschultzponsys, 2026-11-13: rewritten for DreyMail (credits, quick start, releasing); upstream docs kept and rebranded.
-     Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent). -->
+     Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent).
+     Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -24,8 +25,9 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.1**. It's upstream's feature set with DreyMail's own look: a cyan envelope in
-an indigo drey as the icon, and cyan as the accent colour. What's planned is in
+Current version: **1.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+indigo drey) plus per-account colours that recolour the whole app, and an on/off switch for
+"All inboxes". What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -50,9 +52,15 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - Login with a username and password, with any OpenID Connect provider (Authentik, Keycloak, …),
   or both side by side; see [Login](#login). Each user owns their own accounts, with strict
   per-user isolation.
-- Unified inbox across all accounts (merged by date, paginated with per-account cursors), plus
-  per-account folder trees with unread counts. Live updates via IMAP IDLE pushed over one
-  WebSocket per browser session.
+- **Accounts that feel separate.** Each account has its own colour: the first one gets DreyMail
+  cyan, and you can pick from presets or any colour on the colour wheel. While an account is open,
+  the whole app takes on its colour (buttons, highlights, unread dots, a light tint on the page),
+  so you always know which mailbox you're in. Button labels and accent text automatically stay
+  readable for any colour, in light and dark mode.
+- Unified "All inboxes" view across all accounts (merged by date, paginated with per-account
+  cursors). It can be turned off in Settings to keep accounts completely apart; DreyMail then
+  opens on your first account. Per-account folder trees with unread counts. Live updates via IMAP
+  IDLE pushed over one WebSocket per browser session.
 - Message list with sender, subject, snippet, date, unread/flagged/answered/attachment
   indicators, and an account colour tag in the unified view.
 - Conversations, Gmail-style: a message and its replies are one row ("Ada, me 3") and are read

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: unifiedInbox preference validation.
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef } from '../../../shared/types.js';
@@ -75,6 +79,7 @@ export const prefsSchema = z.object({
   notificationContent: z.enum(['full', 'minimal']).default('full'),
   screenTransitions: z.enum(['off', 'fast', 'medium', 'slow']).default('fast'),
   contactPhotos: z.boolean().default(true),
+  unifiedInbox: z.boolean().default(true),
 });
 
 const pushSubscriptionSchema = z.object({

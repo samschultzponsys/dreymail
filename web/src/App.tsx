@@ -1,9 +1,16 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: All inboxes can be turned off; then the first account opens instead.
+// Modified by samschultzponsys, 2026-11-13: the whole UI takes on the open account's colour.
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
 import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
+import { accountPalette, ACCOUNT_PALETTE_VARS } from './accountTheme';
+import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
 import { Login } from './components/Login';
@@ -108,10 +115,15 @@ export function App() {
     [navigate],
   );
 
-  // With a single account the unified view is just that account's inbox.
+  // With a single account, or with "All inboxes" turned off in Settings, the unified view is the
+  // first account's inbox.
+  const unifiedInbox = me.data?.preferences.unifiedInbox !== false;
   const effectiveSel = useMemo<MailboxSel>(
-    () => (sel.accountId === null && accounts.length === 1 ? { accountId: accounts[0]!.id, folder: 'INBOX' } : sel),
-    [sel, accounts],
+    () =>
+      sel.accountId === null && accounts.length > 0 && (accounts.length === 1 || !unifiedInbox)
+        ? { accountId: accounts[0]!.id, folder: 'INBOX' }
+        : sel,
+    [sel, accounts, unifiedInbox],
   );
   const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0);
   const serverMessages = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.messages) ?? [], [messagesQ.data]);
@@ -183,6 +195,23 @@ export function App() {
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, [loggedIn, go]);
+
+  // One account open: the whole app takes on its colour (see accountTheme.ts). "All inboxes" keeps
+  // the DreyMail cyan. Runs after useTheme's effect, so the browser bar colour ends up tinted too.
+  const openAccountColor = effectiveSel.accountId ? accountMap.get(effectiveSel.accountId)?.color : undefined;
+  useEffect(() => {
+    const root = document.documentElement;
+    for (const name of ACCOUNT_PALETTE_VARS) root.style.removeProperty(name);
+    if (!openAccountColor) {
+      delete root.dataset.account;
+      applyThemeColor(document, theme);
+      return;
+    }
+    const palette = accountPalette(openAccountColor, theme);
+    for (const [name, value] of Object.entries(palette)) root.style.setProperty(name, value);
+    root.dataset.account = openAccountColor;
+    applyThemeColor(document, theme, palette['--bg']);
+  }, [openAccountColor, theme]);
 
   // Unread count across all inboxes on the app icon (installed app).
   useEffect(() => {
@@ -442,6 +471,7 @@ export function App() {
     <div className="app" data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
       <Sidebar
         accounts={accounts}
+        showUnified={unifiedInbox}
         folders={folders.data}
         sel={effectiveSel}
         onSelect={(s) => {

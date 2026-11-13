@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
+// Modified by samschultzponsys, 2026-11-13: All inboxes on/off setting.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -84,6 +85,13 @@ export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Prefere
                 </select>
               </div>
             ))}
+          </div>
+          <div>
+            <label className="check">
+              <input type="checkbox" checked={v.unifiedInbox} onChange={(e) => void save({ ...v, unifiedInbox: e.target.checked })} />
+              Show “All inboxes”
+            </label>
+            <div className="hint">One list of every account’s inbox. Turn it off to keep accounts completely separate; DreyMail then opens on your first account.</div>
           </div>
           <label className="check">
             <input type="checkbox" checked={v.markReadOnOpen} onChange={(e) => void save({ ...v, markReadOnOpen: e.target.checked })} />

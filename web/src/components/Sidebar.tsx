@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
+// Modified by samschultzponsys, 2026-11-13: hides "All inboxes" when turned off in Settings.
 
 import {
   AlarmClock,
@@ -54,6 +55,8 @@ function depth(f: FolderView): number {
 }
 
 interface Props {
+  /** Show the "All inboxes" entry (Settings → All inboxes). */
+  showUnified: boolean;
   accounts: AccountView[];
   folders: AccountFolders[] | undefined;
   sel: MailboxSel;
@@ -66,7 +69,7 @@ interface Props {
   onCloseNav: () => void;
 }
 
-export function Sidebar({ accounts, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav }: Props) {
+export function Sidebar({ accounts, showUnified, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav }: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
   useEffect(() => localStorage.setItem('navRail', rail ? '1' : '0'), [rail]);
@@ -86,7 +89,7 @@ export function Sidebar({ accounts, folders, sel, onSelect, onCompose, onAccount
         <PenSquare size={16} /> <span className="name">Compose</span>
       </button>
       <nav className="nav">
-        {accounts.length > 1 && (
+        {showUnified && accounts.length > 1 && (
           <button
             className={`nav-item ${sel.accountId === null ? 'active' : ''} ${totalUnread ? 'unread' : ''}`}
             onClick={() => onSelect({ accountId: null, folder: 'INBOX' })}
