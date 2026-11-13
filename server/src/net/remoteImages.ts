@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
@@ -69,7 +73,7 @@ function getOnce(url: URL, maxBytes: number): Promise<{ status: number; headers:
         timeout: TIMEOUT_MS,
         headers: {
           // Deliberately generic: no cookies, no referer, nothing identifying the reader.
-          'user-agent': 'Mozilla/5.0 (compatible; Ratatoskr image fetcher)',
+          'user-agent': 'Mozilla/5.0 (compatible; DreyMail image fetcher)',
           accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8',
         },
       },

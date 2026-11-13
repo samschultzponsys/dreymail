@@ -1,10 +1,13 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: sign-in values from the environment are recorded as UI overrides; DREYMAIL_ADMIN_USERS.
+// Modified by samschultzponsys, 2026-11-13: DREYMAIL_* environment variables; old names are rejected.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
 import type { TlsMode } from '../../shared/types.js';
+import { oldEnvErrors } from './upgrade.js';
 import { TEMPLATE_TOKENS, unknownTokens, type AccountDefaultsConfig } from './accountDefaults.js';
 
 export interface Config {
@@ -79,8 +82,8 @@ export const LOGIN_ENV_NAMES: Record<keyof LoginEnv, string> = {
   clientSecret: 'OIDC_CLIENT_SECRET',
   scopes: 'OIDC_SCOPES',
   label: 'OIDC_LABEL',
-  passwordLogin: 'RATATOSKR_PASSWORD_LOGIN',
-  registration: 'RATATOSKR_REGISTRATION',
+  passwordLogin: 'DREYMAIL_PASSWORD_LOGIN',
+  registration: 'DREYMAIL_REGISTRATION',
 };
 
 export interface CacheConfig {
@@ -107,16 +110,16 @@ function int(v: string | undefined, def: number): number {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const production = env.NODE_ENV === 'production';
   const port = int(env.PORT, 8080);
-  const errors: string[] = [];
+  const errors: string[] = oldEnvErrors(env);
 
-  const secretKey = env.RATATOSKR_SECRET_KEY ?? '';
-  if (secretKey.length < 32) errors.push('RATATOSKR_SECRET_KEY must be set to at least 32 characters');
+  const secretKey = env.DREYMAIL_SECRET_KEY ?? '';
+  if (secretKey.length < 32) errors.push('DREYMAIL_SECRET_KEY must be set to at least 32 characters');
 
   let baseUrl: URL;
   try {
-    baseUrl = new URL(env.RATATOSKR_BASE_URL || `http://localhost:${port}`);
+    baseUrl = new URL(env.DREYMAIL_BASE_URL || `http://localhost:${port}`);
   } catch {
-    errors.push('RATATOSKR_BASE_URL is not a valid URL');
+    errors.push('DREYMAIL_BASE_URL is not a valid URL');
     baseUrl = new URL(`http://localhost:${port}`);
   }
 
@@ -133,48 +136,48 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   // Without OIDC, password login is the default; with OIDC it has to be switched on explicitly, so
   // existing single sign-on setups don't suddenly accept passwords.
-  const passwordLogin = bool(env.RATATOSKR_PASSWORD_LOGIN, !oidc);
-  const registration = (env.RATATOSKR_REGISTRATION || 'first').toLowerCase() as Registration;
+  const passwordLogin = bool(env.DREYMAIL_PASSWORD_LOGIN, !oidc);
+  const registration = (env.DREYMAIL_REGISTRATION || 'first').toLowerCase() as Registration;
   if (!['open', 'first', 'closed'].includes(registration)) {
-    errors.push('RATATOSKR_REGISTRATION must be open, first or closed');
+    errors.push('DREYMAIL_REGISTRATION must be open, first or closed');
   }
 
-  const devLogin = !production && bool(env.RATATOSKR_DEV_LOGIN, false);
+  const devLogin = !production && bool(env.DREYMAIL_DEV_LOGIN, false);
   if (!oidc && !passwordLogin && !devLogin) {
-    errors.push('Enable a login method: OIDC_ISSUER_URL, RATATOSKR_PASSWORD_LOGIN=true (or RATATOSKR_DEV_LOGIN=true outside production)');
+    errors.push('Enable a login method: OIDC_ISSUER_URL, DREYMAIL_PASSWORD_LOGIN=true (or DREYMAIL_DEV_LOGIN=true outside production)');
   }
 
   let devAllowedHostSuffix: string | null = null;
   if (!production) {
     try {
-      devAllowedHostSuffix = parseHostSuffix(env.RATATOSKR_DEV_ALLOWED_HOST_SUFFIX);
+      devAllowedHostSuffix = parseHostSuffix(env.DREYMAIL_DEV_ALLOWED_HOST_SUFFIX);
     } catch (err) {
       errors.push((err as Error).message);
     }
   }
 
   const vapidSubject =
-    env.RATATOSKR_VAPID_SUBJECT ||
+    env.DREYMAIL_VAPID_SUBJECT ||
     (baseUrl.protocol === 'https:' ? baseUrl.origin : `mailto:postmaster@${baseUrl.hostname}`);
   if (!/^(mailto:\S+@\S+|https:\/\/\S+)$/.test(vapidSubject)) {
-    errors.push('RATATOSKR_VAPID_SUBJECT must be a mailto: or https: URL');
+    errors.push('DREYMAIL_VAPID_SUBJECT must be a mailto: or https: URL');
   }
 
   const accountDefaults = loadAccountDefaults(env, errors);
 
   // Server-wide limits, never per user: one user must not be able to fill the disk.
-  const cache: CacheConfig | null = bool(env.RATATOSKR_CACHE, true)
+  const cache: CacheConfig | null = bool(env.DREYMAIL_CACHE, true)
     ? {
-        messagesPerFolder: int(env.RATATOSKR_CACHE_MESSAGES, 2000),
-        maxBodyBytes: Math.round(Number(env.RATATOSKR_CACHE_MAX_BODY_MB || 1) * 1024 * 1024),
-        bodyBytesPerAccount: int(env.RATATOSKR_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
+        messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 2000),
+        maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 1) * 1024 * 1024),
+        bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
       }
     : null;
   if (cache && !(cache.messagesPerFolder >= 50 && cache.messagesPerFolder <= 100_000)) {
-    errors.push('RATATOSKR_CACHE_MESSAGES must be between 50 and 100000');
+    errors.push('DREYMAIL_CACHE_MESSAGES must be between 50 and 100000');
   }
   if (cache && !(cache.maxBodyBytes >= 0 && cache.bodyBytesPerAccount >= 0)) {
-    errors.push('RATATOSKR_CACHE_MAX_BODY_MB and RATATOSKR_CACHE_ACCOUNT_MB must not be negative');
+    errors.push('DREYMAIL_CACHE_MAX_BODY_MB and DREYMAIL_CACHE_ACCOUNT_MB must not be negative');
   }
 
   if (errors.length) throw new Error(`Invalid configuration:\n  - ${errors.join('\n  - ')}`);
@@ -185,20 +188,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port,
     baseUrl,
     secretKey,
-    dataDir: path.resolve(env.RATATOSKR_DATA_DIR || './data'),
-    trustProxy: bool(env.RATATOSKR_TRUST_PROXY, false),
+    dataDir: path.resolve(env.DREYMAIL_DATA_DIR || './data'),
+    trustProxy: bool(env.DREYMAIL_TRUST_PROXY, false),
     logLevel: env.LOG_LEVEL || 'info',
     oidc,
     passwordLogin,
     registration,
     devLogin,
     devAllowedHostSuffix,
-    blockPrivateMailHosts: bool(env.RATATOSKR_BLOCK_PRIVATE_MAIL_HOSTS, false),
-    imapIdleTimeoutMs: int(env.RATATOSKR_IMAP_IDLE_TIMEOUT, 300) * 1000,
-    maxMessageBytes: int(env.RATATOSKR_MAX_MESSAGE_MB, 50) * 1024 * 1024,
-    maxUploadBytes: int(env.RATATOSKR_MAX_UPLOAD_MB, 25) * 1024 * 1024,
+    blockPrivateMailHosts: bool(env.DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS, false),
+    imapIdleTimeoutMs: int(env.DREYMAIL_IMAP_IDLE_TIMEOUT, 300) * 1000,
+    maxMessageBytes: int(env.DREYMAIL_MAX_MESSAGE_MB, 50) * 1024 * 1024,
+    maxUploadBytes: int(env.DREYMAIL_MAX_UPLOAD_MB, 25) * 1024 * 1024,
     cache,
-    webDir: path.resolve(env.RATATOSKR_WEB_DIR || './dist/web'),
+    webDir: path.resolve(env.DREYMAIL_WEB_DIR || './dist/web'),
     vapidSubject,
     accountDefaults,
     loginEnv: loginEnvFrom(env, passwordLogin, registration),
@@ -217,8 +220,8 @@ function loginEnvFrom(env: NodeJS.ProcessEnv, passwordLogin: boolean, registrati
   if (set('OIDC_CLIENT_SECRET')) out.clientSecret = env.OIDC_CLIENT_SECRET!;
   if (set('OIDC_SCOPES')) out.scopes = env.OIDC_SCOPES!;
   if (set('OIDC_LABEL')) out.label = env.OIDC_LABEL!.trim();
-  if (set('RATATOSKR_PASSWORD_LOGIN')) out.passwordLogin = passwordLogin;
-  if (set('RATATOSKR_REGISTRATION')) out.registration = registration;
+  if (set('DREYMAIL_PASSWORD_LOGIN')) out.passwordLogin = passwordLogin;
+  if (set('DREYMAIL_REGISTRATION')) out.registration = registration;
   return out;
 }
 
@@ -232,24 +235,24 @@ function loadAccountDefaults(env: NodeJS.ProcessEnv, errors: string[]): AccountD
     return v;
   };
   const server = (kind: 'IMAP' | 'SMTP') => {
-    const portName = `RATATOSKR_DEFAULT_${kind}_PORT`;
-    const tlsName = `RATATOSKR_DEFAULT_${kind}_SECURITY`;
+    const portName = `DREYMAIL_DEFAULT_${kind}_PORT`;
+    const tlsName = `DREYMAIL_DEFAULT_${kind}_SECURITY`;
     const rawPort = env[portName]?.trim();
     const port = rawPort ? Number(rawPort) : null;
     if (port !== null && !(Number.isInteger(port) && port >= 1 && port <= 65535)) errors.push(`${portName} must be a port number`);
     const rawTls = env[tlsName]?.trim().toLowerCase();
     const tls = rawTls ? (rawTls as TlsMode) : null;
     if (tls && !['tls', 'starttls', 'none'].includes(tls)) errors.push(`${tlsName} must be tls, starttls or none`);
-    return { host: template(`RATATOSKR_DEFAULT_${kind}_HOST`), port, tls };
+    return { host: template(`DREYMAIL_DEFAULT_${kind}_HOST`), port, tls };
   };
   return {
-    name: template('RATATOSKR_DEFAULT_ACCOUNT_LABEL'),
-    displayName: template('RATATOSKR_DEFAULT_DISPLAY_NAME'),
-    email: template('RATATOSKR_DEFAULT_EMAIL'),
+    name: template('DREYMAIL_DEFAULT_ACCOUNT_LABEL'),
+    displayName: template('DREYMAIL_DEFAULT_DISPLAY_NAME'),
+    email: template('DREYMAIL_DEFAULT_EMAIL'),
     imap: server('IMAP'),
     smtp: server('SMTP'),
-    user: template('RATATOSKR_DEFAULT_MAIL_USERNAME'),
+    user: template('DREYMAIL_DEFAULT_MAIL_USERNAME'),
     // Taken literally (no tokens, not trimmed): braces and spaces can be part of a password.
-    password: env.RATATOSKR_DEFAULT_MAIL_PASSWORD ?? '',
+    password: env.DREYMAIL_DEFAULT_MAIL_PASSWORD ?? '',
   };
 }

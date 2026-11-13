@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
@@ -74,19 +78,19 @@ describe('signatures over HTTP', () => {
   });
 
   it('sanitizes the HTML before storing it', async () => {
-    const config = loadConfig({ RATATOSKR_SECRET_KEY: secret });
+    const config = loadConfig({ DREYMAIL_SECRET_KEY: secret });
     ctx = await buildApp(config, { store: new Store(':memory:', new Keyring(secret).credentialKey), logger: false });
-    const reg = await ctx.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'sam', password: 'a long password' }, headers: { 'x-ratatoskr': '1' } });
-    const cookie = `rk_session=${reg.cookies.find((c) => c.name === 'rk_session')!.value}`;
+    const reg = await ctx.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'sam', password: 'a long password' }, headers: { 'x-dreymail': '1' } });
+    const cookie = `dm_session=${reg.cookies.find((c) => c.name === 'dm_session')!.value}`;
     const res = await ctx.app.inject({
       method: 'POST',
       url: '/api/signatures',
-      headers: { cookie, 'x-ratatoskr': '1' },
+      headers: { cookie, 'x-dreymail': '1' },
       payload: { name: 'Evil', html: '<p onclick="x()">Hi<script>alert(1)</script><img src="/api/secret"></p>', accountIds: [], onReplies: true },
     });
     expect(res.statusCode).toBe(200);
     expect((res.json() as Signature).html).toBe('<p>Hi</p>');
-    const bad = await ctx.app.inject({ method: 'POST', url: '/api/signatures', headers: { cookie, 'x-ratatoskr': '1' }, payload: { name: '', html: '', accountIds: [] } });
+    const bad = await ctx.app.inject({ method: 'POST', url: '/api/signatures', headers: { cookie, 'x-dreymail': '1' }, payload: { name: '', html: '', accountIds: [] } });
     expect(bad.statusCode).toBe(400);
   });
 });

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { useMemo } from 'react';
 import { buildSrcdoc, type RenderMode, type RenderPalette } from '../../../shared/srcdoc';
 import { rewriteMailtoLinks } from '../mailto';
@@ -12,7 +16,7 @@ function palette(): RenderPalette {
  * Renders sanitized message HTML in a sandboxed iframe: no scripts, opaque origin (no access to
  * the app, its cookies or storage), no forms, no top navigation. Links open in a new tab
  * (allow-popups) without an opener. Clicks inside the scriptless frame can't be caught, so mailto:
- * links instead point at Ratatoskr's own composer (in a new tab). A CSP inside the document blocks
+ * links instead point at DreyMail's own composer (in a new tab). A CSP inside the document blocks
  * every network request; remote images, when allowed, arrive already inlined as data: URIs.
  */
 export function MessageFrame({ html, css, mode, themeKey }: { html: string; css: string; mode: RenderMode; themeKey: string }) {

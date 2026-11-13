@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: sign-in options come from LoginSettings (UI, with environment overrides) and can change at runtime.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
@@ -137,7 +138,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
   });
 
   if (config.devLogin) {
-    app.log.warn('RATATOSKR_DEV_LOGIN is enabled: anyone can log in as the local dev user. Never use this in production.');
+    app.log.warn('DREYMAIL_DEV_LOGIN is enabled: anyone can log in as the local dev user. Never use this in production.');
     app.get('/auth/dev-login', async (_req, reply) => {
       const user = store.upsertUser('dev-login', 'dev', 'user@example.com', 'Dev User', 'dev');
       sessions.write(reply, { uid: user.id, via: 'dev' });
@@ -163,7 +164,7 @@ function registerPasswordRoutes(app: FastifyInstance, store: Store, sessions: Se
       void reply.code(404).send({ error: 'Password login is turned off' });
       return null;
     }
-    if (req.headers['x-ratatoskr'] !== '1') {
+    if (req.headers['x-dreymail'] !== '1') {
       void reply.code(403).send({ error: 'Missing CSRF header' });
       return null;
     }

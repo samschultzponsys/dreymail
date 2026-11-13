@@ -3,6 +3,8 @@
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference default.
 // Modified by samschultzponsys, 2026-11-13: signatures tables and store methods.
 // Modified by samschultzponsys, 2026-11-13: administrators, user management and instance settings.
+// Modified by samschultzponsys, 2026-11-13: rekeyFrom for the one-time data upgrade.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -208,7 +210,7 @@ function toView(r: AccountRow): AccountView {
 }
 
 /**
- * Persistence for the only state Ratatoskr keeps: users, their (encrypted) account settings,
+ * Persistence for the only state DreyMail keeps: users, their (encrypted) account settings,
  * preferences, recently used recipients, sender domains allowed to show images, Web Push
  * subscriptions, the highest INBOX UID already notified about and when snoozed messages (by folder
  * and UID) return. No mail content is stored here; the disposable mail cache (cache/store.ts) is a
@@ -331,6 +333,50 @@ export class Store {
 
   setSetting(key: string, value: unknown) {
     this.db.prepare('INSERT INTO instance_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(value));
+  }
+
+  /**
+   * Re-encrypts every stored secret (mail passwords, the OIDC client secret) from `oldKey` to this
+   * store's key, in one transaction that also records `marker`. Values that don't open with the old
+   * key (already unreadable) are left alone. Returns how many account credentials moved.
+   */
+  rekeyFrom(oldKey: Buffer, marker: { key: string; value: string }): number {
+    let moved = 0;
+    this.db.exec('BEGIN');
+    try {
+      const rows = this.db.prepare('SELECT id, user_id, imap_password, smtp_password FROM accounts').all() as {
+        id: string;
+        user_id: string;
+        imap_password: string;
+        smtp_password: string;
+      }[];
+      const update = this.db.prepare('UPDATE accounts SET imap_password = ?, smtp_password = ? WHERE id = ?');
+      for (const r of rows) {
+        try {
+          const imap = decrypt(oldKey, r.imap_password, credAad(r.user_id, r.id, 'imap'));
+          const smtp = decrypt(oldKey, r.smtp_password, credAad(r.user_id, r.id, 'smtp'));
+          update.run(encrypt(this.credentialKey, imap, credAad(r.user_id, r.id, 'imap')), encrypt(this.credentialKey, smtp, credAad(r.user_id, r.id, 'smtp')), r.id);
+          moved++;
+        } catch {
+          /* not readable with the old key either */
+        }
+      }
+      const login = this.getSetting<{ clientSecret?: string }>('login');
+      if (login?.clientSecret) {
+        try {
+          const plain = decrypt(oldKey, login.clientSecret, 'instance-setting:login');
+          this.setSetting('login', { ...login, clientSecret: this.sealSecret('login', plain) });
+        } catch {
+          /* leave it */
+        }
+      }
+      this.setSetting(marker.key, marker.value);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return moved;
   }
 
   /** Encrypts a secret setting value (e.g. the OIDC client secret) with the credential key. */

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hostnameOf, isDevHostAllowed, matchesHostSuffix, parseHostSuffix } from '../../shared/devHosts.js';
@@ -12,9 +16,9 @@ const BASE = 'https://5173--myworkspace--me.dev.example.com';
 const PREVIEW = '40140--myworkspace--me.dev.example.com';
 
 const baseEnv = (extra: Record<string, string> = {}) => ({
-  RATATOSKR_SECRET_KEY: 'x'.repeat(48),
-  RATATOSKR_BASE_URL: BASE,
-  RATATOSKR_DEV_LOGIN: 'true',
+  DREYMAIL_SECRET_KEY: 'x'.repeat(48),
+  DREYMAIL_BASE_URL: BASE,
+  DREYMAIL_DEV_LOGIN: 'true',
   ...extra,
 });
 
@@ -29,7 +33,7 @@ describe('dev host suffix matching', () => {
   });
   it('rejects suffixes that could match in the middle of a name or that are not a domain', () => {
     for (const bad of ['example.com', 'me.dev.example.com', '-me.dev.example.com', '--', '.', '.com', '--me', '--me.example.com/', '--me.example.com:443', '*.example.com']) {
-      expect(() => parseHostSuffix(bad), bad).toThrow(/RATATOSKR_DEV_ALLOWED_HOST_SUFFIX/);
+      expect(() => parseHostSuffix(bad), bad).toThrow(/DREYMAIL_DEV_ALLOWED_HOST_SUFFIX/);
     }
   });
   it('matches any host ending in the suffix, with or without a port', () => {
@@ -67,20 +71,20 @@ describe('dev host suffix matching', () => {
   });
 });
 
-describe('RATATOSKR_DEV_ALLOWED_HOST_SUFFIX in the server config', () => {
+describe('DREYMAIL_DEV_ALLOWED_HOST_SUFFIX in the server config', () => {
   it('is read in development', () => {
-    expect(loadConfig(baseEnv({ NODE_ENV: 'development', RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: SUFFIX })).devAllowedHostSuffix).toBe(SUFFIX);
+    expect(loadConfig(baseEnv({ NODE_ENV: 'development', DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: SUFFIX })).devAllowedHostSuffix).toBe(SUFFIX);
   });
   it('is null when unset', () => {
     expect(loadConfig(baseEnv({ NODE_ENV: 'development' })).devAllowedHostSuffix).toBeNull();
   });
   it('fails startup in development when the value is unusable', () => {
-    expect(() => loadConfig(baseEnv({ NODE_ENV: 'development', RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: 'example.com' }))).toThrow(/RATATOSKR_DEV_ALLOWED_HOST_SUFFIX/);
+    expect(() => loadConfig(baseEnv({ NODE_ENV: 'development', DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: 'example.com' }))).toThrow(/DREYMAIL_DEV_ALLOWED_HOST_SUFFIX/);
   });
   it('is ignored entirely in production, even when set (or invalid)', () => {
-    const env = { NODE_ENV: 'production', OIDC_ISSUER_URL: 'https://auth.example.com/', OIDC_CLIENT_ID: 'ratatoskr' };
-    expect(loadConfig(baseEnv({ ...env, RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: SUFFIX })).devAllowedHostSuffix).toBeNull();
-    expect(loadConfig(baseEnv({ ...env, RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: 'example.com' })).devAllowedHostSuffix).toBeNull();
+    const env = { NODE_ENV: 'production', OIDC_ISSUER_URL: 'https://auth.example.com/', OIDC_CLIENT_ID: 'dreymail' };
+    expect(loadConfig(baseEnv({ ...env, DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: SUFFIX })).devAllowedHostSuffix).toBeNull();
+    expect(loadConfig(baseEnv({ ...env, DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: 'example.com' })).devAllowedHostSuffix).toBeNull();
   });
 });
 
@@ -121,14 +125,14 @@ describe('WebSocket origin check', () => {
   });
 });
 
-describe('dev login when served from a host other than RATATOSKR_BASE_URL', () => {
+describe('dev login when served from a host other than DREYMAIL_BASE_URL', () => {
   let ctx: App;
   let cookie: string;
 
   beforeAll(async () => {
     const config = loadConfig({
-      ...baseEnv({ NODE_ENV: 'development', RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: SUFFIX }),
-      RATATOSKR_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
+      ...baseEnv({ NODE_ENV: 'development', DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: SUFFIX }),
+      DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
     });
     ctx = await buildApp(config, { store: new Store(':memory:', new Keyring(config.secretKey).credentialKey), logger: false });
   });
@@ -140,10 +144,10 @@ describe('dev login when served from a host other than RATATOSKR_BASE_URL', () =
     const res = await ctx.app.inject({ method: 'GET', url: '/auth/dev-login', headers: { host: PREVIEW } });
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe('/');
-    const session = res.cookies.find((c) => c.name === 'rk_session')!;
+    const session = res.cookies.find((c) => c.name === 'dm_session')!;
     expect(session.domain).toBeUndefined();
     expect(session.path).toBe('/');
-    cookie = `rk_session=${session.value}`;
+    cookie = `dm_session=${session.value}`;
     const me = await ctx.app.inject({ method: 'GET', url: '/api/me', headers: { host: PREVIEW, cookie } });
     expect(me.statusCode).toBe(200);
   });

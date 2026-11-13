@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -205,7 +209,7 @@ export class MailCache {
   }
 
   private keyCheck() {
-    return crypto.createHmac('sha256', this.keys.cacheKey).update('ratatoskr mail cache').digest('hex');
+    return crypto.createHmac('sha256', this.keys.cacheKey).update('dreymail mail cache').digest('hex');
   }
 
   private open() {

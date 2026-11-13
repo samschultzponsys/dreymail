@@ -1,11 +1,14 @@
 # syntax=docker/dockerfile:1
+# Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+# Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+# Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 # ---- base: runtime OS plus the entrypoint that drops to PUID:PGID ------------
 # Its own stage so the entrypoint tests can build it without compiling the app.
 FROM node:22-alpine AS base
 RUN apk add --no-cache su-exec
-COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/ratatoskr-entrypoint
-ENTRYPOINT ["ratatoskr-entrypoint"]
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/dreymail-entrypoint
+ENTRYPOINT ["dreymail-entrypoint"]
 
 # ---- build: install all dependencies and compile server + web client -------
 FROM node:22-alpine AS build
@@ -28,8 +31,8 @@ RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 FROM base
 ENV NODE_ENV=production \
     PORT=8080 \
-    RATATOSKR_DATA_DIR=/data \
-    RATATOSKR_WEB_DIR=/app/dist/web
+    DREYMAIL_DATA_DIR=/data \
+    DREYMAIL_WEB_DIR=/app/dist/web
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

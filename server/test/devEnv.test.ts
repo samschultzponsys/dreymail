@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,7 +15,7 @@ describe('dev server environment in git worktrees', () => {
   let worktree: string;
 
   beforeAll(() => {
-    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rk-devenv-')));
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dm-devenv-')));
     main = path.join(tmp, 'main');
     worktree = path.join(tmp, 'task');
     fs.mkdirSync(main);
@@ -32,18 +36,18 @@ describe('dev server environment in git worktrees', () => {
   });
 
   it("uses the main checkout's .env when the worktree has none", () => {
-    write(main, 'RATATOSKR_SECRET_KEY=from-main\nRATATOSKR_DEV_LOGIN=true\n');
+    write(main, 'DREYMAIL_SECRET_KEY=from-main\nDREYMAIL_DEV_LOGIN=true\n');
     remove(worktree);
     const { env, files } = loadDevEnv(worktree, {});
     expect(files).toEqual([path.join(main, '.env')]);
-    expect(env).toMatchObject({ RATATOSKR_SECRET_KEY: 'from-main', RATATOSKR_DEV_LOGIN: 'true' });
+    expect(env).toMatchObject({ DREYMAIL_SECRET_KEY: 'from-main', DREYMAIL_DEV_LOGIN: 'true' });
   });
 
   it("lets the worktree's own .env override single values, and real environment variables override both", () => {
-    write(main, 'RATATOSKR_SECRET_KEY=from-main\nRATATOSKR_DEV_LOGIN=true\nLOG_LEVEL=info\n');
-    write(worktree, 'RATATOSKR_DEV_LOGIN=false\nLOG_LEVEL=debug\n');
+    write(main, 'DREYMAIL_SECRET_KEY=from-main\nDREYMAIL_DEV_LOGIN=true\nLOG_LEVEL=info\n');
+    write(worktree, 'DREYMAIL_DEV_LOGIN=false\nLOG_LEVEL=debug\n');
     const { env } = loadDevEnv(worktree, { LOG_LEVEL: 'trace' });
-    expect(env).toMatchObject({ RATATOSKR_SECRET_KEY: 'from-main', RATATOSKR_DEV_LOGIN: 'false', LOG_LEVEL: 'trace' });
+    expect(env).toMatchObject({ DREYMAIL_SECRET_KEY: 'from-main', DREYMAIL_DEV_LOGIN: 'false', LOG_LEVEL: 'trace' });
   });
 
   it('loads only its own .env in the main checkout, and nothing when there is none', () => {
@@ -57,12 +61,12 @@ describe('dev server environment in git worktrees', () => {
   it("never points a worktree at the main checkout's database", () => {
     remove(main);
     remove(worktree);
-    expect(loadDevEnv(worktree, {}).env.RATATOSKR_DATA_DIR).toBeUndefined();
+    expect(loadDevEnv(worktree, {}).env.DREYMAIL_DATA_DIR).toBeUndefined();
   });
 
   it("keeps a relative data directory from the main .env relative to the worktree", () => {
-    write(main, 'RATATOSKR_DATA_DIR=./var/db\n');
+    write(main, 'DREYMAIL_DATA_DIR=./var/db\n');
     remove(worktree);
-    expect(loadDevEnv(worktree, {}).env.RATATOSKR_DATA_DIR).toBe('./var/db');
+    expect(loadDevEnv(worktree, {}).env.DREYMAIL_DATA_DIR).toBe('./var/db');
   });
 });

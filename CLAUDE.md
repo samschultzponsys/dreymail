@@ -75,7 +75,7 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
 - **Language:** TypeScript end to end (Node.js ≥ 22.13; uses the built-in `node:sqlite`).
 - **Server:** Fastify 5 (`server/src`): IMAP via `imapflow`, SMTP/MIME via `nodemailer`,
   OIDC via `openid-client`, HTML sanitizing via `sanitize-html` + `postcss`, Web Push (own VAPID +
-  RFC 8291), WebSocket live updates (IMAP IDLE). SQLite: `ratatoskr.db` (users, encrypted
+  RFC 8291), WebSocket live updates (IMAP IDLE). SQLite: `dreymail.db` (users, encrypted
   accounts, prefs, push subs, snoozes) and `cache.db` (encrypted, disposable mail cache).
 - **Web client:** React 19 + TanStack Query, built by Vite (`web/`), installable PWA with a
   notification-only service worker (`web/public/sw.js`).
@@ -103,7 +103,7 @@ npm run build               # dist/server + dist/web
 npm start                   # runs the production build
 cp .env.example .env && PORT=5173 npm run dev   # local dev only (the .env is for dev, never for deployment)
 docker build -t dreymail:dev .
-docker run --rm -p 8080:8080 -e RATATOSKR_SECRET_KEY=$(openssl rand -base64 48) -v "$PWD/tmpdata:/data" dreymail:dev
+docker run --rm -p 8080:8080 -e DREYMAIL_SECRET_KEY=$(openssl rand -base64 48) -v "$PWD/tmpdata:/data" dreymail:dev
 ```
 
 In the Claude Code cloud sandbox: start Docker with `dockerd &`. Image builds there can't reach
@@ -143,43 +143,21 @@ added in a throwaway build. That's a sandbox limitation; GitHub Actions builds n
   variable in the compose file **overrides** the UI/database value (and the UI should show it as
   set by the environment). Bootstrap-only exceptions (e.g. the secret key, data dir) stay in env.
 
-## Renames deferred on purpose (don't do these casually)
+## Identity (DreyMail's own names, since 1.5)
 
-### Environment variables: rename later, with a backward-compatible fallback
-Keep the `RATATOSKR_*` names working. The plan is to accept `DREYMAIL_*` first and fall back to
-`RATATOSKR_*`.
-`RATATOSKR_BASE_URL`, `RATATOSKR_SECRET_KEY`, `RATATOSKR_TRUST_PROXY`, `RATATOSKR_DATA_DIR`,
-`RATATOSKR_WEB_DIR`, `RATATOSKR_PASSWORD_LOGIN`, `RATATOSKR_REGISTRATION`,
-`RATATOSKR_BLOCK_PRIVATE_MAIL_HOSTS`, `RATATOSKR_IMAP_IDLE_TIMEOUT`, `RATATOSKR_MAX_MESSAGE_MB`,
-`RATATOSKR_MAX_UPLOAD_MB`, `RATATOSKR_CACHE`, `RATATOSKR_CACHE_MESSAGES`,
-`RATATOSKR_CACHE_MAX_BODY_MB`, `RATATOSKR_CACHE_ACCOUNT_MB`, `RATATOSKR_VAPID_SUBJECT`,
-`RATATOSKR_DEFAULT_IMAP_HOST`, `RATATOSKR_DEFAULT_IMAP_SECURITY`, `RATATOSKR_DEFAULT_IMAP_PORT`,
-`RATATOSKR_DEFAULT_SMTP_HOST`, `RATATOSKR_DEFAULT_SMTP_SECURITY`, `RATATOSKR_DEFAULT_SMTP_PORT`,
-`RATATOSKR_DEFAULT_MAIL_USERNAME`, `RATATOSKR_DEFAULT_EMAIL`, `RATATOSKR_DEFAULT_DISPLAY_NAME`,
-`RATATOSKR_DEFAULT_ACCOUNT_LABEL`, `RATATOSKR_DEFAULT_MAIL_PASSWORD`, `RATATOSKR_DEV_LOGIN`,
-`RATATOSKR_DEV_ALLOWED_HOST_SUFFIX`. (`OIDC_*`, `PUID`, `PGID`, `UMASK`, `PORT`, `HOST`,
-`LOG_LEVEL` are neutral and stay.)
+DreyMail has its own identity throughout: `DREYMAIL_*` environment variables, `dreymail.db`,
+`x-dreymail` CSRF header, `dm_session` cookie, `dreymail-entrypoint`, `X-Mailer: DreyMail`.
+**Never reintroduce the upstream project's name** in code, env, comments or UI. The only allowed
+mentions are the legally required attribution (NOTICE, README Credits, file-header notices,
+CHANGES.md history) and `server/src/upgrade.ts`.
 
-### Internal identifiers and data: future, deliberate migration only
-- **`server/src/crypto.ts`: the HKDF salt `'ratatoskr'`.** **Never change it.** Every stored
-  account password, session cookie, cache key and push key derives from it, so changing it makes
-  existing data unreadable.
-- `server/src/cache/store.ts`: HMAC label `'ratatoskr mail cache'`. Changing it invalidates the
-  cache (harmless but wasteful).
-- Database file `ratatoskr.db` (in `server/src/app.ts`) and `cache.db` in the data volume. A
-  rename needs a migration that moves the existing file.
-- HTTP header `x-ratatoskr` (CSRF guard, in `web/src/api.ts`, `web/public/sw.js`,
-  `server/src/routes/api.ts`, `server/src/auth/routes.ts`). Client and server must change
-  together, and old installed service workers would still send the old header.
-- localStorage key `ratatoskr.pendingMailto` (`web/src/mailto.ts`).
-- Outgoing identifiers: `X-Mailer: Ratatoskr` (`server/src/mail/compose.ts`), IMAP client ID
-  `Ratatoskr` (`server/src/imap/connect.ts`), image-fetcher User-Agent
-  (`server/src/net/remoteImages.ts`).
-- Container entrypoint path `/usr/local/bin/ratatoskr-entrypoint` and its log prefix
-  (`Dockerfile`, `docker/entrypoint.sh`, integration test).
-- Code comments, test names, the vite dev plugin name, the CSS header comment.
+- `server/src/upgrade.ts` carries data written before 1.5 over (old database file name, old
+  key-derivation salt, old env prefix → refuses to start and says what to rename). Delete it once
+  the owner confirms every instance has started on 1.5+.
+- **Never change the HKDF salt `'dreymail'`** in `server/src/crypto.ts`: every stored account
+  password, session cookie, cache key and push key derives from it.
 - The running-squirrel phone animation (`web/src/assets/squirrel-running.svg`, `squirrel.ts`,
-  `SquirrelRun.tsx`) is upstream art, kept and tinted cyan.
+  `SquirrelRun.tsx`) is upstream art, kept and tinted to the accent colour.
 
 ## Brand
 - Icon: cyan envelope (`#22d3ee`) in an indigo drey (`#3b47a8`, weave `#6c7bd9`) on night navy

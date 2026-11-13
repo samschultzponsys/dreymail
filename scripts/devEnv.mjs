@@ -1,8 +1,12 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 // Environment for `npm run dev`. In a git worktree (one checkout per task/branch) there's usually no
 // .env of its own, so the main checkout's .env is used as a base. Precedence, highest first: real
 // environment variables, the worktree's .env, the main checkout's .env.
 //
-// The database is NOT shared: a relative RATATOSKR_DATA_DIR (default ./data) is taken relative to the
+// The database is NOT shared: a relative DREYMAIL_DATA_DIR (default ./data) is taken relative to the
 // worktree, so each one has its own. Branches with different migration lists would otherwise
 // corrupt each other's schema.
 import { execFileSync } from 'node:child_process';

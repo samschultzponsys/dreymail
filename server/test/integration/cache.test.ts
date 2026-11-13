@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -63,7 +67,7 @@ async function api<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unk
   const res = await ctx.app.inject({
     method,
     url,
-    headers: { cookie, 'x-ratatoskr': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { cookie, 'x-dreymail': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     payload: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return { status: res.statusCode, json: JSON.parse(res.body) as T };
@@ -110,15 +114,15 @@ async function imapCalls<T>(fn: () => Promise<T>): Promise<{ result: T; calls: n
 }
 
 beforeAll(async () => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ratatoskr-cache-it-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dreymail-cache-it-'));
   cacheFile = path.join(dir, 'cache.db');
   const config = loadConfig({
     NODE_ENV: 'test',
-    RATATOSKR_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
-    RATATOSKR_DEV_LOGIN: 'true',
-    RATATOSKR_DATA_DIR: '/nonexistent-not-used',
-    RATATOSKR_BASE_URL: 'http://localhost:8080',
-    RATATOSKR_CACHE_MESSAGES: '50',
+    DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
+    DREYMAIL_DEV_LOGIN: 'true',
+    DREYMAIL_DATA_DIR: '/nonexistent-not-used',
+    DREYMAIL_BASE_URL: 'http://localhost:8080',
+    DREYMAIL_CACHE_MESSAGES: '50',
   });
   store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
   ctx = await buildApp(config, { store, logger: false, cacheFile, pushTransport: async () => 'sent', pushHostCheck: async () => {} });
@@ -129,7 +133,7 @@ beforeAll(async () => {
     onEvent(u, e);
   };
   const login = await ctx.app.inject({ method: 'GET', url: '/auth/dev-login' });
-  cookie = `rk_session=${login.cookies.find((c) => c.name === 'rk_session')!.value}`;
+  cookie = `dm_session=${login.cookies.find((c) => c.name === 'dm_session')!.value}`;
   userId = (await api<Me>('GET', '/api/me')).json.id;
 
   for (const user of [HEDY, IVAN]) await withImap(user, async (c) => void (await c.mailboxCreate('Sent').catch(() => undefined)));

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AccountView } from '../../shared/types';
@@ -74,7 +78,7 @@ describe('opening the app for a mailto: link', () => {
     expect(takeMailtoParam('?q=hello')).toBeNull();
   });
 
-  it('registers Ratatoskr for mailto: links in the installed app', () => {
+  it('registers DreyMail for mailto: links in the installed app', () => {
     const manifest = JSON.parse(readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8'));
     expect(manifest.protocol_handlers).toEqual([{ protocol: 'mailto', url: '/?mailto=%s' }]);
   });

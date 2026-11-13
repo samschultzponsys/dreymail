@@ -1,4 +1,7 @@
 #!/bin/sh
+# Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+# Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+# Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 # Container entrypoint: runs the server as PUID:PGID so files in the data directory belong to the
 # user the host expects, e.g. 99:100 (nobody:users) on unRAID. Defaults to 1000:1000, the image's
 # `node` user, which is what earlier images ran as, so existing volumes keep working unchanged.
@@ -11,7 +14,7 @@
 set -eu
 
 fail() {
-  echo "ratatoskr: $*" >&2
+  echo "dreymail: $*" >&2
   exit 1
 }
 
@@ -31,7 +34,7 @@ fi
 
 # Hand the data directory over when anything in it belongs to someone else, e.g. a fresh unRAID
 # appdata folder, a volume written by an older image, or after changing PUID/PGID.
-data_dir="${RATATOSKR_DATA_DIR:-/data}"
+data_dir="${DREYMAIL_DATA_DIR:-/data}"
 mkdir -p "$data_dir"
 if [ -n "$(find "$data_dir" \( ! -user "$puid" -o ! -group "$pgid" \) | head -n 1)" ]; then
   chown -R "$puid:$pgid" "$data_dir"

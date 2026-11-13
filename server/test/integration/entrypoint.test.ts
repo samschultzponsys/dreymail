@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -6,13 +10,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * The container entrypoint (docker/entrypoint.sh), run for real in the Dockerfile's `base` stage:
  * the runtime image minus the app, so it builds in seconds.
  */
-const IMAGE = 'ratatoskr-entrypoint-test';
+const IMAGE = 'dreymail-entrypoint-test';
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 /** Prepares /data as root, then runs the entrypoint with `env`, which reports on itself. */
 function runEntrypoint(env: Record<string, string>, setup = 'true', report = 'id -u; id -g') {
   const envArgs = Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]);
-  const script = `${setup} && exec ratatoskr-entrypoint sh -c '${report}'`;
+  const script = `${setup} && exec dreymail-entrypoint sh -c '${report}'`;
   const r = spawnSync('docker', ['run', '--rm', ...envArgs, '--entrypoint', 'sh', IMAGE, '-c', script], {
     encoding: 'utf8',
   });
@@ -43,8 +47,8 @@ describe('container entrypoint', () => {
   it('hands the whole data directory over to PUID:PGID when it belongs to someone else', () => {
     const r = runEntrypoint(
       { PUID: '99', PGID: '100' },
-      'mkdir -p /data/sub && touch /data/ratatoskr.db /data/sub/f && chown -R 1000:1000 /data',
-      'stat -c %u:%g /data /data/ratatoskr.db /data/sub/f',
+      'mkdir -p /data/sub && touch /data/dreymail.db /data/sub/f && chown -R 1000:1000 /data',
+      'stat -c %u:%g /data /data/dreymail.db /data/sub/f',
     );
     expect(r.out).toEqual(['99:100', '99:100', '99:100']);
   });
@@ -52,14 +56,14 @@ describe('container entrypoint', () => {
   it('fixes ownership of files deeper in the data directory even when the directory itself is right', () => {
     const r = runEntrypoint(
       { PUID: '99', PGID: '100' },
-      'mkdir -p /data && touch /data/ratatoskr.db && chown 1000:1000 /data/ratatoskr.db && chown 99:100 /data',
-      'stat -c %u:%g /data/ratatoskr.db',
+      'mkdir -p /data && touch /data/dreymail.db && chown 1000:1000 /data/dreymail.db && chown 99:100 /data',
+      'stat -c %u:%g /data/dreymail.db',
     );
     expect(r.out).toEqual(['99:100']);
   });
 
-  it('creates and uses RATATOSKR_DATA_DIR when the data directory is moved', () => {
-    const r = runEntrypoint({ PUID: '99', PGID: '100', RATATOSKR_DATA_DIR: '/srv/mail' }, 'true', 'stat -c %u:%g /srv/mail');
+  it('creates and uses DREYMAIL_DATA_DIR when the data directory is moved', () => {
+    const r = runEntrypoint({ PUID: '99', PGID: '100', DREYMAIL_DATA_DIR: '/srv/mail' }, 'true', 'stat -c %u:%g /srv/mail');
     expect(r.out).toEqual(['99:100']);
   });
 

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { convert } from 'html-to-text';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import addressparser from 'nodemailer/lib/addressparser';
@@ -114,7 +118,7 @@ export async function buildRawMessage(
     // Never let message content reference local files or fetch URLs on the server.
     disableFileAccess: true,
     disableUrlAccess: true,
-    xMailer: 'Ratatoskr',
+    xMailer: 'DreyMail',
   });
   const node = composer.compile();
   if (opts.keepBcc) (node as unknown as { keepBcc: boolean }).keepBcc = true;

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, type App } from '../src/app.js';
@@ -120,16 +124,16 @@ describe('GET /api/avatar', () => {
   });
 
   async function setup(fetchImage: (url: string) => Promise<RemoteImage>) {
-    const config = loadConfig({ NODE_ENV: 'test', RATATOSKR_SECRET_KEY: crypto.randomBytes(48).toString('base64') });
+    const config = loadConfig({ NODE_ENV: 'test', DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64') });
     const store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
     ctx = await buildApp(config, { store, logger: false, avatars: new AvatarService({ fetchImage, resolveSrv: noSrv }) });
     const res = await ctx.app.inject({
       method: 'POST',
       url: '/auth/password/register',
       payload: { username: 'alice', password: 'a long password' },
-      headers: { 'x-ratatoskr': '1' },
+      headers: { 'x-dreymail': '1' },
     });
-    const c = res.cookies.find((c) => c.name === 'rk_session')!;
+    const c = res.cookies.find((c) => c.name === 'dm_session')!;
     const cookie = `${c.name}=${c.value}`;
     const get = (email: string) => ctx!.app.inject({ url: `/api/avatar?email=${encodeURIComponent(email)}`, headers: { cookie } });
     return { cookie, get };
@@ -163,7 +167,7 @@ describe('GET /api/avatar', () => {
       method: 'PUT',
       url: '/api/preferences',
       payload: { ...DEFAULT_PREFERENCES, contactPhotos: false },
-      headers: { cookie, 'x-ratatoskr': '1' },
+      headers: { cookie, 'x-dreymail': '1' },
     });
     expect(saved.statusCode).toBe(200);
     const res = await get('ada@example.org');

@@ -1,6 +1,8 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: sign-in settings service and administration routes.
+// Modified by samschultzponsys, 2026-11-13: dreymail.db and the one-time data upgrade.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,6 +29,7 @@ import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { LoginSettings } from './loginSettings.js';
+import { DB_FILE, moveOldDataFiles, rekeyOldSecrets } from './upgrade.js';
 import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
 
@@ -90,7 +93,9 @@ export async function buildApp(
     bodyLimit: 2 * 1024 * 1024,
   });
   const keyring = new Keyring(config.secretKey);
-  const store = opts.store ?? new Store(path.join(config.dataDir, 'ratatoskr.db'), keyring.credentialKey);
+  if (!opts.store) moveOldDataFiles(config.dataDir, (m) => app.log.info(m));
+  const store = opts.store ?? new Store(path.join(config.dataDir, DB_FILE), keyring.credentialKey);
+  rekeyOldSecrets(store, config.secretKey, (m) => app.log.info(m));
   const sessions = new Sessions(keyring.sessionKey, config.baseUrl.protocol === 'https:');
   const pool = new ImapPool(store, {
     idleTimeoutMs: config.imapIdleTimeoutMs,

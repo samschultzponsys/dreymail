@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import type { TlsMode } from '../../../shared/types.js';
@@ -60,7 +64,7 @@ export function createImapClient(s: ServerSettings, opts: ConnectOptions): ImapF
     connectionTimeout: 20_000,
     greetingTimeout: 15_000,
     socketTimeout: 6 * 60 * 1000,
-    clientInfo: { name: 'Ratatoskr' },
+    clientInfo: { name: 'DreyMail' },
   });
   // An unhandled 'error' event would crash the process; failures surface through promises.
   client.on('error', () => {});

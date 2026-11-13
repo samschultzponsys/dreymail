@@ -1,8 +1,12 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 /**
  * Development-only host matching, shared by the Vite dev server (Host header check) and the
  * backend (WebSocket Origin check in development).
  *
- * RATATOSKR_DEV_ALLOWED_HOST_SUFFIX lets one dev setup be reached through several reverse-proxied
+ * DREYMAIL_DEV_ALLOWED_HOST_SUFFIX lets one dev setup be reached through several reverse-proxied
  * hostnames that differ only in a leading part, e.g. `<port>--myworkspace--me.dev.example.com`.
  * The suffix must start with `.` or `--` so it can only match at a label/segment boundary.
  */
@@ -19,7 +23,7 @@ export function parseHostSuffix(raw: string | undefined): string | null {
   if (!value) return null;
   if (!SUFFIX_RE.test(value) || !value.slice(1).includes('.')) {
     throw new Error(
-      `RATATOSKR_DEV_ALLOWED_HOST_SUFFIX must start with "." or "--" and end in a domain (e.g. --myworkspace--me.dev.example.com), got ${JSON.stringify(raw)}`,
+      `DREYMAIL_DEV_ALLOWED_HOST_SUFFIX must start with "." or "--" and end in a domain (e.g. --myworkspace--me.dev.example.com), got ${JSON.stringify(raw)}`,
     );
   }
   return value;

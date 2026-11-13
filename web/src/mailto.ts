@@ -1,10 +1,14 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 /**
  * mailto: links (RFC 6068). Pure functions, no DOM access, so they can be unit tested.
  *
- * Ratatoskr handles mailto: links itself in three places:
+ * DreyMail handles mailto: links itself in three places:
  *   - links in plain-text bodies open the composer directly;
  *   - links in HTML mail (inside the scriptless, sandboxed frame, where clicks can't be caught)
- *     point at `/?mailto=…`, which opens Ratatoskr in a new tab with the composer ready;
+ *     point at `/?mailto=…`, which opens DreyMail in a new tab with the composer ready;
  *   - the browser can be told to send every mailto: link to `/?mailto=%s` (Settings, or the
  *     installed app's manifest).
  *
@@ -24,7 +28,7 @@ export interface MailtoFields {
 export const MAILTO_PARAM = 'mailto';
 
 /** sessionStorage key for a mailto: link waiting for the user to be signed in with an account. */
-export const PENDING_MAILTO_KEY = 'ratatoskr.pendingMailto';
+export const PENDING_MAILTO_KEY = 'dreymail.pendingMailto';
 
 const MAX_URL = 8000;
 const MAX_FIELD = 4000;

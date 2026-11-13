@@ -3,7 +3,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent).
      Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch).
      Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs).
-     Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings). -->
+     Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings).
+     Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -27,7 +28,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.4**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.5**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, and administration (users, OIDC sign-in) in the app. Settings
 are organised in tabs. What's planned is in
@@ -131,9 +132,9 @@ services:
     environment:
       - PUID=99
       - PGID=100
-      - RATATOSKR_BASE_URL=https://mail.example.com
-      - RATATOSKR_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
-      - RATATOSKR_TRUST_PROXY=true
+      - DREYMAIL_BASE_URL=https://mail.example.com
+      - DREYMAIL_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
+      - DREYMAIL_TRUST_PROXY=true
       - OIDC_ISSUER_URL=https://auth.example.com/application/o/dreymail/
       - OIDC_CLIENT_ID=dreymail
       - OIDC_CLIENT_SECRET=replace-with-the-client-secret
@@ -149,11 +150,11 @@ networks:
 
 1. Register an OIDC client at your identity provider (see [OIDC setup](#oidc-setup)), or drop the
    `OIDC_*` lines to use username/password login.
-2. Generate the secret key with `openssl rand -base64 48` and set `RATATOSKR_BASE_URL`.
+2. Generate the secret key with `openssl rand -base64 48` and set `DREYMAIL_BASE_URL`.
 3. Point your reverse proxy at `dreymail:8080`, open `https://mail.example.com`, sign in, and add
    your first mail account.
 
-The variables still use the upstream `RATATOSKR_*` names so existing deployments keep working.
+The variables still use the upstream `DREYMAIL_*` names so existing deployments keep working.
 Renaming them, with the old names still accepted, is on the [roadmap](ROADMAP.md). So is a
 settings page for all configuration (OIDC and the rest), with compose environment values
 overriding what's set there.
@@ -168,37 +169,52 @@ the data directory on start (it `chown`s it when anything in it belongs to someo
 (`user:` in Compose) also works; then it runs as that user, ignores `PUID`/`PGID` and changes no
 ownership.
 
+## Upgrading to 1.5 (new names)
+
+DreyMail 1.5 uses its own names throughout. In your compose file, rename every environment variable
+that starts with the old upstream prefix to start with `DREYMAIL_` instead (same suffix, e.g. the
+secret key becomes `DREYMAIL_SECRET_KEY`). DreyMail refuses to start with the old names and lists
+each one with its new name, so nothing is silently ignored. On first start it upgrades your data
+volume by itself:
+
+- the database file is renamed to `dreymail.db`;
+- stored mail passwords (and an OIDC client secret set in the UI) are re-encrypted with DreyMail's
+  own keys, from the same `DREYMAIL_SECRET_KEY` value;
+- the mail cache is rebuilt (it refills in the background);
+- everyone signs in once more, and each device's notifications re-register by themselves the next
+  time DreyMail is opened on it.
+
 ## Configuration
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `RATATOSKR_BASE_URL` | yes (prod) | `http://localhost:8080` | Public URL of the app. Used for the OIDC redirect URI, cookie `Secure` flag and WebSocket origin check. |
-| `RATATOSKR_SECRET_KEY` | yes | – | Master secret, at least 32 characters (`openssl rand -base64 48`). Subkeys for credential encryption, session cookies and URL signing are derived from it with HKDF. **If you change it, stored account passwords can no longer be decrypted.** |
-| `RATATOSKR_PASSWORD_LOGIN` | no | `true` without OIDC, `false` with OIDC | Username/password login. |
-| `RATATOSKR_REGISTRATION` | no | `first` | Who may create a password account: `open` (anyone), `first` (only the first user of an empty instance) or `closed`. |
+| `DREYMAIL_BASE_URL` | yes (prod) | `http://localhost:8080` | Public URL of the app. Used for the OIDC redirect URI, cookie `Secure` flag and WebSocket origin check. |
+| `DREYMAIL_SECRET_KEY` | yes | – | Master secret, at least 32 characters (`openssl rand -base64 48`). Subkeys for credential encryption, session cookies and URL signing are derived from it with HKDF. **If you change it, stored account passwords can no longer be decrypted.** |
+| `DREYMAIL_PASSWORD_LOGIN` | no | `true` without OIDC, `false` with OIDC | Username/password login. |
+| `DREYMAIL_REGISTRATION` | no | `first` | Who may create a password account: `open` (anyone), `first` (only the first user of an empty instance) or `closed`. |
 | `OIDC_ISSUER_URL` | for OIDC | – | Issuer URL; `/.well-known/openid-configuration` is discovered from it. |
 | `OIDC_CLIENT_ID` | for OIDC | – | Client ID. |
 | `OIDC_CLIENT_SECRET` | usually | – | Client secret (confidential client). |
 | `OIDC_SCOPES` | no | `openid email profile` | Requested scopes. |
 | `OIDC_LABEL` | no | `Single sign-on` | Provider name on the login button ("Sign in with …"), e.g. `Authentik`. |
-| `RATATOSKR_TRUST_PROXY` | no | `false` | Trust `X-Forwarded-*` headers. Set to `true` behind a reverse proxy. |
-| `RATATOSKR_DATA_DIR` | no | `./data` (`/data` in the image) | Where `ratatoskr.db` and the mail cache `cache.db` (SQLite) live. |
+| `DREYMAIL_TRUST_PROXY` | no | `false` | Trust `X-Forwarded-*` headers. Set to `true` behind a reverse proxy. |
+| `DREYMAIL_DATA_DIR` | no | `./data` (`/data` in the image) | Where `dreymail.db` and the mail cache `cache.db` (SQLite) live. |
 | `PUID` / `PGID` | no | `1000` / `1000` | Docker image only: user and group the server runs as and that owns the data directory. |
 | `UMASK` | no | – | Docker image only: umask for files the server creates, e.g. `022` or `002`. |
 | `PORT` / `HOST` | no | `8080` / `0.0.0.0` | Listen address. |
-| `RATATOSKR_BLOCK_PRIVATE_MAIL_HOSTS` | no | `false` | Refuse IMAP/SMTP hosts that resolve to private/internal addresses. Turn on if untrusted users can log in. Leave off if your mail server is on your LAN. |
-| `RATATOSKR_IMAP_IDLE_TIMEOUT` | no | `300` | Seconds before an unused pooled IMAP connection is closed. |
-| `RATATOSKR_MAX_MESSAGE_MB` | no | `50` | Largest message the server downloads for display. |
-| `RATATOSKR_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
-| `RATATOSKR_CACHE` | no | `true` | Keep a local copy of each account's newest INBOX and Sent mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
-| `RATATOSKR_CACHE_MESSAGES` | no | `2000` | Newest messages kept per cached folder (50–100000). Older mail is fetched from the mail server as you scroll. |
-| `RATATOSKR_CACHE_MAX_BODY_MB` | no | `1` | Largest message whose content is kept (`0`: keep no message content). |
-| `RATATOSKR_CACHE_ACCOUNT_MB` | no | `200` | Message content kept per account; the least recently read goes first. |
-| `RATATOSKR_VAPID_SUBJECT` | no | `RATATOSKR_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
-| `RATATOSKR_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
+| `DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS` | no | `false` | Refuse IMAP/SMTP hosts that resolve to private/internal addresses. Turn on if untrusted users can log in. Leave off if your mail server is on your LAN. |
+| `DREYMAIL_IMAP_IDLE_TIMEOUT` | no | `300` | Seconds before an unused pooled IMAP connection is closed. |
+| `DREYMAIL_MAX_MESSAGE_MB` | no | `50` | Largest message the server downloads for display. |
+| `DREYMAIL_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
+| `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest INBOX and Sent mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
+| `DREYMAIL_CACHE_MESSAGES` | no | `2000` | Newest messages kept per cached folder (50–100000). Older mail is fetched from the mail server as you scroll. |
+| `DREYMAIL_CACHE_MAX_BODY_MB` | no | `1` | Largest message whose content is kept (`0`: keep no message content). |
+| `DREYMAIL_CACHE_ACCOUNT_MB` | no | `200` | Message content kept per account; the least recently read goes first. |
+| `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
+| `DREYMAIL_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
 | `LOG_LEVEL` | no | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `RATATOSKR_DEV_LOGIN` | no | `false` | Development only: log in as a local dev user without a password or OIDC. Ignored when `NODE_ENV=production` (always set in the image). |
-| `RATATOSKR_DEV_ALLOWED_HOST_SUFFIX` | no | – | Development only: also serve the dev server on any host ending in this suffix (see [Development](#development)). Ignored when `NODE_ENV=production` and by the production build. |
+| `DREYMAIL_DEV_LOGIN` | no | `false` | Development only: log in as a local dev user without a password or OIDC. Ignored when `NODE_ENV=production` (always set in the image). |
+| `DREYMAIL_DEV_ALLOWED_HOST_SUFFIX` | no | – | Development only: also serve the dev server on any host ending in this suffix (see [Development](#development)). Ignored when `NODE_ENV=production` and by the production build. |
 
 ### Default account settings
 
@@ -207,14 +223,14 @@ If your users all get their mail from the same provider, set the server details 
 
 | Variable | Description |
 | --- | --- |
-| `RATATOSKR_DEFAULT_IMAP_HOST` / `RATATOSKR_DEFAULT_SMTP_HOST` | Incoming and outgoing server. |
-| `RATATOSKR_DEFAULT_IMAP_SECURITY` / `RATATOSKR_DEFAULT_SMTP_SECURITY` | `tls` (default), `starttls` or `none`. |
-| `RATATOSKR_DEFAULT_IMAP_PORT` / `RATATOSKR_DEFAULT_SMTP_PORT` | Defaults to the standard port for the security mode (993/143, 465/587). |
-| `RATATOSKR_DEFAULT_MAIL_USERNAME` | Username for IMAP and SMTP. |
-| `RATATOSKR_DEFAULT_EMAIL` | Email address of the account. |
-| `RATATOSKR_DEFAULT_DISPLAY_NAME` | Name shown to recipients. |
-| `RATATOSKR_DEFAULT_ACCOUNT_LABEL` | Account label in the sidebar. |
-| `RATATOSKR_DEFAULT_MAIL_PASSWORD` | Optional shared password for IMAP and SMTP. |
+| `DREYMAIL_DEFAULT_IMAP_HOST` / `DREYMAIL_DEFAULT_SMTP_HOST` | Incoming and outgoing server. |
+| `DREYMAIL_DEFAULT_IMAP_SECURITY` / `DREYMAIL_DEFAULT_SMTP_SECURITY` | `tls` (default), `starttls` or `none`. |
+| `DREYMAIL_DEFAULT_IMAP_PORT` / `DREYMAIL_DEFAULT_SMTP_PORT` | Defaults to the standard port for the security mode (993/143, 465/587). |
+| `DREYMAIL_DEFAULT_MAIL_USERNAME` | Username for IMAP and SMTP. |
+| `DREYMAIL_DEFAULT_EMAIL` | Email address of the account. |
+| `DREYMAIL_DEFAULT_DISPLAY_NAME` | Name shown to recipients. |
+| `DREYMAIL_DEFAULT_ACCOUNT_LABEL` | Account label in the sidebar. |
+| `DREYMAIL_DEFAULT_MAIL_PASSWORD` | Optional shared password for IMAP and SMTP. |
 
 All of them except the password can contain tokens that are filled in for each user:
 
@@ -227,11 +243,11 @@ If a user has no value for a token (an OIDC user without an email address, say),
 empty instead. A misspelled token stops the server from starting.
 
 ```env
-RATATOSKR_DEFAULT_IMAP_HOST=imap.example.com
-RATATOSKR_DEFAULT_SMTP_HOST=smtp.example.com
-RATATOSKR_DEFAULT_MAIL_USERNAME={username}@example.com
-RATATOSKR_DEFAULT_EMAIL={username}@example.com
-RATATOSKR_DEFAULT_DISPLAY_NAME={name}
+DREYMAIL_DEFAULT_IMAP_HOST=imap.example.com
+DREYMAIL_DEFAULT_SMTP_HOST=smtp.example.com
+DREYMAIL_DEFAULT_MAIL_USERNAME={username}@example.com
+DREYMAIL_DEFAULT_EMAIL={username}@example.com
+DREYMAIL_DEFAULT_DISPLAY_NAME={name}
 ```
 
 The default password is taken literally and never sent to the browser. When a user leaves the
@@ -243,7 +259,7 @@ account at a different host, they have to enter that host's password themselves.
 DreyMail is an installable web app (PWA) and can send notifications for new mail through the
 browsers' standard Web Push services. No native app, no Firebase or Apple developer account and
 no extra configuration are needed. The push keys (VAPID) are derived from
-`RATATOSKR_SECRET_KEY`. HTTPS is required.
+`DREYMAIL_SECRET_KEY`. HTTPS is required.
 
 Each user turns notifications on per device in **Settings → Notifications**:
 
@@ -289,7 +305,7 @@ folder named "Snoozed", and creates one if there is none. IMAP has no way to sto
 should come back, so DreyMail keeps the wake-up time in its database and runs the timer itself.
 
 When the time comes, the message goes back to INBOX as unread, with the current time as its arrival
-date, so it is at the top of the list. Messages larger than `RATATOSKR_MAX_MESSAGE_MB` are moved
+date, so it is at the top of the list. Messages larger than `DREYMAIL_MAX_MESSAGE_MB` are moved
 back as they are and keep their old date. Then:
 
 - your devices with notifications on get a "Back from snooze" notification (same content setting
@@ -307,19 +323,19 @@ stays where you put it.
 Two login methods are available, alone or together:
 
 - **Username and password.** On by default when no OIDC provider is configured. With OIDC, turn
-  it on with `RATATOSKR_PASSWORD_LOGIN=true`. Usernames are case-insensitive (an email address
+  it on with `DREYMAIL_PASSWORD_LOGIN=true`. Usernames are case-insensitive (an email address
   works); passwords need at least 10 characters and are stored as scrypt hashes. By default only
-  the first person to open a fresh instance can create an account (`RATATOSKR_REGISTRATION=first`).
-  To let others sign up, set `RATATOSKR_REGISTRATION=open` (for a while, or permanently on a
+  the first person to open a fresh instance can create an account (`DREYMAIL_REGISTRATION=first`).
+  To let others sign up, set `DREYMAIL_REGISTRATION=open` (for a while, or permanently on a
   private network), then back to `closed`. With open registration on a public instance, also set
-  `RATATOSKR_BLOCK_PRIVATE_MAIL_HOSTS=true` so strangers can't point IMAP/SMTP at your LAN. After
+  `DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS=true` so strangers can't point IMAP/SMTP at your LAN. After
   10 wrong passwords for one username, or 30 from one IP address, logins are refused for 15 minutes. Users change their password in **Settings**.
 - **OpenID Connect** (Authentik, Keycloak, …): see below.
 
 Password users and OIDC users are separate accounts, even if they share an email address.
 
 Sessions are encrypted cookies valid for 14 days. They can't be revoked one by one: changing a
-password doesn't sign out other devices. Changing `RATATOSKR_SECRET_KEY` signs everyone out (and
+password doesn't sign out other devices. Changing `DREYMAIL_SECRET_KEY` signs everyone out (and
 makes stored mail passwords unreadable).
 
 ### OIDC setup
@@ -344,8 +360,8 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
 
 ### Reverse proxy notes
 
-- Terminate TLS at the proxy and set `RATATOSKR_BASE_URL` to the public `https://` URL and
-  `RATATOSKR_TRUST_PROXY=true`.
+- Terminate TLS at the proxy and set `DREYMAIL_BASE_URL` to the public `https://` URL and
+  `DREYMAIL_TRUST_PROXY=true`.
 - **WebSockets** must be proxied on `/api/ws` (live updates). Nginx:
 
   ```nginx
@@ -363,7 +379,7 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
   ```
 
   Caddy and Traefik proxy WebSockets automatically.
-- Allow request bodies at least as large as `RATATOSKR_MAX_UPLOAD_MB` (plus a little overhead).
+- Allow request bodies at least as large as `DREYMAIL_MAX_UPLOAD_MB` (plus a little overhead).
 - Serve DreyMail on its own (sub)domain, not under a path prefix.
 
 ### Mail cache
@@ -371,10 +387,10 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
 Asking the mail server for everything on every click is slow: one page of a folder takes several
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
 searches that some servers are slow at. So DreyMail keeps a copy of the newest messages
-(`RATATOSKR_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder:
+(`DREYMAIL_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder:
 sender, subject, snippet, flags and the headers that tie conversations together. It also keeps the
 content of messages you have opened, and loads the newest unread ones ahead, up to
-`RATATOSKR_CACHE_MAX_BODY_MB` per message and `RATATOSKR_CACHE_ACCOUNT_MB` per account. The limits
+`DREYMAIL_CACHE_MAX_BODY_MB` per message and `DREYMAIL_CACHE_ACCOUNT_MB` per account. The limits
 are server settings; users can't change them.
 
 The mail server stays the source of truth:
@@ -396,7 +412,7 @@ The mail server stays the source of truth:
   stopped is always safe.
 
 What is stored and how: subjects, addresses, snippets, Message-IDs, References and message content
-are encrypted with AES-256-GCM (a key derived from `RATATOSKR_SECRET_KEY`), each entry bound to its
+are encrypted with AES-256-GCM (a key derived from `DREYMAIL_SECRET_KEY`), each entry bound to its
 user, account, folder and message, so a copied row doesn't decrypt elsewhere. Conversations are
 matched through keyed hashes (HMAC) of the Message-IDs, not the IDs themselves. Readable in the file
 are only what queries need: folder names, UIDs, arrival times, sizes and the read/flagged/answered/
@@ -459,26 +475,26 @@ tests).
 
 ```sh
 npm install
-cp .env.example .env          # set RATATOSKR_SECRET_KEY; without OIDC you get password login (or use RATATOSKR_DEV_LOGIN=true)
+cp .env.example .env          # set DREYMAIL_SECRET_KEY; without OIDC you get password login (or use DREYMAIL_DEV_LOGIN=true)
 PORT=5173 npm run dev         # Vite on $PORT, backend on $PORT+1 (proxied under /api and /auth)
 ```
 
 In a git worktree (`git worktree add`), `npm run dev` also reads the main checkout's `.env`, so one
 file serves every worktree. A `.env` in the worktree overrides single values from it, and real
 environment variables override both. The database is not shared: each worktree keeps its own
-`./data` (a relative `RATATOSKR_DATA_DIR` is relative to the worktree), because branches with
+`./data` (a relative `DREYMAIL_DATA_DIR` is relative to the worktree), because branches with
 different migrations would break each other's schema.
 
-If you open the dev server through a reverse proxy, set `RATATOSKR_BASE_URL` to that public URL.
+If you open the dev server through a reverse proxy, set `DREYMAIL_BASE_URL` to that public URL.
 Vite only accepts that host name (plus `localhost`).
 
 If the same setup is reached through several proxied hostnames that differ only in a leading part
 (e.g. one per port: `5173--myworkspace--me.dev.example.com`, `40140--myworkspace--me.dev.example.com`),
-also set `RATATOSKR_DEV_ALLOWED_HOST_SUFFIX=--myworkspace--me.dev.example.com`. The suffix must
+also set `DREYMAIL_DEV_ALLOWED_HOST_SUFFIX=--myworkspace--me.dev.example.com`. The suffix must
 start with `.` or `--` and is matched exactly at the end of the host name, so lookalikes such as
 `…dev.example.com.evil.test` are refused. In development the WebSocket origin check then follows
 the request host, and dev login works on each of those hosts (cookies are per host, so log in once
-per host). OIDC still needs the real `RATATOSKR_BASE_URL`: its redirect URI is built from it, so OIDC
+per host). OIDC still needs the real `DREYMAIL_BASE_URL`: its redirect URI is built from it, so OIDC
 logins always return to that one host.
 
 | Command | What it does |

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,7 +15,7 @@ import { Keyring } from '../src/crypto.js';
 import { Store } from '../src/db.js';
 
 const SECRET = crypto.randomBytes(48).toString('base64');
-const base = { NODE_ENV: 'test', RATATOSKR_SECRET_KEY: SECRET };
+const base = { NODE_ENV: 'test', DREYMAIL_SECRET_KEY: SECRET };
 
 describe('password hashing', () => {
   it('accepts the right password and rejects a wrong one', async () => {
@@ -66,8 +70,8 @@ describe('failed attempt limiter', () => {
 
 describe('database upgrade', () => {
   it('upgrades a shared dev database that got the password column before the snooze table', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rk-migrate-'));
-    const file = path.join(dir, 'ratatoskr.db');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-migrate-'));
+    const file = path.join(dir, 'dreymail.db');
     try {
       const key = crypto.randomBytes(32);
       new Store(file, key).close();
@@ -96,17 +100,17 @@ describe('login configuration', () => {
   it('keeps password login off by default when OIDC is configured, unless switched on', () => {
     const oidc = { ...base, OIDC_ISSUER_URL: 'https://auth.example.com/', OIDC_CLIENT_ID: 'rk' };
     expect(loadConfig(oidc).passwordLogin).toBe(false);
-    expect(loadConfig({ ...oidc, RATATOSKR_PASSWORD_LOGIN: 'true' }).passwordLogin).toBe(true);
+    expect(loadConfig({ ...oidc, DREYMAIL_PASSWORD_LOGIN: 'true' }).passwordLogin).toBe(true);
     expect(loadConfig(oidc).oidc?.label).toBe('Single sign-on');
     expect(loadConfig({ ...oidc, OIDC_LABEL: 'Authentik' }).oidc?.label).toBe('Authentik');
   });
 
   it('refuses to start without any way to log in', () => {
-    expect(() => loadConfig({ ...base, RATATOSKR_PASSWORD_LOGIN: 'false' })).toThrow(/login method/);
+    expect(() => loadConfig({ ...base, DREYMAIL_PASSWORD_LOGIN: 'false' })).toThrow(/login method/);
   });
 
   it('rejects an unknown registration mode', () => {
-    expect(() => loadConfig({ ...base, RATATOSKR_REGISTRATION: 'invite' })).toThrow(/RATATOSKR_REGISTRATION/);
+    expect(() => loadConfig({ ...base, DREYMAIL_REGISTRATION: 'invite' })).toThrow(/DREYMAIL_REGISTRATION/);
   });
 });
 
@@ -128,11 +132,11 @@ describe('password login over HTTP', () => {
       method: 'POST',
       url,
       payload: payload as object,
-      headers: { ...(csrf ? { 'x-ratatoskr': '1' } : {}), ...(cookie ? { cookie } : {}) },
+      headers: { ...(csrf ? { 'x-dreymail': '1' } : {}), ...(cookie ? { cookie } : {}) },
     });
   const cookieOf = (res: { cookies: { name: string; value: string }[] }) => {
-    const c = res.cookies.find((c) => c.name === 'rk_session');
-    return c ? `rk_session=${c.value}` : undefined;
+    const c = res.cookies.find((c) => c.name === 'dm_session');
+    return c ? `dm_session=${c.value}` : undefined;
   };
   const me = (cookie?: string) => ctx!.app.inject({ method: 'GET', url: '/api/me', headers: cookie ? { cookie } : {} });
 
@@ -156,14 +160,14 @@ describe('password login over HTTP', () => {
   });
 
   it('allows anyone to register when registration is open, but not twice with the same username', async () => {
-    await start({ RATATOSKR_REGISTRATION: 'open' });
+    await start({ DREYMAIL_REGISTRATION: 'open' });
     expect((await post('/auth/password/register', { username: 'alice', password: 'a long password' })).statusCode).toBe(200);
     expect((await post('/auth/password/register', { username: 'bob', password: 'another password' })).statusCode).toBe(200);
     expect((await post('/auth/password/register', { username: 'ALICE', password: 'a third password' })).statusCode).toBe(409);
   });
 
   it('refuses all registration when it is closed', async () => {
-    await start({ RATATOSKR_REGISTRATION: 'closed' });
+    await start({ DREYMAIL_REGISTRATION: 'closed' });
     expect((await post('/auth/password/register', { username: 'alice', password: 'a long password' })).statusCode).toBe(403);
   });
 
@@ -208,7 +212,7 @@ describe('password login over HTTP', () => {
     await start();
     const cookie = cookieOf(await post('/auth/password/register', { username: 'alice', password: 'a long password' }))!;
     const put = (payload: unknown) =>
-      ctx!.app.inject({ method: 'PUT', url: '/api/password', payload: payload as object, headers: { cookie, 'x-ratatoskr': '1' } });
+      ctx!.app.inject({ method: 'PUT', url: '/api/password', payload: payload as object, headers: { cookie, 'x-dreymail': '1' } });
 
     expect((await put({ current: 'wrong password', next: 'a brand new password' })).statusCode).toBe(403);
     expect((await put({ current: 'a long password', next: 'short' })).statusCode).toBe(400);
@@ -220,7 +224,7 @@ describe('password login over HTTP', () => {
 
   it('does not send password users to the OIDC provider on logout', async () => {
     // The issuer is never contacted: a password session logs out locally.
-    await start({ OIDC_ISSUER_URL: 'https://auth.invalid/', OIDC_CLIENT_ID: 'rk', RATATOSKR_PASSWORD_LOGIN: 'true' });
+    await start({ OIDC_ISSUER_URL: 'https://auth.invalid/', OIDC_CLIENT_ID: 'rk', DREYMAIL_PASSWORD_LOGIN: 'true' });
     expect((await ctx!.app.inject({ url: '/auth/methods' })).json()).toMatchObject({ password: true, oidc: { label: 'Single sign-on' } });
     const cookie = cookieOf(await post('/auth/password/register', { username: 'alice', password: 'a long password' }))!;
     const res = await post('/auth/logout', {}, cookie);
@@ -228,7 +232,7 @@ describe('password login over HTTP', () => {
   });
 
   it('has no password endpoints when password login is off', async () => {
-    await start({ RATATOSKR_PASSWORD_LOGIN: 'false', RATATOSKR_DEV_LOGIN: 'true' });
+    await start({ DREYMAIL_PASSWORD_LOGIN: 'false', DREYMAIL_DEV_LOGIN: 'true' });
     expect((await ctx!.app.inject({ url: '/auth/methods' })).json()).toMatchObject({ password: false, registration: false, dev: true });
     expect((await post('/auth/password/login', { username: 'alice', password: 'a long password' })).statusCode).toBe(404);
     expect((await post('/auth/password/register', { username: 'alice', password: 'a long password' })).statusCode).toBe(404);

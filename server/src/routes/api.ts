@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference validation.
 // Modified by samschultzponsys, 2026-11-13: signature API (list, create, update, delete).
 // Modified by samschultzponsys, 2026-11-13: Me.admin.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -165,7 +166,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     req.user = user;
     // State-changing requests must carry a custom header. Browsers only allow that from our own
     // origin (it would require a CORS preflight, which we never grant).
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-ratatoskr'] !== '1') {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-dreymail'] !== '1') {
       return reply.code(403).send({ error: 'Missing CSRF header' });
     }
   });

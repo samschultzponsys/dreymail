@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -46,7 +50,7 @@ async function api<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unk
   const res = await ctx.app.inject({
     method,
     url,
-    headers: { cookie, 'x-ratatoskr': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { cookie, 'x-dreymail': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     payload: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return { status: res.statusCode, json: JSON.parse(res.body) as T };
@@ -83,15 +87,15 @@ const tracking = () => until(() => store.getInboxState(userId, account.id) !== n
 beforeAll(async () => {
   config = loadConfig({
     NODE_ENV: 'test',
-    RATATOSKR_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
-    RATATOSKR_DEV_LOGIN: 'true',
-    RATATOSKR_DATA_DIR: '/nonexistent-not-used',
-    RATATOSKR_BASE_URL: 'http://localhost:8080',
+    DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
+    DREYMAIL_DEV_LOGIN: 'true',
+    DREYMAIL_DATA_DIR: '/nonexistent-not-used',
+    DREYMAIL_BASE_URL: 'http://localhost:8080',
   });
   store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
   await start();
   const login = await ctx.app.inject({ method: 'GET', url: '/auth/dev-login' });
-  cookie = `rk_session=${login.cookies.find((c) => c.name === 'rk_session')!.value}`;
+  cookie = `dm_session=${login.cookies.find((c) => c.name === 'dm_session')!.value}`;
   userId = (await api<Me>('GET', '/api/me')).json.id;
 
   await deliver('Already there before notifications');
@@ -148,7 +152,7 @@ describe('phone notifications for new mail', () => {
     expect(sent[0]!.subscription.endpoint).toBe(phone.endpoint);
   });
 
-  it('closes the notification on the phone once the message is read in Ratatoskr', async () => {
+  it('closes the notification on the phone once the message is read in DreyMail', async () => {
     sent.length = 0;
     await deliver('Read me in the app');
     expect(await until(() => titles().includes('Read me in the app'))).toBe(true);

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,15 +31,15 @@ describe('isSpaRequest', () => {
 
 describe('SPA fallback in the production server', () => {
   let ctx: App;
-  const webDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rk-web-'));
+  const webDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-web-'));
 
   beforeAll(async () => {
     fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
     const config = loadConfig({
       NODE_ENV: 'test',
-      RATATOSKR_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
-      RATATOSKR_DEV_LOGIN: 'true',
-      RATATOSKR_WEB_DIR: webDir,
+      DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
+      DREYMAIL_DEV_LOGIN: 'true',
+      DREYMAIL_WEB_DIR: webDir,
     });
     ctx = await buildApp(config, { store: new Store(':memory:', new Keyring(config.secretKey).credentialKey), logger: false });
   });

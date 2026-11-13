@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -56,7 +60,7 @@ async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, bo
   const res = await ctx.app.inject({
     method,
     url,
-    headers: { cookie, 'x-ratatoskr': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { cookie, 'x-dreymail': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     payload: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return { status: res.statusCode, json: res.body ? (JSON.parse(res.body) as T) : (undefined as T) };
@@ -70,7 +74,7 @@ async function multipart<T>(url: string, payload: ComposePayload, files: { name:
   const res = await ctx.app.inject({
     method: 'POST',
     url,
-    headers: { cookie, 'x-ratatoskr': '1', 'content-type': req.headers.get('content-type')! },
+    headers: { cookie, 'x-dreymail': '1', 'content-type': req.headers.get('content-type')! },
     payload: Buffer.from(await req.arrayBuffer()),
   });
   return { status: res.statusCode, json: JSON.parse(res.body) as T };
@@ -112,10 +116,10 @@ const until = async (fn: () => Promise<boolean>, ms = 15_000) => {
 beforeAll(async () => {
   const config = loadConfig({
     NODE_ENV: 'test',
-    RATATOSKR_SECRET_KEY: (secretKey = crypto.randomBytes(48).toString('base64')),
-    RATATOSKR_DEV_LOGIN: 'true',
-    RATATOSKR_DATA_DIR: '/nonexistent-not-used',
-    RATATOSKR_BASE_URL: 'http://localhost:8080',
+    DREYMAIL_SECRET_KEY: (secretKey = crypto.randomBytes(48).toString('base64')),
+    DREYMAIL_DEV_LOGIN: 'true',
+    DREYMAIL_DATA_DIR: '/nonexistent-not-used',
+    DREYMAIL_BASE_URL: 'http://localhost:8080',
   });
   const store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
   // Remote images: only img.example.com "exists"; everything else fails like an unreachable host.
@@ -126,8 +130,8 @@ beforeAll(async () => {
   ctx = await buildApp(config, { store, logger: false, fetchImage });
 
   const login = await ctx.app.inject({ method: 'GET', url: '/auth/dev-login' });
-  cookie = String(login.cookies.find((c) => c.name === 'rk_session')!.value);
-  cookie = `rk_session=${cookie}`;
+  cookie = String(login.cookies.find((c) => c.name === 'dm_session')!.value);
+  cookie = `dm_session=${cookie}`;
 
   // Seed: special folders for alice, and messages with distinct dates for both users.
   const a = imapClient(ALICE);
@@ -268,12 +272,12 @@ describe('reading', () => {
 
   it('does not let one user see or touch another user\'s accounts', async () => {
     const mallory = ctx.store.upsertUser('https://auth.example.com', 'mallory', 'mallory@example.com', 'Mallory');
-    const malloryCookie = `rk_session=${sealJson(new Keyring(secretKey).sessionKey, { uid: mallory.id }, 600, 'session')}`;
+    const malloryCookie = `dm_session=${sealJson(new Keyring(secretKey).sessionKey, { uid: mallory.id }, 600, 'session')}`;
     const as = (method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown) =>
       ctx.app.inject({
         method,
         url,
-        headers: { cookie: malloryCookie, 'x-ratatoskr': '1', ...(body ? { 'content-type': 'application/json' } : {}) },
+        headers: { cookie: malloryCookie, 'x-dreymail': '1', ...(body ? { 'content-type': 'application/json' } : {}) },
         payload: body ? JSON.stringify(body) : undefined,
       });
     const [msg] = await listAll(`accountId=${accounts.alice!.id}&folder=INBOX&limit=1`);
@@ -604,12 +608,12 @@ describe('sender-domain image allowlist', () => {
     (await api<MessageDetail>('GET', `/api/message?${refs[name]}${remote ? `&remote=${remote}` : ''}`)).json;
   const asMallory = () => {
     const mallory = ctx.store.upsertUser('https://auth.example.com', 'mallory', 'mallory@example.com', 'Mallory');
-    const malloryCookie = `rk_session=${sealJson(new Keyring(secretKey).sessionKey, { uid: mallory.id }, 600, 'session')}`;
+    const malloryCookie = `dm_session=${sealJson(new Keyring(secretKey).sessionKey, { uid: mallory.id }, 600, 'session')}`;
     return async (method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown) => {
       const res = await ctx.app.inject({
         method,
         url,
-        headers: { cookie: malloryCookie, 'x-ratatoskr': '1', ...(body ? { 'content-type': 'application/json' } : {}) },
+        headers: { cookie: malloryCookie, 'x-dreymail': '1', ...(body ? { 'content-type': 'application/json' } : {}) },
         payload: body ? JSON.stringify(body) : undefined,
       });
       return { status: res.statusCode, json: JSON.parse(res.body) as unknown };

@@ -1,8 +1,12 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { openJson, sealJson } from '../crypto.js';
 
-export const SESSION_COOKIE = 'rk_session';
-export const LOGIN_COOKIE = 'rk_login';
+export const SESSION_COOKIE = 'dm_session';
+export const LOGIN_COOKIE = 'dm_login';
 const SESSION_TTL = 14 * 24 * 3600;
 const LOGIN_TTL = 10 * 60;
 

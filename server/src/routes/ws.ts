@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { isDevHostAllowed } from '../../../shared/devHosts.js';
@@ -12,7 +16,7 @@ import type { Sessions } from '../auth/session.js';
  *
  * Production accepts exactly what it always has. In development the allowed origin may also follow
  * the request's Host, as long as that Host is one the dev setup serves (localhost, the base URL's
- * host or RATATOSKR_DEV_ALLOWED_HOST_SUFFIX), so one dev server works behind several proxied
+ * host or DREYMAIL_DEV_ALLOWED_HOST_SUFFIX), so one dev server works behind several proxied
  * hostnames/ports. The scheme is not compared there: behind a TLS-terminating proxy and Vite's
  * proxy the backend only ever sees plain http.
  */

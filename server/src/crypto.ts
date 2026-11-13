@@ -1,7 +1,12 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own key-derivation salt (old data is upgraded by upgrade.ts).
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 
 /**
- * All server-side cryptography derives from one master secret (RATATOSKR_SECRET_KEY).
+ * All server-side cryptography derives from one master secret (DREYMAIL_SECRET_KEY).
  * Independent subkeys are derived with HKDF so that, e.g., a session cookie can never be
  * decrypted as an account credential or vice versa.
  */
@@ -15,11 +20,12 @@ export class Keyring {
   /** Keyed hashes of Message-IDs in the mail cache, so conversations can be matched without storing the IDs. */
   readonly cacheIndexKey: Buffer;
 
-  constructor(masterSecret: string) {
+  /** `salt` is DreyMail's own; only the one-time data upgrade (upgrade.ts) passes another. */
+  constructor(masterSecret: string, salt = 'dreymail') {
     if (masterSecret.length < 32) throw new Error('Master secret must be at least 32 characters');
     const ikm = Buffer.from(masterSecret, 'utf8');
     const derive = (info: string) =>
-      Buffer.from(crypto.hkdfSync('sha256', ikm, Buffer.from('ratatoskr'), Buffer.from(info), 32));
+      Buffer.from(crypto.hkdfSync('sha256', ikm, Buffer.from(salt), Buffer.from(info), 32));
     this.credentialKey = derive('account-credentials-v1');
     this.sessionKey = derive('session-cookie-v1');
     this.vapidSeed = derive('web-push-vapid-v1');

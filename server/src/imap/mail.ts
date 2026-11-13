@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
   AccountCursor,
@@ -35,7 +39,7 @@ const SPECIAL_USE: Record<string, SpecialUse> = {
   '\\Junk': 'junk',
   '\\All': 'all',
   '\\Flagged': 'flagged',
-  // RFC 9979. Only marks the folder; IMAP has no wake-up time, so Ratatoskr keeps that itself.
+  // RFC 9979. Only marks the folder; IMAP has no wake-up time, so DreyMail keeps that itself.
   '\\Snoozed': 'snoozed',
 };
 

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +22,7 @@ const keysOf = (s: string) => {
 
 const dirs: string[] = [];
 const tempFile = () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ratatoskr-cache-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dreymail-cache-'));
   dirs.push(dir);
   return path.join(dir, 'cache.db');
 };
@@ -241,15 +245,15 @@ describe('mail cache storage', () => {
 });
 
 describe('mail cache settings', () => {
-  const base = { RATATOSKR_SECRET_KEY: secret(), RATATOSKR_DEV_LOGIN: 'true' };
+  const base = { DREYMAIL_SECRET_KEY: secret(), DREYMAIL_DEV_LOGIN: 'true' };
 
   it('is on by default with 2000 messages per folder, 1 MB per message and 200 MB per account', () => {
     expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 2000, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
   });
 
   it('can be switched off or sized by the administrator', () => {
-    expect(loadConfig({ ...base, RATATOSKR_CACHE: 'false' }).cache).toBeNull();
-    expect(loadConfig({ ...base, RATATOSKR_CACHE_MESSAGES: '500', RATATOSKR_CACHE_MAX_BODY_MB: '0.5', RATATOSKR_CACHE_ACCOUNT_MB: '50' }).cache).toEqual({
+    expect(loadConfig({ ...base, DREYMAIL_CACHE: 'false' }).cache).toBeNull();
+    expect(loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '500', DREYMAIL_CACHE_MAX_BODY_MB: '0.5', DREYMAIL_CACHE_ACCOUNT_MB: '50' }).cache).toEqual({
       messagesPerFolder: 500,
       maxBodyBytes: 512 * 1024,
       bodyBytesPerAccount: 50 * 1024 * 1024,
@@ -257,7 +261,7 @@ describe('mail cache settings', () => {
   });
 
   it('rejects an unreasonable number of messages per folder', () => {
-    expect(() => loadConfig({ ...base, RATATOSKR_CACHE_MESSAGES: '10' })).toThrow(/RATATOSKR_CACHE_MESSAGES/);
-    expect(() => loadConfig({ ...base, RATATOSKR_CACHE_MESSAGES: '10000000' })).toThrow(/RATATOSKR_CACHE_MESSAGES/);
+    expect(() => loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '10' })).toThrow(/DREYMAIL_CACHE_MESSAGES/);
+    expect(() => loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '10000000' })).toThrow(/DREYMAIL_CACHE_MESSAGES/);
   });
 });

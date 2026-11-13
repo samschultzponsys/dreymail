@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
@@ -17,20 +21,20 @@ afterEach(async () => {
 });
 
 async function start(env: Record<string, string> = {}) {
-  const config = loadConfig({ RATATOSKR_SECRET_KEY: secret, ...env });
+  const config = loadConfig({ DREYMAIL_SECRET_KEY: secret, ...env });
   const store = new Store(':memory:', new Keyring(secret).credentialKey);
   ctx = await buildApp(config, { store, logger: false });
   return store;
 }
 
 async function register(username: string) {
-  const res = await ctx!.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username, password: 'a long password' }, headers: { 'x-ratatoskr': '1' } });
+  const res = await ctx!.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username, password: 'a long password' }, headers: { 'x-dreymail': '1' } });
   expect(res.statusCode).toBe(200);
-  return `rk_session=${res.cookies.find((c) => c.name === 'rk_session')!.value}`;
+  return `dm_session=${res.cookies.find((c) => c.name === 'dm_session')!.value}`;
 }
 
 async function call<T>(cookie: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: unknown) {
-  const res = await ctx!.app.inject({ method, url, payload: payload as object, headers: { cookie, 'x-ratatoskr': '1' } });
+  const res = await ctx!.app.inject({ method, url, payload: payload as object, headers: { cookie, 'x-dreymail': '1' } });
   return { status: res.statusCode, json: (res.body ? JSON.parse(res.body) : null) as T };
 }
 
@@ -49,7 +53,7 @@ const loginInput = (over: Partial<LoginSettingsInput> = {}): LoginSettingsInput 
 
 describe('administrators', () => {
   it('the first user is the administrator; later ones are not', async () => {
-    await start({ RATATOSKR_REGISTRATION: 'open' });
+    await start({ DREYMAIL_REGISTRATION: 'open' });
     const sam = await register('sam');
     const eve = await register('eve');
     expect((await call<Me>(sam, 'GET', '/api/me')).json.admin).toBe(true);
@@ -59,7 +63,7 @@ describe('administrators', () => {
   });
 
   it('DREYMAIL_ADMIN_USERS makes users administrators', async () => {
-    await start({ DREYMAIL_ADMIN_USERS: 'Eve, someone@example.com', RATATOSKR_REGISTRATION: 'open' });
+    await start({ DREYMAIL_ADMIN_USERS: 'Eve, someone@example.com', DREYMAIL_REGISTRATION: 'open' });
     await register('sam');
     const eve = await register('eve');
     expect((await call<Me>(eve, 'GET', '/api/me')).json.admin).toBe(true);
@@ -77,7 +81,7 @@ describe('administrators', () => {
     expect((await call(sam, 'POST', '/api/admin/users', { username: 'alice', password: 'another long password' })).status).toBe(409);
     res = await call<AdminUser[]>(sam, 'PATCH', `/api/admin/users/${alice.id}`, { admin: true, password: 'a brand new password' });
     expect(res.json.find((u) => u.id === alice.id)!.admin).toBe(true);
-    const login = await ctx!.app.inject({ method: 'POST', url: '/auth/password/login', payload: { username: 'alice', password: 'a brand new password' }, headers: { 'x-ratatoskr': '1' } });
+    const login = await ctx!.app.inject({ method: 'POST', url: '/auth/password/login', payload: { username: 'alice', password: 'a brand new password' }, headers: { 'x-dreymail': '1' } });
     expect(login.statusCode).toBe(200);
     res = await call<AdminUser[]>(sam, 'DELETE', `/api/admin/users/${alice.id}`);
     expect(res.json.map((u) => u.username)).toEqual(['sam']);
@@ -110,12 +114,12 @@ describe('sign-in settings in the UI', () => {
   });
 
   it('environment variables override the UI and show as locked', async () => {
-    await start({ OIDC_ISSUER_URL: 'https://env.example.com/', OIDC_CLIENT_ID: 'from-env', RATATOSKR_PASSWORD_LOGIN: 'true' });
+    await start({ OIDC_ISSUER_URL: 'https://env.example.com/', OIDC_CLIENT_ID: 'from-env', DREYMAIL_PASSWORD_LOGIN: 'true' });
     const sam = await register('sam');
     const res = await call<LoginSettingsView>(sam, 'PUT', '/api/admin/login', loginInput({ oidcEnabled: false, issuerUrl: 'https://ui.example.com/', clientId: 'from-ui' }));
     expect(res.status).toBe(200);
     expect(res.json).toMatchObject({ oidcEnabled: true, issuerUrl: 'https://env.example.com/', clientId: 'from-env' });
-    expect(res.json.locked).toMatchObject({ issuerUrl: 'OIDC_ISSUER_URL', clientId: 'OIDC_CLIENT_ID', oidcEnabled: 'OIDC_ISSUER_URL', passwordLogin: 'RATATOSKR_PASSWORD_LOGIN' });
+    expect(res.json.locked).toMatchObject({ issuerUrl: 'OIDC_ISSUER_URL', clientId: 'OIDC_CLIENT_ID', oidcEnabled: 'OIDC_ISSUER_URL', passwordLogin: 'DREYMAIL_PASSWORD_LOGIN' });
   });
 
   it('refuses to lock everyone out, or the admin who signed in with a password', async () => {
@@ -134,7 +138,7 @@ describe('sign-in settings in the UI', () => {
     await call(sam, 'PUT', '/api/admin/login', loginInput({ registration: 'open' }));
     await register('eve');
     await call(sam, 'PUT', '/api/admin/login', loginInput({ registration: 'closed' }));
-    const res = await ctx!.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'eve', password: 'a long password' }, headers: { 'x-ratatoskr': '1' } });
+    const res = await ctx!.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'eve', password: 'a long password' }, headers: { 'x-dreymail': '1' } });
     expect(res.statusCode).toBe(403);
   });
 });

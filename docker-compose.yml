@@ -2,11 +2,12 @@
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: DreyMail image; inline environment (no .env file), bind
 # mount, PUID/PGID 99:100, no published ports, external reverse-proxy network.
+# Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 #
 # Example deployment (e.g. as an Arcane stack). Everything is inline: there is no .env file.
 # The container publishes no ports; it joins an external network shared with your reverse proxy,
 # which serves it over HTTPS and forwards to dreymail:8080.
-# The RATATOSKR_* variable names are kept from upstream so existing deployments keep working.
+# The DREYMAIL_* variable names are kept from upstream so existing deployments keep working.
 services:
   dreymail:
     image: ghcr.io/samschultzponsys/dreymail:latest
@@ -15,19 +16,19 @@ services:
     environment:
       - PUID=99
       - PGID=100
-      - RATATOSKR_BASE_URL=https://mail.example.com
+      - DREYMAIL_BASE_URL=https://mail.example.com
       # At least 32 characters: openssl rand -base64 48. Changing it later makes stored
       # account passwords unreadable.
-      - RATATOSKR_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
-      - RATATOSKR_TRUST_PROXY=true
+      - DREYMAIL_SECRET_KEY=replace-with-a-long-random-string-of-at-least-32-chars
+      - DREYMAIL_TRUST_PROXY=true
       # OpenID Connect login (leave these out for username/password login):
       - OIDC_ISSUER_URL=https://auth.example.com/application/o/dreymail/
       - OIDC_CLIENT_ID=dreymail
       - OIDC_CLIENT_SECRET=replace-with-the-client-secret
       # - OIDC_LABEL=Authentik
       # Also allow username/password login next to OIDC:
-      # - RATATOSKR_PASSWORD_LOGIN=true
-      # - RATATOSKR_REGISTRATION=first   # open | first | closed
+      # - DREYMAIL_PASSWORD_LOGIN=true
+      # - DREYMAIL_REGISTRATION=first   # open | first | closed
     networks:
       - customnetex
     volumes:

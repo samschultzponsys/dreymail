@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import type { MessageAction, MessageRef } from '../../shared/types';
 import { api } from './api';
 
@@ -57,7 +61,7 @@ function b64uToBytes(s: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-/** Whether a subscription was made with this server key (it changes with RATATOSKR_SECRET_KEY). */
+/** Whether a subscription was made with this server key (it changes with DREYMAIL_SECRET_KEY). */
 export function sameServerKey(subscriptionKey: ArrayBuffer | null | undefined, serverKey: string): boolean {
   if (!subscriptionKey) return false;
   const a = new Uint8Array(subscriptionKey);

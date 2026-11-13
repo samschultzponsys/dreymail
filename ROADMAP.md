@@ -26,12 +26,13 @@ on the providers; at most a minimal encrypted cache.
 - [ ] Gmail OAuth (XOAUTH2) as an alternative to app passwords. Low priority.
 
 ## Configuration and deployment
-- [ ] All configuration possible in the UI (OIDC, login options, default account settings, cache,
+- [ ] All remaining configuration possible in the UI (default account settings, cache,
       push, …), stored in the database. Values set as environment variables in the compose file
       (inline, no `.env` file) override the UI values, and the UI shows them as locked/"set by
       environment". Only bootstrap values (secret key, data dir) stay env-only.
-- [ ] Rename `RATATOSKR_*` env vars to `DREYMAIL_*` with a backward-compatible fallback (see
-      CLAUDE.md for the list).
+- [x] DreyMail's own names everywhere: `DREYMAIL_*` environment variables, database file, keys
+      (v1.5, with a one-time upgrade of existing data).
+- [x] Sign-in settings (OIDC, password login, registration) in the UI (v1.4).
 
 ## Branding
 - [x] Replace logo/icons with own artwork (v1.1: cyan envelope in an indigo drey).
@@ -39,4 +40,4 @@ on the providers; at most a minimal encrypted cache.
 
 ## License compliance
 - [ ] "Source code" link in the UI (AGPL §13), needed before anyone else uses an instance. Link
-      to this repository at the running version, and show the Ratatoskr attribution next to it.
+      to this repository at the running version, and show the DreyMail attribution next to it.

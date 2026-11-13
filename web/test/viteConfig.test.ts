@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Plugin, UserConfig } from 'vite';
@@ -8,7 +12,7 @@ import viteConfig, { devHostGuard } from '../vite.config';
 vi.mock('vite', async (importOriginal) => ({ ...(await importOriginal<typeof import('vite')>()), loadEnv: () => ({}) }));
 
 const SUFFIX = '--myworkspace--me.dev.example.com';
-const KEYS = ['RATATOSKR_BASE_URL', 'RATATOSKR_DEV_ALLOWED_HOST_SUFFIX'] as const;
+const KEYS = ['DREYMAIL_BASE_URL', 'DREYMAIL_DEV_ALLOWED_HOST_SUFFIX'] as const;
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 
 afterEach(() => {
@@ -27,22 +31,22 @@ function resolve(command: 'serve' | 'build', env: Partial<Record<(typeof KEYS)[n
 const pluginNames = (c: UserConfig) => (c.plugins as Plugin[]).flat().map((p) => p.name);
 
 describe('Vite dev server allowed hosts', () => {
-  it('without the suffix allows exactly localhost and the RATATOSKR_BASE_URL host (unchanged)', () => {
-    const c = resolve('serve', { RATATOSKR_BASE_URL: 'https://5173--myworkspace--me.dev.example.com' });
+  it('without the suffix allows exactly localhost and the DREYMAIL_BASE_URL host (unchanged)', () => {
+    const c = resolve('serve', { DREYMAIL_BASE_URL: 'https://5173--myworkspace--me.dev.example.com' });
     expect(c.server?.allowedHosts).toEqual(['localhost', '5173--myworkspace--me.dev.example.com']);
-    expect(pluginNames(c)).not.toContain('ratatoskr-dev-host-guard');
+    expect(pluginNames(c)).not.toContain('dreymail-dev-host-guard');
   });
   it('with the suffix hands host checking to the guard plugin', () => {
-    const c = resolve('serve', { RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: SUFFIX });
+    const c = resolve('serve', { DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: SUFFIX });
     expect(c.server?.allowedHosts).toBe(true);
-    expect(pluginNames(c)).toContain('ratatoskr-dev-host-guard');
+    expect(pluginNames(c)).toContain('dreymail-dev-host-guard');
   });
   it('refuses to start the dev server with an unusable suffix', () => {
-    expect(() => resolve('serve', { RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: 'example.com' })).toThrow(/RATATOSKR_DEV_ALLOWED_HOST_SUFFIX/);
+    expect(() => resolve('serve', { DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: 'example.com' })).toThrow(/DREYMAIL_DEV_ALLOWED_HOST_SUFFIX/);
   });
   it('has no effect on the production build', () => {
-    const c = resolve('build', { RATATOSKR_DEV_ALLOWED_HOST_SUFFIX: SUFFIX });
-    expect(pluginNames(c)).not.toContain('ratatoskr-dev-host-guard');
+    const c = resolve('build', { DREYMAIL_DEV_ALLOWED_HOST_SUFFIX: SUFFIX });
+    expect(pluginNames(c)).not.toContain('dreymail-dev-host-guard');
     expect(c.server?.allowedHosts).toEqual(['localhost']);
   });
 });

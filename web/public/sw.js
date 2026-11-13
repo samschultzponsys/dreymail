@@ -1,4 +1,8 @@
-// Ratatoskr service worker: phone/desktop notifications only. It deliberately has no fetch handler
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
+// DreyMail service worker: phone/desktop notifications only. It deliberately has no fetch handler
 // and caches nothing, so the app stays a thin client that always talks to the server.
 // The payload formats are NotificationPayload and ClearPayload in server/src/push/notify.ts.
 
@@ -84,7 +88,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       await fetch('/api/push/subscriptions', {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'content-type': 'application/json', 'x-ratatoskr': '1' },
+        headers: { 'content-type': 'application/json', 'x-dreymail': '1' },
         body: JSON.stringify(sub.toJSON()),
       });
     })(),

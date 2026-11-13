@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,15 +16,15 @@ import { Keyring } from '../src/crypto.js';
 import { Store } from '../src/db.js';
 
 const SECRET = crypto.randomBytes(48).toString('base64');
-const base = { NODE_ENV: 'test', RATATOSKR_SECRET_KEY: SECRET };
+const base = { NODE_ENV: 'test', DREYMAIL_SECRET_KEY: SECRET };
 
 // One shared mail provider for everyone, username derived from the login.
 const mailhost = {
   ...base,
-  RATATOSKR_DEFAULT_IMAP_HOST: 'imap.example.net',
-  RATATOSKR_DEFAULT_SMTP_HOST: 'smtp.example.net',
-  RATATOSKR_DEFAULT_MAIL_USERNAME: '{username}@example.org',
-  RATATOSKR_DEFAULT_EMAIL: '{username}@example.org',
+  DREYMAIL_DEFAULT_IMAP_HOST: 'imap.example.net',
+  DREYMAIL_DEFAULT_SMTP_HOST: 'smtp.example.net',
+  DREYMAIL_DEFAULT_MAIL_USERNAME: '{username}@example.org',
+  DREYMAIL_DEFAULT_EMAIL: '{username}@example.org',
 };
 
 const alice = { username: 'alice', email: 'alice@example.com', name: 'Alice Liddell' };
@@ -57,22 +61,22 @@ describe('default account settings configuration', () => {
   });
 
   it('refuses to start with a misspelled token, naming the variable', () => {
-    expect(() => loadConfig({ ...base, RATATOSKR_DEFAULT_MAIL_USERNAME: '{usename}@example.org' })).toThrow(
-      /RATATOSKR_DEFAULT_MAIL_USERNAME uses unknown token\(s\) \{usename\}/,
+    expect(() => loadConfig({ ...base, DREYMAIL_DEFAULT_MAIL_USERNAME: '{usename}@example.org' })).toThrow(
+      /DREYMAIL_DEFAULT_MAIL_USERNAME uses unknown token\(s\) \{usename\}/,
     );
   });
 
   it('rejects an invalid port or security mode', () => {
-    expect(() => loadConfig({ ...base, RATATOSKR_DEFAULT_IMAP_PORT: '99999' })).toThrow(/RATATOSKR_DEFAULT_IMAP_PORT/);
-    expect(() => loadConfig({ ...base, RATATOSKR_DEFAULT_SMTP_SECURITY: 'ssl' })).toThrow(/RATATOSKR_DEFAULT_SMTP_SECURITY/);
+    expect(() => loadConfig({ ...base, DREYMAIL_DEFAULT_IMAP_PORT: '99999' })).toThrow(/DREYMAIL_DEFAULT_IMAP_PORT/);
+    expect(() => loadConfig({ ...base, DREYMAIL_DEFAULT_SMTP_SECURITY: 'ssl' })).toThrow(/DREYMAIL_DEFAULT_SMTP_SECURITY/);
   });
 
   it('takes the default password literally, braces and spaces included', () => {
-    expect(loadConfig({ ...base, RATATOSKR_DEFAULT_MAIL_PASSWORD: ' p{a}ss ' }).accountDefaults.password).toBe(' p{a}ss ');
+    expect(loadConfig({ ...base, DREYMAIL_DEFAULT_MAIL_PASSWORD: ' p{a}ss ' }).accountDefaults.password).toBe(' p{a}ss ');
   });
 
   it('picks the standard port for the chosen security mode unless a port is given', () => {
-    const d = accountDefaultsFor(loadConfig({ ...base, RATATOSKR_DEFAULT_SMTP_SECURITY: 'starttls', RATATOSKR_DEFAULT_IMAP_PORT: '1993' }).accountDefaults, alice);
+    const d = accountDefaultsFor(loadConfig({ ...base, DREYMAIL_DEFAULT_SMTP_SECURITY: 'starttls', DREYMAIL_DEFAULT_IMAP_PORT: '1993' }).accountDefaults, alice);
     expect(d.imap).toMatchObject({ port: 1993, tls: 'tls' });
     expect(d.smtp).toMatchObject({ port: 587, tls: 'starttls' });
   });
@@ -90,7 +94,7 @@ describe('default account settings configuration', () => {
 });
 
 describe('default password', () => {
-  const config = loadConfig({ ...mailhost, RATATOSKR_DEFAULT_MAIL_PASSWORD: 'shared secret' }).accountDefaults;
+  const config = loadConfig({ ...mailhost, DREYMAIL_DEFAULT_MAIL_PASSWORD: 'shared secret' }).accountDefaults;
 
   it('fills blank passwords while the servers are the default ones (any letter case)', () => {
     const filled = withDefaultPassword(config, alice, input('IMAP.example.net', 'smtp.example.net'));
@@ -127,14 +131,14 @@ describe('default account settings over HTTP', () => {
       method: 'POST',
       url: '/auth/password/register',
       payload: { username, password: 'a long password' },
-      headers: { 'x-ratatoskr': '1' },
+      headers: { 'x-dreymail': '1' },
     });
-    const c = res.cookies.find((c) => c.name === 'rk_session')!;
-    return `rk_session=${c.value}`;
+    const c = res.cookies.find((c) => c.name === 'dm_session')!;
+    return `dm_session=${c.value}`;
   }
 
   it("gives each user the defaults with their own username filled in, but never the password", async () => {
-    const cookie = await signUp({ ...mailhost, RATATOSKR_DEFAULT_MAIL_PASSWORD: 'shared secret' }, 'Carol');
+    const cookie = await signUp({ ...mailhost, DREYMAIL_DEFAULT_MAIL_PASSWORD: 'shared secret' }, 'Carol');
     const res = await ctx!.app.inject({ url: '/api/me', headers: { cookie } });
     expect(res.json().accountDefaults).toEqual({
       name: '',
@@ -148,12 +152,12 @@ describe('default account settings over HTTP', () => {
   });
 
   it('still asks for a password when the user switches to another mail server', async () => {
-    const cookie = await signUp({ ...mailhost, RATATOSKR_DEFAULT_MAIL_PASSWORD: 'shared secret' }, 'alice');
+    const cookie = await signUp({ ...mailhost, DREYMAIL_DEFAULT_MAIL_PASSWORD: 'shared secret' }, 'alice');
     const res = await ctx!.app.inject({
       method: 'POST',
       url: '/api/accounts',
       payload: input('imap.gmail.com', 'smtp.gmail.com'),
-      headers: { cookie, 'x-ratatoskr': '1' },
+      headers: { cookie, 'x-dreymail': '1' },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('IMAP password is required');
@@ -162,8 +166,8 @@ describe('default account settings over HTTP', () => {
 
 describe('usernames of existing users', () => {
   it('are filled in from the login name of password users when the database is upgraded', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rk-username-'));
-    const file = path.join(dir, 'ratatoskr.db');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-username-'));
+    const file = path.join(dir, 'dreymail.db');
     try {
       const key = crypto.randomBytes(32);
       const before = new Store(file, key);

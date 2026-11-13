@@ -13,6 +13,28 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.5): DreyMail's own names everywhere
+
+The project now uses its own identity in code, configuration and data; the upstream name remains
+only in the required attribution (NOTICE, README Credits, file-header notices, this history).
+
+- **Environment variables:** every `RATATOSKR_*` variable is now `DREYMAIL_*`
+  (`server/src/config.ts`, `web/vite.config.ts`, `shared/devHosts.ts`, `scripts/devEnv.mjs`,
+  `Dockerfile`, `docker/entrypoint.sh`, `.env.example`, `docker-compose.yml`, README, tests). The
+  old names stop the server with a message naming each replacement.
+- **Data:** database file `dreymail.db`; key-derivation salt `dreymail` (`server/src/crypto.ts`);
+  session cookies `dm_session`/`dm_login` (`server/src/auth/session.ts`); CSRF header
+  `x-dreymail` (`web/src/api.ts`, `web/public/sw.js`, `server/src/routes/api.ts`,
+  `server/src/auth/routes.ts`); cache label; localStorage key (`web/src/mailto.ts`).
+- **One-time upgrade:** new `server/src/upgrade.ts` renames the old database file, drops the mail
+  cache, re-encrypts stored secrets with the new keys (`Store.rekeyFrom` in `server/src/db.ts`,
+  `Keyring` salt parameter) and rejects old variable names (`server/src/app.ts`,
+  `server/src/config.ts`). Tests: `server/test/upgrade.test.ts`.
+- **Outgoing identifiers:** `X-Mailer: DreyMail`, IMAP client ID `DreyMail`, image fetcher
+  User-Agent (`server/src/mail/compose.ts`, `server/src/imap/connect.ts`,
+  `server/src/net/remoteImages.ts`); container entrypoint `dreymail-entrypoint`.
+- Comments, test names and docs across the code base (`CLAUDE.md` rules updated).
+
 ## 2026-11-13 (v1.4): administration and sign-in settings in the UI
 
 - **Administrators:** `users.is_admin` (migration: the oldest existing user becomes admin; the

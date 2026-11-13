@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+
 import type { AccountDefaults, AccountInput, TlsMode } from '../../shared/types.js';
 import { DEFAULT_PORTS } from '../../shared/mailPorts.js';
 
@@ -7,7 +11,7 @@ export type TemplateToken = (typeof TEMPLATE_TOKENS)[number];
 export type TemplateValues = Record<TemplateToken, string>;
 
 /**
- * Instance-wide starting values for new mail accounts (RATATOSKR_DEFAULT_*). Strings are templates;
+ * Instance-wide starting values for new mail accounts (DREYMAIL_DEFAULT_*). Strings are templates;
  * empty means "no default".
  */
 export interface AccountDefaultsConfig {
