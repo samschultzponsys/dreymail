@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: sign-in settings service and administration routes.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import cookie from '@fastify/cookie';
@@ -21,6 +25,8 @@ import { createPushTransport, vapidKeysFromSeed, type PushTransport } from './pu
 import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
+import { registerAdminRoutes } from './routes/admin.js';
+import { LoginSettings } from './loginSettings.js';
 import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
 
@@ -172,7 +178,8 @@ export async function buildApp(
 
   app.get('/healthz', async () => ({ ok: true }));
 
-  await registerAuthRoutes(app, config, store, sessions);
+  const login = new LoginSettings(config, store);
+  await registerAuthRoutes(app, config, store, sessions, login);
   await registerApiRoutes(app, {
     config,
     store,
@@ -187,6 +194,7 @@ export async function buildApp(
     fetchImage: opts.fetchImage,
     avatars: opts.avatars,
   });
+  await registerAdminRoutes(app, { config, store, sessions, login, pool, mail });
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.

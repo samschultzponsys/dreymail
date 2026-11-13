@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: All inboxes on/off setting.
 // Modified by samschultzponsys, 2026-11-13: tabs (General, Signatures, Notifications, Images, Password).
+// Modified by samschultzponsys, 2026-11-13: Users and Sign-in tabs for administrators.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useEffect, useState } from 'react';
 import type { DomainName, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
 import { SignaturesSettings } from './SignaturesSettings';
+import { SignInAdmin, UsersAdmin } from './AdminSettings';
 import { handlerTemplate } from '../mailto';
 import { currentEnvironment, currentSubscription, disablePush, enablePush, pushAvailability, type PushAvailability } from '../push';
 
@@ -28,9 +30,9 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password';
+type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin';
 
-export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Preferences; hasPassword: boolean; onClose: () => void }) {
+export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { prefs: Preferences; hasPassword: boolean; admin: boolean; myId: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,12 @@ export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Prefere
     ['notifications', 'Notifications'],
     ['privacy', 'Images'],
     ...(hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
+    ...(admin
+      ? [
+          ['users', 'Users'],
+          ['signin', 'Sign-in'],
+        ] as [SettingsTab, string][]
+      : []),
   ];
   const [tab, setTab] = useState<SettingsTab>('general');
 
@@ -152,6 +160,8 @@ export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Prefere
           {tab === 'notifications' && <Notifications prefs={v} save={save} />}
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
+          {tab === 'users' && <UsersAdmin myId={myId} />}
+          {tab === 'signin' && <SignInAdmin />}
           {error && <div className="error-text">{error}</div>}
         </div>
       </div>

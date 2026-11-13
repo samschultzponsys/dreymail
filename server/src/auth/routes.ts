@@ -1,17 +1,22 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: sign-in options come from LoginSettings (UI, with environment overrides) and can change at runtime.
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import type { AuthMethods } from '../../../shared/types.js';
 import type { Config } from '../config.js';
 import type { Store } from '../db.js';
+import type { EffectiveLogin, LoginSettings } from '../loginSettings.js';
 import { burnPasswordCheck, FailureLimiter, hashPassword, LOCAL_ISSUER, passwordSchema, usernameSchema, verifyPassword } from './password.js';
 import type { Sessions } from './session.js';
 
 /** May a new password account be created right now? */
-export function registrationOpen(config: Config, store: Store): boolean {
-  if (!config.passwordLogin) return false;
-  if (config.registration === 'open') return true;
-  return config.registration === 'first' && store.countUsers() === 0;
+export function registrationOpen(login: EffectiveLogin, store: Store): boolean {
+  if (!login.passwordLogin) return false;
+  if (login.registration === 'open') return true;
+  return login.registration === 'first' && store.countUsers() === 0;
 }
 
 /**
@@ -21,13 +26,17 @@ export function registrationOpen(config: Config, store: Store): boolean {
  *   any standards-compliant provider (Authentik, Keycloak, ...). Users are keyed by (issuer, sub).
  * - Username and password (scrypt hashes in SQLite), with optional self-registration.
  */
-export async function registerAuthRoutes(app: FastifyInstance, config: Config, store: Store, sessions: Sessions) {
+export async function registerAuthRoutes(app: FastifyInstance, config: Config, store: Store, sessions: Sessions, login: LoginSettings) {
   const callbackUrl = new URL('/auth/callback', config.baseUrl);
   let configPromise: Promise<oidc.Configuration> | null = null;
+  // Sign-in settings changed in the UI: discover the (possibly different) provider again.
+  login.onChange(() => {
+    configPromise = null;
+  });
 
   const getConfig = () => {
-    if (!config.oidc) throw new Error('OIDC is not configured');
-    const o = config.oidc;
+    const o = login.current().oidc;
+    if (!o) throw new Error('OIDC is not configured');
     configPromise ??= oidc
       .discovery(new URL(o.issuerUrl), o.clientId, o.clientSecret || undefined, undefined, {
         execute: !config.production && o.issuerUrl.startsWith('http:') ? [oidc.allowInsecureRequests] : [],
@@ -39,15 +48,19 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     return configPromise;
   };
 
-  app.get('/auth/methods', async (): Promise<AuthMethods> => ({
-    password: config.passwordLogin,
-    registration: registrationOpen(config, store),
-    oidc: config.oidc ? { label: config.oidc.label } : null,
-    dev: config.devLogin,
-  }));
+  app.get('/auth/methods', async (): Promise<AuthMethods> => {
+    const l = login.current();
+    return {
+      password: l.passwordLogin,
+      registration: registrationOpen(l, store),
+      oidc: l.oidc ? { label: l.oidc.label } : null,
+      dev: config.devLogin,
+    };
+  });
 
   app.get('/auth/login', async (req, reply) => {
-    if (!config.oidc) return reply.redirect(config.devLogin ? '/auth/dev-login' : '/');
+    const o = login.current().oidc;
+    if (!o) return reply.redirect(config.devLogin ? '/auth/dev-login' : '/');
     const cfg = await getConfig();
     const verifier = oidc.randomPKCECodeVerifier();
     const state = oidc.randomState();
@@ -55,7 +68,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     sessions.writeLogin(reply, { state, nonce, verifier });
     const url = oidc.buildAuthorizationUrl(cfg, {
       redirect_uri: callbackUrl.toString(),
-      scope: config.oidc.scopes,
+      scope: o.scopes,
       code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
       code_challenge_method: 'S256',
       state,
@@ -105,7 +118,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     const session = sessions.read(req);
     sessions.clear(reply);
     let redirect = '/';
-    if (config.oidc && session && (session.via ?? 'oidc') === 'oidc') {
+    if (login.current().oidc && session && (session.via ?? 'oidc') === 'oidc') {
       try {
         const cfg = await getConfig();
         if (cfg.serverMetadata().end_session_endpoint) {
@@ -132,12 +145,13 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     });
   }
 
-  if (config.passwordLogin) registerPasswordRoutes(app, config, store, sessions);
+  // Always registered: password login can be switched on and off in the UI at any time.
+  registerPasswordRoutes(app, store, sessions, login);
 }
 
 const credentialsSchema = z.object({ username: z.string().max(500), password: z.string().max(1000) });
 
-function registerPasswordRoutes(app: FastifyInstance, config: Config, store: Store, sessions: Sessions) {
+function registerPasswordRoutes(app: FastifyInstance, store: Store, sessions: Sessions, login: LoginSettings) {
   const window = 15 * 60 * 1000;
   const failuresByIp = new FailureLimiter(30, window);
   const failuresByUser = new FailureLimiter(10, window);
@@ -145,6 +159,10 @@ function registerPasswordRoutes(app: FastifyInstance, config: Config, store: Sto
 
   /** Same CSRF rule as /api: a custom header only our own origin can send. Also stops login CSRF. */
   const parse = (req: FastifyRequest, reply: FastifyReply) => {
+    if (!login.current().passwordLogin) {
+      void reply.code(404).send({ error: 'Password login is turned off' });
+      return null;
+    }
     if (req.headers['x-ratatoskr'] !== '1') {
       void reply.code(403).send({ error: 'Missing CSRF header' });
       return null;
@@ -180,7 +198,7 @@ function registerPasswordRoutes(app: FastifyInstance, config: Config, store: Sto
   app.post('/auth/password/register', async (req, reply) => {
     const body = parse(req, reply);
     if (!body) return reply;
-    if (!registrationOpen(config, store)) return reply.code(403).send({ error: 'Registration is closed' });
+    if (!registrationOpen(login.current(), store)) return reply.code(403).send({ error: 'Registration is closed' });
     if (registrationsByIp.blocked(req.ip)) {
       return reply.code(429).send({ error: 'Too many new accounts from this address. Try again later.' });
     }
@@ -190,7 +208,7 @@ function registerPasswordRoutes(app: FastifyInstance, config: Config, store: Sto
     if (!password.success) return reply.code(400).send({ error: password.error.issues[0]!.message });
     const hash = await hashPassword(password.data);
     // Checked again after the (slow) hash: in `first` mode two concurrent sign-ups must not both win.
-    if (!registrationOpen(config, store)) return reply.code(403).send({ error: 'Registration is closed' });
+    if (!registrationOpen(login.current(), store)) return reply.code(403).send({ error: 'Registration is closed' });
     const user = store.createPasswordUser(LOCAL_ISSUER, username.data, hash);
     if (!user) return reply.code(409).send({ error: 'That username is taken' });
     registrationsByIp.fail(req.ip);

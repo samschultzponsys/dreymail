@@ -287,6 +287,53 @@ export interface Me {
   hasPassword: boolean;
   /** Starting values for a new mail account. */
   accountDefaults: AccountDefaults;
+  /** Administrator: sees Settings → Users and Sign-in. */
+  admin: boolean;
+}
+
+export type Registration = 'open' | 'first' | 'closed';
+
+/** Settings → Sign-in, as an administrator sees it (DreyMail). The client secret is never sent. */
+export interface LoginSettingsView {
+  oidcEnabled: boolean;
+  issuerUrl: string;
+  clientId: string;
+  hasClientSecret: boolean;
+  scopes: string;
+  label: string;
+  passwordLogin: boolean;
+  registration: Registration;
+  /** Fields set by environment variables (compose file): field -> variable name. They override the UI. */
+  locked: Partial<Record<'oidcEnabled' | 'issuerUrl' | 'clientId' | 'clientSecret' | 'scopes' | 'label' | 'passwordLogin' | 'registration', string>>;
+  /** Redirect URI to register at the provider. */
+  callbackUrl: string;
+}
+
+export interface LoginSettingsInput {
+  oidcEnabled: boolean;
+  issuerUrl: string;
+  clientId: string;
+  /** New client secret; empty keeps the stored one. */
+  clientSecret: string;
+  clearClientSecret: boolean;
+  scopes: string;
+  label: string;
+  passwordLogin: boolean;
+  registration: Registration;
+}
+
+/** A user in Settings → Users (DreyMail). */
+export interface AdminUser {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  login: 'password' | 'oidc' | 'dev';
+  admin: boolean;
+  /** Administrator because of DREYMAIL_ADMIN_USERS (can't be changed in the UI). */
+  adminByEnv: boolean;
+  accounts: number;
+  createdAt: string;
 }
 
 /** Login options shown on the sign-in page (GET /auth/methods). */

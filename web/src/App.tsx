@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: All inboxes can be turned off; then the first account opens instead.
 // Modified by samschultzponsys, 2026-11-13: the whole UI takes on the open account's colour.
+// Modified by samschultzponsys, 2026-11-13: passes admin to Settings.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -579,7 +580,7 @@ export function App() {
         />
       )}
       {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} onClose={() => closeOverlay('accounts')} />}
-      {dialog === 'settings' && <SettingsDialog prefs={me.data!.preferences} hasPassword={me.data!.hasPassword} onClose={() => closeOverlay('settings')} />}
+      {dialog === 'settings' && <SettingsDialog prefs={me.data!.preferences} hasPassword={me.data!.hasPassword} admin={me.data!.admin} myId={me.data!.id} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (

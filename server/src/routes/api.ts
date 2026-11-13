@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference validation.
 // Modified by samschultzponsys, 2026-11-13: signature API (list, create, update, delete).
+// Modified by samschultzponsys, 2026-11-13: Me.admin.
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -19,6 +20,7 @@ import { FailureLimiter, hashPassword, passwordSchema, verifyPassword } from '..
 import type { Sessions } from '../auth/session.js';
 import { ComposeError, type ComposeService } from '../mail/send.js';
 import { sanitizeOutgoingHtml } from '../mail/compose.js';
+import { isAdmin } from './admin.js';
 import { SnoozeError, type SnoozeService } from '../mail/snooze.js';
 import { PushSubscriptionError, validateSubscription, type PushService } from '../push/service.js';
 
@@ -205,6 +207,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       preferences: u.preferences,
       hasPassword: u.hasPassword,
       accountDefaults: accountDefaultsFor(config.accountDefaults, templateValues(u)),
+      admin: isAdmin(config, u),
     };
   });
 

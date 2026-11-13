@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: sign-in values from the environment are recorded as UI overrides; DREYMAIL_ADMIN_USERS.
+
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
 import type { TlsMode } from '../../shared/types.js';
@@ -49,7 +53,35 @@ export interface Config {
   vapidSubject: string;
   /** What new mail accounts start with (templates with {username} etc.). */
   accountDefaults: AccountDefaultsConfig;
+  /**
+   * Sign-in values given as environment variables (DreyMail). These override what an administrator
+   * sets in the UI, which then shows them as locked. Unset fields are absent.
+   */
+  loginEnv: LoginEnv;
+  /** Usernames or emails that are always administrators (DREYMAIL_ADMIN_USERS), lower case. */
+  adminUsers: string[];
 }
+
+export interface LoginEnv {
+  issuerUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+  scopes?: string;
+  label?: string;
+  passwordLogin?: boolean;
+  registration?: Registration;
+}
+
+/** Environment variable behind each sign-in field (shown in the UI next to locked fields). */
+export const LOGIN_ENV_NAMES: Record<keyof LoginEnv, string> = {
+  issuerUrl: 'OIDC_ISSUER_URL',
+  clientId: 'OIDC_CLIENT_ID',
+  clientSecret: 'OIDC_CLIENT_SECRET',
+  scopes: 'OIDC_SCOPES',
+  label: 'OIDC_LABEL',
+  passwordLogin: 'RATATOSKR_PASSWORD_LOGIN',
+  registration: 'RATATOSKR_REGISTRATION',
+};
 
 export interface CacheConfig {
   /** Newest messages kept per cached folder. */
@@ -169,7 +201,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webDir: path.resolve(env.RATATOSKR_WEB_DIR || './dist/web'),
     vapidSubject,
     accountDefaults,
+    loginEnv: loginEnvFrom(env, passwordLogin, registration),
+    adminUsers: (env.DREYMAIL_ADMIN_USERS ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
   };
+}
+
+function loginEnvFrom(env: NodeJS.ProcessEnv, passwordLogin: boolean, registration: Registration): LoginEnv {
+  const set = (name: string) => (env[name] ?? '') !== '';
+  const out: LoginEnv = {};
+  if (set('OIDC_ISSUER_URL')) out.issuerUrl = env.OIDC_ISSUER_URL!;
+  if (set('OIDC_CLIENT_ID')) out.clientId = env.OIDC_CLIENT_ID!;
+  if (set('OIDC_CLIENT_SECRET')) out.clientSecret = env.OIDC_CLIENT_SECRET!;
+  if (set('OIDC_SCOPES')) out.scopes = env.OIDC_SCOPES!;
+  if (set('OIDC_LABEL')) out.label = env.OIDC_LABEL!.trim();
+  if (set('RATATOSKR_PASSWORD_LOGIN')) out.passwordLogin = passwordLogin;
+  if (set('RATATOSKR_REGISTRATION')) out.registration = registration;
+  return out;
 }
 
 function loadAccountDefaults(env: NodeJS.ProcessEnv, errors: string[]): AccountDefaultsConfig {

@@ -2,7 +2,8 @@
      Modified by samschultzponsys, 2026-11-13: rewritten for DreyMail (credits, quick start, releasing); upstream docs kept and rebranded.
      Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent).
      Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch).
-     Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs). -->
+     Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs).
+     Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -26,9 +27,10 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.3**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.4**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
-inboxes", and signatures per account or shared. Settings are organised in tabs. What's planned is in
+inboxes", signatures per account or shared, and administration (users, OIDC sign-in) in the app. Settings
+are organised in tabs. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -53,6 +55,11 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - Login with a username and password, with any OpenID Connect provider (Authentik, Keycloak, …),
   or both side by side; see [Login](#login). Each user owns their own accounts, with strict
   per-user isolation.
+- **Administration in the app.** The first user is the administrator (more can be added, or
+  named in `DREYMAIL_ADMIN_USERS`). Settings → Users lists everyone and adds, promotes, resets
+  passwords for and removes users. Settings → Sign-in sets up OIDC (with a connection test),
+  password login and who may register, without a restart. Any of these given as environment
+  variables in the compose file win and show as locked in the UI.
 - **Accounts that feel separate.** Each account has its own colour: the first one gets DreyMail
   cyan, and you can pick from presets or any colour on the colour wheel. While an account is open,
   the whole app takes on its colour (buttons, highlights, unread dots, a light tint on the page),

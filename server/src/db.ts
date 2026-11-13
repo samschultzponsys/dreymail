@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference default.
 // Modified by samschultzponsys, 2026-11-13: signatures tables and store methods.
+// Modified by samschultzponsys, 2026-11-13: administrators, user management and instance settings.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -110,6 +111,15 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
      signature_id TEXT NOT NULL REFERENCES signatures(id) ON DELETE CASCADE
    );`,
+  // DreyMail: administrators and instance-wide settings (sign-in options set in the UI). The oldest
+  // user of an existing instance becomes its administrator.
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'is_admin')) db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;');
+    db.exec(`UPDATE users SET is_admin = 1 WHERE NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)
+               AND id = (SELECT id FROM users ORDER BY created_at, rowid LIMIT 1);
+             CREATE TABLE IF NOT EXISTS instance_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -138,6 +148,9 @@ export interface User {
   preferences: Preferences;
   /** Signs in with a username and password (as opposed to OIDC). */
   hasPassword: boolean;
+  /** Administrator (DreyMail): manages users and sign-in settings. */
+  admin: boolean;
+  createdAt: number;
 }
 
 /** A snoozed message: where it waits and when it returns to INBOX (ms since the epoch). */
@@ -249,15 +262,18 @@ export class Store {
       return this.getUser(existing.id)!;
     }
     const id = crypto.randomUUID();
+    // The first user of an empty instance is its administrator.
     this.db
-      .prepare('INSERT INTO users (id, issuer, subject, email, name, username, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .prepare(
+        'INSERT INTO users (id, issuer, subject, email, name, username, created_at, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COUNT(*) = 0 FROM users))',
+      )
       .run(id, issuer, subject, email, name, username, Date.now());
     return this.getUser(id)!;
   }
 
   getUser(id: string): User | null {
     const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(id) as
-      | { id: string; issuer: string; subject: string; email: string; name: string; username: string; preferences: string; password_hash: string | null }
+      | { id: string; issuer: string; subject: string; email: string; name: string; username: string; preferences: string; password_hash: string | null; is_admin: number; created_at: number }
       | undefined;
     if (!row) return null;
     let prefs: Partial<Preferences> = {};
@@ -275,7 +291,55 @@ export class Store {
       username: row.username,
       preferences: { ...DEFAULT_PREFERENCES, ...prefs },
       hasPassword: row.password_hash !== null,
+      admin: row.is_admin === 1,
+      createdAt: row.created_at,
     };
+  }
+
+  // ---- administration (DreyMail) -------------------------------------------
+
+  listUsers(): (User & { accounts: number })[] {
+    const rows = this.db
+      .prepare('SELECT u.id, (SELECT COUNT(*) FROM accounts a WHERE a.user_id = u.id) AS n FROM users u ORDER BY u.created_at, u.rowid')
+      .all() as { id: string; n: number }[];
+    return rows.map((r) => ({ ...this.getUser(r.id)!, accounts: r.n }));
+  }
+
+  setAdmin(userId: string, admin: boolean): boolean {
+    return this.db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(admin ? 1 : 0, userId).changes > 0;
+  }
+
+  countAdmins(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM users WHERE is_admin = 1').get() as { n: number }).n;
+  }
+
+  /** Deletes a user with everything they own (accounts, signatures, push subscriptions, ...). */
+  deleteUser(userId: string): boolean {
+    return this.db.prepare('DELETE FROM users WHERE id = ?').run(userId).changes > 0;
+  }
+
+  /** An instance-wide setting (JSON), or null. */
+  getSetting<T>(key: string): T | null {
+    const row = this.db.prepare('SELECT value FROM instance_settings WHERE key = ?').get(key) as { value: string } | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  setSetting(key: string, value: unknown) {
+    this.db.prepare('INSERT INTO instance_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(value));
+  }
+
+  /** Encrypts a secret setting value (e.g. the OIDC client secret) with the credential key. */
+  sealSecret(key: string, plain: string): string {
+    return encrypt(this.credentialKey, plain, `instance-setting:${key}`);
+  }
+
+  openSecret(key: string, sealed: string): string {
+    return decrypt(this.credentialKey, sealed, `instance-setting:${key}`);
   }
 
   countUsers(): number {
@@ -296,7 +360,8 @@ export class Store {
     const email = username.includes('@') ? username : '';
     const res = this.db
       .prepare(
-        `INSERT INTO users (id, issuer, subject, email, name, username, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO users (id, issuer, subject, email, name, username, password_hash, created_at, is_admin)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COUNT(*) = 0 FROM users))
          ON CONFLICT (issuer, subject) DO NOTHING`,
       )
       .run(id, issuer, username, email, username, username, passwordHash, Date.now());

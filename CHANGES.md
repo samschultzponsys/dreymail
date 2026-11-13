@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.4): administration and sign-in settings in the UI
+
+- **Administrators:** `users.is_admin` (migration: the oldest existing user becomes admin; the
+  first user of a new instance is admin) and `DREYMAIL_ADMIN_USERS` (usernames or emails that are
+  always admins). `Me.admin` tells the client. Files: `server/src/db.ts`, `server/src/config.ts`,
+  `server/src/routes/api.ts`, `shared/types.ts`.
+- **Users admin:** new `server/src/routes/admin.ts` with `/api/admin/users` (list, add password
+  user, make/remove admin, set password, remove user with their data; never yourself, never the
+  last admin). Settings → Users (new `web/src/components/AdminSettings.tsx`).
+- **Sign-in settings in the UI:** new `server/src/loginSettings.ts` stores OIDC (client secret
+  encrypted), password login and registration in the new `instance_settings` table. Environment
+  variables override field by field and show as locked. `server/src/auth/routes.ts` reads the
+  settings per request (no restart; OIDC discovery resets on change); password routes are always
+  registered and check the setting. `/api/admin/login` (get, save with lock-out protection) and
+  `/api/admin/login/test` (OIDC discovery check). Settings → Sign-in.
+- Wiring and UI: `server/src/app.ts`, `web/src/App.tsx`, `web/src/api.ts`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/styles.css`. Tests: `server/test/admin.test.ts`.
+
 ## 2026-11-13 (v1.3): signatures, settings tabs
 
 - **Signatures:** new `signatures` and `signature_accounts` tables (an account uses at most one

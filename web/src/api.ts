@@ -1,8 +1,9 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: signature API calls.
+// Modified by samschultzponsys, 2026-11-13: administration API calls.
 
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AuthMethods, ComposePayload, DomainName, DraftResult, ListResponse, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -67,6 +68,13 @@ export const api = {
   updateAccount: (id: string, a: AccountInput) => request<AccountView>('PUT', `/api/accounts/${encodeURIComponent(id)}`, a),
   deleteAccount: (id: string) => request<{ ok: true }>('DELETE', `/api/accounts/${encodeURIComponent(id)}`),
   signatures: () => request<Signature[]>('GET', '/api/signatures'),
+  adminUsers: () => request<AdminUser[]>('GET', '/api/admin/users'),
+  adminCreateUser: (u: { username: string; password: string; admin: boolean }) => request<AdminUser[]>('POST', '/api/admin/users', u),
+  adminPatchUser: (id: string, patch: { admin?: boolean; password?: string }) => request<AdminUser[]>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, patch),
+  adminDeleteUser: (id: string) => request<AdminUser[]>('DELETE', `/api/admin/users/${encodeURIComponent(id)}`),
+  adminLogin: () => request<LoginSettingsView>('GET', '/api/admin/login'),
+  adminSaveLogin: (s: LoginSettingsInput) => request<LoginSettingsView>('PUT', '/api/admin/login', s),
+  adminTestLogin: (s: { issuerUrl: string; clientId: string; clientSecret: string }) => request<{ ok: true; issuer: string }>('POST', '/api/admin/login/test', s),
   createSignature: (s: SignatureInput) => request<Signature>('POST', '/api/signatures', s),
   updateSignature: (id: string, s: SignatureInput) => request<Signature>('PUT', `/api/signatures/${encodeURIComponent(id)}`, s),
   deleteSignature: (id: string) => request<{ ok: true }>('DELETE', `/api/signatures/${encodeURIComponent(id)}`),

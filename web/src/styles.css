@@ -3,7 +3,8 @@
    Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
    Modified by samschultzponsys, 2026-11-13: accent changed from orange to DreyMail cyan; brand mark follows the theme.
    Modified by samschultzponsys, 2026-11-13: colour-wheel swatch.
-   Modified by samschultzponsys, 2026-11-13: settings tabs and signature styles. */
+   Modified by samschultzponsys, 2026-11-13: settings tabs and signature styles.
+   Modified by samschultzponsys, 2026-11-13: administration styles. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -504,3 +505,17 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .row-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row-buttons .grow { flex: 1; }
 .danger-text { color: var(--danger); }
+
+/* ---- DreyMail: administration ------------------------------------------------------------- */
+.user-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.user-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.user-list li:first-child { border-top: 0; }
+.user-main { flex: 1; min-width: 200px; }
+.user-name { display: flex; align-items: center; gap: 6px; font-weight: 600; flex-wrap: wrap; }
+.user-meta { font-size: 12px; margin-top: 2px; }
+.user-actions { display: flex; align-items: center; gap: 4px; }
+fieldset.group { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 14px; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
+.locked { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; font-weight: 500; color: var(--text-2); font-family: ui-monospace, monospace; }
+.copyable { user-select: all; word-break: break-all; font-size: 12px; padding: 1px 5px; border-radius: 4px; background: var(--surface-2); }
+.success-text { color: var(--success); font-size: 13px; }
