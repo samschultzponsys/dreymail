@@ -13,6 +13,11 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.9): first release with the Android app attached
+
+- The repository's Android signing secrets are set, so the Release workflow now builds and
+  attaches `DreyMail-1.9.apk` (signed) next to the desktop apps. No code changes.
+
 ## 2026-11-13 (v1.8): Android app
 
 - **Android app** (new `android/`: Kotlin, WebView around the user's DreyMail server):

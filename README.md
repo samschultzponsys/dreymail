@@ -7,7 +7,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes).
      Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up).
      Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps).
-     Modified by samschultzponsys, 2026-11-13: v1.8 (Android app). -->
+     Modified by samschultzponsys, 2026-11-13: v1.8 (Android app).
+     Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -31,7 +32,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.8**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.9**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
