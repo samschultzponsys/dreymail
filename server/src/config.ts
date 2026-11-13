@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: sign-in values from the environment are recorded as UI overrides; DREYMAIL_ADMIN_USERS.
 // Modified by samschultzponsys, 2026-11-13: DREYMAIL_* environment variables; old names are rejected.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -63,6 +64,8 @@ export interface Config {
   loginEnv: LoginEnv;
   /** Usernames or emails that are always administrators (DREYMAIL_ADMIN_USERS), lower case. */
   adminUsers: string[];
+  /** Firebase (Android app notifications) set in the environment; overrides the UI. */
+  firebaseEnv: { serviceAccount?: string; apiKey?: string; appId?: string; senderId?: string };
 }
 
 export interface LoginEnv {
@@ -205,6 +208,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     vapidSubject,
     accountDefaults,
     loginEnv: loginEnvFrom(env, passwordLogin, registration),
+    firebaseEnv: {
+      ...(env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT ? { serviceAccount: env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT } : {}),
+      ...(env.DREYMAIL_FIREBASE_API_KEY ? { apiKey: env.DREYMAIL_FIREBASE_API_KEY } : {}),
+      ...(env.DREYMAIL_FIREBASE_APP_ID ? { appId: env.DREYMAIL_FIREBASE_APP_ID } : {}),
+      ...(env.DREYMAIL_FIREBASE_SENDER_ID ? { senderId: env.DREYMAIL_FIREBASE_SENDER_ID } : {}),
+    },
     adminUsers: (env.DREYMAIL_ADMIN_USERS ?? '')
       .split(',')
       .map((s) => s.trim().toLowerCase())

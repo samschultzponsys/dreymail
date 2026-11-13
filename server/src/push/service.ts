@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 
 import crypto from 'node:crypto';
 import type { NotificationContent, PushSubscriptionInput } from '../../../shared/types.js';
@@ -56,6 +57,8 @@ export interface PushServiceOptions {
   isUserActive: (userId: string) => boolean;
   /** Called when a user's last subscription disappears (expired at the push service). */
   onNoSubscriptions: (userId: string) => void;
+  /** Also delivers every notification to the user's Android app phones (DreyMail). */
+  fcm?: { send(userId: string, payload: NotificationPayload | ClearPayload, opts: { ttl: number; high: boolean }): Promise<number> };
   /** Total unread across the user's inboxes, for the app icon badge (null if unknown). */
   unreadCount?: (userId: string) => Promise<number | null>;
   /**
@@ -274,7 +277,10 @@ export class PushService {
         return outcome;
       }),
     );
-    if (subs.length > 0 && store.listPushSubscriptions(userId).length === 0) this.opts.onNoSubscriptions(userId);
-    return outcomes.filter((o) => o === 'sent').length;
+    const hadPhones = this.opts.fcm ? store.listFcmTokens(userId).length > 0 : false;
+    const phones = (await this.opts.fcm?.send(userId, payload, { ttl, high: (opts.urgency ?? 'high') === 'high' }).catch(() => 0)) ?? 0;
+    // The last browser subscription and phone are gone (expired at the push services).
+    if ((subs.length > 0 || hadPhones) && !store.pushUserIds().includes(userId)) this.opts.onNoSubscriptions(userId);
+    return outcomes.filter((o) => o === 'sent').length + phones;
   }
 }

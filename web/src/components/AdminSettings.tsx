@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
+
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
@@ -301,4 +305,95 @@ function fromView(s: LoginSettingsView): LoginSettingsInput {
     passwordLogin: s.passwordLogin,
     registration: s.registration,
   };
+}
+
+/** Settings → Android (administrators): Firebase, which wakes the Android app when mail arrives. */
+export function AndroidAdmin() {
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['admin', 'firebase'], queryFn: api.adminFirebase });
+  const [serviceAccount, setServiceAccount] = useState('');
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [appId, setAppId] = useState<string | null>(null);
+  const [senderId, setSenderId] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!settings.data) return <div className="hint">{settings.error ? (settings.error as Error).message : 'Loading…'}</div>;
+  const s = settings.data;
+  const locked = s.locked;
+  const v = { apiKey: apiKey ?? s.apiKey, appId: appId ?? s.appId, senderId: senderId ?? s.senderId };
+
+  const save = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      qc.setQueryData(['admin', 'firebase'], await api.adminSaveFirebase({ serviceAccount, ...v }));
+      setServiceAccount('');
+      setStatus({ ok: true, text: 'Saved. Phones register the next time the Android app opens.' });
+    } catch (err) {
+      setStatus({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stack">
+      <div className="hint">
+        The DreyMail Android app gets new mail instantly: this server watches your inboxes and wakes the phone through Firebase Cloud Messaging, the
+        same channel Spark and Gmail use. Message contents never go through Google; only “there is a notification” and its text, over TLS.
+      </div>
+      <div className={s.configured ? 'success-text' : 'muted'}>
+        {s.configured ? `Set up for Firebase project “${s.projectId}”.` : 'Not set up yet: the Android app shows no notifications until it is.'}
+      </div>
+      <fieldset className="group">
+        <legend>One-time setup in the Firebase console</legend>
+        <ol className="steps">
+          <li>
+            Open <code className="copyable">console.firebase.google.com</code>, <em>Create a project</em> (free; Analytics not needed).
+          </li>
+          <li>
+            <em>Add app → Android</em>, package name <code className="copyable">io.github.samschultzponsys.dreymail</code>. Skip the download steps.
+          </li>
+          <li>
+            <em>Project settings → General</em>: copy the Android app's <strong>App ID</strong>, the <strong>Web API key</strong> and, under <em>Cloud
+            Messaging</em>, the <strong>Sender ID</strong> into the fields below.
+          </li>
+          <li>
+            <em>Project settings → Service accounts → Generate new private key</em>: paste the whole downloaded JSON file below.
+          </li>
+        </ol>
+      </fieldset>
+      <div className="grid2">
+        <Field label="App ID" lockedBy={locked.appId} htmlFor="fb-app">
+          <input id="fb-app" className="input" value={v.appId} disabled={!!locked.appId} placeholder="1:1234567890:android:abc123" onChange={(e) => setAppId(e.target.value)} />
+        </Field>
+        <Field label="Sender ID" lockedBy={locked.senderId} htmlFor="fb-sender">
+          <input id="fb-sender" className="input" value={v.senderId} disabled={!!locked.senderId} placeholder="1234567890" onChange={(e) => setSenderId(e.target.value)} />
+        </Field>
+      </div>
+      <Field label="Web API key" lockedBy={locked.apiKey} htmlFor="fb-key">
+        <input id="fb-key" className="input" value={v.apiKey} disabled={!!locked.apiKey} placeholder="AIza…" autoComplete="off" onChange={(e) => setApiKey(e.target.value)} />
+      </Field>
+      <Field label="Service account JSON" lockedBy={locked.serviceAccount} htmlFor="fb-sa">
+        <textarea
+          id="fb-sa"
+          className="input textarea"
+          rows={5}
+          value={serviceAccount}
+          disabled={!!locked.serviceAccount}
+          placeholder={s.hasServiceAccount ? `Saved (${s.serviceAccountEmail}). Paste a new one to replace it.` : '{ "type": "service_account", "project_id": … }'}
+          onChange={(e) => setServiceAccount(e.target.value)}
+        />
+      </Field>
+      <div className="hint">The service account is stored encrypted and never sent to browsers or phones.</div>
+      {status && <div className={status.ok ? 'success-text' : 'error-text'}>{status.text}</div>}
+      <div className="row-buttons">
+        <span className="grow" />
+        <button className="btn primary" disabled={busy} onClick={() => void save()}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
 }

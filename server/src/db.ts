@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: administrators, user management and instance settings.
 // Modified by samschultzponsys, 2026-11-13: rekeyFrom for the one-time data upgrade.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -122,6 +123,16 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
                AND id = (SELECT id FROM users ORDER BY created_at, rowid LIMIT 1);
              CREATE TABLE IF NOT EXISTS instance_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   },
+  // DreyMail: the Android app's Firebase registration tokens, one row per phone, with the phone's
+  // Web Push keys: payloads are end-to-end encrypted (RFC 8291), so Google relays only ciphertext.
+  `CREATE TABLE IF NOT EXISTS fcm_tokens (
+     token TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     p256dh TEXT NOT NULL,
+     auth TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS fcm_tokens_user ON fcm_tokens(user_id);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -677,7 +688,37 @@ export class Store {
 
   /** Users with notifications enabled on at least one device. */
   pushUserIds(): string[] {
-    return (this.db.prepare('SELECT DISTINCT user_id FROM push_subscriptions').all() as { user_id: string }[]).map((r) => r.user_id);
+    return (
+      this.db.prepare('SELECT user_id FROM push_subscriptions UNION SELECT user_id FROM fcm_tokens').all() as { user_id: string }[]
+    ).map((r) => r.user_id);
+  }
+
+  // ---- Android app (Firebase) tokens (DreyMail) ------------------------------------
+
+  /** Stores a phone's token; a token used by another user before moves to this one. */
+  addFcmToken(userId: string, token: string, keys: { p256dh: string; auth: string }) {
+    this.db
+      .prepare(
+        `INSERT INTO fcm_tokens (token, user_id, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`,
+      )
+      .run(token, userId, keys.p256dh, keys.auth, Date.now());
+    // Same cap as push subscriptions: the oldest phones go first.
+    this.db
+      .prepare(`DELETE FROM fcm_tokens WHERE user_id = ? AND token NOT IN (SELECT token FROM fcm_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT ${MAX_PUSH_SUBSCRIPTIONS})`)
+      .run(userId, userId);
+  }
+
+  listFcmTokens(userId: string): { token: string; p256dh: string; auth: string }[] {
+    return this.db.prepare('SELECT token, p256dh, auth FROM fcm_tokens WHERE user_id = ? ORDER BY created_at').all(userId) as {
+      token: string;
+      p256dh: string;
+      auth: string;
+    }[];
+  }
+
+  removeFcmToken(userId: string, token: string): boolean {
+    return this.db.prepare('DELETE FROM fcm_tokens WHERE user_id = ? AND token = ?').run(userId, token).changes > 0;
   }
 
   // ---- highest INBOX UID already notified about (per account) ---------------------

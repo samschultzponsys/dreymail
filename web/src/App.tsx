@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: passes admin to Settings.
 // Modified by samschultzponsys, 2026-11-13: phone Compose button.
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
+// Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -14,6 +15,7 @@ import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
 import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme';
 import { accountIcon, desktopBridge } from './desktop';
+import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
@@ -193,6 +195,12 @@ export function App() {
     [accountMap],
   );
   useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify);
+  // Android app: a notification channel per account, and this phone registered for notifications.
+  useEffect(() => {
+    if (!androidBridge() || !accountsQ.data) return;
+    syncAndroidAccounts(accountsQ.data);
+    void registerAndroidPush().catch(() => {});
+  }, [accountsQ.data]);
   useEffect(() => {
     desktopBridge()?.onOpen((url) => {
       const target = notificationTarget(url, window.location.origin);

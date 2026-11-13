@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: dreymail.db and the one-time data upgrade.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: new-mail notifications also go to open sessions (desktop app).
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,9 +30,11 @@ import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerAndroidPushRoutes } from './routes/android.js';
 import { LoginSettings } from './loginSettings.js';
 import { DB_FILE, moveOldDataFiles, rekeyOldSecrets } from './upgrade.js';
 import { buildNotification, buildSnoozeNotification, type NotificationPayload } from './push/notify.js';
+import { FcmSender, FirebaseConfig, type FetchLike } from './push/fcm.js';
 import type { NotificationContent } from '../../shared/types.js';
 import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
@@ -84,6 +87,8 @@ export async function buildApp(
     avatars?: AvatarService;
     /** Replaces real Web Push delivery (tests only). */
     pushTransport?: PushTransport;
+    /** Replaces HTTP calls to Google for the Android app's notifications (tests only). */
+    fcmFetch?: FetchLike;
     /** Replaces the DNS check of push service hosts (tests only). */
     pushHostCheck?: (host: string) => Promise<void>;
     /** Where the mail cache lives, null for none. Defaults to cache.db in the data directory (memory with `store`). */
@@ -134,8 +139,11 @@ export async function buildApp(
   pool.onInboxActivity = (userId, accountId) => mail.folderChanged(userId, accountId, 'INBOX');
   const vapid = vapidKeysFromSeed(keyring.vapidSeed);
   let live: LiveSessions = { isUserActive: () => false };
+  const firebase = new FirebaseConfig(config, store);
+  const fcm = new FcmSender(firebase, store, opts.fcmFetch, (msg, extra) => app.log.warn(extra ?? {}, msg));
   const push = new PushService({
     store,
+    fcm,
     transport: opts.pushTransport ?? createPushTransport(vapid, config.vapidSubject),
     isUserActive: (userId) => live.isUserActive(userId),
     onNoSubscriptions: (userId) => pool.setBackground(userId, false),
@@ -219,7 +227,8 @@ export async function buildApp(
     fetchImage: opts.fetchImage,
     avatars: opts.avatars,
   });
-  await registerAdminRoutes(app, { config, store, sessions, login, pool, mail });
+  await registerAdminRoutes(app, { config, store, sessions, login, pool, mail, firebase });
+  registerAndroidPushRoutes(app, { store, pool, firebase });
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.

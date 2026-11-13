@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
+
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
@@ -8,7 +12,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
-import type { AdminUser } from '../../../shared/types.js';
+import type { AdminUser, FirebaseSettingsView } from '../../../shared/types.js';
 import { hashPassword, LOCAL_ISSUER, passwordSchema, usernameSchema } from '../auth/password.js';
 import type { Sessions } from '../auth/session.js';
 import type { Config } from '../config.js';
@@ -16,6 +20,7 @@ import type { Store, User } from '../db.js';
 import type { MailService } from '../imap/mail.js';
 import type { ImapPool } from '../imap/pool.js';
 import { LoginSettingsError, type LoginSettings } from '../loginSettings.js';
+import type { FirebaseConfig } from '../push/fcm.js';
 
 export interface AdminDeps {
   config: Config;
@@ -24,6 +29,7 @@ export interface AdminDeps {
   login: LoginSettings;
   pool: ImapPool;
   mail: MailService;
+  firebase: FirebaseConfig;
 }
 
 /** Administrator: flagged in the database, or named in DREYMAIL_ADMIN_USERS. */
@@ -53,7 +59,7 @@ const patchUserSchema = z.object({ admin: z.boolean().optional(), password: z.st
 const testSchema = z.object({ issuerUrl: z.string().max(2000), clientId: z.string().max(500), clientSecret: z.string().max(2000) });
 
 export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps) {
-  const { config, store, sessions, login, pool, mail } = deps;
+  const { config, store, sessions, login, pool, mail, firebase } = deps;
 
   const admin = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const user = req.user!;
@@ -158,6 +164,44 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
       if (err instanceof LoginSettingsError) return bad(reply, err.message);
       throw err;
     }
+  });
+
+  // ---- Android app notifications (Firebase) --------------------------------------------
+
+  const firebaseView = (): FirebaseSettingsView => {
+    const c = firebase.current();
+    const env = config.firebaseEnv;
+    const sa = firebase.serviceAccount();
+    return {
+      configured: firebase.client() !== null,
+      hasServiceAccount: !!sa,
+      projectId: sa?.project_id ?? '',
+      serviceAccountEmail: sa?.client_email ?? '',
+      apiKey: c.apiKey,
+      appId: c.appId,
+      senderId: c.senderId,
+      locked: {
+        ...(env.serviceAccount ? { serviceAccount: 'DREYMAIL_FIREBASE_SERVICE_ACCOUNT' } : {}),
+        ...(env.apiKey ? { apiKey: 'DREYMAIL_FIREBASE_API_KEY' } : {}),
+        ...(env.appId ? { appId: 'DREYMAIL_FIREBASE_APP_ID' } : {}),
+        ...(env.senderId ? { senderId: 'DREYMAIL_FIREBASE_SENDER_ID' } : {}),
+      },
+    };
+  };
+  const firebaseSchema = z.object({ serviceAccount: z.string().max(20_000), apiKey: z.string().max(200), appId: z.string().max(200), senderId: z.string().max(100) });
+
+  app.get('/api/admin/firebase', async (req, reply) => (admin(req, reply) ? firebaseView() : reply));
+
+  app.put('/api/admin/firebase', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    const body = firebaseSchema.safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      firebase.save(body.data);
+    } catch (err) {
+      return bad(reply, (err as Error).message);
+    }
+    return firebaseView();
   });
 
   /** Checks that the provider can be discovered with these values (before saving them). */

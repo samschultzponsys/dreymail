@@ -6,6 +6,8 @@
 // Modified by samschultzponsys, 2026-11-13: Users and Sign-in tabs for administrators.
 // Modified by samschultzponsys, 2026-11-13: label capitalization.
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
+// Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
+// Modified by samschultzponsys, 2026-11-13: Android: change server.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -14,7 +16,9 @@ import type { DomainName, NotificationContent, Preferences, SwipeAction, Transit
 import { api } from '../api';
 import { desktopBridge } from '../desktop';
 import { SignaturesSettings } from './SignaturesSettings';
-import { SignInAdmin, UsersAdmin } from './AdminSettings';
+import { AndroidAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { androidBridge, androidInfo } from '../android';
+import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
 import { currentEnvironment, currentSubscription, disablePush, enablePush, pushAvailability, type PushAvailability } from '../push';
 
@@ -33,7 +37,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin';
+type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'android';
 
 export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { prefs: Preferences; hasPassword: boolean; admin: boolean; myId: string; onClose: () => void }) {
   const qc = useQueryClient();
@@ -49,6 +53,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
       ? [
           ['users', 'Users'],
           ['signin', 'Sign-in'],
+          ['android', 'Android'],
         ] as [SettingsTab, string][]
       : []),
   ];
@@ -161,11 +166,12 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
             </>
           )}
           {tab === 'signatures' && <SignaturesSettings />}
-          {tab === 'notifications' && <Notifications prefs={v} save={save} />}
+          {tab === 'notifications' && (androidBridge() ? <AndroidNotifications /> : <Notifications prefs={v} save={save} />)}
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
           {tab === 'users' && <UsersAdmin myId={myId} />}
           {tab === 'signin' && <SignInAdmin />}
+          {tab === 'android' && <AndroidAdmin />}
           {error && <div className="error-text">{error}</div>}
         </div>
       </div>
@@ -423,22 +429,57 @@ function Notifications({ prefs, save }: { prefs: Preferences; save: (p: Preferen
   );
 }
 
-/** Settings → General, in the DreyMail desktop app only: its version and an update check. */
+/** Settings → General, in the DreyMail desktop or Android app only: its version and an update check. */
 function DesktopApp() {
-  const bridge = desktopBridge();
-  if (!bridge) return null;
+  const desktop = desktopBridge();
+  const android = androidInfo();
+  const info = desktop ?? android;
+  if (!info) return null;
   return (
     <div>
-      <label className="label">Desktop app</label>
+      <label className="label">{desktop ? 'Desktop app' : 'Android app'}</label>
       <div className="row-buttons">
         <span>
-          DreyMail {bridge.version} <span className="muted">({bridge.installKind})</span>
+          DreyMail {info.version} <span className="muted">({info.installKind})</span>
         </span>
-        <button className="btn" onClick={() => bridge.checkForUpdates()}>
+        <button className="btn" onClick={() => (desktop ? desktop.checkForUpdates() : androidBridge()?.checkForUpdates())}>
           Check for updates
         </button>
+        {!desktop && (
+          <button className="btn" onClick={() => androidBridge()?.changeServer()}>
+            Change server
+          </button>
+        )}
       </div>
       <div className="hint">Updates are also checked every time the app starts.</div>
+    </div>
+  );
+}
+
+/** Settings → Notifications in the Android app: Android's own per-account settings (sound, vibration). */
+function AndroidNotifications() {
+  const accounts = useAccounts();
+  const bridge = androidBridge()!;
+  return (
+    <div className="stack">
+      <div className="hint">
+        New mail arrives the moment it lands, as a notification in the account’s colour. Each account has its own Android notification channel: pick a
+        different sound, vibration or importance for each one.
+      </div>
+      <ul className="user-list">
+        {(accounts.data ?? []).map((a) => (
+          <li key={a.id}>
+            <span className="dot" style={{ background: a.color, width: 12, height: 12 }} />
+            <div className="user-main">
+              <div className="user-name">{a.name}</div>
+              <div className="muted user-meta">{a.email}</div>
+            </div>
+            <button className="btn" onClick={() => bridge.openChannelSettings(a.id)}>
+              Sound and vibration
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

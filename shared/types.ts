@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference (All inboxes on/off).
 // Modified by samschultzponsys, 2026-11-13: Signature types.
 // Modified by samschultzponsys, 2026-11-13: notify event for the desktop app.
+// Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 
 // Types shared between the server API and the web client.
 
@@ -321,6 +322,19 @@ export interface LoginSettingsInput {
   label: string;
   passwordLogin: boolean;
   registration: Registration;
+}
+
+/** Settings → Android (administrators): Firebase for the Android app's notifications. */
+export interface FirebaseSettingsView {
+  /** Everything the app and the server need is set. */
+  configured: boolean;
+  hasServiceAccount: boolean;
+  projectId: string;
+  serviceAccountEmail: string;
+  apiKey: string;
+  appId: string;
+  senderId: string;
+  locked: Partial<Record<'serviceAccount' | 'apiKey' | 'appId' | 'senderId', string>>;
 }
 
 /** A user in Settings → Users (DreyMail). */

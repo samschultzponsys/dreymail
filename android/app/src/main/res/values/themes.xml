@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DreyMail. Copyright (C) 2026 samschultzponsys. AGPL-3.0-only; see LICENSE and NOTICE. -->
+<resources>
+    <color name="navy">#141B34</color>
+    <color name="cyan">#22D3EE</color>
+    <style name="Theme.DreyMail" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/navy</item>
+        <item name="android:colorAccent">@color/cyan</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

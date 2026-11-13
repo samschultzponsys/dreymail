@@ -1,3 +1,5 @@
+# DreyMail .gitignore. Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr); AGPL-3.0-only, see LICENSE and NOTICE.
+# Modified by samschultzponsys, 2026-11-13: Android build output and signing keys.
 # Dependencies and build output
 node_modules/
 dist/
@@ -21,3 +23,11 @@ data/
 .idea/
 .vscode/
 *.log
+
+# Android app build output (android/)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.keystore
+*.jks

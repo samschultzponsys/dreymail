@@ -1,6 +1,7 @@
 # Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: no longer runs on main (the Release workflow tests it).
+# Modified by samschultzponsys, 2026-11-13: Android app compile check.
 name: CI
 
 # main is tested by the Release workflow, so CI covers other branches and pull requests only
@@ -27,4 +28,19 @@ jobs:
       - run: npm test
       - run: npm run test:integration
       - run: npm run build
+
+  # The Android app compiles (debug build; release builds and signing happen in the Release workflow).
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew --no-daemon assembleDebug -PversionName=0.0
 

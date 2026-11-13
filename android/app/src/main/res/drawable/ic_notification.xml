@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DreyMail. Copyright (C) 2026 samschultzponsys. AGPL-3.0-only; see LICENSE and NOTICE.
+     Status-bar icon: the envelope in its nest as a white silhouette (Android tints it per account). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- envelope with its flap cut out (even-odd: the V shape is a hole) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M5,4.5h14a1.5,1.5 0,0 1,1.5 1.5v6.5h-17v-6.5a1.5,1.5 0,0 1,1.5 -1.5z M5.6,5.7L12,10.1L18.4,5.7L18.4,7.4L12,11.8L5.6,7.4z" />
+    <!-- nest bowl -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.5,12.5C5.5,13.8 18.5,13.8 21.5,12.5C21.2,17.5 17.2,20.5 12,20.5C6.8,20.5 2.8,17.5 2.5,12.5z" />
+</vector>

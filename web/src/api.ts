@@ -3,8 +3,9 @@
 // Modified by samschultzponsys, 2026-11-13: signature API calls.
 // Modified by samschultzponsys, 2026-11-13: administration API calls.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -70,6 +71,10 @@ export const api = {
   deleteAccount: (id: string) => request<{ ok: true }>('DELETE', `/api/accounts/${encodeURIComponent(id)}`),
   signatures: () => request<Signature[]>('GET', '/api/signatures'),
   adminUsers: () => request<AdminUser[]>('GET', '/api/admin/users'),
+  adminFirebase: () => request<FirebaseSettingsView>('GET', '/api/admin/firebase'),
+  adminSaveFirebase: (s: { serviceAccount: string; apiKey: string; appId: string; senderId: string }) => request<FirebaseSettingsView>('PUT', '/api/admin/firebase', s),
+  androidPush: () => request<{ firebase: { projectId: string; apiKey: string; appId: string; senderId: string } | null }>('GET', '/api/push/android'),
+  registerAndroidToken: (token: string, keys: { p256dh: string; auth: string }) => request<{ ok: true }>('POST', '/api/push/android', { token, keys }),
   adminCreateUser: (u: { username: string; password: string; admin: boolean }) => request<AdminUser[]>('POST', '/api/admin/users', u),
   adminPatchUser: (id: string, patch: { admin?: boolean; password?: string }) => request<AdminUser[]>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, patch),
   adminDeleteUser: (id: string) => request<AdminUser[]>('DELETE', `/api/admin/users/${encodeURIComponent(id)}`),
