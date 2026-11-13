@@ -1,3 +1,6 @@
+<!-- dreymail. Copyright (C) 2026 samschultzponsys.
+     Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE. -->
+
 # dreymail roadmap
 
 Context for future work. **Nothing here is implemented yet.**
