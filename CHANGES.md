@@ -13,6 +13,31 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.8): Android app
+
+- **Android app** (new `android/`: Kotlin, WebView around the user's DreyMail server):
+  `MainActivity.kt` (WebView, file uploads, attachment downloads, mailto: handling, bridge
+  `window.DreyMailAndroid`), `PushService.kt` (Firebase messages), `Notifier.kt` (one Android
+  notification channel per account so each has its own sound/vibration; status-bar icon tinted
+  and large icon drawn in the account colour; grouping; clearing), `WebPushCrypto.kt`
+  (decrypts RFC 8291 messages), `Updater.kt` (GitHub release check), `Server.kt`, `Prefs.kt`,
+  `DreyMailApp.kt`; launcher and notification icons (`scripts/icons.mjs`).
+- **Server:** Firebase Cloud Messaging HTTP v1 sender without an SDK (new `server/src/push/fcm.ts`:
+  service-account JWT, data-only messages encrypted end to end with the phone's keys, dead tokens
+  dropped). Every Web Push notification and clear also goes to the user's phones
+  (`server/src/push/service.ts`). New `fcm_tokens` table (`server/src/db.ts`), phone registration
+  `/api/push/android` (new `server/src/routes/android.ts`), Firebase settings in Settings → Android
+  with `DREYMAIL_FIREBASE_*` environment overrides (`server/src/routes/admin.ts`,
+  `server/src/config.ts`, `server/src/app.ts`). Tests: `server/test/fcm.test.ts`.
+- **Web app:** Android bridge (new `web/src/android.ts`): registers the phone, keeps channels in
+  step with accounts; Settings → Notifications lists per-account sound settings in the app;
+  Settings → General shows the app version, update check and server change
+  (`web/src/App.tsx`, `web/src/api.ts`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/components/AdminSettings.tsx`, `web/src/styles.css`).
+- **Builds:** CI compiles the app on branches (`.github/workflows/ci.yml`); the Release workflow
+  builds `DreyMail-X.Y.apk` signed with the key in the repository secrets and attaches it
+  (`.github/workflows/release.yml`). `.gitignore` keeps build output and keystores out.
+
 ## 2026-11-13 (v1.7): desktop apps for Linux and Windows
 
 - **Desktop app** (new `desktop/`: Electron shell `main.cjs`, `preload.cjs`, first-run

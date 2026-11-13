@@ -171,3 +171,52 @@ jobs:
       - name: Attach to the release
         run: gh release upload "v$VERSION" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
 
+  # Android app: DreyMail-X.Y.apk, signed with the key in the repository secrets
+  # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+  # Every release must use the same key, or phones can't update. Without the secrets the APK is
+  # skipped with a warning (the rest of the release is unaffected).
+  android:
+    needs: release
+    if: needs.release.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - name: Signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the Android app is not built for this release."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dreymail.jks"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.key.outputs.signed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - if: steps.key.outputs.signed == 'true'
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build and attach the APK
+        if: steps.key.outputs.signed == 'true'
+        env:
+          DREYMAIL_KEYSTORE_FILE: ${{ runner.temp }}/dreymail.jks
+          DREYMAIL_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DREYMAIL_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          DREYMAIL_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon assembleRelease -PversionName="$VERSION"
+          cp app/build/outputs/apk/release/app-release.apk "DreyMail-$VERSION.apk"
+          gh release upload "v$VERSION" "DreyMail-$VERSION.apk" --clobber --repo "$GITHUB_REPOSITORY"
+

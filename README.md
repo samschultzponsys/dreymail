@@ -6,7 +6,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings).
      Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes).
      Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up).
-     Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps). -->
+     Modified by samschultzponsys, 2026-11-13: v1.7 (desktop apps).
+     Modified by samschultzponsys, 2026-11-13: v1.8 (Android app). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -30,10 +31,11 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.7**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.8**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
-apps for Linux (flatpak, deb, rpm) and Windows with colour-coded notifications and an updater. What's planned is in
+apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
+encrypted notifications that sound and look different per account. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -196,6 +198,31 @@ server…*) and then shows DreyMail in its own window:
   with the download opened), or on Windows it downloads the new installer and runs it.
 - Links in mail open in your normal browser; the window only shows your DreyMail server and its
   sign-in. *Help → Source code* links to this repository.
+
+## Android app
+
+Every release also has `DreyMail-X.Y.apk`. Download it on your phone and open it (allow your
+browser to install apps when Android asks). It asks for your DreyMail server's address once.
+
+- **Instant, per-account notifications.** Your server already watches every inbox with IMAP IDLE;
+  the moment mail lands it wakes the phone through Firebase Cloud Messaging, the same way Spark
+  and Gmail do. No polling, no permanent "checking mail" notification, no mail passwords on the
+  phone.
+- **Each account sounds and looks different.** Every account is its own Android notification
+  channel: Settings → Notifications in the app lists them, and each one opens Android's own
+  sound/vibration/importance settings. The status-bar icon is tinted in the account's colour and
+  the notification shows the envelope in that colour. Notifications of the same account are
+  grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
+- **Private.** Notifications are end-to-end encrypted to the phone (Web Push encryption,
+  RFC 8291): Google relays only ciphertext.
+- **Updates.** The app checks for a newer release when it starts and from Settings → General, and
+  downloads the new APK; Android updates in place and keeps your login.
+
+**One-time setup** (administrator): create a free Firebase project and enter its values in
+Settings → Android. The page walks you through it (about 10 minutes). Or set them in the
+compose file instead, which then wins over the UI:
+`DREYMAIL_FIREBASE_SERVICE_ACCOUNT` (the service account JSON, one line),
+`DREYMAIL_FIREBASE_API_KEY`, `DREYMAIL_FIREBASE_APP_ID`, `DREYMAIL_FIREBASE_SENDER_ID`.
 
 ## Upgrading to 1.5 (new names)
 
