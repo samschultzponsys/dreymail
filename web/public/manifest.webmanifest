@@ -1,6 +1,6 @@
 {
-  "name": "dreymail",
-  "short_name": "dreymail",
+  "name": "DreyMail",
+  "short_name": "DreyMail",
   "description": "Webmail for your IMAP/SMTP accounts",
   "id": "/",
   "start_url": "/",

@@ -1,7 +1,7 @@
-// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "dreymail".
-// Modified by samschultzponsys, 2026-11-13: day/night dreymail logo instead of the favicon.
+// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
+// Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -44,7 +44,7 @@ export function Login() {
       <div className="login-card">
         <img className="brand-mark day" src="/brand-day.svg" alt="" />
         <img className="brand-mark night" src="/brand-night.svg" alt="" />
-        <h1>dreymail</h1>
+        <h1>DreyMail</h1>
         <div className="muted">Your mail, from any IMAP server.</div>
         {methods.isLoading && <div className="muted">Loading…</div>}
         {methods.error && <div className="error-text">Could not reach the server: {(methods.error as Error).message}</div>}

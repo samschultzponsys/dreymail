@@ -1,7 +1,7 @@
 <!-- dreymail. Copyright (C) 2026 samschultzponsys.
      Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE. -->
 
-# dreymail roadmap
+# DreyMail roadmap
 
 Context for future work. **Nothing here is implemented yet.**
 
@@ -35,7 +35,7 @@ on the providers; at most a minimal encrypted cache.
 
 ## Branding
 - [x] Replace logo/icons with own artwork (v1.1: cyan envelope in an indigo drey).
-- [ ] Decide whether the running-squirrel phone animation stays, or gets its own dreymail motion.
+- [ ] Decide whether the running-squirrel phone animation stays, or gets its own DreyMail motion.
 
 ## License compliance
 - [ ] "Source code" link in the UI (AGPL §13), needed before anyone else uses an instance. Link

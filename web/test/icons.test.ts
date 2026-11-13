@@ -1,6 +1,6 @@
-// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-13: tests for dreymail's cyan nest icon and cyan accent instead of the squirrel.
+// Modified by samschultzponsys, 2026-11-13: tests for DreyMail's cyan nest icon and cyan accent instead of the squirrel.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -124,9 +124,9 @@ describe('app icons', () => {
     expect(dark).not.toContain('--accent-fill');
   });
 
-  it('the favicon is the dreymail nest and follows the system light/dark setting', () => {
+  it('the favicon is the DreyMail nest and follows the system light/dark setting', () => {
     const svg = read('favicon.svg').toString('utf8');
-    expect(svg).toContain('<title>dreymail</title>');
+    expect(svg).toContain('<title>DreyMail</title>');
     expect(svg).toContain('@media (prefers-color-scheme: dark)');
     expect(svg).toContain('fill="#22d3ee"');
     expect(svg).not.toContain('M 562,566'); // upstream's squirrel

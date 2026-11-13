@@ -1,4 +1,4 @@
-# Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+# Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: release on push to main when package.json carries a new
 # MAJOR.MINOR version; image goes to ghcr.io/samschultzponsys/dreymail; every release gets a GitHub Release.
@@ -96,6 +96,6 @@ jobs:
         run: >
           gh release create "v$VERSION"
           --target "$GITHUB_SHA"
-          --title "dreymail v$VERSION"
+          --title "DreyMail v$VERSION"
           --generate-notes
           --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\` (also \`latest\`). See CHANGES.md for the dated change log."

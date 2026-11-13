@@ -1,4 +1,4 @@
-dreymail
+DreyMail
 Copyright (C) 2026 samschultzponsys
 
 This project is a modified version of Ratatoskr
@@ -7,7 +7,7 @@ and contributors, licensed under the GNU Affero General Public License
 v3.0. Based on upstream commit e2abaa4c585a2e0edc8a09b082208941c32afcdc
 (2026-10-27).
 
-dreymail is not affiliated with or endorsed by the original author of
+DreyMail is not affiliated with or endorsed by the original author of
 Ratatoskr.
 
 This program is free software: you can redistribute it and/or modify it
@@ -22,12 +22,12 @@ General Public License for more details.
 Additional terms (GNU AGPL v3.0, section 7(b))
 ----------------------------------------------
 The following additional term applies to material added to this project
-by the dreymail contributors (it does not change the terms of the
+by the DreyMail contributors (it does not change the terms of the
 upstream Ratatoskr material):
 
   Anyone who conveys this work or a modified version of it, or makes it
   available to users over a network, must preserve this NOTICE file,
-  including the attribution to both dreymail and Ratatoskr above, and
+  including the attribution to both DreyMail and Ratatoskr above, and
   must keep the attribution and source-code link shown in the
   application's user interface (where present) intact and reasonably
   visible.

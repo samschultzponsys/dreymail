@@ -1,9 +1,9 @@
-<!-- Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
-     Modified by samschultzponsys, 2026-11-13: rewritten for dreymail (credits, quick start, releasing); upstream docs kept and rebranded.
+<!-- Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
+     Modified by samschultzponsys, 2026-11-13: rewritten for DreyMail (credits, quick start, releasing); upstream docs kept and rebranded.
      Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent). -->
-<p align="center"><img src="branding/dreymail-icon.svg" alt="dreymail icon" width="128" height="128"></p>
+<p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
-# dreymail
+# DreyMail
 
 *Pronounced "DRAY-mail". A drey is a squirrel's nest.*
 
@@ -12,19 +12,19 @@ account), for desktop browsers and Android.
 
 ## Credits / Origin
 
-dreymail is based on **[Ratatoskr](https://github.com/magnuspihl/Ratatoskr)** by **Magnus Pihl**
+DreyMail is based on **[Ratatoskr](https://github.com/magnuspihl/Ratatoskr)** by **Magnus Pihl**
 and contributors, licensed under the GNU AGPL v3.0. It started from upstream commit
 [`e2abaa4`](https://github.com/magnuspihl/Ratatoskr/commit/e2abaa4c585a2e0edc8a09b082208941c32afcdc)
 (2026-10-27). The full upstream history is kept in this repository. Nearly all of the code and
-documentation below is Magnus's work. dreymail's changes are listed in [`CHANGES.md`](CHANGES.md).
+documentation below is Magnus's work. DreyMail's changes are listed in [`CHANGES.md`](CHANGES.md).
 
-dreymail is an independent project. It is **not affiliated with or endorsed by** the original
-author. dreymail stays under the same license, AGPL-3.0-only; see [License](#license) and
+DreyMail is an independent project. It is **not affiliated with or endorsed by** the original
+author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#license) and
 [`NOTICE`](NOTICE).
 
 ## Status
 
-Current version: **1.1**. It's upstream's feature set with dreymail's own look: a cyan envelope in
+Current version: **1.1**. It's upstream's feature set with DreyMail's own look: a cyan envelope in
 an indigo drey as the icon, and cyan as the accent colour. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
@@ -32,7 +32,7 @@ an indigo drey as the icon, and cyan as the accent colour. What's planned is in
 
 A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**.
 
-- **Your mail server stays the source of truth.** dreymail keeps users, their encrypted account
+- **Your mail server stays the source of truth.** DreyMail keeps users, their encrypted account
   settings and preferences (plus, for notifications, push subscriptions and the newest INBOX UID
   already notified about, and for snoozed mail, folder, UID and wake-up time) in one SQLite file.
   To be quick, it also keeps an encrypted, disposable copy of each account's newest INBOX and Sent
@@ -81,9 +81,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used
   addresses. Special-use folders (`\Sent`, `\Drafts`, `\Trash`, `\Archive`, `\Junk`) are detected
   with name fallbacks.
-- `mailto:` links open a new message in dreymail: in plain-text mail directly, in HTML mail in a
+- `mailto:` links open a new message in DreyMail: in plain-text mail directly, in HTML mail in a
   new tab (clicks inside the sandboxed message frame can't be caught). Settings → "Open email links
-  with dreymail" makes the browser send `mailto:` links on any website here too; the installed app
+  with DreyMail" makes the browser send `mailto:` links on any website here too; the installed app
   (PWA) registers for them on its own where the browser supports it. Only recipients, subject and
   a plain-text body are taken from a link, and nothing is sent until you press Send.
 - Server-side IMAP search in the current folder, or across all inboxes in the unified view.
@@ -91,13 +91,13 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   dark styling. Heavily designed mail (newsletters) is shown on a light "paper" card instead of
   being force-inverted, with a per-message toggle.
 - Notifications for new mail on phones and desktops (Web Push), and an unread badge on the app
-  icon. Install dreymail as an app (PWA) from the browser; see [Notifications](#notifications).
+  icon. Install DreyMail as an app (PWA) from the browser; see [Notifications](#notifications).
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
 
 ## Quick start (Docker Compose)
 
-dreymail is configured with environment variables written inline in the compose file (no `.env`
+DreyMail is configured with environment variables written inline in the compose file (no `.env`
 file). This example is how I run it: an Arcane-managed stack on Unraid, a bind mount, `PUID`/`PGID`
 `99:100`, no published ports, and an external network shared with the reverse proxy.
 
@@ -219,7 +219,7 @@ account at a different host, they have to enter that host's password themselves.
 
 ### Notifications
 
-dreymail is an installable web app (PWA) and can send notifications for new mail through the
+DreyMail is an installable web app (PWA) and can send notifications for new mail through the
 browsers' standard Web Push services. No native app, no Firebase or Apple developer account and
 no extra configuration are needed. The push keys (VAPID) are derived from
 `RATATOSKR_SECRET_KEY`. HTTPS is required.
@@ -229,7 +229,7 @@ Each user turns notifications on per device in **Settings → Notifications**:
 - **Android** (Chrome, Firefox, Edge, Samsung Internet) and **desktop browsers**: turn the switch on.
   Installing the app ("Add to Home screen" / "Install app") is optional.
 - **iPhone and iPad** (iOS/iPadOS 16.4 or newer): open the site in Safari, tap *Share → Add to
-  Home Screen*, open dreymail from the Home Screen, then turn the switch on. A Safari tab can't
+  Home Screen*, open DreyMail from the Home Screen, then turn the switch on. A Safari tab can't
   receive notifications.
 
 What you get:
@@ -242,7 +242,7 @@ What you get:
   account name. The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
   through Apple's, Google's or Mozilla's push service.
 - Notifications close themselves on all your devices once their messages are read or moved out of
-  the inbox, in dreymail or in any other mail client (within the 24 hours a notification is
+  the inbox, in DreyMail or in any other mail client (within the 24 hours a notification is
   kept, and not across a server restart). Not on iPhone and iPad: Apple revokes notifications for
   sites that send pushes which show nothing.
 - The app icon shows the number of unread messages across all inboxes, where the platform
@@ -262,10 +262,10 @@ notifications on that device.
 
 ### Snooze
 
-Snoozing moves a message to the account's **Snoozed** folder until the time you pick. dreymail
+Snoozing moves a message to the account's **Snoozed** folder until the time you pick. DreyMail
 uses the folder the server marks as Snoozed (the IMAP `\Snoozed` attribute from RFC 9979), or a
 folder named "Snoozed", and creates one if there is none. IMAP has no way to store *when* a message
-should come back, so dreymail keeps the wake-up time in its database and runs the timer itself.
+should come back, so DreyMail keeps the wake-up time in its database and runs the timer itself.
 
 When the time comes, the message goes back to INBOX as unread, with the current time as its arrival
 date, so it is at the top of the list. Messages larger than `RATATOSKR_MAX_MESSAGE_MB` are moved
@@ -278,7 +278,7 @@ back as they are and keep their old date. Then:
 In the Snoozed folder each message shows when it comes back. Open one to **Unsnooze** it (back to
 the inbox right away) or snooze it again to change the time. A snooze can be undone from the
 notice that confirms it. Snoozes that came due while the server was down are handled when it
-starts. A message you move out of the Snoozed folder yourself, in dreymail or another mail app,
+starts. A message you move out of the Snoozed folder yourself, in DreyMail or another mail app,
 stays where you put it.
 
 ### Login
@@ -316,8 +316,8 @@ bindings/policies to decide who may log in.
 **Keycloak:** create a client with *Client authentication* on and *Standard flow* enabled. The
 issuer URL looks like `https://auth.example.com/realms/<realm>`.
 
-Anyone your provider lets through can use dreymail. Users are identified by issuer and `sub`
-claim, and each user sees only the mail accounts they added themselves. dreymail uses PKCE,
+Anyone your provider lets through can use DreyMail. Users are identified by issuer and `sub`
+claim, and each user sees only the mail accounts they added themselves. DreyMail uses PKCE,
 `state` and `nonce`, and supports RP-initiated logout if the provider advertises an
 `end_session_endpoint`.
 
@@ -343,13 +343,13 @@ claim, and each user sees only the mail accounts they added themselves. dreymail
 
   Caddy and Traefik proxy WebSockets automatically.
 - Allow request bodies at least as large as `RATATOSKR_MAX_UPLOAD_MB` (plus a little overhead).
-- Serve dreymail on its own (sub)domain, not under a path prefix.
+- Serve DreyMail on its own (sub)domain, not under a path prefix.
 
 ### Mail cache
 
 Asking the mail server for everything on every click is slow: one page of a folder takes several
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
-searches that some servers are slow at. So dreymail keeps a copy of the newest messages
+searches that some servers are slow at. So DreyMail keeps a copy of the newest messages
 (`RATATOSKR_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder:
 sender, subject, snippet, flags and the headers that tie conversations together. It also keeps the
 content of messages you have opened, and loads the newest unread ones ahead, up to
@@ -371,7 +371,7 @@ The mail server stays the source of truth:
   mail server.
 - The copy is disposable. It is a separate file (`cache.db`), and anything wrong with it (a damaged
   file, an entry that doesn't decrypt, another secret key, a new format) just empties it, or the
-  folder concerned, and it is filled again from the server. Deleting the file while dreymail is
+  folder concerned, and it is filled again from the server. Deleting the file while DreyMail is
   stopped is always safe.
 
 What is stored and how: subjects, addresses, snippets, Message-IDs, References and message content
@@ -522,8 +522,8 @@ folders use the same cursors, so a page can come from the cache and the next fro
 - Live updates (IDLE) cover each account's INBOX. Other folders refresh when you open them, when
   the window regains focus, and every couple of minutes.
 - Sent copies are appended without the Bcc header.
-- Snoozing is a dreymail feature: other mail apps see the messages in the Snoozed folder, but only
-  dreymail brings them back, and only while it is running (late ones come back when it starts).
+- Snoozing is a DreyMail feature: other mail apps see the messages in the Snoozed folder, but only
+  DreyMail brings them back, and only while it is running (late ones come back when it starts).
   A woken message is a new copy in INBOX, so it gets a new UID.
 - No OAuth2 IMAP (XOAUTH2 for Gmail/Microsoft 365). Use app passwords where the provider
   supports them.
@@ -531,7 +531,7 @@ folders use the same cursors, so a page can come from the cache and the next fro
 
 ## License
 
-dreymail is licensed under the [GNU Affero General Public License v3.0](LICENSE)
-(AGPL-3.0-only), the same license as dreymail. See [`NOTICE`](NOTICE) for the attribution
+DreyMail is licensed under the [GNU Affero General Public License v3.0](LICENSE)
+(AGPL-3.0-only), the same license as Ratatoskr. See [`NOTICE`](NOTICE) for the attribution
 requirements and [`CHANGES.md`](CHANGES.md) for what changed from upstream. If you run a modified
 version as a service for others, you must offer them its source code.

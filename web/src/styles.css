@@ -1,7 +1,7 @@
 /* Ratatoskr design tokens. Light is the default; dark via [data-theme="dark"]. */
-/* Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+/* Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
    Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-   Modified by samschultzponsys, 2026-11-13: accent changed from orange to dreymail cyan; brand mark follows the theme. */
+   Modified by samschultzponsys, 2026-11-13: accent changed from orange to DreyMail cyan; brand mark follows the theme. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;

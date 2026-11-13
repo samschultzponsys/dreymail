@@ -1,6 +1,6 @@
 # Changes from upstream
 
-dreymail is a modified version of [Ratatoskr](https://github.com/magnuspihl/Ratatoskr) by Magnus
+DreyMail is a modified version of [Ratatoskr](https://github.com/magnuspihl/Ratatoskr) by Magnus
 Pihl, licensed AGPL-3.0-only. This file is the dated record of our modifications, as AGPL-3.0
 §5(a) requires. Every change to upstream material gets an entry here, newest first.
 
@@ -13,7 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
-## 2026-11-13 (unreleased, ships with v1.2): license notices in icon files
+## v1.2 (in progress)
+
+### Name: DreyMail
+- The product name is now written **DreyMail** everywhere people read it: page and app title,
+  PWA manifest, login page, sidebar, settings text, test notification, release titles, README,
+  NOTICE and docs. Technical identifiers stay lowercase `dreymail` (repo, image, package, container,
+  paths). Files: `web/index.html`, `web/public/manifest.webmanifest`, `web/src/components/Login.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `server/src/push/service.ts`, `scripts/icons.mjs` (+ regenerated SVGs),
+  `.github/workflows/release.yml`, `README.md`, `NOTICE`, `CLAUDE.md`, `ROADMAP.md`, and the
+  notice headers of previously modified files.
+- **Attribution fix:** the v1.0 rename had wrongly turned the Ratatoskr credit in
+  `web/src/components/SettingsDialog.tsx`'s header and the README's license line into "dreymail".
+  Both credit Ratatoskr again.
+
+### License notices in icon files
 
 - `scripts/icons.mjs` now writes an AGPL notice into every generated SVG
   (`web/icons-src/*.svg`, `web/public/favicon.svg`, `web/public/brand-*.svg`, `branding/*.svg`).

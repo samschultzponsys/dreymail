@@ -1,7 +1,7 @@
-// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "dreymail".
-// Modified by samschultzponsys, 2026-11-13: day/night dreymail logo instead of the favicon.
+// Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
+// Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 
 import {
   AlarmClock,
@@ -77,7 +77,7 @@ export function Sidebar({ accounts, folders, sel, onSelect, onCompose, onAccount
       <div className="brand">
         <img className="brand-mark day" src="/brand-day.svg" alt="" />
         <img className="brand-mark night" src="/brand-night.svg" alt="" />
-        <span className="name" style={{ flex: 1 }}>dreymail</span>
+        <span className="name" style={{ flex: 1 }}>DreyMail</span>
         <button className="icon-btn mobile-only" title="Close" onClick={onCloseNav}>
           <X size={18} />
         </button>

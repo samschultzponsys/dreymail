@@ -1,6 +1,6 @@
-# Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+# Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-# Modified by samschultzponsys, 2026-11-13: dreymail image; inline environment (no .env file), bind
+# Modified by samschultzponsys, 2026-11-13: DreyMail image; inline environment (no .env file), bind
 # mount, PUID/PGID 99:100, no published ports, external reverse-proxy network.
 #
 # Example deployment (e.g. as an Arcane stack). Everything is inline: there is no .env file.
