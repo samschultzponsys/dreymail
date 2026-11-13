@@ -1,5 +1,9 @@
-import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+// Part of dreymail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: tests for two-part MAJOR.MINOR versions with rollover after .9.
+
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,69 +12,56 @@ import { afterEach, describe, expect, it } from 'vitest';
 /** scripts/release-version.sh, which the Release workflow uses to pick the version to publish. */
 const SCRIPT = fileURLToPath(new URL('../../scripts/release-version.sh', import.meta.url));
 
-let repo: string | undefined;
+let dir: string | undefined;
 
-/** A throwaway repository with one commit carrying the given tags. */
-function repoWithTags(...tags: string[]) {
-  repo = mkdtempSync(path.join(tmpdir(), 'ratatoskr-release-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.com', ...args], { cwd: repo, stdio: 'pipe' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'init');
-  for (const t of tags) git('tag', t);
+/** A throwaway directory with a package.json carrying the given version. */
+function withVersion(version: string) {
+  dir = mkdtempSync(path.join(tmpdir(), 'dreymail-release-'));
+  writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'x', version }));
 }
 
 function run(...args: string[]) {
-  const r = spawnSync('bash', [SCRIPT, ...args], { cwd: repo, encoding: 'utf8' });
+  const r = spawnSync('bash', [SCRIPT, ...args], { cwd: dir, encoding: 'utf8' });
   return { status: r.status, out: r.stdout.trim(), err: r.stderr };
 }
 
 afterEach(() => {
-  if (repo) rmSync(repo, { recursive: true, force: true });
-  repo = undefined;
+  if (dir) rmSync(dir, { recursive: true, force: true });
+  dir = undefined;
 });
 
 describe('release version', () => {
-  it('starts from 0.0.0 when nothing has been released yet', () => {
-    repoWithTags();
-    expect(run('bump', 'patch').out).toBe('0.0.1');
-    expect(run('bump', 'minor').out).toBe('0.1.0');
-    expect(run('bump', 'major').out).toBe('1.0.0');
+  it('reads MAJOR.MINOR from the MAJOR.MINOR.0 version in package.json', () => {
+    withVersion('1.4.0');
+    expect(run('current').out).toBe('1.4');
   });
 
-  it('bumps patch, minor or major off the newest release tag, resetting the lower parts', () => {
-    repoWithTags('v1.4.2');
-    expect(run('bump', 'patch').out).toBe('1.4.3');
-    expect(run('bump', 'minor').out).toBe('1.5.0');
-    expect(run('bump', 'major').out).toBe('2.0.0');
+  it('refuses a package.json version with a patch part or a minor above 9', () => {
+    for (const v of ['1.4.1', '1.10.0', '1.4', 'next']) {
+      withVersion(v);
+      const r = run('current');
+      expect(r.status).not.toBe(0);
+      expect(r.out).toBe('');
+    }
   });
 
-  it('finds the newest tag by version number, not alphabetically (v0.10.0 is newer than v0.9.0)', () => {
-    repoWithTags('v0.9.0', 'v0.10.0', 'v0.2.5');
-    expect(run('bump', 'patch').out).toBe('0.10.1');
+  it('counts the minor part up and rolls over to the next major after .9', () => {
+    withVersion('1.0.0');
+    expect(run('next').out).toBe('1.1');
+    expect(run('next', '1.8').out).toBe('1.9');
+    expect(run('next', '1.9').out).toBe('2.0');
+    expect(run('next', 'v2.9').out).toBe('3.0');
   });
 
-  it('ignores pre-release and other non-release tags when bumping', () => {
-    repoWithTags('v1.0.0', 'v2.0.0-rc1', 'vnext', 'release-9');
-    expect(run('bump', 'minor').out).toBe('1.1.0');
+  it('uses a tag verbatim, with or without the leading v', () => {
+    withVersion('1.0.0');
+    expect(run('tag', 'v3.2').out).toBe('3.2');
+    expect(run('tag', '3.2').out).toBe('3.2');
   });
 
-  it('rejects a bump other than patch, minor or major', () => {
-    repoWithTags('v1.0.0');
-    const r = run('bump', 'huge');
-    expect(r.status).not.toBe(0);
-    expect(r.err).toMatch(/patch, minor or major/);
-  });
-
-  it('uses a pushed tag verbatim, with or without the leading v', () => {
-    repoWithTags();
-    expect(run('tag', 'v3.2.1').out).toBe('3.2.1');
-    expect(run('tag', '3.2.1').out).toBe('3.2.1');
-  });
-
-  it('rejects a pushed tag that is not MAJOR.MINOR.PATCH', () => {
-    repoWithTags();
-    for (const tag of ['v1.2', 'v1.2.3-rc1', 'vnext', '']) {
+  it('rejects a tag that is not MAJOR.MINOR with MINOR 0-9', () => {
+    withVersion('1.0.0');
+    for (const tag of ['v1.2.3', 'v1.10', 'v1.2-rc1', 'vnext', '']) {
       const r = run('tag', tag);
       expect(r.status).not.toBe(0);
       expect(r.out).toBe('');
