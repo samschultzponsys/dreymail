@@ -30,6 +30,14 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
   // dreymail. Copyright (C) YYYY samschultzponsys.
   // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
   ```
+- **Generated files** (icons from `scripts/icons.mjs`) get their notice from the generator; never
+  hand-edit them.
+- **Before every push, audit the notices.** Every file changed since upstream must carry a
+  notice; JSON and PNG files are covered by `CHANGES.md` instead:
+  ```sh
+  for f in $(git diff --name-only --diff-filter=AM e2abaa4 -- .); do case "$f" in *.png|*.json|*.webmanifest) ;; *) grep -q "samschultzponsys\|GNU AGPL\|AGPL-3.0" "$f" || echo "MISSING notice: $f";; esac; done
+  git diff --quiet e2abaa4 -- LICENSE || echo "LICENSE CHANGED: revert it"
+  ```
 - **Update `CHANGES.md`** with every change: a dated entry with the version, listing what changed
   and in which files.
 - **Network-use source offer (AGPL §13):** if anyone other than the owner ever uses a deployed

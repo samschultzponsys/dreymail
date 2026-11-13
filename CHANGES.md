@@ -13,6 +13,14 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (unreleased, ships with v1.2): license notices in icon files
+
+- `scripts/icons.mjs` now writes an AGPL notice into every generated SVG
+  (`web/icons-src/*.svg`, `web/public/favicon.svg`, `web/public/brand-*.svg`, `branding/*.svg`).
+  The files that replace upstream's squirrel icons at the same path also carry a "Modified by"
+  line. The PNG icons can't hold comments; this entry and the v1.1 entry cover them. Also covered
+  here: the v1.1 version bump in `package.json` / `package-lock.json`.
+
 ## 2026-11-13 (v1.1): dreymail icon and cyan accent
 
 - **Icon:** the app now uses dreymail's own icon, a cyan envelope in an indigo drey on night navy,
