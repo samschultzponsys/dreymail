@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.6): spacing and element clean-up
+
+From a screenshot pass on desktop and phone, light and dark:
+
+- Reader: the account shows as one small tag (dot + name) instead of a dot followed by "· name"
+  (`web/src/components/Reader.tsx`, `web/test/reader.test.ts`).
+- Phones: a floating Compose button on the message list; before, Compose was only in the folder
+  drawer (`web/src/components/MessageList.tsx`, `web/src/App.tsx`).
+- Account editor: the Security column no longer cuts off "None (insecure)"; "Color" spelling
+  (`web/src/components/AccountsDialog.tsx`).
+- Settings: taller Appearance switch, single dropdowns no wider than they need to be, "Screen
+  transitions" capitalisation (`web/src/components/SettingsDialog.tsx`, `web/src/styles.css`).
+
 ## 2026-11-13 (v1.5): DreyMail's own names everywhere
 
 The project now uses its own identity in code, configuration and data; the upstream name remains

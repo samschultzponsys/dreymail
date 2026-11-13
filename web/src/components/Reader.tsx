@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
+
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   AlarmClock,
@@ -458,9 +462,13 @@ function MessageCard({
               </div>
               <div className={`msg-to ${multipleAccounts && account ? 'has-account' : ''}`} title={[...d.to, ...d.cc].map((a) => a.address).join(', ')}>
                 to {d.to.map(displayName).join(', ') || '(undisclosed)'}
-                {multipleAccounts && account && <span className="acct-dot" style={{ background: account.color }} title={account.name} />}
                 {d.cc.length > 0 && <span className="cc"> · cc {d.cc.map(displayName).join(', ')}</span>}
-                {multipleAccounts && account && <span className="muted acct-name"> · {account.name}</span>}
+                {multipleAccounts && account && (
+                  <span className="acct-tag" title={account.name}>
+                    <span className="acct-dot" style={{ background: account.color }} />
+                    <span className="acct-name">{account.name}</span>
+                  </span>
+                )}
               </div>
             </div>
             <div className="msg-date">{formatFullDate(d.date)}</div>

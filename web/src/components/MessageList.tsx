@@ -1,4 +1,8 @@
-import { AlarmClock, Archive, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, RefreshCw, Search, Star, Trash2, X, Reply } from 'lucide-react';
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
+
+import { AlarmClock, Archive, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { participants, type ConversationRow } from '../../../shared/threads';
 import type { AccountFolders, AccountView, MessageAction, MessageSummary, SwipeAction } from '../../../shared/types';
@@ -33,6 +37,7 @@ interface Props {
   onRefresh: () => void;
   onBulk: (action: MessageAction) => void;
   onNav: () => void;
+  onCompose: () => void;
   lastOpenKey: string | null;
   /** Server-side "unread only" filter for this view. */
   unreadOnly: boolean;
@@ -237,6 +242,10 @@ export function MessageList(p: Props) {
           )}
         </div>
       </div>
+      {/* Phones: Compose sits on the list itself, not only in the folder drawer. */}
+      <button className="fab mobile-only" onClick={p.onCompose} title="Compose" aria-label="Compose">
+        <PenSquare size={22} />
+      </button>
     </section>
   );
 }

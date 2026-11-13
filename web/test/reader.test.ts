@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: account tag markup.
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -88,7 +92,7 @@ describe('message header', () => {
   it('shows a dot in the account colour next to the recipient when the user has several accounts', () => {
     const html = render(detail(), { multipleAccounts: true });
     expect(html).toMatch(/class="msg-to has-account"/);
-    expect(html).toMatch(/<span class="acct-dot" style="background:#3b82f6" title="Work">/);
+    expect(html).toMatch(/<span class="acct-tag" title="Work"><span class="acct-dot" style="background:#3b82f6"><\/span><span class="acct-name">Work<\/span>/);
   });
 });
 

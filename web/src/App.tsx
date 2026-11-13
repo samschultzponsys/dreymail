@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: All inboxes can be turned off; then the first account opens instead.
 // Modified by samschultzponsys, 2026-11-13: the whole UI takes on the open account's colour.
 // Modified by samschultzponsys, 2026-11-13: passes admin to Settings.
+// Modified by samschultzponsys, 2026-11-13: phone Compose button.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -535,6 +536,7 @@ export function App() {
         }}
         onBulk={(action) => void act(rows.filter((m) => checked.has(refKey(m))).map(toRef), action)}
         onNav={() => openOverlay('nav')}
+        onCompose={compose}
         lastOpenKey={lastOpenKey}
         swipeLeft={prefs?.swipeLeft ?? 'none'}
         swipeRight={prefs?.swipeRight ?? 'none'}

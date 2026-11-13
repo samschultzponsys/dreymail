@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: All inboxes on/off setting.
 // Modified by samschultzponsys, 2026-11-13: tabs (General, Signatures, Notifications, Images, Password).
 // Modified by samschultzponsys, 2026-11-13: Users and Sign-in tabs for administrators.
+// Modified by samschultzponsys, 2026-11-13: label capitalization.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -137,7 +138,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
               </div>
               <div>
                 <label className="label" htmlFor="screen-transitions">
-                  Screen Transitions
+                  Screen transitions
                 </label>
                 <select
                   id="screen-transitions"

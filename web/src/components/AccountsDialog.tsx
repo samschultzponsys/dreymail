@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: colour wheel (any colour) next to the preset swatches.
+// Modified by samschultzponsys, 2026-11-13: US spelling (Color).
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -163,7 +164,7 @@ function AccountForm({
             <input className="input" value={v.name} placeholder="Work" onChange={(e) => setV({ ...v, name: e.target.value })} />
           </div>
           <div>
-            <label className="label">Colour</label>
+            <label className="label">Color</label>
             <div className="swatches">
               {ACCOUNT_COLORS.map((c) => (
                 <button
@@ -173,18 +174,18 @@ function AccountForm({
                   style={{ background: c }}
                   onClick={() => setV({ ...v, color: c })}
                   title={c}
-                  aria-label={`Colour ${c}`}
+                  aria-label={`Color ${c}`}
                 />
               ))}
               <label
                 className={`swatch custom ${ACCOUNT_COLORS.includes(v.color.toLowerCase()) ? '' : 'on'}`}
-                title="Pick any colour"
+                title="Pick any color"
                 style={ACCOUNT_COLORS.includes(v.color.toLowerCase()) ? undefined : { boxShadow: `inset 0 0 0 5px ${v.color}` }}
               >
-                <input type="color" value={v.color} onChange={(e) => setV({ ...v, color: e.target.value })} aria-label="Pick any colour" />
+                <input type="color" value={v.color} onChange={(e) => setV({ ...v, color: e.target.value })} aria-label="Pick any color" />
               </label>
             </div>
-            <div className="hint">The whole app takes on this colour while the account is open.</div>
+            <div className="hint">The whole app takes on this color while the account is open.</div>
           </div>
         </div>
         <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} onChange={(imap) => setV({ ...v, imap })} />

@@ -4,7 +4,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch).
      Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs).
      Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings).
-     Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes). -->
+     Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes).
+     Modified by samschultzponsys, 2026-11-13: v1.6 (UI clean-up). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -28,7 +29,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.5**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **1.6**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, and administration (users, OIDC sign-in) in the app. Settings
 are organised in tabs. What's planned is in
@@ -114,6 +115,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   being force-inverted, with a per-message toggle.
 - Notifications for new mail on phones and desktops (Web Push), and an unread badge on the app
   icon. Install DreyMail as an app (PWA) from the browser; see [Notifications](#notifications).
+- On phones, a floating Compose button sits on the message list.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
 
