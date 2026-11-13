@@ -1,21 +1,8 @@
-import type {
-  AccountFolders,
-  ActionResult,
-  AccountInput,
-  AccountView,
-  AuthMethods,
-  ComposePayload,
-  DomainName,
-  DraftResult,
-  ListResponse,
-  Me,
-  MessageAction,
-  MessageDetail,
-  MessageRef,
-  Preferences,
-  PushSubscriptionInput,
-  SendResult,
-} from '../../shared/types';
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: signature API calls.
+
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AuthMethods, ComposePayload, DomainName, DraftResult, ListResponse, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -79,6 +66,10 @@ export const api = {
   createAccount: (a: AccountInput) => request<AccountView>('POST', '/api/accounts', a),
   updateAccount: (id: string, a: AccountInput) => request<AccountView>('PUT', `/api/accounts/${encodeURIComponent(id)}`, a),
   deleteAccount: (id: string) => request<{ ok: true }>('DELETE', `/api/accounts/${encodeURIComponent(id)}`),
+  signatures: () => request<Signature[]>('GET', '/api/signatures'),
+  createSignature: (s: SignatureInput) => request<Signature>('POST', '/api/signatures', s),
+  updateSignature: (id: string, s: SignatureInput) => request<Signature>('PUT', `/api/signatures/${encodeURIComponent(id)}`, s),
+  deleteSignature: (id: string) => request<{ ok: true }>('DELETE', `/api/signatures/${encodeURIComponent(id)}`),
 
   folders: () => request<AccountFolders[]>('GET', '/api/folders'),
 

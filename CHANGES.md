@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-13 (v1.3): signatures, settings tabs
+
+- **Signatures:** new `signatures` and `signature_accounts` tables (an account uses at most one
+  signature, so one can be shared or per-inbox), store methods and `GET/POST/PUT/DELETE
+  /api/signatures` with server-side HTML sanitizing (`server/src/db.ts`,
+  `server/src/routes/api.ts`, `shared/types.ts`). Settings → Signatures to manage them (new
+  `web/src/components/SignaturesSettings.tsx`). The composer inserts the From account's signature
+  and swaps it when the account changes (new `web/src/signature.ts`;
+  `web/src/components/Composer.tsx`, `web/src/api.ts`, `web/src/hooks.ts`). Tests:
+  `server/test/signatures.test.ts`, `web/test/signature.test.ts`.
+- **Composer colour:** the composer takes on the From account's colour.
+- **Settings tabs:** General, Signatures, Notifications, Images, Password
+  (`web/src/components/SettingsDialog.tsx`, `web/src/styles.css`).
+
 ## 2026-11-13 (v1.2): DreyMail name, account colours, All inboxes switch
 
 ### All inboxes on/off

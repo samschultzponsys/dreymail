@@ -2,12 +2,14 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: All inboxes on/off setting.
+// Modified by samschultzponsys, 2026-11-13: tabs (General, Signatures, Notifications, Images, Password).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { DomainName, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
+import { SignaturesSettings } from './SignaturesSettings';
 import { handlerTemplate } from '../mailto';
 import { currentEnvironment, currentSubscription, disablePush, enablePush, pushAvailability, type PushAvailability } from '../push';
 
@@ -26,10 +28,20 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
+type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password';
+
 export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Preferences; hasPassword: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
+  const tabs: [SettingsTab, string][] = [
+    ['general', 'General'],
+    ['signatures', 'Signatures'],
+    ['notifications', 'Notifications'],
+    ['privacy', 'Images'],
+    ...(hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
+  ];
+  const [tab, setTab] = useState<SettingsTab>('general');
 
   const save = async (next: Preferences) => {
     setV(next);
@@ -44,90 +56,102 @@ export function SettingsDialog({ prefs, hasPassword, onClose }: { prefs: Prefere
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(460px, 100%)' }}>
+      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(640px, 100%)', height: 'min(720px, calc(100dvh - 32px))' }}>
         <div className="dialog-head">
           <h2>Settings</h2>
           <button className="icon-btn" onClick={onClose} title="Close">
             <X size={17} />
           </button>
         </div>
+        <div className="tabs" role="tablist">
+          {tabs.map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={tab === key} className={`tab ${tab === key ? 'on' : ''}`} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="dialog-body">
-          <div>
-            <label className="label">Appearance</label>
-            <div className="segmented">
-              {(['system', 'light', 'dark'] as const).map((t) => (
-                <button key={t} className={v.theme === t ? 'on' : ''} onClick={() => void save({ ...v, theme: t })} style={{ padding: '6px 14px' }}>
-                  {t === 'system' ? 'System' : t === 'light' ? 'Light' : 'Dark'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="label">Messages per page</label>
-            <select className="select" value={v.pageSize} onChange={(e) => void save({ ...v, pageSize: Number(e.target.value) })}>
-              {[25, 50, 100].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid2">
-            {(['swipeRight', 'swipeLeft'] as const).map((key) => (
-              <div key={key}>
-                <label className="label">{key === 'swipeRight' ? 'Swipe right' : 'Swipe left'}</label>
-                <select className="select" value={v[key]} onChange={(e) => void save({ ...v, [key]: e.target.value as SwipeAction })}>
-                  {SWIPE_OPTIONS.map(([value, label]) => (
+          {tab === 'general' && (
+            <>
+              <div>
+                <label className="label">Appearance</label>
+                <div className="segmented">
+                  {(['system', 'light', 'dark'] as const).map((t) => (
+                    <button key={t} className={v.theme === t ? 'on' : ''} onClick={() => void save({ ...v, theme: t })} style={{ padding: '6px 14px' }}>
+                      {t === 'system' ? 'System' : t === 'light' ? 'Light' : 'Dark'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="label">Messages per page</label>
+                <select className="select" value={v.pageSize} onChange={(e) => void save({ ...v, pageSize: Number(e.target.value) })}>
+                  {[25, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid2">
+                {(['swipeRight', 'swipeLeft'] as const).map((key) => (
+                  <div key={key}>
+                    <label className="label">{key === 'swipeRight' ? 'Swipe right' : 'Swipe left'}</label>
+                    <select className="select" value={v[key]} onChange={(e) => void save({ ...v, [key]: e.target.value as SwipeAction })}>
+                      {SWIPE_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="check">
+                  <input type="checkbox" checked={v.unifiedInbox} onChange={(e) => void save({ ...v, unifiedInbox: e.target.checked })} />
+                  Show “All inboxes”
+                </label>
+                <div className="hint">One list of every account’s inbox. Turn it off to keep accounts completely separate; DreyMail then opens on your first account.</div>
+              </div>
+              <label className="check">
+                <input type="checkbox" checked={v.markReadOnOpen} onChange={(e) => void save({ ...v, markReadOnOpen: e.target.checked })} />
+                Mark messages as read when opened
+              </label>
+              <div>
+                <label className="check">
+                  <input type="checkbox" checked={v.contactPhotos} onChange={(e) => void save({ ...v, contactPhotos: e.target.checked })} />
+                  Show contact pictures
+                </label>
+                <div className="hint">
+                  From Gravatar, Libravatar or the sender's website, fetched by the server so they never see your IP address. Otherwise initials are shown.
+                </div>
+              </div>
+              <div>
+                <label className="label" htmlFor="screen-transitions">
+                  Screen Transitions
+                </label>
+                <select
+                  id="screen-transitions"
+                  className="select"
+                  value={v.screenTransitions}
+                  onChange={(e) => void save({ ...v, screenTransitions: e.target.value as TransitionSpeed })}
+                >
+                  {TRANSITION_OPTIONS.map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
                     </option>
                   ))}
                 </select>
+                <div className="hint">On phones, the squirrel runs across the screen when you open the menu or a message.</div>
               </div>
-            ))}
-          </div>
-          <div>
-            <label className="check">
-              <input type="checkbox" checked={v.unifiedInbox} onChange={(e) => void save({ ...v, unifiedInbox: e.target.checked })} />
-              Show “All inboxes”
-            </label>
-            <div className="hint">One list of every account’s inbox. Turn it off to keep accounts completely separate; DreyMail then opens on your first account.</div>
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={v.markReadOnOpen} onChange={(e) => void save({ ...v, markReadOnOpen: e.target.checked })} />
-            Mark messages as read when opened
-          </label>
-          <div>
-            <label className="check">
-              <input type="checkbox" checked={v.contactPhotos} onChange={(e) => void save({ ...v, contactPhotos: e.target.checked })} />
-              Show contact pictures
-            </label>
-            <div className="hint">
-              From Gravatar, Libravatar or the sender's website, fetched by the server so they never see your IP address. Otherwise initials are shown.
-            </div>
-          </div>
-          <div>
-            <label className="label" htmlFor="screen-transitions">
-              Screen Transitions
-            </label>
-            <select
-              id="screen-transitions"
-              className="select"
-              value={v.screenTransitions}
-              onChange={(e) => void save({ ...v, screenTransitions: e.target.value as TransitionSpeed })}
-            >
-              {TRANSITION_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <div className="hint">On phones, the squirrel runs across the screen when you open the menu or a message.</div>
-          </div>
-          <Notifications prefs={v} save={save} />
-          <EmailLinks />
-          <ImageDomains />
-          {hasPassword && <ChangePassword />}
+              <EmailLinks />
+            </>
+          )}
+          {tab === 'signatures' && <SignaturesSettings />}
+          {tab === 'notifications' && <Notifications prefs={v} save={save} />}
+          {tab === 'privacy' && <ImageDomains />}
+          {tab === 'password' && <ChangePassword />}
           {error && <div className="error-text">{error}</div>}
         </div>
       </div>

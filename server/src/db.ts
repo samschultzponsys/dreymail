@@ -1,12 +1,13 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference default.
+// Modified by samschultzponsys, 2026-11-13: signatures tables and store methods.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { AccountInput, AccountView, Preferences, PushSubscriptionInput, TlsMode } from '../../shared/types.js';
+import type { AccountInput, AccountView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
 import { decrypt, encrypt } from './crypto.js';
 
 // Snoozed messages: where each one waits (IMAP folder, UIDVALIDITY, UID) and when it returns to
@@ -94,6 +95,21 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!cols.some((c) => c.name === 'username')) db.exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT '';");
     db.exec("UPDATE users SET username = subject WHERE password_hash IS NOT NULL AND username = '';");
   },
+  // DreyMail: signatures (IF NOT EXISTS: tests and shared dev databases re-run migrations). An account uses at most one signature (account_id is the key), so one
+  // signature can be shared by several accounts or belong to just one.
+  `CREATE TABLE IF NOT EXISTS signatures (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     html TEXT NOT NULL,
+     on_replies INTEGER NOT NULL DEFAULT 1,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS signatures_user ON signatures(user_id);
+   CREATE TABLE IF NOT EXISTS signature_accounts (
+     account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+     signature_id TEXT NOT NULL REFERENCES signatures(id) ON DELETE CASCADE
+   );`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -407,6 +423,62 @@ export class Store {
 
   deleteAccount(userId: string, accountId: string): boolean {
     return this.db.prepare('DELETE FROM accounts WHERE user_id = ? AND id = ?').run(userId, accountId).changes > 0;
+  }
+
+  // ---- signatures (DreyMail) ------------------------------------------------
+
+  listSignatures(userId: string): Signature[] {
+    const rows = this.db
+      .prepare('SELECT id, name, html, on_replies FROM signatures WHERE user_id = ? ORDER BY created_at, id')
+      .all(userId) as { id: string; name: string; html: string; on_replies: number }[];
+    const links = this.db
+      .prepare('SELECT sa.signature_id, sa.account_id FROM signature_accounts sa JOIN signatures s ON s.id = sa.signature_id WHERE s.user_id = ?')
+      .all(userId) as { signature_id: string; account_id: string }[];
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      html: r.html,
+      onReplies: r.on_replies === 1,
+      accountIds: links.filter((l) => l.signature_id === r.id).map((l) => l.account_id),
+    }));
+  }
+
+  /**
+   * Creates (id null) or replaces a signature. Accounts that are not the user's are ignored; an
+   * account moves here from any other signature it had. Null when the signature isn't the user's.
+   */
+  saveSignature(userId: string, id: string | null, input: SignatureInput): Signature | null {
+    const own = new Set(this.listAccounts(userId).map((a) => a.id));
+    const accountIds = [...new Set(input.accountIds)].filter((a) => own.has(a));
+    this.db.exec('BEGIN');
+    try {
+      if (id === null) {
+        id = crypto.randomUUID();
+        this.db
+          .prepare('INSERT INTO signatures (id, user_id, name, html, on_replies, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(id, userId, input.name, input.html, input.onReplies ? 1 : 0, Date.now());
+      } else {
+        const changed = this.db
+          .prepare('UPDATE signatures SET name = ?, html = ?, on_replies = ? WHERE id = ? AND user_id = ?')
+          .run(input.name, input.html, input.onReplies ? 1 : 0, id, userId).changes;
+        if (!changed) {
+          this.db.exec('ROLLBACK');
+          return null;
+        }
+        this.db.prepare('DELETE FROM signature_accounts WHERE signature_id = ?').run(id);
+      }
+      const link = this.db.prepare('INSERT OR REPLACE INTO signature_accounts (account_id, signature_id) VALUES (?, ?)');
+      for (const a of accountIds) link.run(a, id);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return this.listSignatures(userId).find((s) => s.id === id) ?? null;
+  }
+
+  deleteSignature(userId: string, id: string): boolean {
+    return this.db.prepare('DELETE FROM signatures WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
   }
 
   // ---- recent recipients (address autocomplete) ----------------------------

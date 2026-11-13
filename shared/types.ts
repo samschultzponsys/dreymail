@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference (All inboxes on/off).
+// Modified by samschultzponsys, 2026-11-13: Signature types.
 
 // Types shared between the server API and the web client.
 
@@ -254,6 +255,22 @@ export interface Preferences {
   /** Show the unified "All inboxes" view. Off: every account stays separate and the app opens on the first account. */
   unifiedInbox: boolean;
 }
+
+/**
+ * An email signature (DreyMail). One signature can serve several accounts (shared) or just one
+ * (per inbox); each account has at most one.
+ */
+export interface Signature {
+  id: string;
+  name: string;
+  /** Sanitized HTML. */
+  html: string;
+  accountIds: string[];
+  /** Also added when replying and forwarding, not only to new messages. */
+  onReplies: boolean;
+}
+
+export type SignatureInput = Omit<Signature, 'id'>;
 
 /** A browser's Web Push subscription, as produced by PushSubscription.toJSON(). */
 export interface PushSubscriptionInput {

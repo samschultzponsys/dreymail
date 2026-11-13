@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: unifiedInbox preference validation.
+// Modified by samschultzponsys, 2026-11-13: signature API (list, create, update, delete).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -17,6 +18,7 @@ import { displayDomain, MAX_ALLOWED_DOMAINS, normaliseDomain } from '../mail/ima
 import { FailureLimiter, hashPassword, passwordSchema, verifyPassword } from '../auth/password.js';
 import type { Sessions } from '../auth/session.js';
 import { ComposeError, type ComposeService } from '../mail/send.js';
+import { sanitizeOutgoingHtml } from '../mail/compose.js';
 import { SnoozeError, type SnoozeService } from '../mail/snooze.js';
 import { PushSubscriptionError, validateSubscription, type PushService } from '../push/service.js';
 
@@ -80,6 +82,13 @@ export const prefsSchema = z.object({
   screenTransitions: z.enum(['off', 'fast', 'medium', 'slow']).default('fast'),
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),
+});
+
+export const signatureSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  html: z.string().max(100_000),
+  accountIds: z.array(z.string().max(100)).max(100),
+  onReplies: z.boolean().default(true),
 });
 
 const pushSubscriptionSchema = z.object({
@@ -295,6 +304,25 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   // ---- accounts ---------------------------------------------------------------
 
   app.get('/api/accounts', async (req) => store.listAccounts(uid(req)));
+
+  // ---- signatures (DreyMail) -------------------------------------------------------
+
+  app.get('/api/signatures', async (req) => store.listSignatures(uid(req)));
+
+  const saveSignature = (req: FastifyRequest, reply: FastifyReply, id: string | null) => {
+    try {
+      const input = signatureSchema.parse(req.body);
+      const saved = store.saveSignature(uid(req), id, { ...input, html: sanitizeOutgoingHtml(input.html) });
+      return saved ?? reply.code(404).send({ error: 'Signature not found' });
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  };
+  app.post('/api/signatures', async (req, reply) => saveSignature(req, reply, null));
+  app.put<{ Params: { id: string } }>('/api/signatures/:id', async (req, reply) => saveSignature(req, reply, req.params.id));
+  app.delete<{ Params: { id: string } }>('/api/signatures/:id', async (req, reply) =>
+    store.deleteSignature(uid(req), req.params.id) ? { ok: true } : reply.code(404).send({ error: 'Signature not found' }),
+  );
 
   const verify = async (input: AccountInput, existing?: { imap: string; smtp: string }) => {
     const imapPw = input.imap.password || existing?.imap || '';

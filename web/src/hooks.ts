@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: useSignatures.
+
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientEvent, MessageAction, MessageRef, MessageSummary, Preferences, ServerEvent } from '../../shared/types';
@@ -8,6 +12,7 @@ import { applyThemeColor } from './themeColor';
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: api.me, retry: false, staleTime: Infinity });
 export const useAccounts = () => useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: 60_000 });
+export const useSignatures = (enabled = true) => useQuery({ queryKey: ['signatures'], queryFn: api.signatures, staleTime: 60_000, enabled });
 export const useFolders = (enabled: boolean) =>
   useQuery({ queryKey: ['folders'], queryFn: api.folders, enabled, staleTime: 30_000, refetchInterval: 120_000 });
 

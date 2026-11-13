@@ -1,3 +1,8 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-13: puts the signature in and swaps it when the From account changes.
+// Modified by samschultzponsys, 2026-11-13: takes on the From account's colour.
+
 import {
   Bold,
   Italic,
@@ -15,9 +20,12 @@ import {
   Underline,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { AccountView, AttachmentView, ComposePayload, MessageRef } from '../../../shared/types';
+import { accountPalette } from '../accountTheme';
 import { api } from '../api';
+import { useSignatures } from '../hooks';
+import { applySignature, signatureFor } from '../signature';
 import { formatAddress, formatSize } from '../util';
 
 export interface ComposerInit {
@@ -148,9 +156,17 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }:
   const [dirty, setDirty] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The composer takes on the From account's colour, so it's clear which account sends.
+  const fromColor = accounts.find((a) => a.id === accountId)?.color;
+  const fromPalette = fromColor
+    ? { ...accountPalette(fromColor, document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'), borderTop: `3px solid ${fromColor}` }
+    : undefined;
+  /** The signature now in the editor (undefined: none put in yet). */
+  const sigShown = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (editor.current) editor.current.innerHTML = init.html;
+    sigShown.current = undefined;
     if (init.to) {
       editor.current?.focus();
       // Place the caret at the start (above any quoted text).
@@ -160,6 +176,18 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }:
       }
     }
   }, [init.html, init.to]);
+
+  // Signature: put in once the signatures have loaded (not into a draft being edited, which already
+  // has whatever the user left in it), and swapped when the From account changes.
+  const signatures = useSignatures();
+  const isReply = !!(init.answering || init.inReplyTo || init.forwardFrom);
+  const sigHtml = init.replaceDraft ? null : (signatureFor(signatures.data, accountId, isReply)?.html ?? null);
+  const sigReady = signatures.isSuccess || signatures.isError;
+  useEffect(() => {
+    if (!editor.current || !sigReady || init.replaceDraft || sigShown.current === sigHtml) return;
+    applySignature(editor.current, sigHtml);
+    sigShown.current = sigHtml;
+  }, [sigHtml, sigReady, init.replaceDraft, init.html]);
 
   // Unsaved changes: editor input since the last save, or header fields that differ from the last
   // saved (or initial) values.
@@ -246,6 +274,7 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }:
   return (
     <div
       className={`composer ${maximized ? 'maximized' : ''}`}
+      style={fromPalette as CSSProperties}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
           e.preventDefault();

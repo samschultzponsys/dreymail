@@ -1,7 +1,8 @@
 <!-- Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
      Modified by samschultzponsys, 2026-11-13: rewritten for DreyMail (credits, quick start, releasing); upstream docs kept and rebranded.
      Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent).
-     Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch). -->
+     Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch).
+     Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -25,9 +26,9 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **1.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
-indigo drey) plus per-account colours that recolour the whole app, and an on/off switch for
-"All inboxes". What's planned is in
+Current version: **1.3**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
+inboxes", and signatures per account or shared. Settings are organised in tabs. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -84,6 +85,11 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   change the view or refresh, so the list doesn't jump under your finger.
 - Snooze: hide a message until a date and time you pick (or Later today / Tomorrow / This weekend /
   Next week). See [Snooze](#snooze).
+- **Signatures**, in Settings → Signatures: rich text (bold, italic, links), each with checkboxes
+  for the accounts that use it. Tick one account for a per-inbox signature, or several to share
+  one. Optionally also added to replies and forwards. The composer puts it in below where you
+  type (above any quoted message), swaps it when you change the From account, and takes on the
+  From account's colour.
 - Compose, reply, reply-all, and forward (with the original attachments). Includes a light
   rich-text editor, an automatic plain-text alternative, attachments, drafts (saved to the
   account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used
