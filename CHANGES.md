@@ -252,6 +252,9 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ## 2026-11-15 (v2.6): Collapsed sidebar shows only your picture
 
+_No GitHub Release: the run for 2.6 was dropped when 2.7 was pushed right after it (fixed in 2.7:
+runs now queue per version). Everything in 2.6 is in 2.7 and later._
+
 - With the sidebar collapsed, its footer shows only your profile picture, which opens Settings.
   Accounts, Settings and Sign out are back when it's expanded (`web/src/styles.css`).
 - Saved searches made in the same millisecond keep their order (`server/src/db.ts`; fixes an
