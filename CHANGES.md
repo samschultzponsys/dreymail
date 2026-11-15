@@ -15,6 +15,8 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ## 2026-11-15 (v3.9): Google, Outlook and CalDAV calendars; answering invitations
 
+- **Docs:** `ROADMAP.md` has its own Calendar section; `CLAUDE.md` asks for the roadmap to be
+  updated with every feature.
 - **Provider calendars in the calendar:**
   - **Google and Outlook:** mailboxes added with Google or Microsoft sign-in bring their calendars,
     grouped under the mailbox. The calendar list is mirrored (each keeps its checkbox and color),

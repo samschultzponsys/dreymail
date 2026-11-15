@@ -69,6 +69,9 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
   So, to release: bump the version, add the `CHANGES.md` entry, update `README.md`, push to main.
 - **README is rolling:** update `README.md` (including the "Status" section's current version)
   in the same commit as any user-visible change.
+- **ROADMAP is rolling too:** in the same commit as any feature work, update `ROADMAP.md`: tick
+  finished items into "Done" with their version, and add follow-ups or newly planned items to
+  "Planned".
 
 ### Stay within GitHub's free tier
 - Public repo: Actions minutes and public GHCR images are free. Don't add paid features:

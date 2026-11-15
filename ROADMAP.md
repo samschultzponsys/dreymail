@@ -12,8 +12,11 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
+### Calendar
+- [ ] Reminders as notifications (phone, desktop and browser), from the event's alarms.
+- [ ] Editing whole series of repeating CalDAV events (today they are read-only in DreyMail).
+
 ### Mail
-- [ ] Calendar reminders as notifications; editing whole series of repeating CalDAV events.
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
       Outlook sign-in accounts already let the provider file sent mail).
