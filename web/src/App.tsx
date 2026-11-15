@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on waits after signing out; /login.
+// Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -331,6 +332,17 @@ export function App() {
     push(r.ok ? `${what} account connected.` : `${what} sign-in didn’t work: ${r.message}`);
     if (r.ok && r.account) navigate({ ...HOME, accountId: r.account, folder: 'INBOX' }, { replace: true });
   }, [loggedIn, qc, push, navigate]);
+
+  // Back from connecting single sign-on (see main.tsx).
+  useEffect(() => {
+    if (!loggedIn) return;
+    const raw = sessionStorage.getItem('dreymail.sso');
+    if (!raw) return;
+    sessionStorage.removeItem('dreymail.sso');
+    const r = JSON.parse(raw) as { ok: boolean; message: string };
+    void qc.invalidateQueries({ queryKey: ['sso'] });
+    push(r.ok ? 'Single sign-on connected: signing in with it now opens this account.' : r.message || 'Connecting single sign-on didn’t work.');
+  }, [loggedIn, qc, push]);
 
   // The saved search this view is, if any (highlighted in the sidebar).
   const activeSearch = useMemo(() => {

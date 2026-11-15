@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
+// Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 
 // Types shared between the server API and the web client.
 
@@ -444,6 +445,8 @@ export interface AdminUser {
   username: string;
   email: string;
   login: 'password' | 'oidc' | 'dev';
+  /** Single sign-on is connected to this (password) account too (DreyMail). */
+  sso?: boolean;
   roleId: string;
   /** Superadmin because of DREYMAIL_ADMIN_USERS (can't be changed in the UI). */
   adminByEnv: boolean;
@@ -456,6 +459,20 @@ export interface AdminUser {
 }
 
 /** Login options shown on the sign-in page (GET /auth/methods). */
+/** Settings → Profile → Single sign-on: is it connected to this account (DreyMail)? */
+export interface SsoStatus {
+  /** OIDC is set up on this server. */
+  available: boolean;
+  /** The provider's name ("Sign in with …"). */
+  label: string;
+  /** Signing in with single sign-on opens this account. */
+  connected: boolean;
+  /** When it was connected (null for accounts made by single sign-on itself). */
+  connectedAt: string | null;
+  /** It can be disconnected without locking the account out (it has a password or passkey). */
+  canDisconnect: boolean;
+}
+
 export interface AuthMethods {
   password: boolean;
   /** A new password account can be created right now. */

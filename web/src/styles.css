@@ -954,3 +954,6 @@ img.account-mark { object-fit: cover; }
 .provider-pick { display: flex; flex-direction: column; gap: 2px; }
 .provider-pick .select { max-width: 340px; }
 .server-known { font-size: 13px; padding: 2px 0 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sso-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
+.sso-row .grow { min-width: 200px; }
+a.btn { text-decoration: none; }

@@ -29,7 +29,8 @@
      Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end.
      Modified by samschultzponsys, 2026-11-15: privacy page.
      Modified by samschultzponsys, 2026-11-15: Gmail's two ways compared.
-     Modified by samschultzponsys, 2026-11-15: provider list. -->
+     Modified by samschultzponsys, 2026-11-15: provider list.
+     Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an account. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -41,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -693,6 +694,14 @@ Create an OAuth2/OpenID Connect application (confidential client, authorization 
 
 Settings → Sign-in shows both URIs for the address you have DreyMail open at, with Copy buttons,
 and warns if that differs from `DREYMAIL_BASE_URL`.
+
+**Already have a password account?** Signing in with OIDC makes a new, separate account, matched by
+the provider's user ID. To use your existing account instead, sign in to it and choose **Settings →
+Profile → Connect** (your provider's name), then sign in at the provider once. From then on, single
+sign-on opens that account with its mailboxes; the password keeps working as a fallback, and
+**Disconnect** undoes it. DreyMail never joins accounts by email address, so nobody can take over an
+account by changing their email at the provider. If you signed in with OIDC before connecting, the
+empty account it made can be removed in Settings → Users.
 
 **Sign in automatically** (Settings → Sign-in, or `DREYMAIL_OIDC_AUTO_LOGIN=true`): opening DreyMail
 goes straight to the provider, with no sign-in page in between. The sign-in page with every other

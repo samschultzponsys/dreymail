@@ -67,7 +67,7 @@ export function UsersAdmin({ me }: { me: Me }) {
                   )}
                 </div>
                 <div className="muted user-meta">
-                  {u.login === 'password' ? `Password · ${u.username}` : u.login === 'oidc' ? `OIDC · ${u.email || u.username}` : 'Dev login'} ·{' '}
+                  {u.login === 'password' ? `Password${u.sso ? ' + single sign-on' : ''} · ${u.username}` : u.login === 'oidc' ? `OIDC · ${u.email || u.username}` : 'Dev login'} ·{' '}
                   {u.accounts} mail {u.accounts === 1 ? 'account' : 'accounts'} · since {new Date(u.createdAt).toLocaleDateString()}
                 </div>
               </div>

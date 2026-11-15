@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.4): connect single sign-on to your account
+
+- **Settings → Profile → Single sign-on → Connect** (the provider's name): connects the server's
+  OIDC provider to the account you're signed in to. Afterwards, signing in with it (including
+  automatic sign-in) opens that account with its mailboxes and settings, instead of a new, empty
+  one. The password keeps working as a fallback; **Disconnect** (only when a password or passkey is
+  left) undoes it. An identity that already made its own account is moved over. Linking needs
+  both: being signed in to the account and signing in at the provider; accounts are never joined
+  by email address. Settings → Users shows "Password + single sign-on" for connected accounts.
+- **Files:** new `web/src/components/SingleSignOn.tsx`, `server/test/sso-connect.test.ts` (with a
+  small fake OIDC provider); `server/src/db.ts` (`user_identities`), `server/src/auth/routes.ts`,
+  `server/src/auth/session.ts`, `server/src/routes/admin.ts`, `shared/types.ts`,
+  `web/src/components/SettingsDialog.tsx`, `AdminSettings.tsx`, `web/src/main.tsx`, `App.tsx`,
+  `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.3): mail providers to pick from
 
 - **Add account → Other email** starts with a **Mail provider** list: iCloud, Yahoo, AOL, Fastmail,

@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
+// Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -389,6 +390,15 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
         PRIMARY KEY (user_id, ical_uid)
       );`);
   },
+  // DreyMail: single sign-on identities connected to an existing account ("Connect single sign-on").
+  `CREATE TABLE IF NOT EXISTS user_identities (
+     issuer TEXT NOT NULL,
+     subject TEXT NOT NULL,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (issuer, subject)
+   );
+   CREATE INDEX IF NOT EXISTS user_identities_user ON user_identities(user_id);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -547,6 +557,9 @@ export class Store {
   // ---- users ---------------------------------------------------------------
 
   upsertUser(issuer: string, subject: string, email: string, name: string, username = ''): User {
+    // A single sign-on identity connected to an existing account signs in to that account, as it is.
+    const connected = this.identityUser(issuer, subject);
+    if (connected) return connected;
     const existing = this.db
       .prepare('SELECT id FROM users WHERE issuer = ? AND subject = ?')
       .get(issuer, subject) as { id: string } | undefined;
@@ -560,6 +573,27 @@ export class Store {
       .prepare('INSERT INTO users (id, issuer, subject, email, name, username, created_at, role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, issuer, subject, email, name, username, Date.now(), this.newUserRole());
     return this.getUser(id)!;
+  }
+
+  /** The account a connected single sign-on identity belongs to. */
+  identityUser(issuer: string, subject: string): User | null {
+    const r = this.db.prepare('SELECT user_id FROM user_identities WHERE issuer = ? AND subject = ?').get(issuer, subject) as { user_id: string } | undefined;
+    return r ? this.getUser(r.user_id) : null;
+  }
+
+  /** Connects a single sign-on identity to this account (moving it from any other account). */
+  connectIdentity(userId: string, issuer: string, subject: string) {
+    this.db
+      .prepare('INSERT INTO user_identities (issuer, subject, user_id, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (issuer, subject) DO UPDATE SET user_id = excluded.user_id, created_at = excluded.created_at')
+      .run(issuer, subject, userId, Date.now());
+  }
+
+  identitiesOf(userId: string): { issuer: string; createdAt: number }[] {
+    return (this.db.prepare('SELECT issuer, created_at FROM user_identities WHERE user_id = ? ORDER BY created_at').all(userId) as { issuer: string; created_at: number }[]).map((r) => ({ issuer: r.issuer, createdAt: r.created_at }));
+  }
+
+  disconnectIdentities(userId: string): number {
+    return Number(this.db.prepare('DELETE FROM user_identities WHERE user_id = ?').run(userId).changes);
   }
 
   getUser(id: string): User | null {

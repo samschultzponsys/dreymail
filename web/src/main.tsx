@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
@@ -36,6 +37,18 @@ if (opened) {
       JSON.stringify({ ok: outcome === 'added', message: q.get('message') ?? '', account: q.get('account') ?? '', provider: q.get('provider') ?? 'microsoft' }),
     );
     for (const k of ['outlook', 'message', 'account', 'provider']) q.delete(k);
+    const rest = q.toString();
+    window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+  }
+}
+
+// Back from connecting single sign-on (?sso=connected|error): the same, for the app to announce.
+{
+  const q = new URLSearchParams(window.location.search);
+  const sso = q.get('sso');
+  if (sso) {
+    sessionStorage.setItem('dreymail.sso', JSON.stringify({ ok: sso === 'connected', message: q.get('message') ?? '' }));
+    for (const k of ['sso', 'message']) q.delete(k);
     const rest = q.toString();
     window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
   }

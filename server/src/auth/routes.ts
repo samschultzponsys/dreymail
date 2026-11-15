@@ -5,12 +5,13 @@
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
+// Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 
 import { serverVersion } from '../version.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
-import type { AuthMethods } from '../../../shared/types.js';
+import type { AuthMethods, SsoStatus } from '../../../shared/types.js';
 import type { Config } from '../config.js';
 import type { Store } from '../db.js';
 import type { EffectiveLogin, LoginSettings } from '../loginSettings.js';
@@ -65,8 +66,11 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     };
   });
 
-  app.get('/auth/login', async (req, reply) => {
+  app.get<{ Querystring: { link?: string } }>('/auth/login', async (req, reply) => {
     const o = login.current().oidc;
+    // ?link=1: connect single sign-on to the account that is signed in now.
+    const linking = req.query.link === '1' ? sessions.read(req) : null;
+    if (req.query.link === '1' && !linking) return reply.redirect('/login');
     if (!o) return reply.redirect(config.devLogin ? '/auth/dev-login' : '/login');
     let cfg: Awaited<ReturnType<typeof getConfig>>;
     try {
@@ -78,7 +82,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     const verifier = oidc.randomPKCECodeVerifier();
     const state = oidc.randomState();
     const nonce = oidc.randomNonce();
-    sessions.writeLogin(reply, { state, nonce, verifier });
+    sessions.writeLogin(reply, { state, nonce, verifier, ...(linking ? { link: linking.uid } : {}) });
     const url = oidc.buildAuthorizationUrl(cfg, {
       redirect_uri: callbackUrl.toString(),
       scope: o.scopes,
@@ -110,6 +114,17 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
       });
       const claims = tokens.claims();
       if (!claims?.sub) throw new Error('ID token has no subject');
+      if (tx.link) {
+        // Connecting: only for the account that started it, still signed in on this browser.
+        const back = (params: Record<string, string>) => reply.redirect(`/?${new URLSearchParams(params)}`);
+        const session = sessions.read(req);
+        if (!session || session.uid !== tx.link || !store.getUser(tx.link)) return back({ sso: 'error', message: 'Sign in to DreyMail first, then connect single sign-on again.' });
+        const me = store.getUser(tx.link)!;
+        if (me.issuer === claims.iss && me.subject === claims.sub) return back({ sso: 'connected' });
+        store.connectIdentity(tx.link, claims.iss, claims.sub);
+        req.log.info({ user: tx.link }, 'single sign-on connected to an account');
+        return back({ sso: 'connected' });
+      }
       let email = typeof claims.email === 'string' ? claims.email : '';
       let name = typeof claims.name === 'string' ? claims.name : '';
       let username = typeof claims.preferred_username === 'string' ? claims.preferred_username : '';
@@ -128,8 +143,34 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
       return reply.redirect('/');
     } catch (err) {
       req.log.warn({ err: (err as Error).message }, 'OIDC callback failed');
+      if (tx.link) return reply.redirect(`/?${new URLSearchParams({ sso: 'error', message: 'Connecting single sign-on failed. Please try again.' })}`);
       return failed('Single sign-on failed. Please try again, or ask your administrator.');
     }
+  });
+
+  // ---- connecting single sign-on to an existing account (signed in; /api checks the session) ----
+
+  app.get('/api/sso', async (req): Promise<SsoStatus> => {
+    const me = req.user!;
+    const o = login.current().oidc;
+    const ids = store.identitiesOf(me.id);
+    const ownOidc = !me.hasPassword && me.issuer !== 'dev-login';
+    return {
+      available: !!o,
+      label: o?.label ?? '',
+      connected: ownOidc || ids.length > 0,
+      connectedAt: ids[0] ? new Date(ids[0].createdAt).toISOString() : null,
+      // Disconnecting must leave a way in: a password or a passkey (and only connected identities can go).
+      canDisconnect: ids.length > 0 && (me.hasPassword || !!store.db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(me.id)),
+    };
+  });
+
+  app.delete('/api/sso', async (req, reply) => {
+    const me = req.user!;
+    const hasPasskey = !!store.db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(me.id);
+    if (!me.hasPassword && !hasPasskey) return reply.code(400).send({ error: 'Add a password or passkey first, so you can still sign in.' });
+    store.disconnectIdentities(me.id);
+    return { ok: true };
   });
 
   app.post('/auth/logout', async (req, reply) => {

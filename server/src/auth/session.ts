@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { openJson, sealJson } from '../crypto.js';
@@ -23,6 +24,8 @@ export interface LoginTransaction {
   state: string;
   nonce: string;
   verifier: string;
+  /** Connecting single sign-on to this signed-in account (user id) instead of signing in. */
+  link?: string;
 }
 
 /**

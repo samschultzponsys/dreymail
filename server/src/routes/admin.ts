@@ -64,6 +64,7 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
     username: u.username,
     email: u.email,
     login: u.hasPassword ? 'password' : u.issuer === 'dev-login' ? 'dev' : 'oidc',
+    sso: store.identitiesOf(u.id).length > 0,
     roleId: access.superadminByEnv(u) ? SUPERADMIN : u.roleId,
     adminByEnv: access.superadminByEnv(u),
     accounts: u.accounts,

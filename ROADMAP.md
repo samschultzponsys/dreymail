@@ -91,6 +91,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Administration and security
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
+- [x] Connecting single sign-on to an existing account (4.4).
 - [x] Automatic single sign-on with `/login` as the way back in; OIDC redirect URIs shown for the
       address you're on (4.0).
 - [x] User management in the app (1.4); roles with permission flags (Superadmin, User and custom

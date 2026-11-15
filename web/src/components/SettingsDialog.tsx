@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-15: connect single sign-on in Profile.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -36,6 +37,7 @@ import { ProfilePicture } from './UserPicture';
 import { AiConnections } from './AiConnections';
 import { SourceLink } from './SourceLink';
 import { Passkeys } from './Passkeys';
+import { SingleSignOn } from './SingleSignOn';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -211,6 +213,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
             <>
               <ProfilePicture me={me} />
               <Passkeys />
+              <SingleSignOn />
               <YourName />
               <FullNameToggle v={v} save={save} />
               <div className="hint">
