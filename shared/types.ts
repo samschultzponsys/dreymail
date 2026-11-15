@@ -17,11 +17,13 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 // Types shared between the server API and the web client.
 
 import type { Permission } from './permissions.js';
 import type { UnsubscribeOptions } from './unsubscribe.js';
+import type { MailCategory } from './categories.js';
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
 
@@ -118,6 +120,8 @@ export interface MessageSummary {
   draft: boolean;
   hasAttachments: boolean;
   size: number;
+  /** Automatic inbox tab (DreyMail). */
+  category?: MailCategory;
   /** ISO time the message returns to the inbox, while it waits in the Snoozed folder. */
   snoozedUntil?: string;
 }
@@ -305,6 +309,8 @@ export interface Preferences {
   footerIdentity: FooterIdentity;
   /** Seconds a sent message waits so it can be undone (0 = send at once) (DreyMail). */
   undoSendSeconds: number;
+  /** Inbox split into Personal / Updates / Newsletters tabs (DreyMail). */
+  inboxTabs: boolean;
 }
 
 /**

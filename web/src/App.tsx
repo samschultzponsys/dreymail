@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -616,6 +617,7 @@ export function App() {
         title={title}
         unified={effectiveSel.accountId === null}
         isSentLike={isSentLike}
+        inboxTabs={(me.data?.preferences.inboxTabs ?? true) && !route.q && !Object.keys(route.filters).length && (effectiveSel.accountId === null || folderInfo?.specialUse === 'inbox')}
         accounts={accountMap}
         folders={folders.data}
         messages={rows}

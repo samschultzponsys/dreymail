@@ -46,3 +46,17 @@ describe('message detail', () => {
     expect(d.unsubscribe).toEqual({ oneClick: 'https://shop.example/u/1', url: 'https://shop.example/u/1', mailto: 'mailto:u@shop.example' });
   });
 });
+
+describe('automatic inbox tabs', () => {
+  it('sorts by headers and sender, without AI', async () => {
+    const { categoryFromHeaders } = await import('../../shared/categories.js');
+    expect(categoryFromHeaders('List-Id: <news.shop.example>\r\n', 'news@shop.example')).toBe('newsletters');
+    expect(categoryFromHeaders('List-Unsubscribe: <https://x.example/u>\r\n', 'someone@x.example')).toBe('newsletters');
+    expect(categoryFromHeaders('Precedence: bulk\r\n', 'a@x.example')).toBe('newsletters');
+    expect(categoryFromHeaders('Auto-Submitted: auto-generated\r\n', 'a@x.example')).toBe('updates');
+    expect(categoryFromHeaders('', 'no-reply@bank.example')).toBe('updates');
+    expect(categoryFromHeaders('', 'notifications@github.example')).toBe('updates');
+    expect(categoryFromHeaders('Auto-Submitted: no\r\n', 'mom@example.com')).toBe('personal');
+    expect(categoryFromHeaders('', 'grace@example.com')).toBe('personal');
+  });
+});

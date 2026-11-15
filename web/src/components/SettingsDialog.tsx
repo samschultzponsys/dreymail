@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -217,6 +218,12 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               </div>
               <SourceLink version={versionQ.data?.version} />
             </>
+          )}
+          {tab === 'general' && (
+            <label className="check">
+              <input type="checkbox" checked={v.inboxTabs ?? true} onChange={(e) => void save({ ...v, inboxTabs: e.target.checked })} />
+              Split the inbox into Personal, Updates and Newsletters tabs
+            </label>
           )}
           {tab === 'general' && (
             <div>

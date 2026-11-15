@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -339,6 +340,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showFullName: false,
   footerIdentity: 'both',
   undoSendSeconds: 10,
+  inboxTabs: true,
 };
 
 export interface User {

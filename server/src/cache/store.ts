@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -24,7 +25,8 @@ import { matchesTerm, type LookupField, type LookupTerm } from '../imap/related.
  * Conversations are matched through keyed hashes of the Message-IDs.
  */
 
-const SCHEMA_VERSION = '1';
+// 2 (DreyMail): summaries carry the automatic inbox tab.
+const SCHEMA_VERSION = '2';
 
 const SCHEMA = `
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -353,6 +355,7 @@ export class MailCache {
           snippet: s.snippet,
           hasAttachments: s.hasAttachments,
           internalDate,
+          category: s.category,
         };
         const data = encryptBytes(this.keys.cacheKey, Buffer.from(JSON.stringify(sealed)), this.aad(f, s.uid, 'summary'));
         del.run(f.id, s.uid);
@@ -435,6 +438,7 @@ export class MailCache {
         ...flags,
         hasAttachments: s.hasAttachments,
         size: r.size,
+        ...(s.category ? { category: s.category } : {}),
       },
       sortTime: r.sort_time,
       internalDate: s.internalDate,

@@ -22,7 +22,8 @@
    Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
    Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
    Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
-   Modified by samschultzponsys, 2026-11-15: send later and undo send. */
+   Modified by samschultzponsys, 2026-11-15: send later and undo send.
+   Modified by samschultzponsys, 2026-11-15: automatic inbox tabs. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -806,3 +807,10 @@ img.account-mark { object-fit: cover; }
 .send-later-menu > button:hover { background: var(--hover); }
 .send-later-custom { display: flex; gap: 6px; padding: 6px 4px 2px; border-top: 1px solid var(--border); margin-top: 4px; }
 .send-later-custom .input { flex: 1; min-width: 0; height: 32px; }
+
+/* Automatic inbox tabs (DreyMail) */
+.inbox-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex: none; }
+.inbox-tab { border: 0; background: none; padding: 9px 10px 8px; font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.inbox-tab:hover { color: var(--text); }
+.inbox-tab.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent-fill); }
+.inbox-tab .count { font-size: 11px; font-weight: 700; color: var(--accent); }

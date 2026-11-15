@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -107,6 +108,7 @@ export const prefsSchema = z.object({
   unifiedInbox: z.boolean().default(true),
   showFullName: z.boolean().default(false),
   footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
+  inboxTabs: z.boolean().default(true),
   undoSendSeconds: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(20), z.literal(30)]).default(10),
 });
 

@@ -24,7 +24,8 @@
      Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
      Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
      Modified by samschultzponsys, 2026-11-15: send later and undo send.
-     Modified by samschultzponsys, 2026-11-15: passkey sign-in. -->
+     Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+     Modified by samschultzponsys, 2026-11-15: automatic inbox tabs. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -48,7 +49,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.6**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.7**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -174,6 +175,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   keeps the search in the sidebar as a smart folder that is re-run each time you open it, so
   "past week" always means the past week. The IMAP server does the searching; DreyMail keeps no
   index of your mail.
+- **Inbox tabs:** Personal, Updates and Newsletters, sorted automatically from the mail's own
+  headers without AI, each with an unread count. Switch them off in Settings → General.
 - **One-time codes:** sign-in and verification codes get a copy button, on the message row and in
   the open message.
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender

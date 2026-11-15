@@ -4,10 +4,12 @@
 // Modified by samschultzponsys, 2026-11-15: search filter builder, filter chips, save search.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 
 import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { findCode } from '../../../shared/codes';
+import { CATEGORY_TABS, type MailCategory } from '../../../shared/categories';
 import { filterChips, filterCount, hasFilters, withoutFilter, type SearchFilters } from '../../../shared/search';
 import { participants, type ConversationRow } from '../../../shared/threads';
 import type { AccountFolders, AccountView, MessageAction, MessageSummary, SwipeAction } from '../../../shared/types';
@@ -44,6 +46,8 @@ interface Props {
   onSaveSearch: (name: string) => Promise<boolean>;
   /** The open view is one account's folder. */
   inFolder: boolean;
+  /** Show the automatic Personal / Updates / Newsletters tabs (inbox views, setting on). */
+  inboxTabs?: boolean;
   /** Set when the user has no mailboxes yet: the list shows how to add one instead. */
   noMailboxes?: { canAdd: boolean; onAdd: () => void };
   onOpen: (m: MessageSummary) => void;
@@ -110,7 +114,13 @@ export function MessageList(p: Props) {
     return () => io.disconnect();
   }, [hasMore, fetchingMore, onLoadMore]);
 
-  const checkedMsgs = p.messages.filter((m) => p.checked.has(refKey(m)));
+  // Automatic inbox tabs: a filter over the loaded conversations; back to All when the view changes.
+  const [tab, setTab] = useState<MailCategory | 'all'>('all');
+  useEffect(() => setTab('all'), [p.title]);
+  const tabsOn = !!p.inboxTabs && !p.noMailboxes;
+  const shown = tabsOn && tab !== 'all' ? p.messages.filter((m) => (m.category ?? 'personal') === tab) : p.messages;
+  const unreadIn = (k: MailCategory) => p.messages.filter((m) => (m.category ?? 'personal') === k && !m.seen).length;
+  const checkedMsgs = shown.filter((m) => p.checked.has(refKey(m)));
   const sameAccount = checkedMsgs.length > 0 && checkedMsgs.every((m) => m.accountId === checkedMsgs[0]!.accountId);
   const anyUnread = checkedMsgs.some((m) => !m.seen);
   const anyUnflagged = checkedMsgs.some((m) => !m.flagged);
@@ -214,11 +224,24 @@ export function MessageList(p: Props) {
         )}
       </div>
 
+      {tabsOn && (
+        <div className="inbox-tabs" role="tablist" aria-label="Inbox tabs">
+          {([{ key: 'all' as const, label: 'All' }, ...CATEGORY_TABS]).map((t) => {
+            const n = t.key === 'all' ? 0 : unreadIn(t.key);
+            return (
+              <button key={t.key} role="tab" aria-selected={tab === t.key} className={`inbox-tab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
+                {t.label}
+                {n > 0 && <span className="count">{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {checkedMsgs.length > 0 && (
         <div className="bulk-bar">
           <input
             type="checkbox"
-            checked={checkedMsgs.length === p.messages.length}
+            checked={checkedMsgs.length === shown.length}
             onChange={(e) => p.onCheckAll(e.target.checked)}
             title="Select all"
             style={{ accentColor: 'var(--accent)' }}
@@ -278,7 +301,7 @@ export function MessageList(p: Props) {
             )}
           </div>
         )}
-        {!p.noMailboxes && !p.loading && p.messages.length === 0 && !p.listError && (
+        {!p.noMailboxes && !p.loading && shown.length === 0 && !p.listError && (
           <div className="center muted" style={{ height: 160 }}>
             {p.unreadOnly ? (
               <div>
@@ -294,7 +317,7 @@ export function MessageList(p: Props) {
             )}
           </div>
         )}
-        {p.messages.map((m) => {
+        {shown.map((m) => {
           const key = refKey(m);
           const acc = p.accounts.get(m.accountId);
           const me = acc?.email.toLowerCase();

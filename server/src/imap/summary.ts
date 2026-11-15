@@ -1,3 +1,8 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: automatic inbox tabs (category of each message).
+
+import { categoryFromHeaders } from '../../../shared/categories.js';
 import type { FetchMessageObject, FetchQueryObject, ImapFlow, MessageAddressObject } from 'imapflow';
 import type { Address, MessageSummary } from '../../../shared/types.js';
 import { firstMessageId, type ThreadHeaders } from '../../../shared/threads.js';
@@ -7,7 +12,7 @@ import { findTextPart, hasAttachments, SNIPPET_FETCH_BYTES, snippetFromPart, typ
 // Turning fetched IMAP messages into list entries, shared by live listings and the mail cache.
 
 /** What a message list needs of each message. */
-export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: true, bodyStructure: true, internalDate: true, size: true, headers: ['references', 'in-reply-to'] };
+export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: true, bodyStructure: true, internalDate: true, size: true, headers: ['references', 'in-reply-to', 'list-id', 'list-unsubscribe', 'precedence', 'auto-submitted'] };
 
 /** References kept per message: the root and the most recent ancestors are what threading needs. */
 const MAX_REFERENCES = 30;
@@ -61,6 +66,7 @@ export function summaryOf(source: { accountId: string; folder: string }, uidVali
     draft: flags.has('\\Draft'),
     hasAttachments: hasAttachments(msg.bodyStructure),
     size: msg.size ?? 0,
+    category: categoryFromHeaders(msg.headers?.toString('latin1') ?? '', env.from?.[0]?.address ?? ''),
   };
 }
 

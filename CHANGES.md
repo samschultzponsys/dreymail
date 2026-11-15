@@ -13,6 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.7): Automatic inbox tabs
+
+- **Inbox tabs:** All, Personal, Updates and Newsletters, each with its unread count, in an inbox
+  and in All inboxes. Sorting needs no AI:
+  - **Newsletters:** mailing-list headers (List-Id, List-Unsubscribe, Precedence: bulk).
+  - **Updates:** automated mail (Auto-Submitted, or a no-reply / notifications / billing style
+    sender).
+  - **Personal:** everything else.
+  - Switch the tabs off in Settings → General.
+- **Files:** new `shared/categories.ts`; the list fetch reads those headers and each summary
+  carries its category (`server/src/imap/summary.ts`, `shared/types.ts`). The mail cache stores it,
+  and its format version goes up, so the cache rebuilds itself once after updating
+  (`server/src/cache/store.ts`). Also the `inboxTabs` preference (`server/src/db.ts`,
+  `server/src/routes/api.ts`), `web/src/components/MessageList.tsx`, `web/src/App.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/styles.css`.
+- Tests: `server/test/conveniences.test.ts`.
+
 ## 2026-11-15 (v3.6): Passkeys (fingerprint, face, PIN, security key)
 
 - **Passkeys:** sign in with a fingerprint, face, device PIN or security key, without typing a
