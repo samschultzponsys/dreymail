@@ -49,12 +49,12 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.7**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.8**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
-filters with saved searches, roles with permission flags, and an optional [AI mailbox
+filters with saved searches, roles with permission flags, a calendar you can share with other DreyMail users, and an optional [AI mailbox
 assistant](#ai-mailbox-assistant) that sorts mail by rules you write in plain language. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
@@ -186,6 +186,14 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   seconds, 10 by default (adjustable in Settings → General), with an Undo button. Your server
   sends both, even if you close DreyMail. Waiting messages are listed under **Scheduled** in the
   sidebar.
+- **Calendar** (in the sidebar): month, week, day and agenda views. Make as many calendars as you
+  like, each with its own color, and show or hide each one with its checkbox. Group a calendar
+  under one of your mailboxes in the calendar list, or keep it under "My calendars". Events have a
+  title, a time or all day, a location, notes, and can repeat every day, week, month or year
+  (optionally until a date). **Share** a calendar with other users of your DreyMail, to view
+  or to edit; it shows up for them under "Shared with me", where they can hide it or remove it.
+  These calendars live in DreyMail's own database. Syncing with Google, Outlook and CalDAV
+  calendars is planned (see [`ROADMAP.md`](ROADMAP.md)).
 - **Mailbox health:** a mailbox with a problem, such as an expired sign-in or an unreachable
   server, shows a warning in the sidebar with a link to fix it.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get

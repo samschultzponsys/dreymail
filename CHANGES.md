@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.8): Calendar
+
+- **Calendar**, opened from the sidebar:
+  - Month, week, day and agenda views, with Today and previous/next; phones open on the agenda.
+  - Your calendars, each with a color and a show/hide checkbox, listed under "My calendars" or
+    grouped under one of your mailboxes. Everyone gets a "Personal" calendar to start with.
+  - Events with a title, a time or all day, location, notes, and repeats (daily, weekly, monthly,
+    yearly, optionally until a date). Repeats are expanded in your time zone. All-day events stay
+    on their dates across daylight-saving changes.
+  - Sharing with other DreyMail users, to view or to edit. Shared calendars appear under "Shared
+    with me", where each person can hide or leave them. Every request checks access (owner, edit,
+    view).
+  - Syncing with Google, Outlook and CalDAV and answering invitations come in a later release.
+- **Files:** new `shared/calendar.ts`, `server/src/routes/calendar.ts`,
+  `web/src/components/CalendarDialog.tsx`, `server/test/calendar.test.ts`. Also the calendar
+  tables migration (`server/src/db.ts`), `server/src/app.ts`, `web/src/components/Sidebar.tsx`,
+  `web/src/App.tsx`, `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-15 (v3.7): Automatic inbox tabs
 
 - **Inbox tabs:** All, Personal, Updates and Newsletters, each with its unread count, in an inbox

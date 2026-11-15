@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-15: calendar.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +40,7 @@ import { quotableDetail, Reader, replyTarget, type ReplyKind } from './component
 import { SettingsDialog } from './components/SettingsDialog';
 import { AssistantDialog } from './components/AssistantDialog';
 import { ScheduledDialog, useScheduled } from './components/ScheduledDialog';
+import { CalendarDialog } from './components/CalendarDialog';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
 import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
@@ -161,6 +163,7 @@ export function App() {
   const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
   const scheduledQ = useScheduled(loggedIn);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
   // A learning period ended: the first time DreyMail opens afterwards, show its review.
   const reviews = useQuery({ queryKey: ['ai', 'reviews'], queryFn: api.assistantReviewsDue, enabled: loggedIn && !!assistantStatus.data?.allowed, staleTime: 300_000 });
@@ -607,6 +610,10 @@ export function App() {
         }}
         scheduledCount={scheduledQ.data?.filter((m) => Date.parse(m.sendAt) > Date.now() + 60_000 || m.status === 'failed').length ?? 0}
         onScheduled={() => setShowScheduled(true)}
+        onCalendar={() => {
+          setShowCalendar(true);
+          closeOverlay('nav');
+        }}
         onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor({ id }) : undefined}
         onDeleteSearch={(s) => {
           if (!confirm(`Remove the saved search “${s.name}”?`)) return;
@@ -728,6 +735,7 @@ export function App() {
         />
       )}
       {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} onClose={() => closeOverlay('accounts')} />}
+      {showCalendar && <CalendarDialog accounts={accounts} onClose={() => setShowCalendar(false)} />}
       {showScheduled && <ScheduledDialog accounts={accountMap} onClose={() => setShowScheduled(false)} />}
       {assistantFor && accountMap.get(assistantFor.id) && (
         <AssistantDialog

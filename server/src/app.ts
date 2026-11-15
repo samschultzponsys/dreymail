@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: calendar.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +41,7 @@ import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
 import { registerPasskeyRoutes } from './auth/passkeys.js';
+import { registerCalendarRoutes } from './routes/calendar.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
 import { AssistantEngine } from './ai/engine.js';
@@ -300,6 +302,7 @@ export async function buildApp(
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
+  registerCalendarRoutes(app, { store });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
   // Learning periods end on their own: stop watching inboxes that no longer need it.

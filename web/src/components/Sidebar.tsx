@@ -12,10 +12,12 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: calendar.
 
 import { useQuery } from '@tanstack/react-query';
 import {
   AlarmClock,
+  CalendarDays,
   Archive,
   ChevronDown,
   ChevronLeft,
@@ -99,11 +101,13 @@ interface Props {
   /** Messages waiting to be sent later, and opening their list. */
   scheduledCount?: number;
   onScheduled?: () => void;
+  /** Open the calendar. */
+  onCalendar?: () => void;
   /** Open the AI assistant for a mailbox (only when the user may use it). */
   onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -142,6 +146,12 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
             <Layers size={16} />
             <span className="name">All inboxes</span>
             {totalUnread > 0 && <span className="count">{totalUnread}</span>}
+          </button>
+        )}
+        {onCalendar && (
+          <button className="nav-item" onClick={onCalendar} title="Calendar">
+            <CalendarDays size={16} />
+            <span className="name">Calendar</span>
           </button>
         )}
         {scheduledCount > 0 && onScheduled && (

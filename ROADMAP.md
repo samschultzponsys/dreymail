@@ -13,8 +13,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Planned
 
 ### Mail
-- [ ] Calendar: DreyMail calendars shared between users, a calendar list with per-account
-      checkboxes, month/week/day/agenda views.
 - [ ] Calendar sync with Google, Outlook and CalDAV; RSVP from invitations.
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
@@ -63,6 +61,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Copy verification codes; unsubscribe button; block sender (address or domain); mailbox health
       warnings (3.4).
 - [x] Send later and undo send, sent by the server (3.5).
+- [x] Calendar: DreyMail's own calendars with colors and show/hide checkboxes, grouped by mailbox,
+      shared with other users (view or edit), repeating events, month/week/day/agenda views (3.8).
 - [x] Automatic inbox tabs: Personal / Updates / Newsletters, without AI (3.7). Rules with a match
       preview are part of the AI assistant (Test this rule, 3.1).
 

@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-15: calendar.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -322,6 +323,41 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      last_used INTEGER NOT NULL DEFAULT 0
    );
    CREATE INDEX IF NOT EXISTS passkeys_user ON passkeys(user_id);`,
+  // DreyMail: calendars of DreyMail itself (shareable with other DreyMail users) and their events.
+  `CREATE TABLE IF NOT EXISTS calendars (
+     id TEXT PRIMARY KEY,
+     owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     color TEXT NOT NULL,
+     account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS calendar_shares (
+     calendar_id TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     can_edit INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (calendar_id, user_id)
+   );
+   CREATE TABLE IF NOT EXISTS calendar_hidden (
+     calendar_id TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     PRIMARY KEY (calendar_id, user_id)
+   );
+   CREATE TABLE IF NOT EXISTS calendar_events (
+     id TEXT PRIMARY KEY,
+     calendar_id TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     start_at INTEGER NOT NULL,
+     end_at INTEGER NOT NULL,
+     all_day INTEGER NOT NULL DEFAULT 0,
+     location TEXT NOT NULL DEFAULT '',
+     notes TEXT NOT NULL DEFAULT '',
+     recurrence TEXT NOT NULL DEFAULT 'none',
+     until_day TEXT,
+     created_by TEXT,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS calendar_events_cal ON calendar_events(calendar_id, start_at);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
