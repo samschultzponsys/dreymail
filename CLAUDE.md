@@ -174,6 +174,10 @@ CHANGES.md history) and `server/src/upgrade.ts`.
 - `server/src/upgrade.ts` carries data written before 1.5 over (old database file name, old
   key-derivation salt, old env prefix → refuses to start and says what to rename). Delete it once
   the owner confirms every instance has started on 1.5+.
+- **Database migrations are append-only.** `MIGRATIONS` in `server/src/db.ts` runs by position
+  (`PRAGMA user_version`): always add new ones at the end, never in the middle, or existing
+  databases skip them. `server/test/migrations.test.ts` pins the order (add each new migration's
+  marker at the end of its list). Write migrations so they are safe to run twice.
 - **Never change the HKDF salt `'dreymail'`** in `server/src/crypto.ts`: every stored account
   password, session cookie, cache key and push key derives from it.
 - The running-squirrel phone animation (`web/src/assets/squirrel-running.svg`, `squirrel.ts`,

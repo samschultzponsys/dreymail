@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
+// Modified by samschultzponsys, 2026-11-15: repair for databases that skipped the Microsoft sign-in columns.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -399,6 +400,15 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      PRIMARY KEY (issuer, subject)
    );
    CREATE INDEX IF NOT EXISTS user_identities_user ON user_identities(user_id);`,
+  // DreyMail: repair. The Microsoft sign-in columns above were once inserted out of order (before
+  // 2.0's migration instead of after it), so databases created on 2.0–2.1 skipped them and Google /
+  // Microsoft sign-in failed with "no such column: auth". Safe to run on any database.
+  // Migrations are append-only: never insert one above this line (server/test/migrations.test.ts).
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'auth')) db.exec("ALTER TABLE accounts ADD COLUMN auth TEXT NOT NULL DEFAULT 'password';");
+    if (!cols.some((c) => c.name === 'oauth_token')) db.exec("ALTER TABLE accounts ADD COLUMN oauth_token TEXT NOT NULL DEFAULT '';");
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

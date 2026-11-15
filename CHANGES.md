@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.6): fix "no such column: auth" when signing in with Google or Microsoft
+
+- **Fix:** servers first set up on 2.0 or 2.1 never got the database columns for Google and Microsoft
+  sign-in (that migration had been inserted out of order, before 2.0's, so those databases skipped
+  it), and adding Gmail or Outlook by signing in failed with "no such column: auth". A repair step
+  at the end of the migrations adds them; nothing else changes. Migrations are now pinned as
+  append-only by a test.
+- **Files:** `server/src/db.ts`, new `server/test/migrations.test.ts`, `CLAUDE.md`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.5): Gmail choice without the setup note once it's done
 
 - **Add account → Gmail:** "Needs a one-time setup by an administrator" only shows while Sign in with
