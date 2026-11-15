@@ -660,8 +660,9 @@ Every push to `main` runs the **Release** workflow. It always runs the tests. Wh
 `package.json` has no `v` tag yet, it also pushes the image (tagged with the version, and `latest`
 if that version is still the one on `main`), then creates the `vX.Y` tag and a GitHub Release with
 generated notes. Runs queue per version, so pushing the next version quickly doesn't cancel the
-previous one's release. If a version's release never ran, start the workflow by hand (Actions →
-Release → Run workflow) with that version's commit in **sha**. To release:
+previous one's release. If a version's release never ran, push its tag (`git tag vX.Y <commit>`,
+`git push origin vX.Y`), then start the workflow by hand (Actions → Release → Run workflow) with
+that version's full commit SHA in **sha**. To release:
 
 ```sh
 scripts/release-version.sh next      # prints the next version, e.g. 1.1

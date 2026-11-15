@@ -13,8 +13,10 @@ name: Release
 #   - the image ghcr.io/<owner>/dreymail tagged 1.3 and latest
 #   - the tag v1.3 and a GitHub Release (no files attached; notes generated from commits)
 # To release: bump package.json to the next version (scripts/release-version.sh next) and push.
-# A version whose release never ran (e.g. pushed while another was building): run this workflow by
-# hand (Actions → Release → Run workflow) with that version's commit in "sha".
+# A version whose release never ran (e.g. pushed while another was building): push its tag
+# (git tag vX.Y <commit> && git push origin vX.Y), then run this workflow by hand (Actions → Release →
+# Run workflow) with that full commit SHA in "sha". GitHub doesn't let the workflow's token create a
+# tag on an older commit whose workflow files differ from main's, hence the tag by hand.
 # Versions are MAJOR.MINOR and roll over after .9 (1.9 -> 2.0).
 #
 # Kept within GitHub's free tier: public repo (Actions minutes and public GHCR images are free),
@@ -25,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Commit on main to release (for a version whose release never ran). Empty: the tip of main."
+        description: "Full commit SHA on main to release (for a version whose release never ran). Empty: the tip of main."
         required: false
         default: ""
 
@@ -50,6 +52,8 @@ jobs:
           ref: ${{ inputs.sha || github.sha }}
       - name: Work out the version
         id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sha="$(git rev-parse HEAD)"
           git fetch -q origin main
@@ -59,7 +63,9 @@ jobs:
           version="$(scripts/release-version.sh current)"
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+          # Released = a GitHub Release exists (a tag alone may have been pushed by hand for a
+          # missed version, see the top of this file).
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "v$version is already released; tests only."
           else
@@ -91,9 +97,9 @@ jobs:
         id: again
         env:
           VERSION: ${{ needs.version.outputs.value }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch -q --tags origin
-          if [ "${{ needs.version.outputs.publish }}" = true ] && ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+          if [ "${{ needs.version.outputs.publish }}" = true ] && ! gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -136,6 +142,8 @@ jobs:
           tags: |
             type=raw,value=${{ needs.version.outputs.value }}
             type=raw,value=latest,enable=${{ steps.latest.outputs.value == 'true' }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.version.outputs.sha }}
       - if: steps.again.outputs.publish == 'true'
         uses: docker/build-push-action@v7
         with:

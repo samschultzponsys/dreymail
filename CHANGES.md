@@ -22,6 +22,9 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   Actions versions that run on Node 24 (checkout, setup-node, setup-java v5, setup-gradle v5, docker
   setup-buildx/login v4, metadata v6, build-push v7) (`.github/workflows/ci.yml`,
   `.github/workflows/release.yml`). Unit and integration tests pass on Node 24.22.
+- **Releases:** "already released" now means a GitHub Release exists (a missed version's tag can be
+  pushed by hand first, since the workflow's token may not tag an older commit whose workflow files
+  differ); the image's revision label names the commit actually built (`.github/workflows/release.yml`).
 
 ## 2026-11-15 (v2.7): Choose what the bottom left shows
 
