@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: calendar.
+// Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +43,8 @@ import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
 import { registerPasskeyRoutes } from './auth/passkeys.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
+import { CalendarService } from './calendar/service.js';
+import type { Http } from './calendar/remote.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
 import { AssistantEngine } from './ai/engine.js';
@@ -121,6 +124,8 @@ export async function buildApp(
     updates?: { get(): Promise<{ version: string; url: string } | null> };
     /** Replaces HTTP calls to Microsoft (tests only). */
     microsoftFetch?: MicrosoftFetch;
+    /** HTTP for provider calendars (Google, Graph, CalDAV); tests pass a fake. */
+    calendarFetch?: Http;
     /** Replaces HTTP calls to Google sign-in (tests only). */
     googleFetch?: MicrosoftFetch;
     /** Replaces the DNS check of push service hosts (tests only). */
@@ -258,6 +263,16 @@ export async function buildApp(
     graphSend: (userId, accountId, raw) => microsoft.sendRaw(userId, accountId, raw),
     smtpToken: (userId, accountId) => google.accessToken(userId, accountId),
   });
+  const calendars = new CalendarService({
+    store,
+    google,
+    microsoft,
+    mail,
+    compose,
+    http: opts.calendarFetch ?? (fetch as unknown as Http),
+    blockPrivateHosts: config.blockPrivateMailHosts,
+    maxMessageBytes: config.maxMessageBytes,
+  });
 
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 50, fieldSize: 6 * 1024 * 1024 } });
@@ -302,7 +317,7 @@ export async function buildApp(
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
-  registerCalendarRoutes(app, { store });
+  registerCalendarRoutes(app, { store, calendars });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
   // Learning periods end on their own: stop watching inboxes that no longer need it.

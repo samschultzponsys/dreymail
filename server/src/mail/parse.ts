@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: unsubscribe options and verification codes in the message detail.
+// Modified by samschultzponsys, 2026-11-15: calendar invitations in the message detail.
 
 import PostalMime from 'postal-mime';
 import type { Address as PmAddress, Attachment, Email } from 'postal-mime';
@@ -8,6 +9,7 @@ import type { Address, AttachmentView, DomainName, MessageDetail } from '../../.
 import { sanitizeEmailHtml, type SanitizeOptions } from './sanitize.js';
 import { findCode } from '../../../shared/codes.js';
 import { parseUnsubscribe } from '../../../shared/unsubscribe.js';
+import { findInvite, inviteView } from '../calendar/invites.js';
 
 /** List-Unsubscribe options of a message (DreyMail). */
 function unsubscribeOf(email: ParsedEmail) {
@@ -40,6 +42,15 @@ export function attachmentBytes(a: Attachment): Buffer {
   if (typeof a.content === 'string') return Buffer.from(a.content, a.encoding === 'base64' ? 'base64' : 'utf8');
   if (a.content instanceof ArrayBuffer) return Buffer.from(a.content);
   return Buffer.from(a.content.buffer, a.content.byteOffset, a.content.byteLength);
+}
+
+/** The invitation card's data; a broken calendar attachment never breaks reading the message. */
+function safeInvite(email: ParsedEmail) {
+  try {
+    return inviteView(findInvite(email));
+  } catch {
+    return null;
+  }
 }
 
 function normaliseCid(cid: string): string {
@@ -108,8 +119,10 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
       inline: a.disposition === 'inline' || (!!a.contentId && usedCids.has(normaliseCid(a.contentId))),
       contentId: a.contentId ? normaliseCid(a.contentId) : null,
     }))
-    // Inline images that were actually displayed in the body aren't listed as attachments.
-    .filter((a) => !(a.contentId && usedCids.has(a.contentId)));
+    // Inline images that were actually displayed in the body aren't listed as attachments,
+    // nor the unnamed calendar part of an invitation (the invitation card shows it).
+    .filter((a) => !(a.contentId && usedCids.has(a.contentId)))
+    .filter((a) => !(a.mimeType === 'text/calendar' && /^attachment-\d+$/.test(a.filename)));
 
   const date = email.date ? new Date(email.date) : meta.internalDate;
   return {
@@ -138,6 +151,7 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     senderDomain: opts.allowlist?.senderDomain ?? null,
     unsubscribe: unsubscribeOf(email),
     code: findCode(email.subject ?? '', email.text ?? ''),
+    invite: safeInvite(email),
     imagesAllowedBy: opts.allowlist?.allowedBy ?? null,
     allowlistSkipped: opts.allowlist?.skipped ?? null,
     attachments,

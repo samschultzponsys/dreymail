@@ -49,12 +49,12 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.8**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.9**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
-filters with saved searches, roles with permission flags, a calendar you can share with other DreyMail users, and an optional [AI mailbox
+filters with saved searches, roles with permission flags, a calendar that brings together DreyMail's own shared calendars with Google, Outlook and CalDAV calendars and answers invitations, and an optional [AI mailbox
 assistant](#ai-mailbox-assistant) that sorts mail by rules you write in plain language. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
@@ -186,14 +186,26 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   seconds, 10 by default (adjustable in Settings → General), with an Undo button. Your server
   sends both, even if you close DreyMail. Waiting messages are listed under **Scheduled** in the
   sidebar.
-- **Calendar** (in the sidebar): month, week, day and agenda views. Make as many calendars as you
-  like, each with its own color, and show or hide each one with its checkbox. Group a calendar
-  under one of your mailboxes in the calendar list, or keep it under "My calendars". Events have a
-  title, a time or all day, a location, notes, and can repeat every day, week, month or year
-  (optionally until a date). **Share** a calendar with other users of your DreyMail, to view
-  or to edit; it shows up for them under "Shared with me", where they can hide it or remove it.
-  These calendars live in DreyMail's own database. Syncing with Google, Outlook and CalDAV
-  calendars is planned (see [`ROADMAP.md`](ROADMAP.md)).
+- **Calendar** (in the sidebar): month, week, day and agenda views, with every calendar in one list
+  and a checkbox to show or hide each one.
+  - **DreyMail's own calendars:** as many as you like, each with its own color, kept under "My
+    calendars" or grouped under one of your mailboxes. Events have a title, a time or all day, a
+    location, notes, and can repeat every day, week, month or year (optionally until a date).
+    **Share** a calendar with other users of your DreyMail, to view or to edit; it shows up for them
+    under "Shared with me".
+  - **Google and Outlook calendars** of mailboxes added with Google or Microsoft sign-in appear under
+    that mailbox by themselves. They are read live and changes go straight back, so they stay the
+    same as on your phone. Changing one occurrence of a repeating event changes just that one.
+    Mailboxes added before 3.9 ask to be reconnected once to allow calendar access.
+  - **CalDAV calendars** (Nextcloud, iCloud, Fastmail, Radicale, Baïkal and others): *Connect
+    CalDAV* with the server address, username and an app password; DreyMail finds the calendars.
+    Add, change and delete events; repeating events from these calendars are shown, and changed in
+    their own app.
+- **Invitations:** a message with a calendar invitation shows a card with what, when, where and who,
+  and **Yes / Maybe / No**. Gmail and Outlook mailboxes signed in with Google or Microsoft answer
+  through their own calendar, which tells the organizer. Other mailboxes email the standard answer
+  (iTIP) to the organizer from that mailbox and put the event in the calendar you pick (a DreyMail,
+  Google, Outlook or CalDAV calendar). Canceled invitations say so and offer to remove the event.
 - **Mailbox health:** a mailbox with a problem, such as an expired sign-in or an unreachable
   server, shows a warning in the sidebar with a link to fix it.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get
@@ -243,11 +255,13 @@ automatically.
 **Sign in with Google** (optional; app passwords keep working): Settings → **Google** walks you
 through creating a free OAuth client in Google Cloud (about 10 minutes). Publish the app there, or
 Google ends the sign-in every 7 days; as it's your own unverified app, Google shows a "hasn't
-verified this app" screen once (*Advanced → Go to DreyMail*). Compose overrides:
+verified this app" screen once (*Advanced → Go to DreyMail*). For the calendar, also turn on the
+**Google Calendar API** in the same project (*APIs & Services → Library*). Compose overrides:
 `DREYMAIL_GOOGLE_CLIENT_ID`, `DREYMAIL_GOOGLE_CLIENT_SECRET`.
 
 **Outlook one-time setup** (administrator, about 5 minutes, free): Settings → **Outlook** walks you
-through registering DreyMail in Microsoft's Entra admin center and pasting two values. Or set them
+through registering DreyMail in Microsoft's Entra admin center and pasting two values (people
+allow mail and calendar access themselves when they sign in). Or set them
 in the compose file, which then wins over the UI: `DREYMAIL_MICROSOFT_CLIENT_ID`,
 `DREYMAIL_MICROSOFT_CLIENT_SECRET` and optionally `DREYMAIL_MICROSOFT_TENANT` (`common` by
 default).

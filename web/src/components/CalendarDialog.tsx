@@ -6,9 +6,9 @@
 // editors. Repeating events are expanded here, in the browser's time zone.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Pencil, Plus, Repeat, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Pencil, Plus, RefreshCw, Repeat, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { occurrences, type CalendarEvent, type CalendarView, type EventInput, type EventOccurrence, type Recurrence } from '../../../shared/calendar';
+import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventInput, type EventOccurrence, type Recurrence } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
 import { fetchJson } from '../api';
 import { ACCOUNT_COLORS } from '../util';
@@ -44,7 +44,8 @@ function daysOf(o: EventOccurrence): string[] {
 }
 
 const calendarsApi = {
-  list: () => fetchJson<CalendarView[]>('GET', '/api/calendars'),
+  list: (refresh = false) => fetchJson<CalendarView[]>('GET', `/api/calendars${refresh ? '?refresh=1' : ''}`),
+  sources: () => fetchJson<CalendarSourceView[]>('GET', '/api/calendar-sources'),
   people: () => fetchJson<{ id: string; name: string }[]>('GET', '/api/calendars/people'),
   events: (from: number, to: number) => fetchJson<CalendarEvent[]>('GET', `/api/events?from=${encodeURIComponent(new Date(from).toISOString())}&to=${encodeURIComponent(new Date(to).toISOString())}`),
 };
@@ -58,7 +59,10 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
   const [showList, setShowList] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const cals = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list });
+  const cals = useQuery({ queryKey: ['calendars'], queryFn: () => calendarsApi.list() });
+  const sources = useQuery({ queryKey: ['calendar-sources'], queryFn: calendarsApi.sources, enabled: !!cals.data });
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const calMap = useMemo(() => new Map((cals.data ?? []).map((c) => [c.id, c])), [cals.data]);
 
   // The days shown.
@@ -73,7 +77,12 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
     return [cursor, addDays(cursor, AGENDA_DAYS)];
   }, [mode, cursor]);
   // All-day events sit on UTC midnights, so ask for a day more on each side.
-  const evQ = useQuery({ queryKey: ['events', from.getTime(), to.getTime()], queryFn: () => calendarsApi.events(from.getTime() - DAY, to.getTime() + DAY), enabled: !!cals.data });
+  const evQ = useQuery({
+    queryKey: ['events', from.getTime(), to.getTime()],
+    // Provider problems are found while reading events: refresh the connection list afterwards.
+    queryFn: () => calendarsApi.events(from.getTime() - DAY, to.getTime() + DAY).finally(() => void qc.invalidateQueries({ queryKey: ['calendar-sources'] })),
+    enabled: !!cals.data,
+  });
 
   /** Occurrences per local day key, all-day events first, then by start. */
   const byDay = useMemo(() => {
@@ -91,6 +100,27 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['events'] });
+  };
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      qc.setQueryData(['calendars'], await calendarsApi.list(true));
+      refresh();
+      void qc.invalidateQueries({ queryKey: ['calendar-sources'] });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+  const reconnect = async (src: CalendarSourceView) => {
+    const acc = accounts.find((a) => a.id === src.id);
+    try {
+      const { url } = await fetchJson<{ url: string }>('POST', `/api/oauth/${src.kind}/start`, { color: acc?.color ?? '#22d3ee' });
+      window.location.href = url;
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
   const setCals = (l: CalendarView[]) => {
     qc.setQueryData(['calendars'], l);
@@ -133,26 +163,34 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
       >
         {!o.allDay && <span className="cal-time">{timeLabel(new Date(o.occurrenceStart))}</span>}
         <span className="cal-title">{o.title}</span>
-        {!compact && o.recurrence !== 'none' && <Repeat size={11} />}
+        {!compact && (o.recurrence !== 'none' || o.instance) && <Repeat size={11} />}
       </button>
     );
   };
 
   // ---- the calendar list ----------------------------------------------------------------
-  const groups: { label: string; items: CalendarView[] }[] = [];
-  const mine = (cals.data ?? []).filter((c) => c.access === 'owner');
-  groups.push({ label: 'My calendars', items: mine.filter((c) => !c.accountId || !accounts.some((a) => a.id === c.accountId)) });
+  // My calendars, then each mailbox (its own calendars, its Google/Outlook calendars and CalDAV
+  // accounts shown under it), then CalDAV accounts of their own, then calendars shared with me.
+  const all = cals.data ?? [];
+  const srcs = sources.data ?? [];
+  const groups: { key: string; label: string; items: CalendarView[]; problems: CalendarSourceView[]; caldav: CalendarSourceView[] }[] = [];
+  const isMine = (c: CalendarView) => c.source !== 'local' || c.access === 'owner';
+  const known = (id: string | null) => !!id && accounts.some((a) => a.id === id);
+  groups.push({ key: 'mine', label: 'My calendars', items: all.filter((c) => c.source === 'local' && c.access === 'owner' && !known(c.accountId)), problems: [], caldav: [] });
   for (const a of accounts) {
-    const items = mine.filter((c) => c.accountId === a.id);
-    if (items.length) groups.push({ label: a.name, items });
+    const items = all.filter((c) => isMine(c) && c.accountId === a.id);
+    const here = srcs.filter((x) => x.accountId === a.id);
+    if (items.length || here.some((x) => x.error)) groups.push({ key: a.id, label: a.name, items, problems: here.filter((x) => x.error), caldav: here.filter((x) => x.kind === 'caldav') });
   }
-  const shared = (cals.data ?? []).filter((c) => c.access !== 'owner');
-  if (shared.length) groups.push({ label: 'Shared with me', items: shared });
+  for (const x of srcs.filter((x) => x.kind === 'caldav' && !known(x.accountId)))
+    groups.push({ key: x.id, label: x.name, items: all.filter((c) => c.source === 'caldav' && c.sourceId === x.id), problems: x.error ? [x] : [], caldav: [x] });
+  const shared = all.filter((c) => c.source === 'local' && c.access !== 'owner');
+  if (shared.length) groups.push({ key: 'shared', label: 'Shared with me', items: shared, problems: [], caldav: [] });
 
   const list = (
     <aside className={`cal-list ${showList ? 'open' : ''}`}>
       {groups.map((g) => (
-        <div key={g.label} className="cal-group">
+        <div key={g.key} className="cal-group">
           <div className="cal-group-label">{g.label}</div>
           {g.items.map((c) => (
             <div key={c.id} className="cal-item">
@@ -161,10 +199,21 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
                 <span className="cal-dot" style={{ background: c.color }} />
                 <span className="cal-name">{c.name}</span>
               </label>
-              {c.access !== 'owner' && <span className="muted cal-owner">{c.ownerName}</span>}
-              <button className="icon-btn" title={c.access === 'owner' ? 'Edit and share' : 'Details'} onClick={() => setCalEditing(c)}>
+              {c.source === 'local' && c.access !== 'owner' && <span className="muted cal-owner">{c.ownerName}</span>}
+              <button className="icon-btn" title={c.source === 'local' && c.access === 'owner' ? 'Edit and share' : 'Details'} onClick={() => setCalEditing(c)}>
                 <Pencil size={13} />
               </button>
+            </div>
+          ))}
+          {g.problems.map((x) => (
+            <div key={x.id} className="cal-problem">
+              <AlertTriangle size={13} />
+              <span>{x.error}</span>
+              {x.reconnect && (
+                <button className="btn" onClick={() => void reconnect(x)}>
+                  Reconnect
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -172,6 +221,10 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
       <button className="btn" onClick={() => setCalEditing('new')}>
         <Plus size={14} /> New calendar
       </button>
+      <button className="btn" onClick={() => setConnecting(true)} title="Nextcloud, iCloud, Fastmail and other CalDAV calendars">
+        <Link2 size={14} /> Connect CalDAV
+      </button>
+      {srcs.some((x) => x.kind !== 'caldav') ? null : accounts.some((a) => a.auth === 'password') && <div className="hint">Google and Outlook calendars appear here for mailboxes added with Google or Microsoft sign-in.</div>}
     </aside>
   );
 
@@ -298,6 +351,9 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
           <button className="btn" onClick={() => setCursor(startOfDay(new Date()))}>
             Today
           </button>
+          <button className={`icon-btn ${syncing || evQ.isFetching ? 'spinning' : ''}`} title="Refresh from Google, Outlook and CalDAV" onClick={() => void syncNow()}>
+            <RefreshCw size={16} />
+          </button>
           <button className="icon-btn" title="Previous" onClick={() => step(-1)}>
             <ChevronLeft size={17} />
           </button>
@@ -339,7 +395,26 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
           }}
         />
       )}
-      {calEditing && <CalendarEditor calendar={calEditing === 'new' ? null : calEditing} accounts={accounts} onClose={() => setCalEditing(null)} onSaved={(l) => (setCals(l), setCalEditing(null))} />}
+      {calEditing && (
+        <CalendarEditor
+          calendar={calEditing === 'new' ? null : calEditing}
+          source={calEditing === 'new' ? null : srcs.find((x) => x.id === calEditing.sourceId) ?? null}
+          accounts={accounts}
+          onClose={() => setCalEditing(null)}
+          onSaved={(l) => (setCals(l), setCalEditing(null), void qc.invalidateQueries({ queryKey: ['calendar-sources'] }))}
+        />
+      )}
+      {connecting && (
+        <CalDavDialog
+          accounts={accounts}
+          onClose={() => setConnecting(false)}
+          onSaved={(l) => {
+            setCals(l);
+            setConnecting(false);
+            void qc.invalidateQueries({ queryKey: ['calendar-sources'] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -399,8 +474,10 @@ const toLocalInput = (iso: string) => {
 
 function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<CalendarEvent>; calendars: CalendarView[]; onClose: () => void; onSaved: () => void }) {
   const cal = calendars.find((c) => c.id === event.calendarId);
-  const readOnly = !!event.id && cal?.access === 'view';
+  const readOnly = !!event.id && (cal?.access === 'view' || !!event.readOnly);
   const writable = calendars.filter((c) => c.access !== 'view');
+  /** Provider events stay in their calendar; one occurrence of a series can't change the series. */
+  const fromProvider = !!event.id && !!cal && cal.source !== 'local';
   const s0 = event.allDay ? { date: utcKeyOf(new Date(event.start!)), time: '09:00' } : toLocalInput(event.start!);
   const e0 = event.allDay ? { date: utcKeyOf(new Date(Date.parse(event.end!) - DAY)), time: '10:00' } : toLocalInput(event.end!);
   const [title, setTitle] = useState(event.title ?? '');
@@ -431,7 +508,19 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
       start = s.toISOString();
       end = e.toISOString();
     }
-    const body: EventInput = { calendarId, title: title.trim() || '(no title)', start, end, allDay, location, notes, recurrence, until: recurrence === 'none' || !until ? null : until };
+    const body: EventInput & { instance?: boolean } = {
+      calendarId,
+      title: title.trim() || '(no title)',
+      start,
+      end,
+      allDay,
+      location,
+      notes,
+      recurrence: event.instance ? 'none' : recurrence,
+      until: recurrence === 'none' || !until ? null : until,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      instance: event.instance,
+    };
     setBusy(true);
     try {
       if (event.id) await fetchJson('PUT', `/api/events/${encodeURIComponent(event.id)}`, body);
@@ -443,7 +532,8 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
     }
   };
   const remove = async () => {
-    if (!event.id || !window.confirm(event.recurrence && event.recurrence !== 'none' ? 'Delete this event and all its repeats?' : 'Delete this event?')) return;
+    const question = event.instance ? 'Delete this occurrence? The other repeats stay.' : event.recurrence && event.recurrence !== 'none' ? 'Delete this event and all its repeats?' : 'Delete this event?';
+    if (!event.id || !window.confirm(question)) return;
     try {
       await fetchJson('DELETE', `/api/events/${encodeURIComponent(event.id)}`);
       onSaved();
@@ -477,7 +567,12 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
             )}
             {event.notes && <div style={{ whiteSpace: 'pre-wrap' }}>{event.notes}</div>}
             <div className="hint">
-              <span className="cal-dot" style={{ background: cal?.color }} /> {cal?.name} · shared by {cal?.ownerName} (view only)
+              <span className="cal-dot" style={{ background: cal?.color }} /> {cal?.name} ·{' '}
+              {cal?.source === 'local'
+                ? `shared by ${cal.ownerName} (view only)`
+                : event.readOnly && cal?.access !== 'view'
+                  ? 'repeating events of this calendar are changed in its own app'
+                  : 'read-only calendar'}
             </div>
           </div>
         </div>
@@ -505,7 +600,7 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
             <label className="label" htmlFor="ev-cal">
               Calendar
             </label>
-            <select id="ev-cal" className="select" value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>
+            <select id="ev-cal" className="select" value={calendarId} disabled={fromProvider} onChange={(e) => setCalendarId(e.target.value)}>
               {writable.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -544,6 +639,7 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
               </div>
             </div>
           </div>
+          {!event.instance && (
           <div className="cal-when">
             <div>
               <label className="label" htmlFor="ev-repeat">
@@ -566,6 +662,7 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
               </div>
             )}
           </div>
+          )}
           <div>
             <label className="label" htmlFor="ev-loc">
               Location
@@ -579,6 +676,7 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
             <textarea id="ev-notes" className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={10_000} />
           </div>
           {event.id && event.recurrence && event.recurrence !== 'none' && <div className="hint">Changes apply to every repeat of this event.</div>}
+          {event.instance && <div className="hint">One occurrence of a repeating event: changes apply to this occurrence only.</div>}
           {error && <div className="error-text">{error}</div>}
         </div>
         <div className="dialog-foot">
@@ -602,7 +700,189 @@ function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<Ca
 
 // ---- the calendar editor ------------------------------------------------------------------------
 
-function CalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar: CalendarView | null; accounts: AccountView[]; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
+function CalendarEditor({
+  calendar,
+  source,
+  accounts,
+  onClose,
+  onSaved,
+}: {
+  calendar: CalendarView | null;
+  source: CalendarSourceView | null;
+  accounts: AccountView[];
+  onClose: () => void;
+  onSaved: (l: CalendarView[]) => void;
+}) {
+  if (calendar && calendar.source !== 'local') return <ProviderCalendarEditor calendar={calendar} source={source} onClose={onClose} onSaved={onSaved} />;
+  return <OwnCalendarEditor calendar={calendar} accounts={accounts} onClose={onClose} onSaved={onSaved} />;
+}
+
+const PROVIDER_NAMES = { google: 'Google Calendar', microsoft: 'Outlook', caldav: 'CalDAV' } as const;
+
+/** A Google / Outlook / CalDAV calendar: its color here, and disconnecting a CalDAV account. */
+function ProviderCalendarEditor({ calendar, source, onClose, onSaved }: { calendar: CalendarView; source: CalendarSourceView | null; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
+  const [color, setColor] = useState(calendar.color);
+  const [error, setError] = useState<string | null>(null);
+  const kind = calendar.source as keyof typeof PROVIDER_NAMES;
+  const save = async () => {
+    try {
+      onSaved(await fetchJson<CalendarView[]>('PUT', `/api/calendars/${encodeURIComponent(calendar.id)}`, { name: calendar.name, color, accountId: null }));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+  const disconnect = async () => {
+    if (!source || !window.confirm(`Disconnect “${source.name}”? Its calendars disappear from DreyMail; nothing is deleted on the server.`)) return;
+    try {
+      onSaved((await fetchJson<{ calendars: CalendarView[] }>('DELETE', `/api/calendar-sources/${encodeURIComponent(source.id)}`)).calendars);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+  return (
+    <div className="overlay" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
+      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(460px, 100%)' }}>
+        <div className="dialog-head">
+          <h2>{calendar.name}</h2>
+          <button className="icon-btn" onClick={onClose} title="Close">
+            <X size={17} />
+          </button>
+        </div>
+        <div className="dialog-body">
+          <div className="muted">
+            From {PROVIDER_NAMES[kind]}
+            {source ? ` · ${source.name}` : ''}
+            {calendar.access === 'view' ? ' · read-only' : ''}. Events are read from there and changes go straight back.
+          </div>
+          {source?.kind === 'caldav' && source.url && (
+            <div className="hint">
+              {source.username} at {source.url}
+            </div>
+          )}
+          <div>
+            <label className="label">Color in DreyMail</label>
+            <div className="cal-colors">
+              {ACCOUNT_COLORS.map((c) => (
+                <button key={c} className={`cal-swatch ${c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor(c)} title={c} aria-label={`Color ${c}`} />
+              ))}
+              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title="Any color" aria-label="Any color" />
+            </div>
+          </div>
+          {error && <div className="error-text">{error}</div>}
+        </div>
+        <div className="dialog-foot">
+          {source?.kind === 'caldav' && (
+            <button className="btn" onClick={() => void disconnect()}>
+              <Trash2 size={14} /> Disconnect
+            </button>
+          )}
+          <span className="grow" />
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" onClick={() => void save()}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Connect a CalDAV account: Nextcloud, iCloud, Fastmail, Radicale, Baïkal… */
+function CalDavDialog({ accounts, onClose, onSaved }: { accounts: AccountView[]; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
+  const [url, setUrl] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved((await fetchJson<{ calendars: CalendarView[] }>('POST', '/api/calendar-sources', { url, username, password, name, accountId })).calendars);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="overlay" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
+      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(500px, 100%)' }}>
+        <div className="dialog-head">
+          <h2>Connect a CalDAV calendar</h2>
+          <button className="icon-btn" onClick={onClose} title="Close">
+            <X size={17} />
+          </button>
+        </div>
+        <div className="dialog-body">
+          <div>
+            <label className="label" htmlFor="dav-url">
+              Server address
+            </label>
+            <input id="dav-url" className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://cloud.example.com/remote.php/dav" autoFocus />
+            <div className="hint">
+              Nextcloud: https://your-cloud/remote.php/dav · iCloud: https://caldav.icloud.com · Fastmail: https://caldav.fastmail.com · Radicale or Baïkal: the server&apos;s address. Use https unless the server is on
+              your own network.
+            </div>
+          </div>
+          <div className="cal-when">
+            <div>
+              <label className="label" htmlFor="dav-user">
+                Username
+              </label>
+              <input id="dav-user" className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />
+            </div>
+            <div>
+              <label className="label" htmlFor="dav-pass">
+                Password
+              </label>
+              <input id="dav-pass" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" onKeyDown={(e) => e.key === 'Enter' && void save()} />
+            </div>
+          </div>
+          <div className="hint">iCloud and Fastmail need an app-specific password. It is stored encrypted, like mailbox passwords.</div>
+          <div className="cal-when">
+            <div>
+              <label className="label" htmlFor="dav-name">
+                Name (optional)
+              </label>
+              <input id="dav-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="The server's name" maxLength={80} />
+            </div>
+            {accounts.length > 0 && (
+              <div>
+                <label className="label" htmlFor="dav-acct">
+                  Show under
+                </label>
+                <select id="dav-acct" className="select" value={accountId ?? ''} onChange={(e) => setAccountId(e.target.value || null)}>
+                  <option value="">Its own name</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          {error && <div className="error-text">{error}</div>}
+        </div>
+        <div className="dialog-foot">
+          <span className="grow muted">{busy ? 'Looking for calendars…' : ''}</span>
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={busy || !url.trim() || !username.trim() || !password} onClick={() => void save()}>
+            Connect
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OwnCalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar: CalendarView | null; accounts: AccountView[]; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
   const owner = !calendar || calendar.access === 'owner';
   const [name, setName] = useState(calendar?.name ?? '');
   const [color, setColor] = useState(calendar?.color ?? ACCOUNT_COLORS[1]!);

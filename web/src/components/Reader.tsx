@@ -3,8 +3,10 @@
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe and block sender.
+// Modified by samschultzponsys, 2026-11-15: calendar invitation card.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { InviteCard } from './InviteCard';
 import {
   AlarmClock,
   Archive,
@@ -553,6 +555,8 @@ function MessageCard({
               </button>
             </div>
           )}
+
+          {d.invite && <InviteCard invite={d.invite} detail={d} account={account} />}
 
           {d.snoozedUntil && (
             <div className="notice">

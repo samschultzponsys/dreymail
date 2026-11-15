@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: calendar.
+// Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -358,6 +359,36 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      updated_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS calendar_events_cal ON calendar_events(calendar_id, start_at);`,
+  // DreyMail: calendars from Google, Outlook and CalDAV next to DreyMail's own, and answers to invitations.
+  (db) => {
+    const has = (table: string, col: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === col);
+    if (!has('calendars', 'source')) db.exec(`ALTER TABLE calendars ADD COLUMN source TEXT NOT NULL DEFAULT 'local'`);
+    if (!has('calendars', 'source_id')) db.exec('ALTER TABLE calendars ADD COLUMN source_id TEXT');
+    if (!has('calendars', 'remote_id')) db.exec('ALTER TABLE calendars ADD COLUMN remote_id TEXT');
+    if (!has('calendars', 'writable')) db.exec('ALTER TABLE calendars ADD COLUMN writable INTEGER NOT NULL DEFAULT 1');
+    if (!has('calendar_events', 'ical_uid')) db.exec('ALTER TABLE calendar_events ADD COLUMN ical_uid TEXT');
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS calendars_remote ON calendars(owner_id, source, source_id, remote_id) WHERE remote_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS calendar_events_uid ON calendar_events(ical_uid);
+      CREATE TABLE IF NOT EXISTS calendar_sources (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        username TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS invite_responses (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ical_uid TEXT NOT NULL,
+        response TEXT NOT NULL,
+        calendar_id TEXT,
+        remote_ref TEXT,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, ical_uid)
+      );`);
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

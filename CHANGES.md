@@ -13,6 +13,41 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.9): Google, Outlook and CalDAV calendars; answering invitations
+
+- **Provider calendars in the calendar:**
+  - **Google and Outlook:** mailboxes added with Google or Microsoft sign-in bring their calendars,
+    grouped under the mailbox. The calendar list is mirrored (each keeps its checkbox and color),
+    events are read live for the range on screen, and changes are written straight back through
+    the Google Calendar API and Microsoft Graph. Changing one occurrence of a repeating event changes
+    that occurrence only. Signing in now also asks for calendar access; mailboxes added earlier show
+    a Reconnect button. Administrators turn on the Google Calendar API in their Google Cloud project.
+  - **CalDAV** (Nextcloud, iCloud, Fastmail, Radicale…): connect with a server address, username
+    and password (stored encrypted). DreyMail finds the calendars (RFC 6764 / 4791), reads events
+    with the server expanding repeats (or expands them itself), and adds, changes (keeping alarms,
+    attendees and other details) and deletes events. Repeating CalDAV events are read-only.
+    Connections follow the mail-host rule for internal addresses (`DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS`).
+  - Problems (no calendar access, API turned off, wrong password) show under the calendar's group.
+    A refresh button reloads everything.
+- **Invitations:** messages with a calendar invitation show a card (what, when, where, who, repeats)
+  with Yes / Maybe / No.
+  - Google and Outlook mailboxes answer through their calendar, which tells the organizer.
+  - Other mailboxes email an iTIP REPLY (RFC 5546) to the organizer and add accepted invitations to
+    a calendar you pick. Declining removes what was added; canceled invitations offer to remove it.
+  - Time zones from Outlook (Windows names) and the invitation's own VTIMEZONE are understood.
+- **iCalendar support** (`server/src/calendar/ical.ts`): parsing that keeps unknown properties,
+  time zones, repeat rules (RRULE with BYDAY, BYMONTHDAY, BYSETPOS, COUNT, UNTIL, EXDATE and changed
+  occurrences) and writing.
+- **Files:** new `server/src/calendar/` (`ical.ts`, `remote.ts`, `service.ts`, `invites.ts`),
+  `web/src/components/InviteCard.tsx`, tests `server/test/ical.test.ts`,
+  `server/test/calendar-sync.test.ts` and `server/test/caldav-live.test.ts` (runs against a real
+  CalDAV server when one is given). Also `server/src/db.ts` (provider calendars, CalDAV connections,
+  invitation answers), `server/src/routes/calendar.ts`, `server/src/app.ts`, `server/src/mail/send.ts`
+  (invitation answers), `server/src/mail/parse.ts` (invitations in the message),
+  `server/src/oauth/google.ts` and `microsoft.ts` (calendar access), `shared/calendar.ts`,
+  `shared/types.ts`, `web/src/components/CalendarDialog.tsx`, `Reader.tsx`, `AdminSettings.tsx`,
+  `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v3.8): Calendar
 
 - **Calendar**, opened from the sidebar:

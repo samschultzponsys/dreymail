@@ -16,8 +16,61 @@ export interface CalendarView {
   ownerName: string;
   /** Shown in the calendar (the checkbox). */
   visible: boolean;
-  /** People it is shared with (owner only). */
+  /** People it is shared with (owner only; DreyMail calendars only). */
   shares: { userId: string; name: string; canEdit: boolean }[];
+  /** Where it lives: DreyMail itself, or a provider (read and written live). */
+  source: CalendarSource;
+  /** For provider calendars: the mailbox (Google, Outlook) or CalDAV connection it comes from. */
+  sourceId: string | null;
+}
+
+export type CalendarSource = 'local' | 'google' | 'microsoft' | 'caldav';
+
+/** A provider connection that brings calendars: a Google or Outlook mailbox, or a CalDAV account. */
+export interface CalendarSourceView {
+  id: string;
+  kind: 'google' | 'microsoft' | 'caldav';
+  /** Mailbox name, or the CalDAV connection's name. */
+  name: string;
+  /** Mailbox it is grouped under (Google/Outlook: itself; CalDAV: chosen, or null). */
+  accountId: string | null;
+  /** CalDAV only. */
+  url?: string;
+  username?: string;
+  /** Why its calendars can't be read right now, if so. */
+  error: string | null;
+  /** Reconnecting the mailbox (signing in again) fixes the error. */
+  reconnect: boolean;
+}
+
+/** An invitation found in an email (an iCalendar attachment). */
+export interface InviteView {
+  /** REQUEST (an invitation or update), CANCEL, REPLY (someone answered yours), PUBLISH… */
+  method: string;
+  uid: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  location: string;
+  description: string;
+  organizer: { email: string; name: string } | null;
+  attendees: { email: string; name: string; status: string }[];
+  /** "Repeats every week on Mon" for repeating events. */
+  repeats: string | null;
+}
+
+export type InviteAnswer = 'accepted' | 'tentative' | 'declined';
+
+/** What DreyMail knows about your answer to an invitation. */
+export interface InviteState {
+  answer: InviteAnswer | null;
+  /** The calendar it is in, if known ("Google Calendar", or a DreyMail/CalDAV calendar name). */
+  calendar: string | null;
+  /** Answers go through the mailbox's own calendar (Google, Outlook) rather than by email. */
+  viaProvider: boolean;
+  /** A copy DreyMail added that "Remove from calendar" can delete (after a cancellation). */
+  removable: boolean;
 }
 
 export interface CalendarEvent {
@@ -33,6 +86,10 @@ export interface CalendarEvent {
   recurrence: Recurrence;
   /** Last day a repeating event happens (YYYY-MM-DD), or null for no end. */
   until: string | null;
+  /** Provider calendars: one occurrence of a repeating series (edits change this occurrence only). */
+  instance?: boolean;
+  /** Can't be changed from DreyMail (repeating events of CalDAV calendars). */
+  readOnly?: boolean;
 }
 
 /** One occurrence in a range (a repeating event appears once per day it happens). */
@@ -42,7 +99,10 @@ export interface EventOccurrence extends CalendarEvent {
   occurrenceEnd: string;
 }
 
-export type EventInput = Omit<CalendarEvent, 'id'>;
+export type EventInput = Omit<CalendarEvent, 'id' | 'instance' | 'readOnly'> & {
+  /** The browser's time zone, so repeats keep their local time at providers. */
+  timeZone?: string;
+};
 
 /**
  * Occurrences of an event between `from` and `to` (ms), counted in local time (so a weekly 9:00

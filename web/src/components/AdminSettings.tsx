@@ -663,7 +663,7 @@ export function OutlookAdmin() {
             <em>Certificates &amp; secrets → New client secret</em> (pick the longest expiry), then copy its <strong>Value</strong> (not the ID) below.
           </li>
           <li>
-            Nothing else: people grant the mail permissions themselves when they sign in. (In some work tenants an admin must approve the app once.)
+            Nothing else: people grant the mail and calendar permissions themselves when they sign in. (In some work tenants an admin must approve the app once.)
           </li>
         </ol>
       </fieldset>
@@ -764,6 +764,9 @@ export function GoogleAdmin() {
             <code className="copyable">{s.redirectUri}</code>. Create.
           </li>
           <li>Copy the <strong>Client ID</strong> and <strong>Client secret</strong> into the fields below.</li>
+          <li>
+            For the calendar: <em>APIs &amp; Services → Library</em>, search <em>Google Calendar API</em> and click <em>Enable</em>. (Mail works without it.)
+          </li>
         </ol>
       </fieldset>
       <div className="grid2">

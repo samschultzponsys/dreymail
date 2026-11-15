@@ -23,6 +23,7 @@
 
 import type { Permission } from './permissions.js';
 import type { UnsubscribeOptions } from './unsubscribe.js';
+import type { InviteView } from './calendar.js';
 import type { MailCategory } from './categories.js';
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
@@ -208,6 +209,8 @@ export interface MessageDetail {
   snoozedUntil?: string;
   /** How to unsubscribe, if the message is from a mailing list (DreyMail). */
   unsubscribe?: UnsubscribeOptions | null;
+  /** A calendar invitation (or its update, cancellation or answer) in the message (DreyMail). */
+  invite?: InviteView | null;
   /** A one-time code found in the message (DreyMail). */
   code?: string | null;
 }

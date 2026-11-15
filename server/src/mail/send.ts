@@ -2,11 +2,13 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: answers to calendar invitations (iTIP REPLY).
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
 import { createSmtpTransport, describeError, MailServerError } from '../imap/connect.js';
 import type { MailService } from '../imap/mail.js';
+import MailComposer from 'nodemailer/lib/mail-composer';
 import { assertPublicHost } from '../net/ssrf.js';
 import { attachmentBytes } from './parse.js';
 import { buildRawMessage, isValidAddress, parseAddressList, type OutgoingAttachment } from './compose.js';
@@ -74,26 +76,7 @@ export class ComposeService {
     // from what recipients get); SMTP gets them in the envelope instead.
     const viaGraph = account.auth === 'microsoft';
     const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: viaGraph });
-
-    if (viaGraph) {
-      if (!this.opts.graphSend) throw new ComposeError('Outlook sending is not available on this server');
-      try {
-        await this.opts.graphSend(userId, account.id, raw);
-      } catch (err) {
-        throw new MailServerError((err as Error).message, 'protocol');
-      }
-    } else try {
-      if (this.opts.blockPrivateHosts) await assertPublicHost(account.smtp.host);
-      const accessToken = account.auth === 'google' && this.opts.smtpToken ? await this.opts.smtpToken(userId, account.id) : undefined;
-      const transport = createSmtpTransport(account.smtp, accessToken);
-      try {
-        await transport.sendMail({ envelope, raw });
-      } finally {
-        transport.close();
-      }
-    } catch (err) {
-      throw describeError(err, `SMTP ${account.smtp.host}`);
-    }
+    await this.deliver(userId, account, raw, envelope);
 
     // From here on the message is sent; failures are reported as warnings, not errors.
     const warnings: string[] = [];
@@ -114,6 +97,49 @@ export class ComposeService {
     if (p.answering) await this.mail.markAnswered(userId, p.answering);
     this.store.rememberRecipients(userId, recipients);
     return { messageId, savedToSent, warning: warnings.join(' ') || null };
+  }
+
+  /** Hands a finished message to Microsoft Graph or the account's SMTP server. */
+  private async deliver(userId: string, account: NonNullable<ReturnType<Store['getAccountSecret']>>, raw: Buffer, envelope: { from: string; to: string[] }) {
+    if (account.auth === 'microsoft') {
+      if (!this.opts.graphSend) throw new ComposeError('Outlook sending is not available on this server');
+      try {
+        await this.opts.graphSend(userId, account.id, raw);
+      } catch (err) {
+        throw new MailServerError((err as Error).message, 'protocol');
+      }
+    } else try {
+      if (this.opts.blockPrivateHosts) await assertPublicHost(account.smtp.host);
+      const accessToken = account.auth === 'google' && this.opts.smtpToken ? await this.opts.smtpToken(userId, account.id) : undefined;
+      const transport = createSmtpTransport(account.smtp, accessToken);
+      try {
+        await transport.sendMail({ envelope, raw });
+      } finally {
+        transport.close();
+      }
+    } catch (err) {
+      throw describeError(err, `SMTP ${account.smtp.host}`);
+    }
+  }
+
+  /** Answers a calendar invitation: a short note with the iTIP REPLY the organizer's calendar reads. */
+  async sendInvitationReply(userId: string, accountId: string, r: { to: string; subject: string; text: string; ics: string }): Promise<void> {
+    const account = this.store.getAccountSecret(userId, accountId);
+    if (!account) throw new ComposeError('Unknown sender account');
+    if (!isValidAddress(r.to)) throw new ComposeError(`Invalid address: ${r.to}`);
+    const composer = new MailComposer({
+      from: { name: account.displayName, address: account.email },
+      to: r.to,
+      subject: r.subject,
+      text: r.text,
+      icalEvent: { method: 'REPLY', content: r.ics },
+      disableFileAccess: true,
+      disableUrlAccess: true,
+      xMailer: 'DreyMail',
+    });
+    const mail = composer.compile();
+    const raw = await mail.build();
+    await this.deliver(userId, account, raw, { from: account.email, to: [r.to] });
   }
 
   async saveDraft(userId: string, p: ComposePayload, uploads: OutgoingAttachment[]): Promise<DraftResult> {

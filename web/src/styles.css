@@ -24,7 +24,7 @@
    Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
    Modified by samschultzponsys, 2026-11-15: send later and undo send.
    Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
-   Modified by samschultzponsys, 2026-11-15: calendar. */
+   Modified by samschultzponsys, 2026-11-15: calendar; calendar sync and invitations. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -902,3 +902,29 @@ img.account-mark { object-fit: cover; }
   .cal-cell { padding: 2px 1px; }
   .cal-agenda-day { flex-direction: column; gap: 4px; }
 }
+.cal-problem { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); background: color-mix(in srgb, #eab308 14%, transparent); border-radius: var(--radius-sm); padding: 6px 8px; margin-top: 4px; }
+.cal-problem svg { color: #ca8a04; flex-shrink: 0; margin-top: 1px; }
+.cal-problem span { flex: 1; min-width: 140px; }
+.cal-problem .btn { font-size: 12px; min-height: 26px; padding: 2px 8px; }
+.icon-btn.spinning svg { animation: cal-spin 0.9s linear infinite; }
+@keyframes cal-spin { to { transform: rotate(360deg); } }
+.cal-list > .btn { justify-content: flex-start; }
+
+/* ---- invitation card --------------------------------------------------------------------- */
+.invite-card { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+.invite-card.canceled { border-left-color: var(--muted); }
+.invite-card.canceled .invite-title { text-decoration: line-through; text-decoration-color: var(--muted); }
+.invite-head { display: flex; gap: 10px; align-items: flex-start; }
+.invite-head > svg { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.invite-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.invite-title { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.invite-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--active); color: var(--text-2); margin-right: 6px; text-decoration: none; vertical-align: 1px; }
+.invite-when { font-size: 13px; }
+.invite-line { display: flex; align-items: center; gap: 5px; font-size: 13px; overflow-wrap: anywhere; }
+.invite-line svg { flex-shrink: 0; }
+.invite-note { font-size: 13px; }
+.invite-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.invite-going { font-size: 13px; font-weight: 600; margin-right: 2px; }
+.invite-cal { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 13px; white-space: nowrap; }
+.invite-cal .select { max-width: 200px; min-height: 32px; }
+@media (max-width: 600px) { .invite-cal { margin-left: 0; width: 100%; } .invite-cal .select { flex: 1; max-width: none; } }

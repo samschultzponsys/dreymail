@@ -31,9 +31,10 @@ const SETTING = 'microsoft';
 export const SCOPES = {
   imap: 'https://outlook.office.com/IMAP.AccessAsUser.All',
   graph: 'https://graph.microsoft.com/Mail.Send',
+  calendar: 'https://graph.microsoft.com/Calendars.ReadWrite',
 } as const;
 /** Asked for at sign-in: both resources (consented at once), a refresh token, and who the user is. */
-const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph}`;
+const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph} ${SCOPES.calendar}`;
 
 export class MicrosoftError extends Error {}
 

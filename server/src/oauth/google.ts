@@ -19,6 +19,8 @@ export interface GoogleSettings {
 const SETTING = 'google';
 /** Full Gmail access over IMAP/SMTP (Google calls it a restricted scope). */
 export const GMAIL_SCOPE = 'https://mail.google.com/';
+/** Google Calendar, read and write (DreyMail's calendar shows and edits it). */
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
 
 export class GoogleError extends Error {}
 
@@ -94,7 +96,7 @@ export class GoogleAuth {
       client_id: this.settings.current().clientId,
       response_type: 'code',
       redirect_uri: this.redirectUri,
-      scope: `openid email profile ${GMAIL_SCOPE}`,
+      scope: `openid email profile ${GMAIL_SCOPE} ${CALENDAR_SCOPE}`,
       state,
       code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
       code_challenge_method: 'S256',
