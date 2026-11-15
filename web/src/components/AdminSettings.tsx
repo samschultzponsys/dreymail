@@ -496,3 +496,89 @@ export function OutlookAdmin() {
     </div>
   );
 }
+
+/** Settings → Google (administrators): the OAuth client behind "Gmail: Sign in with Google". */
+export function GoogleAdmin() {
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['admin', 'google'], queryFn: api.adminGoogle });
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState('');
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!settings.data) return <div className="hint">{settings.error ? (settings.error as Error).message : 'Loading…'}</div>;
+  const s = settings.data;
+  const id = clientId ?? s.clientId;
+
+  const save = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      qc.setQueryData(['admin', 'google'], await api.adminSaveGoogle({ clientId: id, clientSecret }));
+      await qc.invalidateQueries({ queryKey: ['googleAvailable'] });
+      setClientSecret('');
+      setStatus({ ok: true, text: 'Saved. "Add account → Gmail: Sign in with Google" now works. App passwords keep working too.' });
+    } catch (err) {
+      setStatus({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stack">
+      <div className="hint">
+        Optional: lets people add Gmail by signing in with Google instead of creating an app password. Both ways keep working; the sign-in survives
+        password changes and doesn’t need 2-Step Verification app passwords.
+      </div>
+      <div className={s.configured ? 'success-text' : 'muted'}>{s.configured ? 'Set up: Gmail can be added with Sign in with Google.' : 'Not set up (Gmail works with app passwords).'}</div>
+      <fieldset className="group">
+        <legend>One-time setup in Google Cloud (free)</legend>
+        <ol className="steps">
+          <li>
+            Open <code className="copyable">console.cloud.google.com</code>, create a project named <code className="copyable">DreyMail</code>.
+          </li>
+          <li>
+            <em>APIs &amp; Services → OAuth consent screen</em> (or <em>Google Auth Platform</em>): User type <em>External</em>, app name DreyMail, your
+            email as support and developer contact. Save.
+          </li>
+          <li>
+            <strong>Publish the app</strong> (<em>Audience → Publish app</em>). In “Testing”, Google ends the sign-in every 7 days. Published but
+            unverified is fine for your own use: when signing in, Google shows “Google hasn’t verified this app”; choose <em>Advanced → Go to
+            DreyMail</em>.
+          </li>
+          <li>
+            <em>Credentials (Clients) → Create OAuth client ID</em>, type <em>Web application</em>, Authorized redirect URI{' '}
+            <code className="copyable">{s.redirectUri}</code>. Create.
+          </li>
+          <li>Copy the <strong>Client ID</strong> and <strong>Client secret</strong> into the fields below.</li>
+        </ol>
+      </fieldset>
+      <div className="grid2">
+        <Field label="Client ID" lockedBy={s.locked.clientId} htmlFor="g-client">
+          <input id="g-client" className="input" value={id} disabled={!!s.locked.clientId} placeholder="…apps.googleusercontent.com" onChange={(e) => setClientId(e.target.value)} />
+        </Field>
+        <Field label="Client secret" lockedBy={s.locked.clientSecret} htmlFor="g-secret">
+          <input
+            id="g-secret"
+            className="input"
+            type="password"
+            value={clientSecret}
+            disabled={!!s.locked.clientSecret}
+            autoComplete="new-password"
+            placeholder={s.hasClientSecret ? '•••••••• (saved; type to replace)' : 'GOCSPX-…'}
+            onChange={(e) => setClientSecret(e.target.value)}
+          />
+        </Field>
+      </div>
+      <div className="hint">The client secret is stored encrypted.</div>
+      {status && <div className={status.ok ? 'success-text' : 'error-text'}>{status.text}</div>}
+      <div className="row-buttons">
+        <span className="grow" />
+        <button className="btn primary" disabled={busy} onClick={() => void save()}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}

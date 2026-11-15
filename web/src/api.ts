@@ -7,8 +7,9 @@
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -64,6 +65,10 @@ export const api = {
   saveName: (name: string) => request<{ name: string }>('PUT', '/api/me/name', { name }),
   version: () => request<VersionInfo>('GET', '/api/version'),
   microsoftAvailable: () => request<{ available: boolean }>('GET', '/api/oauth/microsoft'),
+  googleAvailable: () => request<{ available: boolean }>('GET', '/api/oauth/google'),
+  startGoogle: (color: string) => request<{ url: string }>('POST', '/api/oauth/google/start', { color }),
+  adminGoogle: () => request<GoogleSettingsView>('GET', '/api/admin/google'),
+  adminSaveGoogle: (s: { clientId: string; clientSecret: string }) => request<GoogleSettingsView>('PUT', '/api/admin/google', s),
   startMicrosoft: (color: string) => request<{ url: string }>('POST', '/api/oauth/microsoft/start', { color }),
   adminMicrosoft: () => request<MicrosoftSettingsView>('GET', '/api/admin/microsoft'),
   adminSaveMicrosoft: (s: { clientId: string; clientSecret: string; tenant: string }) => request<MicrosoftSettingsView>('PUT', '/api/admin/microsoft', s),

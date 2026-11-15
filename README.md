@@ -12,7 +12,8 @@
      Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates).
      Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog).
      Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet).
-     Modified by samschultzponsys, 2026-11-15: v2.2 (Outlook and Microsoft 365, This device). -->
+     Modified by samschultzponsys, 2026-11-15: v2.2 (Outlook and Microsoft 365, This device).
+     Modified by samschultzponsys, 2026-11-15: v2.3 (Sign in with Google for Gmail). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -36,7 +37,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.3**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -150,7 +151,7 @@ app password). Anything that allows that works:
 | Provider | Works? | How |
 | --- | --- | --- |
 | Purelymail, Fastmail, Migadu, mailbox.org, Proton (via Bridge), your own server | ✅ | Your normal password (or the provider's app password) |
-| Gmail / Google Workspace | ✅ | Turn on 2-Step Verification, then create an **app password** and use that |
+| Gmail / Google Workspace | ✅ | Either **Add account → Gmail: Sign in with Google** (after the one-time setup below), or an **app password** (needs 2-Step Verification) |
 | iCloud Mail | ✅ | An **app-specific password** from your Apple account |
 | Yahoo, AOL | ✅ | An **app password** |
 | **Outlook.com, Hotmail, Live** | ✅ | **Add account → Outlook / Microsoft 365**: you sign in on Microsoft's own page |
@@ -162,7 +163,13 @@ and sent through Microsoft Graph, which works even where an organisation has swi
 sending, and Microsoft keeps the copy in Sent. The sign-in is stored encrypted and renewed
 automatically.
 
-**One-time setup** (administrator, about 5 minutes, free): Settings → **Outlook** walks you
+**Sign in with Google** (optional; app passwords keep working): Settings → **Google** walks you
+through creating a free OAuth client in Google Cloud (about 10 minutes). Publish the app there, or
+Google ends the sign-in every 7 days; as it's your own unverified app, Google shows a "hasn't
+verified this app" screen once (*Advanced → Go to DreyMail*). Compose overrides:
+`DREYMAIL_GOOGLE_CLIENT_ID`, `DREYMAIL_GOOGLE_CLIENT_SECRET`.
+
+**Outlook one-time setup** (administrator, about 5 minutes, free): Settings → **Outlook** walks you
 through registering DreyMail in Microsoft's Entra admin center and pasting two values. Or set them
 in the compose file, which then wins over the UI: `DREYMAIL_MICROSOFT_CLIENT_ID`,
 `DREYMAIL_MICROSOFT_CLIENT_SECRET` and optionally `DREYMAIL_MICROSOFT_TENANT` (`common` by
@@ -665,7 +672,7 @@ folders use the same cursors, so a page can come from the cache and the next fro
 - Snoozing is a DreyMail feature: other mail apps see the messages in the Snoozed folder, but only
   DreyMail brings them back, and only while it is running (late ones come back when it starts).
   A woken message is a new copy in INBOX, so it gets a new UID.
-- Gmail still uses an app password (Sign in with Google is on the roadmap). Use app passwords where the provider
+- Use app passwords where the provider
   supports them.
 - Out of scope: server-side filters, calendar/contacts, JMAP, PGP, local full-text search.
 

@@ -31,7 +31,7 @@ on the providers; at most a minimal encrypted cache.
 - [ ] Copy verification codes, unsubscribe button, block sender, send later, undo send, account
       health alerts, passkey/fingerprint login.
 - [ ] Rules/filters with a match preview; automatic tabs (Personal / Updates / Newsletters).
-- [ ] Gmail OAuth (XOAUTH2) as an alternative to app passwords (same mechanism). Low priority.
+- [x] Sign in with Google for Gmail (v2.3), next to app passwords.
 
 ## Configuration and deployment
 - [ ] All remaining configuration possible in the UI (default account settings, cache,

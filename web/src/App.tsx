@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -284,10 +285,11 @@ export function App() {
     const raw = sessionStorage.getItem('dreymail.outlook');
     if (!raw) return;
     sessionStorage.removeItem('dreymail.outlook');
-    const r = JSON.parse(raw) as { ok: boolean; message: string; account: string };
+    const r = JSON.parse(raw) as { ok: boolean; message: string; account: string; provider?: string };
+    const what = r.provider === 'google' ? 'Gmail' : 'Outlook';
     void qc.invalidateQueries({ queryKey: ['accounts'] });
     void qc.invalidateQueries({ queryKey: ['folders'] });
-    push(r.ok ? 'Outlook account connected.' : `Outlook sign-in didn’t work: ${r.message}`);
+    push(r.ok ? `${what} account connected.` : `${what} sign-in didn’t work: ${r.message}`);
     if (r.ok && r.account) navigate({ ...HOME, accountId: r.account, folder: 'INBOX' }, { replace: true });
   }, [loggedIn, qc, push, navigate]);
 

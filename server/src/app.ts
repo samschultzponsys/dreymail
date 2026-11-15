@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,6 +35,8 @@ import { registerApiRoutes } from './routes/api.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAndroidPushRoutes } from './routes/android.js';
 import { registerMicrosoftRoutes } from './routes/microsoft.js';
+import { registerGoogleRoutes } from './routes/google.js';
+import { GoogleAuth, GoogleConfig } from './oauth/google.js';
 import { MicrosoftAuth, MicrosoftConfig, type FetchLike as MicrosoftFetch } from './oauth/microsoft.js';
 import { setOAuthTokenProvider } from './imap/connect.js';
 import { LoginSettings } from './loginSettings.js';
@@ -81,6 +84,7 @@ export interface App {
   push: PushService;
   snooze: SnoozeService;
   microsoft: MicrosoftAuth;
+  google: GoogleAuth;
 }
 
 export async function buildApp(
@@ -99,6 +103,8 @@ export async function buildApp(
     updates?: { get(): Promise<{ version: string; url: string } | null> };
     /** Replaces HTTP calls to Microsoft (tests only). */
     microsoftFetch?: MicrosoftFetch;
+    /** Replaces HTTP calls to Google sign-in (tests only). */
+    googleFetch?: MicrosoftFetch;
     /** Replaces the DNS check of push service hosts (tests only). */
     pushHostCheck?: (host: string) => Promise<void>;
     /** Where the mail cache lives, null for none. Defaults to cache.db in the data directory (memory with `store`). */
@@ -203,11 +209,15 @@ export async function buildApp(
   // Outlook / Microsoft 365: sign in with Microsoft; IMAP gets OAuth tokens, sending goes through Graph.
   const microsoftConfig = new MicrosoftConfig(config, store);
   const microsoft = new MicrosoftAuth(microsoftConfig, store, config.baseUrl, opts.microsoftFetch);
-  setOAuthTokenProvider((o) => microsoft.accessToken(o.userId, o.accountId, 'imap'));
+  // Gmail with Sign in with Google: IMAP and SMTP with OAuth.
+  const googleConfig = new GoogleConfig(config, store);
+  const google = new GoogleAuth(googleConfig, store, config.baseUrl, opts.googleFetch);
+  setOAuthTokenProvider((o) => (o.provider === 'google' ? google.accessToken(o.userId, o.accountId) : microsoft.accessToken(o.userId, o.accountId, 'imap')));
   const compose = new ComposeService(store, mail, {
     maxMessageBytes: config.maxMessageBytes,
     blockPrivateHosts: config.blockPrivateMailHosts,
     graphSend: (userId, accountId, raw) => microsoft.sendRaw(userId, accountId, raw),
+    smtpToken: (userId, accountId) => google.accessToken(userId, accountId),
   });
 
   await app.register(cookie);
@@ -246,6 +256,7 @@ export async function buildApp(
   await registerAdminRoutes(app, { config, store, sessions, login, pool, mail, firebase });
   registerAndroidPushRoutes(app, { store, pool, firebase });
   registerMicrosoftRoutes(app, { config, store, sessions, microsoft, microsoftConfig });
+  registerGoogleRoutes(app, { config, store, sessions, google, googleConfig });
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.
@@ -275,5 +286,5 @@ export async function buildApp(
     if (!opts.store) store.close();
   });
 
-  return { app, store, pool, mail, cache, cacheSync, push, snooze, microsoft };
+  return { app, store, pool, mail, cache, cacheSync, push, snooze, microsoft, google };
 }

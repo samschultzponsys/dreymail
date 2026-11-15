@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.3): Gmail with Sign in with Google
+
+- **Sign in with Google** as a second way to add Gmail (app passwords keep working): new
+  `server/src/oauth/google.ts` (authorization code + PKCE, `https://mail.google.com/` scope,
+  offline access; refresh token encrypted) and `server/src/routes/google.ts` (start, callback,
+  admin); `DREYMAIL_GOOGLE_CLIENT_ID` / `_SECRET` override (`server/src/config.ts`). Google-signed-in
+  accounts use IMAP and SMTP with OAuth (`createSmtpTransport` token, `server/src/imap/connect.ts`;
+  `server/src/mail/send.ts`); `Store.saveGoogleAccount` and a shared `saveOAuthAccount`
+  (`server/src/db.ts`); `AccountAuth` gains `google` (`shared/types.ts`); wiring in `server/src/app.ts`.
+- **Web:** Add account offers "Gmail: Sign in with Google" next to "Gmail (app password) or other
+  email"; Google accounts share the Outlook edit/reconnect screen; Settings → Google for
+  administrators with the Google Cloud walkthrough (`web/src/components/AccountsDialog.tsx`,
+  `web/src/components/AdminSettings.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/main.tsx`,
+  `web/src/App.tsx`, `web/src/api.ts`, `web/src/styles.css`). Tests: `server/test/google.test.ts`.
+
 ## 2026-11-15 (v2.2): Outlook and Microsoft 365, "This device" settings
 
 - **Outlook / Microsoft 365 accounts** with Microsoft sign-in (OAuth 2.0 authorization code +

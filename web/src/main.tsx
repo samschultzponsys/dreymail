@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
@@ -30,8 +31,11 @@ if (opened) {
   const q = new URLSearchParams(window.location.search);
   const outcome = q.get('outlook');
   if (outcome) {
-    sessionStorage.setItem('dreymail.outlook', JSON.stringify({ ok: outcome === 'added', message: q.get('message') ?? '', account: q.get('account') ?? '' }));
-    for (const k of ['outlook', 'message', 'account']) q.delete(k);
+    sessionStorage.setItem(
+      'dreymail.outlook',
+      JSON.stringify({ ok: outcome === 'added', message: q.get('message') ?? '', account: q.get('account') ?? '', provider: q.get('provider') ?? 'microsoft' }),
+    );
+    for (const k of ['outlook', 'message', 'account', 'provider']) q.delete(k);
     const rest = q.toString();
     window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
   }

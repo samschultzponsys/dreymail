@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -21,6 +22,8 @@ export class ComposeService {
       blockPrivateHosts: boolean;
       /** Sends a complete MIME message through Microsoft Graph (Outlook / Microsoft 365 accounts). */
       graphSend?: (userId: string, accountId: string, raw: Buffer) => Promise<void>;
+      /** OAuth access token for SMTP (Gmail signed in with Google). */
+      smtpToken?: (userId: string, accountId: string) => Promise<string>;
     },
   ) {}
 
@@ -81,7 +84,8 @@ export class ComposeService {
       }
     } else try {
       if (this.opts.blockPrivateHosts) await assertPublicHost(account.smtp.host);
-      const transport = createSmtpTransport(account.smtp);
+      const accessToken = account.auth === 'google' && this.opts.smtpToken ? await this.opts.smtpToken(userId, account.id) : undefined;
+      const transport = createSmtpTransport(account.smtp, accessToken);
       try {
         await transport.sendMail({ envelope, raw });
       } finally {

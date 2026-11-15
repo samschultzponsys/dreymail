@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -20,7 +21,7 @@ import { api } from '../api';
 import { desktopBridge } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
-import { AndroidAdmin, OutlookAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { AndroidAdmin, GoogleAdmin, OutlookAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -41,7 +42,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'outlook' | 'android';
+type SettingsTab = 'device' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'outlook' | 'google' | 'android';
 
 export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { prefs: Preferences; hasPassword: boolean; admin: boolean; myId: string; onClose: () => void }) {
   const qc = useQueryClient();
@@ -58,6 +59,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
           ['users', 'Users'],
           ['signin', 'Sign-in'],
           ['outlook', 'Outlook'],
+          ['google', 'Google'],
           ['android', 'Android'],
         ] as [SettingsTab, string][]
       : []),
@@ -177,6 +179,7 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
           {tab === 'users' && <UsersAdmin myId={myId} />}
           {tab === 'signin' && <SignInAdmin />}
           {tab === 'outlook' && <OutlookAdmin />}
+          {tab === 'google' && <GoogleAdmin />}
           {tab === 'android' && <AndroidAdmin />}
           {error && <div className="error-text">{error}</div>}
         </div>

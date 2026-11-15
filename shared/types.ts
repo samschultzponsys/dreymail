@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: account sign-in kind (password or Microsoft).
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 // Types shared between the server API and the web client.
 
@@ -32,11 +33,11 @@ export interface AccountView {
   imap: { host: string; port: number; tls: TlsMode; user: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string };
   appendSent: boolean;
-  /** How DreyMail signs in (DreyMail): a password, or Microsoft sign-in (OAuth) for Outlook/Microsoft 365. */
+  /** How DreyMail signs in (DreyMail): a password, or Microsoft / Google sign-in (OAuth). */
   auth: AccountAuth;
 }
 
-export type AccountAuth = 'password' | 'microsoft';
+export type AccountAuth = 'password' | 'microsoft' | 'google';
 
 /**
  * What the "Add account" form starts with for this user: the admin's defaults with tokens such as
@@ -345,6 +346,15 @@ export interface MicrosoftSettingsView {
   /** Redirect URI to enter in the app registration. */
   redirectUri: string;
   locked: Partial<Record<'clientId' | 'clientSecret' | 'tenant', string>>;
+}
+
+/** Settings → Google (administrators): the OAuth client for Sign in with Google (Gmail). */
+export interface GoogleSettingsView {
+  configured: boolean;
+  clientId: string;
+  hasClientSecret: boolean;
+  redirectUri: string;
+  locked: Partial<Record<'clientId' | 'clientSecret', string>>;
 }
 
 /** GET /api/version (DreyMail). */

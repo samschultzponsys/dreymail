@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
@@ -15,7 +16,7 @@ export interface ServerSettings {
   user: string;
   password: string;
   /** Logs in with an OAuth access token instead of the password (Outlook / Microsoft 365). */
-  oauth?: { provider: 'microsoft'; userId: string; accountId: string };
+  oauth?: { provider: 'microsoft' | 'google'; userId: string; accountId: string };
 }
 
 /** Fetches OAuth access tokens for IMAP (set at startup; see oauth/microsoft.ts). */
@@ -100,14 +101,14 @@ export async function connectImap(s: ServerSettings, opts: ConnectOptions): Prom
   }
 }
 
-export function createSmtpTransport(s: ServerSettings) {
+export function createSmtpTransport(s: ServerSettings, accessToken?: string) {
   return nodemailer.createTransport({
     host: s.host,
     port: s.port,
     secure: s.tls === 'tls',
     requireTLS: s.tls === 'starttls',
     ignoreTLS: s.tls === 'none',
-    auth: s.user ? { user: s.user, pass: s.password } : undefined,
+    auth: accessToken ? { type: 'OAuth2', user: s.user, accessToken } : s.user ? { user: s.user, pass: s.password } : undefined,
     connectionTimeout: 20_000,
     greetingTimeout: 15_000,
     socketTimeout: 60_000,

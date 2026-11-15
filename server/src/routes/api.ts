@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -376,7 +377,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     try {
       const body = z.object({ account: accountSchema, id: z.string().optional() }).parse(req.body);
       const existing = body.id ? store.getAccountSecret(uid(req), body.id) : null;
-      if (existing?.auth === 'microsoft') {
+      if (existing && existing.auth !== 'password') {
         // Outlook: reading over IMAP (with Microsoft sign-in) is what can be tested; sending goes through Graph.
         const client = await connectImap(existing.imap, { blockPrivateHosts: false });
         await client.logout().catch(() => client.close());
@@ -406,8 +407,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const input = accountSchema.parse(req.body);
       const existing = store.getAccountSecret(uid(req), req.params.id);
       if (!existing) throw new NotFoundError('Account not found');
-      // Outlook accounts sign in with Microsoft: only the label, name and colour can change here.
-      if (existing.auth === 'microsoft') {
+      // Outlook / Google-signed-in accounts: only the label, name and colour can change here.
+      if (existing.auth !== 'password') {
         return store.updateAccountLabels(uid(req), req.params.id, { name: input.name, displayName: input.displayName, color: input.color });
       }
       await verify(input, { imap: existing.imap.password, smtp: existing.smtp.password });

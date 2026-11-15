@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Microsoft (OAuth) accounts.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -204,7 +205,7 @@ export interface AccountSecret extends AccountView {
 
 /** Marks server settings that log in with an OAuth access token (fetched just before connecting). */
 export interface OAuthRef {
-  provider: 'microsoft';
+  provider: 'microsoft' | 'google';
   userId: string;
   accountId: string;
 }
@@ -245,7 +246,7 @@ function toView(r: AccountRow): AccountView {
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
-    auth: r.auth === 'microsoft' ? 'microsoft' : 'password',
+    auth: r.auth === 'microsoft' || r.auth === 'google' ? r.auth : 'password',
   };
 }
 
@@ -505,7 +506,7 @@ export class Store {
       .get(userId, accountId) as AccountRow | undefined;
     if (!r) return null;
     const view = toView(r);
-    const oauth: OAuthRef | undefined = view.auth === 'microsoft' ? { provider: 'microsoft', userId, accountId: r.id } : undefined;
+    const oauth: OAuthRef | undefined = view.auth !== 'password' ? { provider: view.auth, userId, accountId: r.id } : undefined;
     return {
       ...view,
       userId: r.user_id,
@@ -522,9 +523,29 @@ export class Store {
    * through Microsoft Graph (which keeps its own copy in Sent).
    */
   saveMicrosoftAccount(userId: string, a: { email: string; name: string; displayName: string; color: string; refreshToken: string }): AccountView {
+    return this.saveOAuthAccount(userId, 'microsoft', a, {
+      imap: { host: 'outlook.office365.com', port: 993, tls: 'tls' },
+      smtp: { host: 'graph.microsoft.com', port: 443, tls: 'tls' },
+    });
+  }
+
+  /** Gmail signed in with Google: IMAP and SMTP with OAuth (Gmail files sent mail itself). */
+  saveGoogleAccount(userId: string, a: { email: string; name: string; displayName: string; color: string; refreshToken: string }): AccountView {
+    return this.saveOAuthAccount(userId, 'google', a, {
+      imap: { host: 'imap.gmail.com', port: 993, tls: 'tls' },
+      smtp: { host: 'smtp.gmail.com', port: 465, tls: 'tls' },
+    });
+  }
+
+  private saveOAuthAccount(
+    userId: string,
+    provider: 'microsoft' | 'google',
+    a: { email: string; name: string; displayName: string; color: string; refreshToken: string },
+    servers: { imap: { host: string; port: number; tls: TlsMode }; smtp: { host: string; port: number; tls: TlsMode } },
+  ): AccountView {
     const existing = this.db
-      .prepare("SELECT id FROM accounts WHERE user_id = ? AND auth = 'microsoft' AND lower(email) = lower(?)")
-      .get(userId, a.email) as { id: string } | undefined;
+      .prepare('SELECT id FROM accounts WHERE user_id = ? AND auth = ? AND lower(email) = lower(?)')
+      .get(userId, provider, a.email) as { id: string } | undefined;
     const id = existing?.id ?? crypto.randomUUID();
     if (!existing) {
       this.createAccount(
@@ -534,13 +555,13 @@ export class Store {
           displayName: a.displayName,
           email: a.email,
           color: a.color,
-          imap: { host: 'outlook.office365.com', port: 993, tls: 'tls', user: a.email, password: '' },
-          smtp: { host: 'graph.microsoft.com', port: 443, tls: 'tls', user: a.email, password: '' },
+          imap: { ...servers.imap, user: a.email, password: '' },
+          smtp: { ...servers.smtp, user: a.email, password: '' },
           appendSent: false,
         },
         id,
       );
-      this.db.prepare("UPDATE accounts SET auth = 'microsoft' WHERE id = ?").run(id);
+      this.db.prepare('UPDATE accounts SET auth = ? WHERE id = ?').run(provider, id);
     }
     this.setOAuthToken(userId, id, a.refreshToken);
     return this.listAccounts(userId).find((x) => x.id === id)!;

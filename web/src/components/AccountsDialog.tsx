@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: colour wheel (any colour) next to the preset swatches.
 // Modified by samschultzponsys, 2026-11-13: US spelling (Color).
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
+// Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -232,15 +233,17 @@ export function AccountsDialog({
   const [choosing, setChoosing] = useState(!!startWithNew);
   const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(null);
   const microsoft = useQuery({ queryKey: ['microsoftAvailable'], queryFn: api.microsoftAvailable, staleTime: 60_000 });
+  const google = useQuery({ queryKey: ['googleAvailable'], queryFn: api.googleAvailable, staleTime: 60_000 });
   const [msError, setMsError] = useState<string | null>(null);
-  const signInWithMicrosoft = async (color: string) => {
+  const signIn = async (provider: 'microsoft' | 'google', color: string) => {
     setMsError(null);
     try {
-      window.location.href = (await api.startMicrosoft(color)).url;
+      window.location.href = (provider === 'google' ? await api.startGoogle(color) : await api.startMicrosoft(color)).url;
     } catch (err) {
       setMsError((err as Error).message);
     }
   };
+  const signInWithMicrosoft = (color: string) => signIn('microsoft', color);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['accounts'] });
     void qc.invalidateQueries({ queryKey: ['folders'] });
@@ -259,7 +262,7 @@ export function AccountsDialog({
         {editingMicrosoft ? (
           <MicrosoftAccountForm
             account={editingMicrosoft}
-            onReconnect={() => void signInWithMicrosoft(editingMicrosoft.color)}
+            onReconnect={() => void signIn(editingMicrosoft.auth === 'google' ? 'google' : 'microsoft', editingMicrosoft.color)}
             error={msError}
             onCancel={() => setEditingMicrosoft(null)}
             onDone={() => {
@@ -291,6 +294,21 @@ export function AccountsDialog({
             </button>
             <button
               className="provider-choice"
+              disabled={!google.data?.available}
+              onClick={() => void signIn('google', ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)}
+            >
+              <span className="provider-mark google" aria-hidden="true">G</span>
+              <span className="grow">
+                <strong>Gmail: Sign in with Google</strong>
+                <span className="sub">
+                  {google.data?.available
+                    ? 'Gmail and Google Workspace. You sign in on Google’s page; no app password needed.'
+                    : 'Not set up on this server yet: an administrator adds it in Settings → Google. Gmail still works with an app password below.'}
+                </span>
+              </span>
+            </button>
+            <button
+              className="provider-choice"
               onClick={() => {
                 setChoosing(false);
                 setEditing({ input: newAccountInput(accounts.length, defaults) });
@@ -298,7 +316,7 @@ export function AccountsDialog({
             >
               <span className="provider-mark" aria-hidden="true">@</span>
               <span className="grow">
-                <strong>Gmail or other email</strong>
+                <strong>Gmail (app password) or other email</strong>
                 <span className="sub">Gmail (with an app password), iCloud, Yahoo, Purelymail, Fastmail, your own server: any IMAP/SMTP account.</span>
               </span>
             </button>
@@ -331,13 +349,13 @@ export function AccountsDialog({
                   <div className="grow">
                     <div style={{ fontWeight: 600 }}>{a.name}</div>
                     <div className="sub">
-                      {a.email} · {a.auth === 'microsoft' ? 'Microsoft sign-in' : a.imap.host}
+                      {a.email} · {a.auth === 'microsoft' ? 'Microsoft sign-in' : a.auth === 'google' ? 'Google sign-in' : a.imap.host}
                     </div>
                   </div>
                   <button
                     className="icon-btn"
                     title="Edit"
-                    onClick={() => (a.auth === 'microsoft' ? setEditingMicrosoft(a) : setEditing({ id: a.id, input: fromView(a) }))}
+                    onClick={() => (a.auth !== 'password' ? setEditingMicrosoft(a) : setEditing({ id: a.id, input: fromView(a) }))}
                   >
                     <Pencil size={16} />
                   </button>
@@ -391,15 +409,19 @@ function MicrosoftAccountForm({
     <>
       <div className="dialog-body">
         <div className="ms-signed-in">
-          <span className="provider-mark ms" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
+          {account.auth === 'google' ? (
+            <span className="provider-mark google" aria-hidden="true">G</span>
+          ) : (
+            <span className="provider-mark ms" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+          )}
           <div className="grow">
             <strong>{account.email}</strong>
-            <div className="sub">Signed in with Microsoft. DreyMail never sees the password.</div>
+            <div className="sub">Signed in with {account.auth === 'google' ? 'Google' : 'Microsoft'}. DreyMail never sees the password.</div>
           </div>
           <button className="btn" onClick={onReconnect}>
             Reconnect
@@ -426,7 +448,7 @@ function MicrosoftAccountForm({
             </label>
           </div>
         </div>
-        <div className="hint">Sent mail goes through Microsoft, which keeps the copy in Sent Items.</div>
+        <div className="hint">{account.auth === 'google' ? 'Gmail keeps the copy of sent mail itself.' : 'Sent mail goes through Microsoft, which keeps the copy in Sent Items.'}</div>
         {(error || status) && <div className="error-text">{error ?? status}</div>}
       </div>
       <div className="dialog-foot">
