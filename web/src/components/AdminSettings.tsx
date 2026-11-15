@@ -811,6 +811,11 @@ export function GoogleAdmin() {
             email as support and developer contact. Save.
           </li>
           <li>
+            <em>Branding</em>: no logo (a logo makes Google ask for a long brand review). Home page <code className="copyable">{window.location.origin}</code>, privacy
+            policy <code className="copyable">{window.location.origin}/privacy</code>, and under <em>Authorized domains</em> your own domain (
+            <code>{window.location.hostname.split('.').slice(-2).join('.')}</code> for this address). Leave out domains you don&apos;t own. Save.
+          </li>
+          <li>
             <strong>Publish the app</strong> (<em>Audience → Publish app</em>). In “Testing”, Google ends the sign-in every 7 days. Published but
             unverified is fine for your own use: when signing in, Google shows “Google hasn’t verified this app”; choose <em>Advanced → Go to
             DreyMail</em>.

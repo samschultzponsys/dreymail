@@ -1,0 +1,155 @@
+<!doctype html>
+<!-- dreymail. Copyright (C) 2026 samschultzponsys.
+     Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy · DreyMail</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg: #f6f6f4;
+        --surface: #ffffff;
+        --text: #1d1d1b;
+        --muted: #5f5f58;
+        --border: #e4e4df;
+        --accent: #0e7490;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141517;
+          --surface: #1c1d20;
+          --text: #ececea;
+          --muted: #a3a39c;
+          --border: #2c2d31;
+          --accent: #67e8f9;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 32px auto;
+        padding: 28px 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+      }
+      @media (max-width: 760px) {
+        main {
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+          padding: 20px 16px;
+        }
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      header img {
+        width: 40px;
+        height: 40px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 28px 0 6px;
+      }
+      p,
+      li {
+        margin: 6px 0;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="/brand-day.svg" alt="" />
+        <h1>Privacy</h1>
+      </header>
+      <p class="muted">DreyMail on this server. Last updated November 15, 2026.</p>
+
+      <p>
+        DreyMail is self-hosted mail software. This copy of DreyMail is run by the person or organization that operates this server (the
+        “operator”), not by a company that collects your data. Your mail stays with your mail providers; DreyMail shows it to you and sends
+        what you write.
+      </p>
+
+      <h2>What this server keeps</h2>
+      <ul>
+        <li>Your DreyMail account: name, username or sign-in identity, profile picture, role and settings.</li>
+        <li>
+          The mailboxes you add: server addresses and the password or sign-in token for each, encrypted (AES-256-GCM) with a key only this
+          server holds. Passwords and tokens are never sent back to your browser.
+        </li>
+        <li>
+          A disposable, encrypted copy of your newest messages (to load quickly), and what you set up in DreyMail itself: signatures, rules,
+          snoozes, scheduled messages, blocked senders, calendars you make in DreyMail, and notification subscriptions.
+        </li>
+      </ul>
+
+      <h2>Google and Microsoft accounts</h2>
+      <p>
+        When you add Gmail with Google sign-in, or Outlook with Microsoft sign-in, DreyMail asks for access to your mail and calendar. It uses
+        that access only to show you your mail and calendar, to send, move and delete messages and change events when you ask it to, and to
+        tell you about new mail. It does not use the data for advertising, does not sell it, and does not share it with anyone else. People
+        can't read it except where you ask for it or the law requires it.
+      </p>
+      <p>
+        DreyMail’s use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noreferrer">Google API Services User Data Policy</a>,
+        including the Limited Use requirements.
+      </p>
+
+      <h2>The AI mailbox assistant (optional)</h2>
+      <p>
+        The assistant is off unless you turn it on for a mailbox. When it is on, DreyMail sends the parts of messages you allow (set with
+        its accuracy slider) to the AI service you connected, only to sort your mail by your rules. With a local model (such as LM Studio or
+        Ollama) nothing leaves your network. That service’s own privacy terms apply to what it receives.
+      </p>
+
+      <h2>What leaves this server</h2>
+      <ul>
+        <li>Connections to your mail and calendar providers, to read and send what you ask for.</li>
+        <li>
+          Remote images and contact pictures are fetched by the server only when shown, so senders and picture services don’t see your
+          address.
+        </li>
+        <li>Notifications go through your browser’s or phone’s push service, encrypted end to end.</li>
+        <li>No analytics, tracking or advertising of any kind.</li>
+      </ul>
+
+      <h2>Removing your data</h2>
+      <p>
+        Removing a mailbox in DreyMail deletes its stored password or token and cached mail from this server. You can also take back access
+        at any time in your Google account (Security → Third-party connections) or Microsoft account. The operator can remove your DreyMail
+        account entirely.
+      </p>
+
+      <h2>Questions</h2>
+      <p>Contact the operator of this server. DreyMail’s source code is public, so you can see exactly what it does.</p>
+      <p class="muted">
+        <a href="/">Back to DreyMail</a> · <a href="https://github.com/samschultzponsys/dreymail" rel="noreferrer">Source code</a>
+      </p>
+    </main>
+  </body>
+</html>

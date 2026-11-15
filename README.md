@@ -26,7 +26,8 @@
      Modified by samschultzponsys, 2026-11-15: send later and undo send.
      Modified by samschultzponsys, 2026-11-15: passkey sign-in.
      Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
-     Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end. -->
+     Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end.
+     Modified by samschultzponsys, 2026-11-15: privacy page. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -38,7 +39,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -212,6 +213,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   email links. Every other tab is your account and applies on all your devices.
 - **Interface size** per device (Settings → This device): Automatic is larger in the Android app and
   follows the phone's font size; or pick 90–150%.
+- **Privacy page** at `/privacy`, describing what a DreyMail server keeps and what leaves it, for
+  the privacy policy link Google and Microsoft ask for. It's linked next to Source code.
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
   "Show my full name"); typed in lower case it is capitalized for you.
 - **Version and what's new.** The server's version sits next to your name; click it for the
@@ -244,7 +247,9 @@ automatically.
 **Sign in with Google** (optional; app passwords keep working): Settings → **Google** walks you
 through creating a free OAuth client in Google Cloud (about 10 minutes). Publish the app there, or
 Google ends the sign-in every 7 days; as it's your own unverified app, Google shows a "hasn't
-verified this app" screen once (*Advanced → Go to DreyMail*). For the calendar, also turn on the
+verified this app" screen once (*Advanced → Go to DreyMail*). Google asks for a privacy policy before
+you can publish: DreyMail has one at `/privacy` (e.g. `https://mail.example.com/privacy`); add your
+own domain under *Authorized domains* and leave the logo empty. For the calendar, also turn on the
 **Google Calendar API** in the same project (*APIs & Services → Library*). Compose overrides:
 `DREYMAIL_GOOGLE_CLIENT_ID`, `DREYMAIL_GOOGLE_CLIENT_SECRET`.
 

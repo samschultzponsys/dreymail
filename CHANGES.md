@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.1): privacy page
+
+- **Privacy page** at `/privacy` (e.g. `https://mail.example.com/privacy`): what a DreyMail server
+  keeps, what leaves it, how Google and Microsoft data is used (with the Google API Services User
+  Data Policy / Limited Use statement), the optional AI assistant, and removing your data. Google
+  asks for a privacy policy link on your own domain before an OAuth app can be published; this is
+  it. Linked next to "Source code".
+- **Settings → Google** walkthrough: the Branding step (no logo, home page, privacy policy and your
+  own authorized domain, filled in for the address you're on).
+- **Files:** new `web/public/privacy.html`; `server/src/app.ts` (the `/privacy` route),
+  `web/src/components/SourceLink.tsx`, `web/src/components/AdminSettings.tsx`,
+  `server/test/spa.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.0): automatic single sign-on, /login, easier OIDC setup; credits trimmed
 
 - **Sign in automatically with OIDC** (Settings → Sign-in, or `DREYMAIL_OIDC_AUTO_LOGIN=true`, which

@@ -17,6 +17,10 @@ export function SourceLink({ version }: { version: string | undefined }) {
       ·{' '}
       <a href={`${REPO_URL}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
         AGPL-3.0
+      </a>{' '}
+      ·{' '}
+      <a href="/privacy" target="_blank" rel="noreferrer">
+        Privacy
       </a>
     </div>
   );

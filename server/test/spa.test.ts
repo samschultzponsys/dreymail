@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: the privacy page at /privacy.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -35,6 +36,7 @@ describe('SPA fallback in the production server', () => {
 
   beforeAll(async () => {
     fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
+    fs.writeFileSync(path.join(webDir, 'privacy.html'), '<!doctype html><title>Privacy</title>');
     const config = loadConfig({
       NODE_ENV: 'test',
       DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
@@ -60,6 +62,11 @@ describe('SPA fallback in the production server', () => {
     const auth = await get('/auth/does-not-exist');
     expect(auth.statusCode).toBe(404);
     expect(auth.body).not.toContain('shell');
+  });
+  it('serves the privacy page at /privacy (for Google and Microsoft app registrations)', async () => {
+    const res = await get('/privacy');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<title>Privacy</title>');
   });
   it('does not answer missing assets with HTML', async () => {
     const res = await get('/assets/missing.js', '*/*');

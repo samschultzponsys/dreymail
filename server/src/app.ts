@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
+// Modified by samschultzponsys, 2026-11-15: privacy page at /privacy.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -329,6 +330,8 @@ export async function buildApp(
   // Static frontend (production build). In development Vite serves the UI and proxies /api.
   if (fs.existsSync(path.join(config.webDir, 'index.html'))) {
     await app.register(fastifyStatic, { root: config.webDir, wildcard: false, index: ['index.html'] });
+    // The privacy page Google and Microsoft app registrations link to (https://your-dreymail/privacy).
+    app.get('/privacy', async (_req, reply) => reply.header('cache-control', 'no-cache').sendFile('privacy.html'));
     app.setNotFoundHandler((req, reply) => {
       if (isSpaRequest(req.method, req.url, req.headers.accept)) {
         return reply.header('cache-control', 'no-cache').sendFile('index.html');

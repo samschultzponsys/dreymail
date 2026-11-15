@@ -94,6 +94,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] User management in the app (1.4); roles with permission flags (Superadmin, User and custom
       roles) and per-flag checks on every administrative action (2.5).
 - [x] Outlook, Google and Android (Firebase) setup in the UI with walkthroughs (2.0–2.3).
+- [x] Privacy page at `/privacy` for the Google and Microsoft app registrations (4.1).
 
 ### License compliance
 - [x] Source code link (AGPL §13) on the sign-in page, in What's new and in Settings (3.2; credit
