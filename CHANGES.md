@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.5): Send later and undo send
+
+- **Send later** from the composer's clock button: tomorrow morning, tomorrow afternoon, Monday
+  morning, or any date and time. The **Scheduled** list in the sidebar has Send now and Cancel, and
+  failed sends are shown with their error.
+- **Undo send:** after Send the message waits 10 seconds by default (Off, 5, 10, 20 or 30 in
+  Settings → General). **Undo** in the toast cancels it and reopens the composer with everything,
+  attachments included.
+- **Both are sent by the server:** the message, attachments included, is sealed like account
+  passwords and sent when due, even with no browser open. A send interrupted by a restart is
+  marked failed rather than resent blindly.
+- **Files:** new `server/src/mail/scheduled.ts` and the `scheduled_sends` table
+  (`server/src/db.ts`); the `sendAt` field and `/api/scheduled` (`server/src/routes/api.ts`);
+  `server/src/app.ts`; `undoSendSeconds` and `ScheduledSend` (`shared/types.ts`); new
+  `web/src/components/ScheduledDialog.tsx`; `web/src/components/Composer.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/App.tsx`,
+  `web/src/api.ts`, `web/src/hooks.ts`, `web/src/styles.css`.
+- Tests: `server/test/scheduled.test.ts`.
+
 ## 2026-11-15 (v3.4): Copy codes, unsubscribe, block sender, mailbox health
 
 - **Verification codes:** sign-in, 2FA and one-time codes are found near the words that announce

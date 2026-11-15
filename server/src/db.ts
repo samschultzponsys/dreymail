@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -292,6 +293,21 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      created_at INTEGER NOT NULL,
      PRIMARY KEY (account_id, address)
    );`,
+  // DreyMail: mail to send later (also how "undo send" waits a few seconds). The message with its
+  // attachments is sealed like account passwords.
+  `CREATE TABLE IF NOT EXISTS scheduled_sends (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     send_at INTEGER NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending',
+     error TEXT NOT NULL DEFAULT '',
+     subject TEXT NOT NULL DEFAULT '',
+     recipients TEXT NOT NULL DEFAULT '',
+     message TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS scheduled_sends_due ON scheduled_sends(status, send_at);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -309,6 +325,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   unifiedInbox: true,
   showFullName: false,
   footerIdentity: 'both',
+  undoSendSeconds: 10,
 };
 
 export interface User {

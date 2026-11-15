@@ -22,7 +22,8 @@
      Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
      Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
      Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
-     Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health. -->
+     Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+     Modified by samschultzponsys, 2026-11-15: send later and undo send. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -46,7 +47,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.4**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.5**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -172,6 +173,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender
   supports it). **Block sender** sends an address or a whole domain to Junk, now and in future;
   manage blocked senders in Settings → General.
+- **Send later** (tomorrow morning, Monday, or any time) and **undo send**: Send waits a few
+  seconds, 10 by default (adjustable in Settings → General), with an Undo button. Your server
+  sends both, even if you close DreyMail. Waiting messages are listed under **Scheduled** in the
+  sidebar.
 - **Mailbox health:** a mailbox with a problem, such as an expired sign-in or an unreachable
   server, shows a warning in the sidebar with a link to fix it.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get

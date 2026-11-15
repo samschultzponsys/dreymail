@@ -21,7 +21,8 @@
    Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
    Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
    Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
-   Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health. */
+   Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+   Modified by samschultzponsys, 2026-11-15: send later and undo send. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -796,3 +797,12 @@ img.account-mark { object-fit: cover; }
 .blocked-list .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .health-alert { color: var(--danger); display: inline-grid; margin-left: auto; }
 .link-btn { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Send later (DreyMail) */
+.send-later { position: relative; }
+.send-later-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 20; width: 280px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); }
+.send-later-menu > button { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; background: none; border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 13px; color: var(--text); text-align: left; }
+.send-later-menu > button:hover { background: var(--hover); }
+.send-later-custom { display: flex; gap: 6px; padding: 6px 4px 2px; border-top: 1px solid var(--border); margin-top: 4px; }
+.send-later-custom .input { flex: 1; min-width: 0; height: 32px; }

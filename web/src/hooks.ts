@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 // Modified by samschultzponsys, 2026-11-13: useAccounts can wait for sign-in.
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -157,10 +158,10 @@ export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
   const push = useCallback(
-    (text: string, error = false, action?: Toast['action']) => {
+    (text: string, error = false, action?: Toast['action'], ms?: number) => {
       const id = Date.now() + Math.random();
       setToasts((t) => [...t.slice(-3), { id, text, error, action }]);
-      window.setTimeout(() => dismiss(id), action ? 7000 : error ? 6000 : 3500);
+      window.setTimeout(() => dismiss(id), Math.max(ms ?? 0, action ? 7000 : error ? 6000 : 3500));
     },
     [dismiss],
   );

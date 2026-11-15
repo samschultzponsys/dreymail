@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -19,6 +20,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   File,
   Folder,
   Inbox,
@@ -94,11 +96,14 @@ interface Props {
   activeSearch: string | null;
   onSearch: (s: SavedSearch) => void;
   onDeleteSearch: (s: SavedSearch) => void;
+  /** Messages waiting to be sent later, and opening their list. */
+  scheduledCount?: number;
+  onScheduled?: () => void;
   /** Open the AI assistant for a mailbox (only when the user may use it). */
   onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -137,6 +142,13 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
             <Layers size={16} />
             <span className="name">All inboxes</span>
             {totalUnread > 0 && <span className="count">{totalUnread}</span>}
+          </button>
+        )}
+        {scheduledCount > 0 && onScheduled && (
+          <button className="nav-item" onClick={onScheduled} title="Scheduled">
+            <Clock size={16} />
+            <span className="name">Scheduled</span>
+            <span className="count">{scheduledCount}</span>
           </button>
         )}
         {searches.length > 0 && (

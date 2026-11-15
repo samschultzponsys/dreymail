@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -213,6 +214,19 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               </div>
               <SourceLink version={versionQ.data?.version} />
             </>
+          )}
+          {tab === 'general' && (
+            <div>
+              <label className="label">Undo send</label>
+              <div className="segmented">
+                {[0, 5, 10, 20, 30].map((n) => (
+                  <button key={n} className={(v.undoSendSeconds ?? 10) === n ? 'on' : ''} onClick={() => void save({ ...v, undoSendSeconds: n })} style={{ padding: '6px 12px' }}>
+                    {n === 0 ? 'Off' : `${n} s`}
+                  </button>
+                ))}
+              </div>
+              <div className="hint">After you press Send, the message waits this long so you can take it back with Undo. Your server sends it even if you close DreyMail.</div>
+            </div>
           )}
           {tab === 'general' && <BlockedSenders accounts={myAccounts.data ?? []} />}
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}

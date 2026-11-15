@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: puts the signature in and swaps it when the From account changes.
 // Modified by samschultzponsys, 2026-11-13: takes on the From account's colour.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import {
   Bold,
@@ -15,6 +16,7 @@ import {
   Quote,
   RemoveFormatting,
   Send,
+  Clock,
   Strikethrough,
   Trash2,
   Underline,
@@ -41,6 +43,8 @@ export interface ComposerInit {
   forwardAttachments: AttachmentView[];
   replaceDraft: MessageRef | null;
   answering: MessageRef | null;
+  /** Attachments picked before (reopening after "undo send") (DreyMail). */
+  files?: File[];
 }
 
 function AddressInput({ label, value, onChange, extra }: { label: string; value: string; onChange: (v: string) => void; extra?: ReactNode }) {
@@ -133,20 +137,26 @@ interface Props {
   init: ComposerInit;
   accounts: AccountView[];
   onClose: () => void;
-  onToast: (msg: string, error?: boolean) => void;
+  onToast: (msg: string, error?: boolean, action?: { label: string; run: () => void }, ms?: number) => void;
   onSent: () => void;
+  /** Seconds a sent message waits so it can be undone (0 = at once). */
+  undoSeconds?: number;
+  /** Reopen a composer with this content (after undo send). */
+  onReopen?: (init: ComposerInit) => void;
+  /** A message was scheduled (the Scheduled list needs refreshing). */
+  onScheduled?: () => void;
   /** Mirrors the unsaved-changes state, so browser Back can ask before discarding. */
   dirtyRef?: { current: boolean };
 }
 
-export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }: Props) {
+export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, undoSeconds = 0, onReopen, onScheduled }: Props) {
   const [accountId, setAccountId] = useState(init.accountId);
   const [to, setTo] = useState(init.to);
   const [cc, setCc] = useState(init.cc);
   const [bcc, setBcc] = useState(init.bcc);
   const [showCc, setShowCc] = useState(!!(init.cc || init.bcc));
   const [subject, setSubject] = useState(init.subject);
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(init.files ?? []);
   const [fwd, setFwd] = useState<AttachmentView[]>(init.forwardAttachments);
   const [fwdSource, setFwdSource] = useState<MessageRef | null>(init.forwardFrom);
   const [draft, setDraft] = useState<MessageRef | null>(init.replaceDraft);
@@ -212,19 +222,55 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }:
     answering: init.answering,
   });
 
-  const send = async () => {
+  /** The composer as it is now, to reopen it after "undo send". */
+  const snapshot = (): ComposerInit => ({
+    ...init,
+    accountId,
+    to,
+    cc,
+    bcc,
+    subject,
+    html: editor.current?.innerHTML ?? '',
+    forwardFrom: fwdSource,
+    forwardAttachments: fwd,
+    replaceDraft: draft,
+    files,
+  });
+
+  /** Send now (after the undo wait, if any), or at `at` (send later). */
+  const send = async (at?: Date) => {
     setBusy('send');
     setError(null);
     try {
-      const res = await api.send(payload(), files);
-      onToast(res.warning ? `Sent. ${res.warning}` : 'Message sent', !!res.warning);
-      onSent();
+      const wait = at ? null : undoSeconds > 0 ? new Date(Date.now() + undoSeconds * 1000) : null;
+      const res = await api.send(payload(), files, at ?? wait ?? undefined);
+      if (res.scheduled) {
+        const id = res.scheduled.id;
+        const back = snapshot();
+        const undo = { label: 'Undo', run: () => void api.cancelScheduled(id).then(() => (onScheduled?.(), onReopen?.(back)), (e: Error) => onToast(e.message, true)) };
+        if (at) onToast(`Scheduled for ${at.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`, false, undo);
+        else onToast('Sending…', false, undo, undoSeconds * 1000);
+        onScheduled?.();
+        if (!at) window.setTimeout(onSent, undoSeconds * 1000 + 3000);
+      } else {
+        onToast(res.warning ? `Sent. ${res.warning}` : 'Message sent', !!res.warning);
+        onSent();
+      }
       onClose();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(null);
     }
+  };
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [laterCustom, setLaterCustom] = useState('');
+  const at = (days: number, hour: number, weekday?: number) => {
+    const d = new Date();
+    if (weekday !== undefined) d.setDate(d.getDate() + ((weekday + 7 - d.getDay()) % 7 || 7));
+    else d.setDate(d.getDate() + days);
+    d.setHours(hour, 0, 0, 0);
+    return d;
   };
 
   const saveDraft = async () => {
@@ -384,6 +430,43 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef }:
         <button className="btn primary" onClick={() => void send()} disabled={busy !== null}>
           <Send size={15} /> {busy === 'send' ? 'Sending…' : 'Send'}
         </button>
+        <span className="send-later">
+          <button className="icon-btn" title="Send later" aria-expanded={laterOpen} onClick={() => setLaterOpen((o) => !o)} disabled={busy !== null}>
+            <Clock size={16} />
+          </button>
+          {laterOpen && (
+            <div className="send-later-menu" role="menu">
+              {(
+                [
+                  ['Tomorrow morning', at(1, 8)],
+                  ['Tomorrow afternoon', at(1, 13)],
+                  ['Monday morning', at(0, 8, 1)],
+                ] as const
+              ).map(([label, when]) => (
+                <button key={label} role="menuitem" onClick={() => (setLaterOpen(false), void send(when))}>
+                  <span>{label}</span>
+                  <span className="muted">{when.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+                </button>
+              ))}
+              <form
+                className="send-later-custom"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const when = new Date(laterCustom);
+                  if (!Number.isNaN(when.getTime()) && when.getTime() > Date.now()) {
+                    setLaterOpen(false);
+                    void send(when);
+                  }
+                }}
+              >
+                <input className="input" type="datetime-local" value={laterCustom} onChange={(e) => setLaterCustom(e.target.value)} aria-label="Send at" />
+                <button className="btn" disabled={!laterCustom}>
+                  Schedule
+                </button>
+              </form>
+            </div>
+          )}
+        </span>
         <button className="btn" onClick={() => void saveDraft()} disabled={busy !== null}>
           {busy === 'draft' ? 'Saving…' : 'Save draft'}
         </button>

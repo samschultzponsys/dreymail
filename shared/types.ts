@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 // Types shared between the server API and the web client.
 
@@ -154,6 +155,17 @@ export interface AttachmentView {
 
 export type HtmlStyle = 'simple' | 'designed';
 
+/** A message waiting to be sent (send later / undo send) (DreyMail). */
+export interface ScheduledSend {
+  id: string;
+  accountId: string;
+  sendAt: string;
+  subject: string;
+  to: string;
+  status: 'pending' | 'sending' | 'failed';
+  error: string;
+}
+
 export interface MessageDetail {
   accountId: string;
   folder: string;
@@ -290,6 +302,8 @@ export interface Preferences {
   showFullName: boolean;
   /** Bottom left (DreyMail): photo and name, name only, or photo only. */
   footerIdentity: FooterIdentity;
+  /** Seconds a sent message waits so it can be undone (0 = send at once) (DreyMail). */
+  undoSendSeconds: number;
 }
 
 /**

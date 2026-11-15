@@ -12,11 +12,13 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: unsubscribe and blocked senders.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
+import type { ScheduledSends } from '../mail/scheduled.js';
 import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
@@ -105,6 +107,7 @@ export const prefsSchema = z.object({
   unifiedInbox: z.boolean().default(true),
   showFullName: z.boolean().default(false),
   footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
+  undoSendSeconds: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(20), z.literal(30)]).default(10),
 });
 
 /** Collapses spaces and, for all-lowercase input, capitalises each word. Mixed case is kept (McDonald). */
@@ -182,6 +185,7 @@ export interface ApiDeps {
   updates?: Pick<UpdateChecker, 'get'>;
   blocklist?: Blocklist;
   onBlocklistChanged?: (userId: string) => void;
+  scheduled?: ScheduledSends;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
@@ -758,6 +762,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
 
   const readCompose = async (req: FastifyRequest) => {
     let payload: unknown = null;
+    let sendAt: number | null = null;
     const files: { filename: string; contentType: string; content: Buffer }[] = [];
     let total = 0;
     for await (const part of req.parts()) {
@@ -768,6 +773,9 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         files.push({ filename: part.filename || 'attachment', contentType: part.mimetype || 'application/octet-stream', content });
       } else if (part.fieldname === 'payload') {
         payload = JSON.parse(String(part.value));
+      } else if (part.fieldname === 'sendAt') {
+        const t = Date.parse(String(part.value));
+        if (!Number.isNaN(t)) sendAt = t;
       }
     }
     const parsed = composeSchema.parse(payload) as ComposePayload;
@@ -775,17 +783,30 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     if (parsed.forwardFrom) requireAccount(uid(req), parsed.forwardFrom.accountId);
     if (parsed.replaceDraft) requireAccount(uid(req), parsed.replaceDraft.accountId);
     if (parsed.answering) requireAccount(uid(req), parsed.answering.accountId);
-    return { payload: parsed, files };
+    return { payload: parsed, files, sendAt };
   };
 
   app.post('/api/send', async (req, reply) => {
     try {
-      const { payload, files } = await readCompose(req);
+      const { payload, files, sendAt } = await readCompose(req);
+      // Send later (or undo send's short wait): the server keeps it and sends it when due.
+      if (sendAt && sendAt > Date.now() + 1000 && deps.scheduled) {
+        if (sendAt > Date.now() + 366 * 86_400_000) throw new ComposeError('Choose a time within the next year');
+        return { scheduled: deps.scheduled.schedule(uid(req), payload, files, sendAt) };
+      }
       return await compose.send(uid(req), payload, files);
     } catch (err) {
       return sendError(reply, err);
     }
   });
+
+  app.get('/api/scheduled', async (req) => deps.scheduled?.list(uid(req)) ?? []);
+  app.delete<{ Params: { id: string } }>('/api/scheduled/:id', async (req, reply) =>
+    deps.scheduled?.cancel(uid(req), req.params.id) ? deps.scheduled.list(uid(req)) : reply.code(404).send({ error: 'Already sent, or not found' }),
+  );
+  app.post<{ Params: { id: string } }>('/api/scheduled/:id/send', async (req, reply) =>
+    deps.scheduled?.sendNow(uid(req), req.params.id) ? deps.scheduled.list(uid(req)) : reply.code(404).send({ error: 'Already sent, or not found' }),
+  );
 
   app.post('/api/drafts', async (req, reply) => {
     try {

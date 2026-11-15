@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -34,7 +35,7 @@ export interface RolesView {
   roles: Role[];
   defaultRole: string;
 }
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, ScheduledSend, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -204,7 +205,11 @@ export const api = {
   attachmentUrl: (r: MessageRef, index: number) => `/api/attachment?${refQuery(r)}&index=${index}`,
   action: (messages: MessageRef[], action: MessageAction) => request<ActionResult>('POST', '/api/messages/actions', { messages, action }),
 
-  send: (payload: ComposePayload, files: File[]) => request<SendResult>('POST', '/api/send', composeForm(payload, files)),
+  send: (payload: ComposePayload, files: File[], sendAt?: Date) =>
+    request<SendResult & { scheduled?: ScheduledSend }>('POST', '/api/send', composeForm(payload, files, sendAt)),
+  scheduled: () => request<ScheduledSend[]>('GET', '/api/scheduled'),
+  cancelScheduled: (id: string) => request<ScheduledSend[]>('DELETE', `/api/scheduled/${encodeURIComponent(id)}`),
+  sendScheduledNow: (id: string) => request<ScheduledSend[]>('POST', `/api/scheduled/${encodeURIComponent(id)}/send`),
   saveDraft: (payload: ComposePayload, files: File[]) => request<DraftResult>('POST', '/api/drafts', composeForm(payload, files)),
   imageDomains: () => request<DomainName[]>('GET', '/api/image-domains'),
   addImageDomain: (domain: string) => request<DomainName[]>('POST', '/api/image-domains', { domain }),
@@ -222,9 +227,10 @@ export const api = {
   recipients: (q: string) => request<{ name: string; address: string }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}`),
 };
 
-function composeForm(payload: ComposePayload, files: File[]): FormData {
+function composeForm(payload: ComposePayload, files: File[], sendAt?: Date): FormData {
   const form = new FormData();
   form.append('payload', JSON.stringify(payload));
+  if (sendAt) form.append('sendAt', sendAt.toISOString());
   for (const f of files) form.append('files', f, f.name);
   return form;
 }

@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
+// Modified by samschultzponsys, 2026-11-15: send later and undo send.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,6 +39,7 @@ import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
 import { Blocklist } from './blocklist.js';
+import { ScheduledSends } from './mail/scheduled.js';
 import { AssistantEngine } from './ai/engine.js';
 import { AiClient, type FetchLike as AiFetch } from './ai/providers.js';
 import { AssistantStore } from './ai/store.js';
@@ -213,6 +215,10 @@ export async function buildApp(
   const assistantStore = new AssistantStore(store);
   const aiClient = new AiClient(opts.aiFetch);
   const blocklist = new Blocklist({ store, pool, mail });
+  // Send later / undo send: due messages are sent by the server.
+  const scheduled = new ScheduledSends(store, (userId, payload, files) => compose.send(userId, payload, files), (msg, extra) => app.log.warn(extra ?? {}, msg));
+  scheduled.start();
+  app.addHook('onClose', async () => scheduled.stop());
   const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg), alsoWatch: () => blocklist.users() });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
@@ -285,6 +291,7 @@ export async function buildApp(
     onAction: (userId, accountId, folder, uids, action) => assistant.observeAction(userId, accountId, folder, uids, action),
     blocklist,
     onBlocklistChanged: (userId) => assistant.syncWatching(userId),
+    scheduled,
   });
   await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase, onAiAccess: (id) => assistant.syncWatching(id) });
   registerAndroidPushRoutes(app, { store, pool, firebase });
