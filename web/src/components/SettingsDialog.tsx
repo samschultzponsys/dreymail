@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-15: American spelling.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -213,6 +214,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               <SourceLink version={versionQ.data?.version} />
             </>
           )}
+          {tab === 'general' && <BlockedSenders accounts={myAccounts.data ?? []} />}
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}
           {tab === 'signatures' && <SignaturesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
@@ -631,6 +633,73 @@ function FullNameToggle({ v, save }: { v: Preferences; save: (p: Preferences) =>
           Show my full name (otherwise only the first name)
         </label>
       )}
+    </div>
+  );
+}
+
+/** Settings → General → Blocked senders: whose mail goes to Junk, per mailbox. */
+function BlockedSenders({ accounts }: { accounts: { id: string; name: string; color: string }[] }) {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ['blocked'], queryFn: api.blocked });
+  const [accountId, setAccountId] = useState('');
+  const [address, setAddress] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const acc = accountId || accounts[0]?.id || '';
+  return (
+    <div>
+      <label className="label">Blocked senders</label>
+      <div className="hint">Mail from these senders goes to Junk as it arrives. Block from a message (Block sender) or add one here; @domain.com blocks a whole domain.</div>
+      {list.data && list.data.length > 0 && (
+        <ul className="blocked-list">
+          {list.data.map((b) => {
+            const a = accounts.find((x) => x.id === b.accountId);
+            return (
+              <li key={`${b.accountId}:${b.address}`}>
+                <span className="dot" style={{ background: a?.color ?? 'var(--muted)' }} />
+                <span className="grow">
+                  {b.address} <span className="muted">· {a?.name ?? 'Mailbox'}</span>
+                </span>
+                <button className="btn ghost" onClick={() => void api.unblock(b.accountId, b.address).then((l) => qc.setQueryData(['blocked'], l), (e: Error) => setError(e.message))}>
+                  Unblock
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {accounts.length > 0 && (
+        <form
+          className="row-buttons"
+          style={{ marginTop: 8 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            void api.block(acc, address).then(
+              () => {
+                setAddress('');
+                void qc.invalidateQueries({ queryKey: ['blocked'] });
+                void qc.invalidateQueries({ queryKey: ['messages'] });
+              },
+              (err: Error) => setError(err.message),
+            );
+          }}
+        >
+          <input className="input grow" value={address} placeholder="sender@example.com or @example.com" onChange={(e) => setAddress(e.target.value)} />
+          {accounts.length > 1 && (
+            <select className="input" style={{ width: 'auto' }} value={acc} onChange={(e) => setAccountId(e.target.value)}>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <button className="btn" disabled={!address.trim()}>
+            Block
+          </button>
+        </form>
+      )}
+      {error && <div className="error-text">{error}</div>}
     </div>
   );
 }

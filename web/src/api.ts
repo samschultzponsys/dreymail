@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles, permissions and profile pictures.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -123,6 +124,11 @@ export const api = {
     request<RolesView>(id ? 'PUT' : 'POST', id ? `/api/admin/roles/${encodeURIComponent(id)}` : '/api/admin/roles', r),
   adminDeleteRole: (id: string) => request<RolesView>('DELETE', `/api/admin/roles/${encodeURIComponent(id)}`),
   adminDefaultRole: (roleId: string) => request<RolesView>('PUT', '/api/admin/roles-default', { roleId }),
+  unsubscribe: (oneClick: string) => request<{ ok: true }>('POST', '/api/unsubscribe', { oneClick }),
+  blocked: () => request<{ accountId: string; address: string; createdAt: string }[]>('GET', '/api/blocked'),
+  block: (accountId: string, address: string) => request<{ moved: number }>('POST', '/api/blocked', { accountId, address }),
+  unblock: (accountId: string, address: string) => request<{ accountId: string; address: string; createdAt: string }[]>('DELETE', '/api/blocked', { accountId, address }),
+
   // AI mailbox assistant
   assistantStatus: () => request<{ allowed: boolean; acceptedTerms: boolean; canShare: boolean }>('GET', '/api/assistant/status'),
   acceptAssistantTerms: () => request<{ ok: true }>('POST', '/api/assistant/terms'),

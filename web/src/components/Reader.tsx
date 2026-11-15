@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe and block sender.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
@@ -23,6 +24,10 @@ import {
   Reply,
   ReplyAll,
   Trash2,
+  Ban,
+  Copy,
+  KeyRound,
+  MailX,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ConversationRow } from '../../../shared/threads';
@@ -375,6 +380,9 @@ function MessageCard({
   const [modeOverride, setModeOverride] = useState<'dark' | 'paper' | null>(null);
   const [showText, setShowText] = useState(false);
   const [headOpen, setHeadOpen] = useState(false);
+  const [tool, setTool] = useState<{ ok: boolean; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const qcCard = useQueryClient();
   const q = useQuery({
     queryKey: ['message', refKey(msgRef), remote ? 'load' : 'auto'],
     queryFn: () => api.message(msgRef, remote ? 'load' : 'auto'),
@@ -474,6 +482,77 @@ function MessageCard({
             </div>
             <div className="msg-date">{formatFullDate(d.date)}</div>
           </div>
+
+          {(d.unsubscribe || d.from[0]?.address) && (
+            <div className="msg-tools">
+              {d.unsubscribe &&
+                (d.unsubscribe.oneClick ? (
+                  <button
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void api.unsubscribe(d.unsubscribe!.oneClick!).then(
+                        () => setTool({ ok: true, text: `Unsubscribed from ${displayName(d.from[0])}.` }),
+                        (e: Error) => setTool({ ok: false, text: e.message }),
+                      )
+                    }
+                  >
+                    <MailX size={14} /> Unsubscribe
+                  </button>
+                ) : d.unsubscribe.url ? (
+                  <a className="btn ghost" href={d.unsubscribe.url} target="_blank" rel="noreferrer noopener">
+                    <MailX size={14} /> Unsubscribe…
+                  </a>
+                ) : (
+                  <button className="btn ghost" onClick={() => onMailto(d.unsubscribe!.mailto!)}>
+                    <MailX size={14} /> Unsubscribe…
+                  </button>
+                ))}
+              {d.from[0]?.address && (
+                <button
+                  className="btn ghost"
+                  disabled={busy}
+                  title="Move mail from this sender to Junk, now and in future"
+                  onClick={() => {
+                    const address = d.from[0]!.address;
+                    if (!window.confirm(`Block ${address}? Their mail in this mailbox goes to Junk, now and in future. Unblock any time in Settings → General.`)) return;
+                    void api.block(msgRef.accountId, address).then(
+                      (r) => {
+                        setTool({ ok: true, text: `Blocked ${address}. ${r.moved} message${r.moved === 1 ? '' : 's'} moved to Junk.` });
+                        void qcCard.invalidateQueries({ queryKey: ['messages'] });
+                        void qcCard.invalidateQueries({ queryKey: ['folders'] });
+                        onGone?.(false);
+                      },
+                      (e: Error) => setTool({ ok: false, text: e.message }),
+                    );
+                  }}
+                >
+                  <Ban size={14} /> Block sender
+                </button>
+              )}
+              {tool && <span className={tool.ok ? 'ok-text' : 'error-text'}>{tool.text}</span>}
+            </div>
+          )}
+
+          {d.code && (
+            <div className="notice code-notice">
+              <KeyRound size={16} />
+              <span className="grow">
+                Code <strong className="code">{d.code}</strong>
+              </span>
+              <button
+                className="btn"
+                onClick={() =>
+                  void navigator.clipboard.writeText(d.code!).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  })
+                }
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          )}
 
           {d.snoozedUntil && (
             <div className="notice">

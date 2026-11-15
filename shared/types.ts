@@ -14,10 +14,12 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 // Types shared between the server API and the web client.
 
 import type { Permission } from './permissions.js';
+import type { UnsubscribeOptions } from './unsubscribe.js';
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
 
@@ -187,6 +189,10 @@ export interface MessageDetail {
   attachments: AttachmentView[];
   /** ISO time the message returns to the inbox, while it waits in the Snoozed folder. */
   snoozedUntil?: string;
+  /** How to unsubscribe, if the message is from a mailing list (DreyMail). */
+  unsubscribe?: UnsubscribeOptions | null;
+  /** A one-time code found in the message (DreyMail). */
+  code?: string | null;
 }
 
 /** A domain in its stored ASCII (punycode) form and its human-readable form. */

@@ -1,7 +1,20 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: unsubscribe options and verification codes in the message detail.
+
 import PostalMime from 'postal-mime';
 import type { Address as PmAddress, Attachment, Email } from 'postal-mime';
 import type { Address, AttachmentView, DomainName, MessageDetail } from '../../../shared/types.js';
 import { sanitizeEmailHtml, type SanitizeOptions } from './sanitize.js';
+import { findCode } from '../../../shared/codes.js';
+import { parseUnsubscribe } from '../../../shared/unsubscribe.js';
+
+/** List-Unsubscribe options of a message (DreyMail). */
+function unsubscribeOf(email: ParsedEmail) {
+  const header = (name: string) => email.headers.find((h) => h.key.toLowerCase() === name)?.value ?? '';
+  const lu = header('list-unsubscribe');
+  return lu ? parseUnsubscribe(lu, header('list-unsubscribe-post')) : null;
+}
 
 export type ParsedEmail = Email;
 
@@ -123,6 +136,8 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     remoteContentBlocked,
     remoteContentLoaded: opts.allowRemote,
     senderDomain: opts.allowlist?.senderDomain ?? null,
+    unsubscribe: unsubscribeOf(email),
+    code: findCode(email.subject ?? '', email.text ?? ''),
     imagesAllowedBy: opts.allowlist?.allowedBy ?? null,
     allowlistSkipped: opts.allowlist?.skipped ?? null,
     attachments,

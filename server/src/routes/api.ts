@@ -11,10 +11,13 @@
 // Modified by samschultzponsys, 2026-11-15: search filters, all-mail search and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: unsubscribe and blocked senders.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 
+import { normaliseBlock, type Blocklist } from '../blocklist.js';
+import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -177,6 +180,8 @@ export interface ApiDeps {
   onAction?: (userId: string, accountId: string, folder: string, uids: number[], action: MessageAction) => Promise<void>;
   /** Replaces the GitHub release check (tests only). */
   updates?: Pick<UpdateChecker, 'get'>;
+  blocklist?: Blocklist;
+  onBlocklistChanged?: (userId: string) => void;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
@@ -671,6 +676,41 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       .header('content-type', img.contentType)
       .header('content-security-policy', "default-src 'none'; sandbox")
       .send(img.body);
+  });
+
+  // ---- unsubscribe and blocked senders (DreyMail) ---------------------------------------
+
+  app.post('/api/unsubscribe', async (req, reply) => {
+    const body = z.object({ oneClick: z.string().max(2000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
+    try {
+      await oneClickUnsubscribe(body.data.oneClick);
+      return { ok: true };
+    } catch (err) {
+      return reply.code(502).send({ error: (err as Error).message });
+    }
+  });
+
+  app.get('/api/blocked', async (req) => deps.blocklist?.list(uid(req)) ?? []);
+  app.post('/api/blocked', async (req, reply) => {
+    const body = z.object({ accountId: z.string().max(64), address: z.string().max(320) }).safeParse(req.body);
+    const address = body.success ? normaliseBlock(body.data.address) : null;
+    if (!body.success || !address) return reply.code(400).send({ error: 'Enter an email address, or @domain.com for a whole domain' });
+    try {
+      requireAccount(uid(req), body.data.accountId);
+      const moved = (await deps.blocklist?.add(uid(req), body.data.accountId, address)) ?? 0;
+      deps.onBlocklistChanged?.(uid(req));
+      return { moved, blocked: deps.blocklist?.list(uid(req)) ?? [] };
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
+  app.delete('/api/blocked', async (req, reply) => {
+    const body = z.object({ accountId: z.string().max(64), address: z.string().max(320) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
+    deps.blocklist?.remove(uid(req), body.data.accountId, body.data.address);
+    deps.onBlocklistChanged?.(uid(req));
+    return deps.blocklist?.list(uid(req)) ?? [];
   });
 
   app.post('/api/messages/actions', async (req, reply) => {

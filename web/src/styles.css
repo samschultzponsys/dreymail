@@ -20,7 +20,8 @@
    Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
    Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
    Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
-   Modified by samschultzponsys, 2026-11-15: AI assistant learning mode. */
+   Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
+   Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -783,3 +784,15 @@ img.account-mark { object-fit: cover; }
 .senders .user-actions { display: flex; gap: 4px; align-items: center; }
 .learning-on { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); }
 .learning-on > svg { color: var(--accent); }
+
+/* Codes, unsubscribe, block (DreyMail) */
+.code-chip { margin-top: 4px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; letter-spacing: 0.06em; }
+.code-chip:hover { border-color: var(--accent); color: var(--text); }
+.code-notice .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: 0.12em; }
+.msg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 16px 8px; font-size: 13px; }
+.msg-tools .btn { height: 28px; font-size: 12.5px; }
+.blocked-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.blocked-list li { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.blocked-list .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.health-alert { color: var(--danger); display: inline-grid; margin-left: auto; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }

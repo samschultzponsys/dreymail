@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.4): Copy codes, unsubscribe, block sender, mailbox health
+
+- **Verification codes:** sign-in, 2FA and one-time codes are found near the words that announce
+  them. They can be copied from the message list (a chip on the row) and from the open message
+  (Copy) (new `shared/codes.ts`; `server/src/mail/parse.ts`, `web/src/components/MessageList.tsx`,
+  `web/src/components/Reader.tsx`).
+- **Unsubscribe button** on mailing-list mail: done by DreyMail where the sender offers one-click
+  (RFC 8058, https only, public hosts, no cookies); otherwise their page or address opens (new
+  `shared/unsubscribe.ts` and `server/src/net/unsubscribe.ts`; `/api/unsubscribe` in
+  `server/src/routes/api.ts`).
+- **Block sender:** an address, or a whole domain with `@example.com`, per mailbox. Their mail
+  already in the inbox and arriving later goes to Junk, without a notification. Blocked senders are
+  listed in Settings → General with Unblock (new `server/src/blocklist.ts` and `blocked_senders`
+  table; `server/src/db.ts`, `server/src/app.ts`, `server/src/ai/engine.ts` keeps their inboxes
+  watched, `web/src/components/SettingsDialog.tsx`, `web/src/api.ts`).
+- **Mailbox health:** a mailbox with a problem (sign-in expired, server unreachable) shows a
+  warning in the sidebar with a link to fix it in Accounts (`web/src/components/Sidebar.tsx`).
+- Tests: `server/test/conveniences.test.ts`.
+
 ## 2026-11-15 (v3.3): AI assistant learning mode
 
 - **Learning mode** per mailbox: 3 days, 1 week, 2 weeks or 1 month (30 days at most in all, with

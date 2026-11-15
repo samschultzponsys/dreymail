@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions (Access).
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +37,7 @@ import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
+import { Blocklist } from './blocklist.js';
 import { AssistantEngine } from './ai/engine.js';
 import { AiClient, type FetchLike as AiFetch } from './ai/providers.js';
 import { AssistantStore } from './ai/store.js';
@@ -210,12 +212,17 @@ export async function buildApp(
   const access = new Access(config, store);
   const assistantStore = new AssistantStore(store);
   const aiClient = new AiClient(opts.aiFetch);
-  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg) });
+  const blocklist = new Blocklist({ store, pool, mail });
+  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg), alsoWatch: () => blocklist.users() });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
     let fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));
     if (fresh.length === 0) return;
     void (async () => {
+      // Blocked senders go to Junk first, without a notification.
+      const unblocked = await blocklist.handleNew(userId, accountId, fresh).catch(() => fresh.map((m) => m.uid));
+      fresh = fresh.filter((m) => unblocked.includes(m.uid));
+      if (fresh.length === 0) return;
       // Mail the assistant moves out of the inbox doesn't need a notification.
       const stays = await assistant.handleNew(userId, accountId, fresh.map((m) => m.uid)).catch(() => null);
       if (stays) fresh = fresh.filter((m) => stays.includes(m.uid));
@@ -276,6 +283,8 @@ export async function buildApp(
     updates: opts.updates,
     access,
     onAction: (userId, accountId, folder, uids, action) => assistant.observeAction(userId, accountId, folder, uids, action),
+    blocklist,
+    onBlocklistChanged: (userId) => assistant.syncWatching(userId),
   });
   await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase, onAiAccess: (id) => assistant.syncWatching(id) });
   registerAndroidPushRoutes(app, { store, pool, firebase });

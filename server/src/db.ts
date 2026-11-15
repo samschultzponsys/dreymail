@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant (connections, rules, history, usage).
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -283,6 +284,14 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
              );
              CREATE INDEX IF NOT EXISTS ai_observations_account ON ai_observations(account_id, at);`);
   },
+  // DreyMail: blocked senders per mailbox (their mail goes to Junk).
+  `CREATE TABLE IF NOT EXISTS blocked_senders (
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     address TEXT NOT NULL,
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (account_id, address)
+   );`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -32,6 +33,7 @@ import {
   Layers,
   Search,
   Sparkles,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -171,6 +173,11 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
                   {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                   <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
                   <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
+                  {af?.error && (
+                    <span className="health-alert" title={`This mailbox has a problem: ${af.error}`} aria-label="Mailbox problem">
+                      <TriangleAlert size={13} />
+                    </span>
+                  )}
                 </button>
                 {onAssistant && (
                   <button className="nav-assistant name" title={`AI assistant for ${acc.name}`} aria-label={`AI assistant for ${acc.name}`} onClick={() => onAssistant(acc.id)}>
@@ -185,7 +192,14 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
                       <div className="spinner" />
                     </div>
                   )}
-                  {af?.error && <div className="nav-error">{af.error}</div>}
+                  {af?.error && (
+                    <div className="nav-error">
+                      {af.error}{' '}
+                      <button className="link-btn" onClick={onAccounts}>
+                        Fix in Accounts
+                      </button>
+                    </div>
+                  )}
                   {af &&
                     sortFolders(af.folders).map((f) => {
                       const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;

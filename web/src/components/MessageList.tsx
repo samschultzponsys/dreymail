@@ -3,9 +3,11 @@
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
 // Modified by samschultzponsys, 2026-11-15: search filter builder, filter chips, save search.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 
-import { AlarmClock, Archive, Bookmark, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
+import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { findCode } from '../../../shared/codes';
 import { filterChips, filterCount, hasFilters, withoutFilter, type SearchFilters } from '../../../shared/search';
 import { participants, type ConversationRow } from '../../../shared/threads';
 import type { AccountFolders, AccountView, MessageAction, MessageSummary, SwipeAction } from '../../../shared/types';
@@ -61,6 +63,28 @@ interface Props {
   swipeRemoves: (m: MessageSummary, dir: Direction) => boolean;
   confirmSwipe: (m: MessageSummary, dir: Direction) => boolean;
   onSwipe: (m: MessageSummary, dir: Direction) => void;
+}
+
+/** A one-time code in a row (subject or preview), copyable without opening the message. */
+function CodeChip({ subject, snippet }: { subject: string; snippet: string }) {
+  const code = findCode(subject, snippet);
+  const [copied, setCopied] = useState(false);
+  if (!code) return null;
+  return (
+    <button
+      className="chip code-chip"
+      title="Copy code"
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(code).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />} {code}
+    </button>
+  );
 }
 
 export function MessageList(p: Props) {
@@ -322,6 +346,7 @@ export function MessageList(p: Props) {
                   <span>{m.subject || '(no subject)'}</span>
                 </div>
                 {m.snippet && <div className="row-snippet">{m.snippet}</div>}
+                <CodeChip subject={m.subject} snippet={m.snippet} />
               </div>
             </SwipeRow>
           );

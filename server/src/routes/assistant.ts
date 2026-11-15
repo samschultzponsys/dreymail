@@ -14,6 +14,7 @@ import { AiError, type AiClient, type AiTarget } from '../ai/providers.js';
 import type { AssistantStore } from '../ai/store.js';
 import type { Store } from '../db.js';
 import { assertPublicHost } from '../net/ssrf.js';
+import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 
 const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('move'), folder: z.string().trim().min(1).max(200) }),
@@ -404,17 +405,11 @@ export function registerAssistantRoutes(
     if (!user) return reply;
     const body = z.object({ oneClick: z.string().url().max(2000) }).safeParse(req.body);
     if (!body.success) return bad(reply, 'Invalid request');
-    const url = new URL(body.data.oneClick);
-    if (url.protocol !== 'https:') return bad(reply, 'Only https unsubscribe links are followed');
     try {
-      await assertPublicHost(url.hostname);
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 15_000);
-      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click', redirect: 'manual', signal: ctl.signal }).finally(() => clearTimeout(timer));
-      if (res.status >= 400) return bad(reply, `The sender's server answered ${res.status}; try their unsubscribe page instead`, 502);
+      await oneClickUnsubscribe(body.data.oneClick);
       return { ok: true };
     } catch (err) {
-      return bad(reply, `Could not unsubscribe: ${(err as Error).message}`, 502);
+      return bad(reply, (err as Error).message, 502);
     }
   });
 

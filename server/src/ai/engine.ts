@@ -18,6 +18,7 @@ import type { Store, User } from '../db.js';
 import type { MailService } from '../imap/mail.js';
 import type { ImapPool } from '../imap/pool.js';
 import { parseRaw } from '../mail/parse.js';
+import { parseUnsubscribe } from '../../../shared/unsubscribe.js';
 import { AiError, type AiClient } from './providers.js';
 import type { AssistantStore, StoredConnection, UndoStep } from './store.js';
 
@@ -92,15 +93,7 @@ export function systemPrompt(rules: AssistantRule[]): string {
   ].join('\n');
 }
 
-/** The List-Unsubscribe header's targets (RFC 2369 / 8058). */
-export function parseUnsubscribe(listUnsub: string, listUnsubPost: string): SenderGroup['unsubscribe'] {
-  const targets = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]!.trim());
-  const url = targets.find((t) => /^https:\/\//i.test(t)) ?? null;
-  const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
-  if (!url && !mailto) return null;
-  const oneClick = url && /List-Unsubscribe=One-Click/i.test(listUnsubPost) ? url : null;
-  return { oneClick, url, mailto };
-}
+export { parseUnsubscribe };
 
 export class AssistantEngine {
   /** Mailboxes being worked on, so the same message isn't handled twice at once. */
@@ -117,6 +110,8 @@ export class AssistantEngine {
       mail: MailService;
       access: Access;
       log?: (msg: string, extra?: Record<string, unknown>) => void;
+      /** Users whose inboxes are watched for other reasons (blocked senders). */
+      alsoWatch?: () => string[];
     },
   ) {}
 
@@ -132,10 +127,11 @@ export class AssistantEngine {
   private watched = new Set<string>();
   syncWatching(userId?: string) {
     const enabled = this.deps.ai.enabledMailboxes();
-    const users = userId ? [userId] : [...new Set([...enabled.map((e) => e.userId), ...this.watched])];
+    const also = new Set(this.deps.alsoWatch?.() ?? []);
+    const users = userId ? [userId] : [...new Set([...enabled.map((e) => e.userId), ...this.watched, ...also])];
     for (const id of users) {
       const user = this.deps.store.getUser(id);
-      const on = !!user && this.allowed(user) && enabled.some((e) => e.userId === id);
+      const on = !!user && ((this.allowed(user) && enabled.some((e) => e.userId === id)) || also.has(id));
       this.deps.pool.setAssistant(id, on);
       if (on) this.watched.add(id);
       else this.watched.delete(id);

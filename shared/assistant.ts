@@ -1,6 +1,8 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
+import type { UnsubscribeOptions } from './unsubscribe.js';
+
 /**
  * The AI mailbox assistant: rules per mailbox, what they do, and the record of what was done.
  * Rules are checked in order and the first that applies wins. A rule's exact conditions (if any)
@@ -132,5 +134,5 @@ export interface SenderGroup {
   unread: number;
   latest: string;
   /** How to unsubscribe, from the List-Unsubscribe header: one-click (RFC 8058), a web page, or an email. */
-  unsubscribe: { oneClick: string | null; url: string | null; mailto: string | null } | null;
+  unsubscribe: UnsubscribeOptions | null;
 }
