@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -155,7 +156,16 @@ export function App() {
   const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0, filterParam);
   const savedSearches = useSavedSearches(loggedIn);
   const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
-  const [assistantFor, setAssistantFor] = useState<string | null>(null);
+  const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
+  // A learning period ended: the first time DreyMail opens afterwards, show its review.
+  const reviews = useQuery({ queryKey: ['ai', 'reviews'], queryFn: api.assistantReviewsDue, enabled: loggedIn && !!assistantStatus.data?.allowed, staleTime: 300_000 });
+  const reviewShown = useRef(false);
+  useEffect(() => {
+    const id = reviews.data?.[0];
+    if (!id || reviewShown.current || !accounts.some((a) => a.id === id)) return;
+    reviewShown.current = true;
+    setAssistantFor({ id, tab: 'learning' });
+  }, [reviews.data, accounts]);
   const serverMessages = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.messages) ?? [], [messagesQ.data]);
 
   // "Unread only": messages read in this view stay listed (dimmed) until the view changes or is
@@ -590,7 +600,7 @@ export function App() {
           if (overlay === 'nav') navigate(r, { replace: true });
           else go(r);
         }}
-        onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor(id) : undefined}
+        onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor({ id }) : undefined}
         onDeleteSearch={(s) => {
           if (!confirm(`Remove the saved search “${s.name}”?`)) return;
           api.deleteSearch(s.id).then((list) => qc.setQueryData(['searches'], list), (e: Error) => push(e.message, true));
@@ -707,8 +717,13 @@ export function App() {
         />
       )}
       {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} onClose={() => closeOverlay('accounts')} />}
-      {assistantFor && accountMap.get(assistantFor) && (
-        <AssistantDialog account={accountMap.get(assistantFor)!} folders={folders.data?.find((f) => f.accountId === assistantFor)} onClose={() => setAssistantFor(null)} />
+      {assistantFor && accountMap.get(assistantFor.id) && (
+        <AssistantDialog
+          account={accountMap.get(assistantFor.id)!}
+          folders={folders.data?.find((f) => f.accountId === assistantFor.id)}
+          initialTab={assistantFor.tab}
+          onClose={() => setAssistantFor(null)}
+        />
       )}
       {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}

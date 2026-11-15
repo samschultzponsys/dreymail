@@ -19,7 +19,8 @@
    Modified by samschultzponsys, 2026-11-15: mailbox icons.
    Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
    Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
-   Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup. */
+   Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
+   Modified by samschultzponsys, 2026-11-15: AI assistant learning mode. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -780,3 +781,5 @@ img.account-mark { object-fit: cover; }
 .scan-progress .bar { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
 .scan-progress .bar span { display: block; height: 100%; background: var(--accent-fill); transition: width 0.4s; }
 .senders .user-actions { display: flex; gap: 4px; align-items: center; }
+.learning-on { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); }
+.learning-on > svg { color: var(--accent); }

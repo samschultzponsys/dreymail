@@ -20,7 +20,8 @@
      Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
      Modified by samschultzponsys, 2026-11-15: American spelling; describes DreyMail generally.
      Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
-     Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup. -->
+     Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
+     Modified by samschultzponsys, 2026-11-15: AI assistant learning mode. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -44,7 +45,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.3**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -334,8 +335,21 @@ applies one. **History** lists everything the assistant did, with **Undo**.
   - **Unsubscribe:** DreyMail does it for you where the sender supports one-click unsubscribe;
     otherwise it opens their unsubscribe page.
 
-**Coming next:** a *learning mode* that watches how you handle your mail for a period you choose
-and suggests rules (see [`ROADMAP.md`](ROADMAP.md)).
+### Learning mode
+
+Not sure which rules you need? Let the assistant learn:
+- **Choose a period** per mailbox: 3 days, 1 week, 2 weeks (catches weekly mail) or 1 month
+  (catches monthly bills and statements). A month is the maximum; you can extend or end early.
+- **While it runs:**
+  - The AI notes what kind of mail each new message is. That's **one extra AI request per new
+    message**, shown before you start and counted toward the daily limit.
+  - DreyMail notes what you do with the mail: archive, delete, move, read, star, reply, or leave
+    unread, including in other apps.
+  - Learning itself sorts nothing.
+- **Afterwards:** **Suggest rules** asks the AI once, with a per-sender summary rather than your
+  messages. Each suggestion shows its evidence (*"You archived 4 of 4 emails from this sender
+  without reading them"*) and can be accepted, edited or rejected.
+- **When the period ends,** DreyMail opens the review the next time you use it.
 
 ## Quick start (Docker Compose)
 

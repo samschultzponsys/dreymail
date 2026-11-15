@@ -13,6 +13,30 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.3): AI assistant learning mode
+
+- **Learning mode** per mailbox: 3 days, 1 week, 2 weeks or 1 month (30 days at most in all, with
+  Extend and End now).
+  - **While on,** the AI classifies each new message (kind of mail, importance; one extra request
+    per message, shown up front) and DreyMail notes what you do with it: archive, delete, move,
+    read, star, snooze, reply, or leaving it unread, including mail that left the inbox in other
+    apps.
+  - **Suggesting rules:** one AI request with a per-sender summary, never raw mail. Each suggestion
+    comes with its evidence, to Accept, Edit or Reject.
+  - **When it ends,** the next time DreyMail opens it goes straight to the review (Remind me
+    tomorrow / Finish review).
+  - Learning mailboxes are watched like assistant mailboxes, and an hourly check lets expired
+    periods stop.
+- **Files:**
+  - Server: `ai_mailboxes.learning_*` and the new `ai_observations` table (`server/src/db.ts`);
+    `server/src/ai/store.ts`, `server/src/ai/engine.ts` (learnArrivals, observeAction, suggest),
+    `server/src/routes/assistant.ts`; actions report to learning before they run
+    (`server/src/routes/api.ts`, `server/src/app.ts`).
+  - Shared: `shared/assistant.ts`.
+  - Web: `web/src/components/AssistantDialog.tsx` (Learning tab), `web/src/App.tsx` (review on
+    open), `web/src/api.ts`, `web/src/styles.css`.
+- Tests: `server/test/assistant.test.ts`.
+
 ## 2026-11-15 (v3.2): Source code link; AI cleanup of existing mail and senders
 
 - **Source code link (AGPL §13):** "DreyMail X.Y · Source code · based on Ratatoskr by Magnus Pihl ·

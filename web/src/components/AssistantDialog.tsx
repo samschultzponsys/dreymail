@@ -6,16 +6,16 @@
 // of what it did, with undo.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Archive, Ban, Eraser, MailX, Square, ArrowDown, ArrowUp, Check, History, ListChecks, Pencil, Plus, Settings2, Sparkles, Trash2, Undo2, X, FlaskConical } from 'lucide-react';
+import { AlertTriangle, GraduationCap, Archive, Ban, Eraser, MailX, Square, ArrowDown, ArrowUp, Check, History, ListChecks, Pencil, Plus, Settings2, Sparkles, Trash2, Undo2, X, FlaskConical } from 'lucide-react';
 import { useState } from 'react';
 import { ACCURACY_LEVELS } from '../../../shared/aiProviders';
-import { RULE_ACTION_LABELS, type AssistantDecision, type AssistantRule, type RuleAction, type RuleInput, type SenderGroup } from '../../../shared/assistant';
+import { RULE_ACTION_LABELS, type AssistantDecision, type AssistantRule, type RuleAction, type RuleInput, type RuleSuggestion, type SenderGroup, LEARNING_PERIODS } from '../../../shared/assistant';
 import type { AccountFolders, AccountView } from '../../../shared/types';
 import { api } from '../api';
 import { AiGuideLink, ConnectionForm, useAiConnections } from './AiConnections';
 import { MailboxIcon } from './MailboxIcon';
 
-type Tab = 'setup' | 'rules' | 'test' | 'cleanup' | 'history';
+type Tab = 'setup' | 'rules' | 'test' | 'cleanup' | 'learning' | 'history';
 
 function Notice({ onAccept }: { onAccept: () => void }) {
   const [ok, setOk] = useState(false);
@@ -270,6 +270,164 @@ function Decisions({ items, rules, onApply, busy }: { items: AssistantDecision[]
   );
 }
 
+/**
+ * Learning mode: for a period you pick (up to a month) the assistant watches what arrives and what
+ * you do with it, then suggests rules to accept, edit or reject.
+ */
+function LearningTab({ accountId, hasConnection, folders, onRules }: { accountId: string; hasConnection: boolean; folders: string[]; onRules: (r: AssistantRule[]) => void }) {
+  const qc = useQueryClient();
+  const learning = useQuery({ queryKey: ['ai', 'learning', accountId], queryFn: () => api.assistantLearning(accountId) });
+  const [days, setDays] = useState(14);
+  const [suggestions, setSuggestions] = useState<RuleSuggestion[] | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const set = (l: Awaited<ReturnType<typeof api.assistantLearning>>) => {
+    qc.setQueryData(['ai', 'learning', accountId], l);
+    void qc.invalidateQueries({ queryKey: ['ai', 'reviews'] });
+  };
+  const l = learning.data;
+  if (!l) return <div className="hint">Loading…</div>;
+  const left = l.active && l.until ? Math.max(0, Math.ceil((Date.parse(l.until) - Date.now()) / 86_400_000)) : 0;
+  const remove = (i: number) => setSuggestions((cur) => (cur ?? []).filter((_, j) => j !== i));
+
+  return (
+    <div className="stack">
+      <div className="hint">
+        While learning, the assistant looks at each new message (what kind of mail it is) and notes what you do with it: archive, delete, move, read, star, reply, or leave unread. Afterwards
+        it suggests rules from that. Nothing is sorted by learning itself.
+      </div>
+      <div className="hint warn-text">
+        <AlertTriangle size={12} /> Learning uses the AI more: one extra request for every new message in this mailbox for the whole period, plus one to suggest rules at the end. It counts
+        toward the connection's daily limit.
+      </div>
+      {l.active ? (
+        <div className="learning-on">
+          <GraduationCap size={18} />
+          <div className="grow">
+            <strong>Learning</strong> until {new Date(l.until!).toLocaleDateString()} ({left} day{left === 1 ? '' : 's'} left) · {l.observations} things noticed so far
+          </div>
+          <select className="input" style={{ width: 'auto' }} value={days} onChange={(e) => setDays(Number(e.target.value))}>
+            {LEARNING_PERIODS.map((p) => (
+              <option key={p.days} value={p.days}>
+                +{p.label}
+              </option>
+            ))}
+          </select>
+          <button className="btn" disabled={busy} onClick={() => void run(async () => set(await api.assistantStartLearning(accountId, days)))}>
+            Extend
+          </button>
+          <button className="btn" disabled={busy} onClick={() => void run(async () => set(await api.assistantStopLearning(accountId)))}>
+            End now
+          </button>
+        </div>
+      ) : (
+        <div>
+          <label className="label">Learn for</label>
+          <div className="row-buttons">
+            <div className="segmented">
+              {LEARNING_PERIODS.map((p) => (
+                <button key={p.days} type="button" className={days === p.days ? 'on' : ''} onClick={() => setDays(p.days)} style={{ padding: '6px 12px' }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <button className="btn primary" disabled={busy || !hasConnection} onClick={() => void run(async () => set(await api.assistantStartLearning(accountId, days)))}>
+              <GraduationCap size={15} /> {l.from ? 'Learn again' : 'Start learning'}
+            </button>
+          </div>
+          {!hasConnection && <div className="hint">Choose an AI connection in Setup first.</div>}
+          <div className="hint">Two weeks catches most weekly mail; a month also catches monthly statements and bills. When it ends, DreyMail brings you back here to review the suggestions.</div>
+        </div>
+      )}
+
+      {(l.observations > 0 || l.reviewDue) && (
+        <div>
+          <label className="label">Suggested rules</label>
+          <div className="row-buttons">
+            <button className="btn primary" disabled={busy} onClick={() => void run(async () => setSuggestions((await api.assistantSuggest(accountId)).suggestions))}>
+              <Sparkles size={15} /> {busy && !suggestions ? 'Thinking…' : suggestions ? 'Suggest again' : 'Suggest rules'}
+            </button>
+            {l.reviewDue && (
+              <>
+                <button className="btn" disabled={busy} onClick={() => void run(async () => set(await api.assistantReview(accountId, 'later')))}>
+                  Remind me tomorrow
+                </button>
+                <button className="btn" disabled={busy} onClick={() => void run(async () => set(await api.assistantReview(accountId, 'done')))}>
+                  Finish review
+                </button>
+              </>
+            )}
+          </div>
+          {suggestions && suggestions.length === 0 && <div className="hint">No rule stood out yet. Learning longer gives clearer patterns.</div>}
+          {suggestions && suggestions.length > 0 && (
+            <ul className="role-list" style={{ marginTop: 10 }}>
+              {suggestions.map((sg, i) =>
+                editing === i ? (
+                  <li key={i}>
+                    <div className="grow">
+                      <RuleEditor
+                        initial={sg}
+                        folders={folders}
+                        busy={busy}
+                        onCancel={() => setEditing(null)}
+                        onTest={() => undefined}
+                        onSave={(rule) =>
+                          void run(async () => {
+                            onRules(await api.saveAssistantRule(accountId, null, rule));
+                            setEditing(null);
+                            remove(i);
+                          })
+                        }
+                      />
+                    </div>
+                  </li>
+                ) : (
+                  <li key={i}>
+                    <div className="user-main">
+                      <div className="user-name">{sg.name}</div>
+                      <div className="muted user-meta">
+                        {sg.instructions ? `“${sg.instructions}”` : ''}
+                        {sg.conditions.from ? ` from ${sg.conditions.from}` : ''}
+                        {sg.conditions.subject ? ` · subject has “${sg.conditions.subject}”` : ''} → {sg.actions.map(actionText).join(', ')}
+                      </div>
+                      <div className="hint">{sg.evidence}</div>
+                    </div>
+                    <div className="user-actions">
+                      <button className="btn primary" disabled={busy} onClick={() => void run(async () => (onRules(await api.saveAssistantRule(accountId, null, { ...sg })), remove(i)))}>
+                        Accept
+                      </button>
+                      <button className="icon-btn" title="Edit, then add" onClick={() => setEditing(i)}>
+                        <Pencil size={15} />
+                      </button>
+                      <button className="icon-btn" title="Reject" onClick={() => remove(i)}>
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+          <div className="hint">Accepted rules are added to the Rules tab, switched on. They only run on new mail if “Sort new mail automatically” is on in Setup.</div>
+        </div>
+      )}
+      {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
 /** Clean up: run the rules over older mail once, and tidy up by sender (no AI needed for that). */
 function CleanupTab({ accountId, hasConnection, hasRules, onRules }: { accountId: string; hasConnection: boolean; hasRules: boolean; onRules: (r: AssistantRule[]) => void }) {
   const qc = useQueryClient();
@@ -412,13 +570,13 @@ function CleanupTab({ accountId, hasConnection, hasRules, onRules }: { accountId
   );
 }
 
-export function AssistantDialog({ account, folders, onClose }: { account: AccountView; folders: AccountFolders | undefined; onClose: () => void }) {
+export function AssistantDialog({ account, folders, onClose, initialTab = 'setup' }: { account: AccountView; folders: AccountFolders | undefined; onClose: () => void; initialTab?: Tab }) {
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus });
   const conns = useAiConnections(!!status.data?.allowed);
   const data = useQuery({ queryKey: ['ai', 'mailbox', account.id], queryFn: () => api.assistantMailbox(account.id), enabled: !!status.data?.allowed });
   const history = useQuery({ queryKey: ['ai', 'history', account.id], queryFn: () => api.assistantHistory(account.id), enabled: false });
-  const [tab, setTab] = useState<Tab>('setup');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [editing, setEditing] = useState<{ id: string | null; rule: RuleInput } | null>(null);
   const [preview, setPreview] = useState<{ title: string; items: AssistantDecision[] } | null>(null);
   const [limit, setLimit] = useState(25);
@@ -464,6 +622,7 @@ export function AssistantDialog({ account, folders, onClose }: { account: Accoun
               ['rules', `Rules (${rules.length})`, ListChecks],
               ['test', 'Test', FlaskConical],
               ['cleanup', 'Clean up', Eraser],
+              ['learning', 'Learning', GraduationCap],
               ['history', 'History', History],
             ] as const
           ).map(([key, label, Icon]) => (
@@ -637,6 +796,8 @@ export function AssistantDialog({ account, folders, onClose }: { account: Accoun
               )}
             </div>
           )}
+
+          {tab === 'learning' && <LearningTab accountId={account.id} hasConnection={!!settings.connectionId} folders={folderPaths} onRules={setRules} />}
 
           {tab === 'cleanup' && <CleanupTab accountId={account.id} hasConnection={!!settings.connectionId} hasRules={rules.some((r) => r.enabled)} onRules={setRules} />}
 

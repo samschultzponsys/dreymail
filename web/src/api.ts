@@ -14,7 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
-import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, ScanStatus, SenderGroup } from '../../shared/assistant';
+import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
 import type { Permission, Role } from '../../shared/permissions';
 
 export interface AiConnectionInput {
@@ -144,6 +144,12 @@ export const api = {
     request<{ decisions: AssistantDecision[] }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/preview`, { limit, ...(rule ? { rule } : {}) }),
   assistantApply: (accountId: string, d: AssistantDecision) =>
     request<{ ok: true }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/apply`, { ruleId: d.ruleId, folder: d.folder, uidValidity: d.uidValidity, uid: d.uid, subject: d.subject, from: d.from }),
+  assistantReviewsDue: () => request<string[]>('GET', '/api/assistant/reviews-due'),
+  assistantLearning: (accountId: string) => request<LearningStatus>('GET', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/learning`),
+  assistantStartLearning: (accountId: string, days: number) => request<LearningStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/learning`, { days }),
+  assistantStopLearning: (accountId: string) => request<LearningStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/learning/stop`),
+  assistantSuggest: (accountId: string) => request<{ suggestions: RuleSuggestion[] }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/learning/suggest`),
+  assistantReview: (accountId: string, what: 'done' | 'later') => request<LearningStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/learning/${what}`),
   assistantScan: (accountId: string) => request<ScanStatus>('GET', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan`),
   assistantStartScan: (accountId: string, limit: number) => request<ScanStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan`, { limit }),
   assistantStopScan: (accountId: string) => request<ScanStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan/stop`),

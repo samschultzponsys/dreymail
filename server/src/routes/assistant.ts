@@ -288,6 +288,65 @@ export function registerAssistantRoutes(
     }
   });
 
+  // ---- learning mode -----------------------------------------------------------------------
+
+  /** Mailboxes whose learning ended and want their review (the app opens the assistant for them). */
+  app.get('/api/assistant/reviews-due', async (req) => (engine.allowed(req.user!) ? ai.reviewsDue(req.user!.id) : []));
+
+  app.get<P>('/api/assistant/mailbox/:accountId/learning', async (req, reply) => {
+    const user = mailbox(req, reply);
+    return user ? ai.learning(user.id, req.params.accountId) : reply;
+  });
+
+  /** Start learning for `days` (or extend a running period); never more than 30 days in all. */
+  app.post<P>('/api/assistant/mailbox/:accountId/learning', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    if (needsTerms(user.id, reply)) return reply;
+    const body = z.object({ days: z.number().int().min(1).max(30) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Choose between 1 and 30 days');
+    if (!ai.mailbox(user.id, req.params.accountId).connectionId) return bad(reply, 'Choose an AI connection in Setup first');
+    const now = Date.now();
+    const cur = ai.learning(user.id, req.params.accountId);
+    const day = 86_400_000;
+    if (cur.active && cur.from && cur.until) {
+      const max = Date.parse(cur.from) + 30 * day;
+      ai.startLearning(user.id, req.params.accountId, Math.min(max, Date.parse(cur.until) + body.data.days * day), false);
+    } else {
+      ai.startLearning(user.id, req.params.accountId, now + body.data.days * day, true);
+    }
+    engine.syncWatching(user.id);
+    return ai.learning(user.id, req.params.accountId);
+  });
+
+  app.post<P>('/api/assistant/mailbox/:accountId/learning/stop', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    ai.stopLearning(user.id, req.params.accountId);
+    engine.syncWatching(user.id);
+    return ai.learning(user.id, req.params.accountId);
+  });
+
+  app.post<P>('/api/assistant/mailbox/:accountId/learning/suggest', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    if (needsTerms(user.id, reply)) return reply;
+    try {
+      return { suggestions: await engine.suggest(user.id, req.params.accountId) };
+    } catch (err) {
+      return bad(reply, (err as Error).message, err instanceof AiError ? 400 : 502);
+    }
+  });
+
+  /** The review is finished (done) or postponed by a day (later). */
+  app.post<{ Params: { accountId: string; what: string } }>('/api/assistant/mailbox/:accountId/learning/:what', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    if (req.params.what !== 'done' && req.params.what !== 'later') return bad(reply, 'Not found', 404);
+    ai.setReviewAfter(user.id, req.params.accountId, req.params.what === 'done' ? 0 : Date.now() + 86_400_000);
+    return ai.learning(user.id, req.params.accountId);
+  });
+
   // ---- one-time cleanup and senders ----------------------------------------------------------
 
   app.get<P>('/api/assistant/mailbox/:accountId/scan', async (req, reply) => {

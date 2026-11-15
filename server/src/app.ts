@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions (Access).
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -218,6 +219,8 @@ export async function buildApp(
       // Mail the assistant moves out of the inbox doesn't need a notification.
       const stays = await assistant.handleNew(userId, accountId, fresh.map((m) => m.uid)).catch(() => null);
       if (stays) fresh = fresh.filter((m) => stays.includes(m.uid));
+      // Learning mode looks at what stayed in the inbox, without holding up the notification.
+      void assistant.learnArrivals(userId, accountId, fresh.map((m) => m.uid)).catch(() => undefined);
       if (fresh.length === 0 || !pool.notifiesNewMail(userId)) return;
       liveNotify(userId, accountId, (account, content) => buildNotification(account, fresh, content));
       await push.notifyNewMail(userId, accountId, fresh);
@@ -272,6 +275,7 @@ export async function buildApp(
     avatars: opts.avatars,
     updates: opts.updates,
     access,
+    onAction: (userId, accountId, folder, uids, action) => assistant.observeAction(userId, accountId, folder, uids, action),
   });
   await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase, onAiAccess: (id) => assistant.syncWatching(id) });
   registerAndroidPushRoutes(app, { store, pool, firebase });
@@ -279,6 +283,10 @@ export async function buildApp(
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
+  // Learning periods end on their own: stop watching inboxes that no longer need it.
+  const learningTimer = setInterval(() => assistant.syncWatching(), 3600_000);
+  learningTimer.unref();
+  app.addHook('onClose', async () => clearInterval(learningTimer));
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.

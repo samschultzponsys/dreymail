@@ -7,7 +7,7 @@
 
 import crypto from 'node:crypto';
 import { presetFor, type AiApi, type AiConnectionView } from '../../../shared/aiProviders.js';
-import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleAction, RuleConditions, RuleInput } from '../../../shared/assistant.js';
+import type { AssistantDecision, AssistantRule, HistoryEntry, LearningStatus, MailboxAssistantSettings, RuleAction, RuleConditions, RuleInput } from '../../../shared/assistant.js';
 import type { Store } from '../db.js';
 
 export interface ConnectionInput {
@@ -201,11 +201,80 @@ export class AssistantStore {
     for (const accountId of accountIds) this.saveMailbox(userId, { ...this.mailbox(userId, accountId), connectionId });
   }
 
-  /** Every (user, mailbox) with the assistant switched on. */
+  /** Every (user, mailbox) with the assistant switched on, or learning. */
   enabledMailboxes(): { userId: string; accountId: string }[] {
-    return (this.db.prepare('SELECT user_id, account_id FROM ai_mailboxes WHERE enabled = 1').all() as { user_id: string; account_id: string }[]).map((r) => ({
+    return (this.db.prepare('SELECT user_id, account_id FROM ai_mailboxes WHERE enabled = 1 OR learning_until > ?').all(Date.now()) as { user_id: string; account_id: string }[]).map((r) => ({
       userId: r.user_id,
       accountId: r.account_id,
+    }));
+  }
+
+  // ---- learning mode ---------------------------------------------------------------------
+
+  learning(userId: string, accountId: string): LearningStatus {
+    const r = this.db.prepare('SELECT learning_from, learning_until, review_after FROM ai_mailboxes WHERE account_id = ? AND user_id = ?').get(accountId, userId) as
+      | { learning_from: number; learning_until: number; review_after: number }
+      | undefined;
+    const now = Date.now();
+    const n = (this.db.prepare('SELECT COUNT(*) AS n FROM ai_observations WHERE account_id = ? AND user_id = ?').get(accountId, userId) as { n: number }).n;
+    if (!r || !r.learning_from) return { from: null, until: null, active: false, reviewDue: false, observations: n };
+    return {
+      from: new Date(r.learning_from).toISOString(),
+      until: new Date(r.learning_until).toISOString(),
+      active: r.learning_until > now,
+      // review_after 0 = reviewed (or never due); otherwise due once learning ended and the reminder time passed.
+      reviewDue: r.review_after > 0 && r.learning_until <= now && r.review_after <= now,
+      observations: n,
+    };
+  }
+
+  /** Start (or extend) learning until `until`; a fresh start forgets earlier observations. */
+  startLearning(userId: string, accountId: string, until: number, fresh: boolean) {
+    this.saveMailbox(userId, this.mailbox(userId, accountId));
+    const now = Date.now();
+    if (fresh) this.db.prepare('DELETE FROM ai_observations WHERE account_id = ? AND user_id = ?').run(accountId, userId);
+    this.db
+      .prepare('UPDATE ai_mailboxes SET learning_from = CASE WHEN ? OR learning_from = 0 THEN ? ELSE learning_from END, learning_until = ?, review_after = ? WHERE account_id = ? AND user_id = ?')
+      .run(fresh ? 1 : 0, now, until, until, accountId, userId);
+  }
+
+  /** End learning now; the review becomes due. */
+  stopLearning(userId: string, accountId: string) {
+    const now = Date.now();
+    this.db.prepare('UPDATE ai_mailboxes SET learning_until = ?, review_after = ? WHERE account_id = ? AND user_id = ? AND learning_until > ?').run(now, now, accountId, userId, now);
+  }
+
+  /** Review done (0) or postponed until `when`. */
+  setReviewAfter(userId: string, accountId: string, when: number) {
+    this.db.prepare('UPDATE ai_mailboxes SET review_after = ? WHERE account_id = ? AND user_id = ?').run(when, accountId, userId);
+  }
+
+  /** Mailboxes of this user whose learning ended and want a review. */
+  reviewsDue(userId: string): string[] {
+    const now = Date.now();
+    return (this.db.prepare('SELECT account_id FROM ai_mailboxes WHERE user_id = ? AND learning_from > 0 AND learning_until <= ? AND review_after > 0 AND review_after <= ?').all(userId, now, now) as { account_id: string }[]).map(
+      (r) => r.account_id,
+    );
+  }
+
+  observe(userId: string, accountId: string, o: { kind: string; messageId: string; sender: string; subject: string; detail?: Record<string, unknown> }) {
+    this.db
+      .prepare('INSERT INTO ai_observations (user_id, account_id, at, kind, message_id, sender, subject, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(userId, accountId, Date.now(), o.kind, o.messageId, o.sender.slice(0, 320), o.subject.slice(0, 300), JSON.stringify(o.detail ?? {}));
+    // At most 20,000 observations per mailbox.
+    this.db
+      .prepare('DELETE FROM ai_observations WHERE account_id = ? AND id NOT IN (SELECT id FROM ai_observations WHERE account_id = ? ORDER BY id DESC LIMIT 20000)')
+      .run(accountId, accountId);
+  }
+
+  observations(userId: string, accountId: string): { at: number; kind: string; messageId: string; sender: string; subject: string; detail: Record<string, unknown> }[] {
+    return (this.db.prepare('SELECT at, kind, message_id, sender, subject, detail FROM ai_observations WHERE account_id = ? AND user_id = ? ORDER BY id').all(accountId, userId) as Record<string, unknown>[]).map((r) => ({
+      at: Number(r.at),
+      kind: String(r.kind),
+      messageId: String(r.message_id),
+      sender: String(r.sender),
+      subject: String(r.subject),
+      detail: json<Record<string, unknown>>(String(r.detail), {}),
     }));
   }
 

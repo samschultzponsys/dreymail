@@ -21,8 +21,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Send later and undo send.
 - [ ] Account health alerts (sign-in expired, mailbox unreachable, quota).
 - [ ] Rules with a match preview; automatic tabs (Personal / Updates / Newsletters).
-- [ ] AI assistant learning mode: per mailbox, for up to a month, learns from how you handle mail and
-      suggests rules; a review screen when it ends.
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
       Outlook sign-in accounts already let the provider file sent mail).
@@ -80,6 +78,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       per-user switch (3.1).
 - [x] Clean up: sort existing mail in batches with progress; senders grouped by volume with archive
       all, always archive and one-click unsubscribe (3.2).
+- [x] Learning mode: per mailbox for up to a month, suggested rules with evidence, review when it
+      ends (3.3).
 
 ### Administration and security
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).

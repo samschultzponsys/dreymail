@@ -162,3 +162,31 @@ describe('unsubscribe headers', () => {
     expect(parseUnsubscribe('<http://list.example/u>', 'List-Unsubscribe=One-Click')).toBeNull();
   });
 });
+
+describe('learning mode', () => {
+  it('starts, extends up to 30 days in all, ends early, and asks for a review once', () => {
+    const store = new Store(':memory:', new Keyring(secret).credentialKey);
+    const ai = new AssistantStore(store);
+    const u = store.upsertUser('local', 'sam', '', 'Sam');
+    const a = store.createAccount(u.id, {
+      name: 'G', displayName: 'S', email: 's@x', color: '#22d3ee',
+      imap: { host: 'h', port: 993, tls: 'tls', user: 'u', password: 'p' }, smtp: { host: 'h', port: 465, tls: 'tls', user: 'u', password: 'p' }, appendSent: true,
+    });
+    const day = 86_400_000;
+    ai.startLearning(u.id, a.id, Date.now() + 14 * day, true);
+    expect(ai.learning(u.id, a.id)).toMatchObject({ active: true, reviewDue: false });
+    expect(ai.enabledMailboxes()).toEqual([{ userId: u.id, accountId: a.id }]);
+    ai.observe(u.id, a.id, { kind: 'arrived', messageId: '<1@x>', sender: 'a@x', subject: 's' });
+    expect(ai.learning(u.id, a.id).observations).toBe(1);
+    ai.stopLearning(u.id, a.id);
+    expect(ai.learning(u.id, a.id)).toMatchObject({ active: false, reviewDue: true });
+    expect(ai.reviewsDue(u.id)).toEqual([a.id]);
+    ai.setReviewAfter(u.id, a.id, Date.now() + day);
+    expect(ai.reviewsDue(u.id)).toEqual([]);
+    ai.setReviewAfter(u.id, a.id, 0);
+    expect(ai.learning(u.id, a.id).reviewDue).toBe(false);
+    // A fresh start forgets earlier observations.
+    ai.startLearning(u.id, a.id, Date.now() + day, true);
+    expect(ai.learning(u.id, a.id).observations).toBe(0);
+  });
+});

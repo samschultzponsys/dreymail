@@ -13,12 +13,13 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef, VersionInfo } from '../../../shared/types.js';
+import type { AccountInput, ActionResult, ComposePayload, Me, MessageAction, MessageRef, VersionInfo } from '../../../shared/types.js';
 import { accountDefaultsFor, withDefaultPassword, type TemplateValues } from '../accountDefaults.js';
 import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
@@ -172,6 +173,8 @@ export interface ApiDeps {
   /** Replaces the contact picture lookup (tests only). */
   avatars?: AvatarService;
   access: Access;
+  /** A message action is about to run (the AI assistant's learning mode notes it; returns at once otherwise). */
+  onAction?: (userId: string, accountId: string, folder: string, uids: number[], action: MessageAction) => Promise<void>;
   /** Replaces the GitHub release check (tests only). */
   updates?: Pick<UpdateChecker, 'get'>;
 }
@@ -686,6 +689,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const result: ActionResult = { undo: [], permanent: false, createdFolders: [] };
       const action = body.action;
       for (const { ref, uids } of groups.values()) {
+        // Before the action: a moved message can't be looked at in its old folder afterwards.
+        await deps.onAction?.(userId, ref.accountId, ref.folder, uids, action).catch(() => undefined);
         let r;
         if (action.type === 'snooze') r = await snooze.snooze(userId, ref, uids, action.until);
         else if (action.type === 'unsnooze') r = await snooze.unsnooze(userId, ref, uids);

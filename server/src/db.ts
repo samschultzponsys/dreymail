@@ -262,6 +262,27 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!cols.some((c) => c.name === 'ai_access')) db.exec("ALTER TABLE users ADD COLUMN ai_access TEXT NOT NULL DEFAULT '';");
     if (!cols.some((c) => c.name === 'ai_terms_at')) db.exec('ALTER TABLE users ADD COLUMN ai_terms_at INTEGER NOT NULL DEFAULT 0;');
   },
+  // DreyMail: the assistant's learning mode. Per mailbox: until when it learns, and whether its
+  // suggestions were reviewed; observations are what arrived and what the user did with it.
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('ai_mailboxes')").all() as { name: string }[];
+    const has = (c: string) => cols.some((x) => x.name === c);
+    if (!has('learning_from')) db.exec('ALTER TABLE ai_mailboxes ADD COLUMN learning_from INTEGER NOT NULL DEFAULT 0;');
+    if (!has('learning_until')) db.exec('ALTER TABLE ai_mailboxes ADD COLUMN learning_until INTEGER NOT NULL DEFAULT 0;');
+    if (!has('review_after')) db.exec('ALTER TABLE ai_mailboxes ADD COLUMN review_after INTEGER NOT NULL DEFAULT 0;');
+    db.exec(`CREATE TABLE IF NOT EXISTS ai_observations (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+               account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+               at INTEGER NOT NULL,
+               kind TEXT NOT NULL,
+               message_id TEXT NOT NULL DEFAULT '',
+               sender TEXT NOT NULL,
+               subject TEXT NOT NULL,
+               detail TEXT NOT NULL DEFAULT '{}'
+             );
+             CREATE INDEX IF NOT EXISTS ai_observations_account ON ai_observations(account_id, at);`);
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

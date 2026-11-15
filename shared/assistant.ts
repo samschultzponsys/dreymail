@@ -58,6 +58,29 @@ export interface MailboxAssistantSettings {
   accuracy: number;
 }
 
+/** Learning mode of a mailbox. */
+export interface LearningStatus {
+  /** ISO times; null when learning was never started. */
+  from: string | null;
+  until: string | null;
+  active: boolean;
+  /** Ended and its suggestions not reviewed yet. */
+  reviewDue: boolean;
+  observations: number;
+}
+
+export const LEARNING_PERIODS = [
+  { days: 3, label: '3 days' },
+  { days: 7, label: '1 week' },
+  { days: 14, label: '2 weeks' },
+  { days: 30, label: '1 month' },
+] as const;
+
+/** A rule learning mode proposes, with the evidence for it. */
+export interface RuleSuggestion extends RuleInput {
+  evidence: string;
+}
+
 /** One message the assistant handled (or would handle, in a preview). */
 export interface AssistantDecision {
   uid: number;
