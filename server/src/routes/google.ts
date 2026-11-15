@@ -10,14 +10,15 @@ import type { Sessions } from '../auth/session.js';
 import type { Config } from '../config.js';
 import type { Store } from '../db.js';
 import { GoogleError, type GoogleAuth, type GoogleConfig } from '../oauth/google.js';
-import { isAdmin } from './admin.js';
+import type { Access } from '../access.js';
 
-export function registerGoogleRoutes(app: FastifyInstance, deps: { config: Config; store: Store; sessions: Sessions; google: GoogleAuth; googleConfig: GoogleConfig }) {
-  const { config, store, sessions, google, googleConfig } = deps;
+export function registerGoogleRoutes(app: FastifyInstance, deps: { config: Config; store: Store; sessions: Sessions; access: Access; google: GoogleAuth; googleConfig: GoogleConfig }) {
+  const { config, store, sessions, access, google, googleConfig } = deps;
 
   app.get('/api/oauth/google', async () => ({ available: googleConfig.configured() }));
 
   app.post('/api/oauth/google/start', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
     const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ef4444') }).safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'Invalid colour' });
     try {
@@ -59,10 +60,10 @@ export function registerGoogleRoutes(app: FastifyInstance, deps: { config: Confi
     };
   };
 
-  app.get('/api/admin/google', async (req, reply) => (isAdmin(config, req.user!) ? view() : reply.code(403).send({ error: 'Administrators only' })));
+  app.get('/api/admin/google', async (req, reply) => (access.require(req, reply, 'providers.manage') ? view() : reply));
 
   app.put('/api/admin/google', async (req, reply) => {
-    if (!isAdmin(config, req.user!)) return reply.code(403).send({ error: 'Administrators only' });
+    if (!access.require(req, reply, 'providers.manage')) return reply;
     const body = z.object({ clientId: z.string().max(300), clientSecret: z.string().max(500) }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
     googleConfig.save(body.data);

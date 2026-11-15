@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: US spelling (Color).
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: mailbox editing follows the role's permissions.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -221,16 +222,19 @@ export function AccountsDialog({
   defaults,
   onClose,
   startWithNew,
+  canEdit = true,
 }: {
   accounts: AccountView[];
   defaults: AccountDefaults;
   onClose: () => void;
   startWithNew?: boolean;
+  /** The user's role allows adding, editing and removing mailboxes. */
+  canEdit?: boolean;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<{ id?: string; input: AccountInput } | null>(null);
   // "Add account" first asks what kind: Outlook (Microsoft sign-in) or any other IMAP account.
-  const [choosing, setChoosing] = useState(!!startWithNew);
+  const [choosing, setChoosing] = useState(!!startWithNew && canEdit);
   const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(null);
   const microsoft = useQuery({ queryKey: ['microsoftAvailable'], queryFn: api.microsoftAvailable, staleTime: 60_000 });
   const google = useQuery({ queryKey: ['googleAvailable'], queryFn: api.googleAvailable, staleTime: 60_000 });
@@ -343,6 +347,7 @@ export function AccountsDialog({
           <>
             <div className="dialog-body">
               {accounts.length === 0 && <div className="muted">No accounts yet.</div>}
+              {!canEdit && <div className="hint">Your role doesn't allow changing mailboxes. Ask an administrator.</div>}
               {accounts.map((a) => (
                 <div className="account-card" key={a.id}>
                   <span className="swatch" style={{ background: a.color, cursor: 'default' }} />
@@ -352,6 +357,8 @@ export function AccountsDialog({
                       {a.email} · {a.auth === 'microsoft' ? 'Microsoft sign-in' : a.auth === 'google' ? 'Google sign-in' : a.imap.host}
                     </div>
                   </div>
+                  {canEdit && (
+                  <>
                   <button
                     className="icon-btn"
                     title="Edit"
@@ -370,14 +377,18 @@ export function AccountsDialog({
                   >
                     <Trash2 size={16} />
                   </button>
+                  </>
+                  )}
                 </div>
               ))}
             </div>
             <div className="dialog-foot">
               <span className="grow muted">Passwords are stored encrypted and never sent back to the browser.</span>
-              <button className="btn primary" onClick={() => setChoosing(true)}>
-                <Plus size={15} /> Add account
-              </button>
+              {canEdit && (
+                <button className="btn primary" onClick={() => setChoosing(true)}>
+                  <Plus size={15} /> Add account
+                </button>
+              )}
             </div>
           </>
         )}

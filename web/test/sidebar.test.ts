@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: renders inside a QueryClientProvider (the sidebar shows the version).
 // Modified by samschultzponsys, 2026-11-15: saved searches props.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
@@ -36,6 +37,7 @@ function render(folders: Parameters<typeof Sidebar>[0]['folders']) {
       userLabel: 'me',
       onCloseNav: noop,
       searches: [],
+      userAvatar: null,
       activeSearch: null,
       onSearch: noop,
       onDeleteSearch: noop,

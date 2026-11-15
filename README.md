@@ -14,7 +14,8 @@
      Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet).
      Modified by samschultzponsys, 2026-11-15: v2.2 (Outlook and Microsoft 365, This device).
      Modified by samschultzponsys, 2026-11-15: v2.3 (Sign in with Google for Gmail).
-     Modified by samschultzponsys, 2026-11-15: search filters and saved searches. -->
+     Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
+     Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -38,12 +39,12 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.4**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.5**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
-filters with saved searches. What's planned is in
+filters with saved searches, and roles with permission flags. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -68,9 +69,18 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - Login with a username and password, with any OpenID Connect provider (Authentik, Keycloak, …),
   or both side by side; see [Login](#login). Each user owns their own accounts, with strict
   per-user isolation.
-- **Administration in the app.** The first user is the administrator (more can be added, or
-  named in `DREYMAIL_ADMIN_USERS`). Settings → Users lists everyone and adds, promotes, resets
-  passwords for and removes users. Settings → Sign-in sets up OIDC (with a connection test),
+- **Administration in the app, with roles.** Every user has a role made of permission flags:
+  - **Superadmin** has every right, including ones added in later versions. The first user is
+    Superadmin, and so is anyone named in `DREYMAIL_ADMIN_USERS`.
+  - **User** is the default for new users: they can use DreyMail fully, but not administer it.
+  - **Your own roles** (Settings → Roles) can have any mix of flags: managing their own
+    mailboxes, changing their own profile picture, managing users, changing anyone's picture,
+    giving roles, sign-in settings, Microsoft/Google setup, Android setup, and seeing new versions.
+
+  Nobody can grant rights they don't have themselves, and only a Superadmin can make or change a
+  Superadmin. You also choose which role new users get. Settings shows the administration tabs
+  only to roles that allow them. Settings → Users lists everyone and adds users, gives roles,
+  resets passwords, changes pictures and removes users. Settings → Sign-in sets up OIDC (with a connection test),
   password login and who may register, without a restart. Any of these given as environment
   variables in the compose file win and show as locked in the UI.
 - **Accounts that feel separate.** Each account has its own colour: the first one gets DreyMail
@@ -78,6 +88,14 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   the whole app takes on its colour (buttons, highlights, unread dots, a light tint on the page),
   so you always know which mailbox you're in. Button labels and accent text automatically stay
   readable for any colour, in light and dark mode.
+- **Profile pictures.** Upload a picture and place it in the circle (drag and zoom; it's resized in
+  the browser). Without one, DreyMail shows your Gravatar (fetched by the server, so Gravatar never
+  sees your browser), or your initials. The User role may change its own picture; a role flag
+  turns that off, and another lets administrators change anyone's.
+- **Settings in three groups:**
+  - **This device:** stored in this browser or app only.
+  - **Your account:** applies on every device.
+  - **Administration:** only the tabs your role allows.
 - Unified "All inboxes" view across all accounts (merged by date, paginated with per-account
   cursors). It can be turned off in Settings to keep accounts completely apart; DreyMail then
   opens on your first account. Per-account folder trees with unread counts. Live updates via IMAP
@@ -153,7 +171,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
   "Show my full name"); typed in lower case it is capitalised for you.
 - **Version and what's new.** The server's version sits next to your name; click it for the
-  changelog. When a newer image is released, administrators see a blinking dot on it and the
+  changelog. When a newer image is released, Superadmins (and roles allowed to see new versions) see a blinking dot on it and the
   changelog says how to update (redeploy the stack in Arcane). The server checks GitHub at most
   every 6 hours; `DREYMAIL_UPDATE_CHECK=false` turns that off.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,

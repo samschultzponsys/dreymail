@@ -13,6 +13,37 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.5): Roles and permissions, profile pictures, grouped settings
+
+- **Roles with permission flags** replace the administrator yes/no.
+  - Superadmin has every right, including future ones. User is the default for new users.
+  - Custom roles can have any flags. No one can grant rights they lack, and only a Superadmin can
+    change a Superadmin.
+  - Files: new `shared/permissions.ts` and `server/src/access.ts`; `roles` table, `users.role_id`
+    and an upgrade that makes existing administrators Superadmins (`server/src/db.ts`).
+  - Every administrative route checks its own flag (`server/src/routes/admin.ts`,
+    `server/src/routes/microsoft.ts`, `server/src/routes/google.ts`, `server/src/routes/api.ts`),
+    and mailbox changes need `mail.accounts`. `Me` carries the role and its permissions; `AdminUser`
+    has `roleId` (`shared/types.ts`).
+- **Profile pictures**, with flags for your own and for anyone's.
+  - The browser crops and scales the picture (new `web/src/components/UserPicture.tsx`), and the
+    server checks the image and stores it (new `server/src/profilePicture.ts`, `users.avatar`).
+  - Without a picture: your Gravatar, fetched by the server (can be turned off), or your initials.
+  - Shown in the sidebar footer and in Settings → Users.
+- **Settings tabs grouped** under This device, Your account and Administration, wrapping instead
+  of scrolling out of sight. Changes:
+  - New Profile tab (picture, name, role).
+  - New Roles tab; Users tab with role pickers and picture editing
+    (`web/src/components/AdminSettings.tsx`, `web/src/components/SettingsDialog.tsx`).
+- **No mailboxes yet:** the list says "Add a mailbox to get started" with an Add mailbox button (or
+  explains that the role doesn't allow it) instead of an empty "All inboxes"
+  (`web/src/components/MessageList.tsx`, `web/src/App.tsx`).
+- **Mailboxes dialog** hides adding and editing when the role doesn't allow it
+  (`web/src/components/AccountsDialog.tsx`).
+- **Sidebar footer:** a small picture next to your name, which opens Settings; the collapse arrow
+  moved next to the logo (`web/src/components/Sidebar.tsx`, `web/src/styles.css`, `web/src/api.ts`).
+- Tests: `server/test/admin.test.ts` (roles, escalation, pictures, upgrade), `web/test/sidebar.test.ts`.
+
 ## 2026-11-15 (v2.4): Search filters and saved searches
 
 - **Filter builder** (no query syntax): where to look (this folder, all inboxes, all mail), accounts,

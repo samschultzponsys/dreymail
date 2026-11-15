@@ -8,6 +8,10 @@ import { buildApp, type App } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { Keyring } from '../src/crypto.js';
 import { Store } from '../src/db.js';
+import { ALL_PERMISSIONS, type Role } from '../../shared/permissions.js';
+
+/** A 1×1 PNG. */
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 const secret = crypto.randomBytes(48).toString('base64');
 let ctx: App | null = null;
@@ -47,48 +51,125 @@ const loginInput = (over: Partial<LoginSettingsInput> = {}): LoginSettingsInput 
   ...over,
 });
 
-describe('administrators', () => {
-  it('the first user is the administrator; later ones are not', async () => {
+const perms = async (cookie: string) => (await call<Me>(cookie, 'GET', '/api/me')).json;
+
+describe('roles and permissions', () => {
+
+  it('the first user is Superadmin with every right; later ones get the User role', async () => {
     await start({ DREYMAIL_REGISTRATION: 'open' });
     const sam = await register('sam');
     const eve = await register('eve');
-    expect((await call<Me>(sam, 'GET', '/api/me')).json.admin).toBe(true);
-    expect((await call<Me>(eve, 'GET', '/api/me')).json.admin).toBe(false);
-    expect((await call(eve, 'GET', '/api/admin/users')).status).toBe(403);
-    expect((await call(eve, 'GET', '/api/admin/login')).status).toBe(403);
+    expect((await perms(sam)).role.id).toBe('superadmin');
+    expect((await perms(sam)).permissions).toEqual(ALL_PERMISSIONS);
+    expect(await perms(eve)).toMatchObject({ role: { id: 'user', name: 'User' }, permissions: ['mail.accounts', 'profile.picture'] });
+    for (const url of ['/api/admin/users', '/api/admin/login', '/api/admin/roles', '/api/admin/firebase', '/api/admin/google', '/api/admin/microsoft']) {
+      expect((await call(eve, 'GET', url)).status).toBe(403);
+    }
   });
 
-  it('DREYMAIL_ADMIN_USERS makes users administrators', async () => {
+  it('DREYMAIL_ADMIN_USERS makes users Superadmins', async () => {
     await start({ DREYMAIL_ADMIN_USERS: 'Eve, someone@example.com', DREYMAIL_REGISTRATION: 'open' });
     await register('sam');
     const eve = await register('eve');
-    expect((await call<Me>(eve, 'GET', '/api/me')).json.admin).toBe(true);
+    expect((await perms(eve)).role.id).toBe('superadmin');
     const users = (await call<AdminUser[]>(eve, 'GET', '/api/admin/users')).json;
-    expect(users.find((u) => u.username === 'eve')).toMatchObject({ admin: true, adminByEnv: true });
+    expect(users.find((u) => u.username === 'eve')).toMatchObject({ roleId: 'superadmin', adminByEnv: true });
   });
 
-  it('add a user, make them admin, reset their password, remove them', async () => {
+  it('add a user with a role, reset their password, remove them', async () => {
     await start();
     const sam = await register('sam');
     let res = await call<AdminUser[]>(sam, 'POST', '/api/admin/users', { username: 'alice', password: 'another long password' });
     expect(res.status).toBe(200);
     const alice = res.json.find((u) => u.username === 'alice')!;
-    expect(alice).toMatchObject({ login: 'password', admin: false, accounts: 0 });
+    expect(alice).toMatchObject({ login: 'password', roleId: 'user', accounts: 0 });
     expect((await call(sam, 'POST', '/api/admin/users', { username: 'alice', password: 'another long password' })).status).toBe(409);
-    res = await call<AdminUser[]>(sam, 'PATCH', `/api/admin/users/${alice.id}`, { admin: true, password: 'a brand new password' });
-    expect(res.json.find((u) => u.id === alice.id)!.admin).toBe(true);
+    res = await call<AdminUser[]>(sam, 'PATCH', `/api/admin/users/${alice.id}`, { roleId: 'superadmin', password: 'a brand new password' });
+    expect(res.json.find((u) => u.id === alice.id)!.roleId).toBe('superadmin');
     const login = await ctx!.app.inject({ method: 'POST', url: '/auth/password/login', payload: { username: 'alice', password: 'a brand new password' }, headers: { 'x-dreymail': '1' } });
     expect(login.statusCode).toBe(200);
     res = await call<AdminUser[]>(sam, 'DELETE', `/api/admin/users/${alice.id}`);
     expect(res.json.map((u) => u.username)).toEqual(['sam']);
   });
 
-  it("can't remove yourself or your own admin rights", async () => {
+  it("can't remove yourself, change your own role, or leave no Superadmin", async () => {
     await start();
     const sam = await register('sam');
-    const me = (await call<Me>(sam, 'GET', '/api/me')).json;
+    const me = await perms(sam);
     expect((await call(sam, 'DELETE', `/api/admin/users/${me.id}`)).status).toBe(400);
-    expect((await call(sam, 'PATCH', `/api/admin/users/${me.id}`, { admin: false })).status).toBe(400);
+    expect((await call(sam, 'PATCH', `/api/admin/users/${me.id}`, { roleId: 'user' })).status).toBe(400);
+  });
+
+  it('custom roles: flags take effect, nobody can grant more than they have', async () => {
+    const store = await start({ DREYMAIL_REGISTRATION: 'open' });
+    const sam = await register('sam');
+    const eve = await register('eve');
+    const eveId = (await perms(eve)).id;
+    // A user manager: may add/remove users and give roles, nothing else.
+    let roles = await call<{ roles: Role[] }>(sam, 'POST', '/api/admin/roles', { name: 'User manager', permissions: ['users.manage', 'roles.manage', 'bogus'] });
+    const mgr = roles.json.roles.find((r) => r.name === 'User manager')!;
+    expect(mgr.permissions).toEqual(['users.manage', 'roles.manage']);
+    await call(sam, 'PATCH', `/api/admin/users/${eveId}`, { roleId: mgr.id });
+    expect((await perms(eve)).permissions).toEqual(['users.manage', 'roles.manage']);
+    expect((await call(eve, 'GET', '/api/admin/users')).status).toBe(200);
+    expect((await call(eve, 'GET', '/api/admin/login')).status).toBe(403);
+    // No mailbox rights in this role.
+    expect((await call(eve, 'DELETE', '/api/accounts/x')).status).toBe(403);
+    // Escalation attempts.
+    const samId = (await perms(sam)).id;
+    expect((await call(eve, 'POST', '/api/admin/roles', { name: 'Sneaky', permissions: ['signin.manage'] })).status).toBe(400);
+    expect((await call(eve, 'PATCH', `/api/admin/users/${eveId}`, { roleId: 'superadmin' })).status).toBe(400);
+    expect((await call(eve, 'PATCH', `/api/admin/users/${samId}`, { roleId: 'user' })).status).toBe(400);
+    expect((await call(eve, 'DELETE', `/api/admin/users/${samId}`)).status).toBe(400);
+    expect((await call(eve, 'PUT', '/api/admin/roles/superadmin', { name: 'x', permissions: [] })).status).toBe(400);
+    // Deleting the role moves its users to the default role.
+    roles = await call<{ roles: Role[] }>(sam, 'DELETE', `/api/admin/roles/${mgr.id}`);
+    expect(roles.json.roles.map((r) => r.id)).toEqual(['superadmin', 'user']);
+    expect(store.getUser(eveId)!.roleId).toBe('user');
+    expect((await call(sam, 'DELETE', '/api/admin/roles/user')).status).toBe(400);
+  });
+
+  it('the default role is what new users get', async () => {
+    await start({ DREYMAIL_REGISTRATION: 'open' });
+    const sam = await register('sam');
+    const r = await call<{ roles: Role[] }>(sam, 'POST', '/api/admin/roles', { name: 'Reader', permissions: [] });
+    const reader = r.json.roles.find((x) => x.name === 'Reader')!;
+    expect((await call(sam, 'PUT', '/api/admin/roles-default', { roleId: 'superadmin' })).status).toBe(400);
+    expect((await call<{ defaultRole: string }>(sam, 'PUT', '/api/admin/roles-default', { roleId: reader.id })).json.defaultRole).toBe(reader.id);
+    const eve = await register('eve');
+    expect(await perms(eve)).toMatchObject({ role: { id: reader.id, name: 'Reader' }, permissions: [] });
+    expect((await call(eve, 'PUT', '/api/me/picture', { image: PNG })).status).toBe(403);
+  });
+});
+
+describe('profile pictures', () => {
+  it('upload, show, remove; Gravatar can be turned off', async () => {
+    await start({ DREYMAIL_REGISTRATION: 'open' });
+    const sam = await register('sam');
+    expect((await call(sam, 'PUT', '/api/me/picture', { image: 'data:image/png;base64,AAAA' })).status).toBe(400);
+    expect((await call(sam, 'PUT', '/api/me/picture', { image: PNG.replace('image/png', 'image/jpeg') })).status).toBe(400);
+    const up = await call<{ avatar: string }>(sam, 'PUT', '/api/me/picture', { image: PNG });
+    expect(up.json.avatar).toMatch(/^\/api\/users\/[\w-]+\/picture\?v=\d+$/);
+    const img = await ctx!.app.inject({ method: 'GET', url: up.json.avatar, headers: { cookie: sam } });
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.rawPayload.subarray(1, 4).toString()).toBe('PNG');
+    expect((await perms(sam)).hasPicture).toBe(true);
+    await call(sam, 'DELETE', '/api/me/picture');
+    // A password user without a mailbox has no address for Gravatar: initials.
+    expect((await perms(sam)).avatar).toBeNull();
+    await call(sam, 'PUT', '/api/me/gravatar', { on: false });
+    expect((await perms(sam)).gravatar).toBe(false);
+  });
+
+  it("only users.pictures may change someone else's", async () => {
+    await start({ DREYMAIL_REGISTRATION: 'open' });
+    const sam = await register('sam');
+    const eve = await register('eve');
+    const samId = (await perms(sam)).id;
+    const eveId = (await perms(eve)).id;
+    expect((await call(eve, 'PUT', `/api/admin/users/${samId}/picture`, { image: PNG })).status).toBe(403);
+    const res = await call<AdminUser[]>(sam, 'PUT', `/api/admin/users/${eveId}/picture`, { image: PNG });
+    expect(res.json.find((u) => u.id === eveId)!.hasPicture).toBe(true);
   });
 });
 
@@ -136,5 +217,32 @@ describe('sign-in settings in the UI', () => {
     await call(sam, 'PUT', '/api/admin/login', loginInput({ registration: 'closed' }));
     const res = await ctx!.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'eve', password: 'a long password' }, headers: { 'x-dreymail': '1' } });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('upgrading to roles', () => {
+  it('administrators of an older database become Superadmins, everyone else Users', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { DatabaseSync } = await import('node:sqlite');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-roles-'));
+    const file = path.join(dir, 'dreymail.db');
+    const key = new Keyring(secret).credentialKey;
+    let store = new Store(file, key);
+    const sam = store.upsertUser('local', 'sam', '', 'Sam');
+    const eve = store.upsertUser('local', 'eve', '', 'Eve');
+    store.close();
+    // Back to the database as 2.4 left it: admin flag, no role column.
+    const db = new DatabaseSync(file);
+    const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+    db.exec(`UPDATE users SET is_admin = (id = '${sam.id}'); ALTER TABLE users DROP COLUMN role_id; DROP TABLE roles; PRAGMA user_version = ${version - 1};`);
+    db.close();
+    store = new Store(file, key);
+    expect(store.getUser(sam.id)!.roleId).toBe('superadmin');
+    expect(store.getUser(eve.id)!.roleId).toBe('user');
+    expect(store.listRoles().map((r) => r.name)).toEqual(['Superadmin', 'User']);
+    store.close();
+    fs.rmSync(dir, { recursive: true });
   });
 });

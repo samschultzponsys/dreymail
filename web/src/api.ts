@@ -9,8 +9,15 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
+// Modified by samschultzponsys, 2026-11-15: roles, permissions and profile pictures.
 
+import type { Permission, Role } from '../../shared/permissions';
 import type { SavedSearch } from '../../shared/search';
+
+export interface RolesView {
+  roles: Role[];
+  defaultRole: string;
+}
 import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
@@ -92,8 +99,18 @@ export const api = {
   adminSaveFirebase: (s: { serviceAccount: string; apiKey: string; appId: string; senderId: string }) => request<FirebaseSettingsView>('PUT', '/api/admin/firebase', s),
   androidPush: () => request<{ firebase: { projectId: string; apiKey: string; appId: string; senderId: string } | null }>('GET', '/api/push/android'),
   registerAndroidToken: (token: string, keys: { p256dh: string; auth: string }) => request<{ ok: true }>('POST', '/api/push/android', { token, keys }),
-  adminCreateUser: (u: { username: string; password: string; admin: boolean }) => request<AdminUser[]>('POST', '/api/admin/users', u),
-  adminPatchUser: (id: string, patch: { admin?: boolean; password?: string }) => request<AdminUser[]>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, patch),
+  adminCreateUser: (u: { username: string; password: string; roleId?: string }) => request<AdminUser[]>('POST', '/api/admin/users', u),
+  adminPatchUser: (id: string, patch: { roleId?: string; password?: string }) => request<AdminUser[]>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, patch),
+  adminSetPicture: (id: string, image: string) => request<AdminUser[]>('PUT', `/api/admin/users/${encodeURIComponent(id)}/picture`, { image }),
+  adminDeletePicture: (id: string) => request<AdminUser[]>('DELETE', `/api/admin/users/${encodeURIComponent(id)}/picture`),
+  adminRoles: () => request<RolesView>('GET', '/api/admin/roles'),
+  adminSaveRole: (id: string | null, r: { name: string; permissions: Permission[] }) =>
+    request<RolesView>(id ? 'PUT' : 'POST', id ? `/api/admin/roles/${encodeURIComponent(id)}` : '/api/admin/roles', r),
+  adminDeleteRole: (id: string) => request<RolesView>('DELETE', `/api/admin/roles/${encodeURIComponent(id)}`),
+  adminDefaultRole: (roleId: string) => request<RolesView>('PUT', '/api/admin/roles-default', { roleId }),
+  setPicture: (image: string) => request<{ avatar: string | null }>('PUT', '/api/me/picture', { image }),
+  deletePicture: () => request<{ avatar: string | null }>('DELETE', '/api/me/picture'),
+  setGravatar: (on: boolean) => request<{ avatar: string | null }>('PUT', '/api/me/gravatar', { on }),
   adminDeleteUser: (id: string) => request<AdminUser[]>('DELETE', `/api/admin/users/${encodeURIComponent(id)}`),
   adminLogin: () => request<LoginSettingsView>('GET', '/api/admin/login'),
   adminSaveLogin: (s: LoginSettingsInput) => request<LoginSettingsView>('PUT', '/api/admin/login', s),

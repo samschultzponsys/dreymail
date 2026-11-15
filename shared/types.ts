@@ -8,8 +8,11 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: account sign-in kind (password or Microsoft).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 
 // Types shared between the server API and the web client.
+
+import type { Permission } from './permissions.js';
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
 
@@ -302,8 +305,15 @@ export interface Me {
   hasPassword: boolean;
   /** Starting values for a new mail account. */
   accountDefaults: AccountDefaults;
-  /** Administrator: sees Settings → Users and Sign-in. */
-  admin: boolean;
+  /** The user's role and what it allows (DreyMail, see shared/permissions.ts). */
+  role: { id: string; name: string };
+  permissions: Permission[];
+  /** Profile picture URL (uploaded, or Gravatar when allowed), or null for initials. */
+  avatar: string | null;
+  /** Show their Gravatar when no picture is uploaded. */
+  gravatar: boolean;
+  /** Has uploaded a picture of their own. */
+  hasPicture: boolean;
 }
 
 export type Registration = 'open' | 'first' | 'closed';
@@ -385,9 +395,11 @@ export interface AdminUser {
   username: string;
   email: string;
   login: 'password' | 'oidc' | 'dev';
-  admin: boolean;
-  /** Administrator because of DREYMAIL_ADMIN_USERS (can't be changed in the UI). */
+  roleId: string;
+  /** Superadmin because of DREYMAIL_ADMIN_USERS (can't be changed in the UI). */
   adminByEnv: boolean;
+  avatar: string | null;
+  hasPicture: boolean;
   accounts: number;
   createdAt: string;
 }

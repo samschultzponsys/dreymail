@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters, saved searches.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -280,8 +281,8 @@ export function App() {
 
   // First run: open the account dialog.
   useEffect(() => {
-    if (loggedIn && accountsQ.isSuccess && accounts.length === 0) openOverlay('accounts');
-  }, [loggedIn, accountsQ.isSuccess, accounts.length, openOverlay]);
+    if (loggedIn && accountsQ.isSuccess && accounts.length === 0 && me.data?.permissions.includes('mail.accounts')) openOverlay('accounts');
+  }, [loggedIn, accountsQ.isSuccess, accounts.length, openOverlay, me.data]);
 
   // Back from adding an Outlook account (see main.tsx).
   useEffect(() => {
@@ -305,7 +306,9 @@ export function App() {
 
   const runAction = useMessageAction(useCallback((m: string) => push(m, true), [push]));
 
-  const title = route.filters.where === 'all'
+  const title = accountsQ.isSuccess && accounts.length === 0
+    ? 'No mailboxes yet'
+    : route.filters.where === 'all'
     ? 'All mail'
     : route.filters.where === 'inboxes'
       ? 'All inboxes'
@@ -565,6 +568,7 @@ export function App() {
         onLogout={() => void logout()}
         userLabel={userLabel(me.data!, me.data!.preferences.showFullName)}
         userFullName={userLabel(me.data!, true)}
+        userAvatar={me.data!.avatar}
         onCloseNav={() => closeOverlay('nav')}
         searches={savedSearches.data ?? []}
         activeSearch={activeSearch}
@@ -605,6 +609,7 @@ export function App() {
           go({ ...route, filters, q: q ?? route.q, open: null });
         }}
         inFolder={sel.accountId !== null}
+        noMailboxes={accountsQ.isSuccess && accounts.length === 0 ? { canAdd: !!me.data?.permissions.includes('mail.accounts'), onAdd: () => openOverlay('accounts') } : undefined}
         onSaveSearch={(name) =>
           api.saveSearch({ name, q: route.q, unread: route.unread, filters: route.filters, accountId: sel.accountId, folder: sel.folder }).then(
             (list) => {
@@ -688,8 +693,8 @@ export function App() {
           }}
         />
       )}
-      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} onClose={() => closeOverlay('accounts')} />}
-      {dialog === 'settings' && <SettingsDialog prefs={me.data!.preferences} hasPassword={me.data!.hasPassword} admin={me.data!.admin} myId={me.data!.id} onClose={() => closeOverlay('settings')} />}
+      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} onClose={() => closeOverlay('accounts')} />}
+      {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (

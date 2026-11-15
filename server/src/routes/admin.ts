@@ -1,14 +1,18 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-// Administration: users (list, add, make admin, reset password, remove) and sign-in settings
-// (OIDC, password login, registration). Only administrators may call these; /api's preHandler has
+// Administration: users (list, add, give a role, reset password, change picture, remove), roles
+// with permission flags, sign-in settings (OIDC, password login, registration) and the Android app's
+// Firebase setup. Each needs its own permission (shared/permissions.ts); /api's preHandler has
 // already authenticated the user and checked the CSRF header.
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
+import { isPermission, SUPERADMIN, type Permission, type Role } from '../../../shared/permissions.js';
 import type { AdminUser, FirebaseSettingsView } from '../../../shared/types.js';
+import type { Access } from '../access.js';
+import { parsePicture, PictureError, pictureUrl } from '../profilePicture.js';
 import { hashPassword, LOCAL_ISSUER, passwordSchema, usernameSchema } from '../auth/password.js';
 import type { Sessions } from '../auth/session.js';
 import type { Config } from '../config.js';
@@ -22,20 +26,11 @@ export interface AdminDeps {
   config: Config;
   store: Store;
   sessions: Sessions;
+  access: Access;
   login: LoginSettings;
   pool: ImapPool;
   mail: MailService;
   firebase: FirebaseConfig;
-}
-
-/** Administrator: flagged in the database, or named in DREYMAIL_ADMIN_USERS. */
-export function isAdmin(config: Config, user: User): boolean {
-  return user.admin || adminByEnv(config, user);
-}
-
-function adminByEnv(config: Config, user: User): boolean {
-  const names = [user.username, user.email].map((s) => s.toLowerCase()).filter(Boolean);
-  return names.some((n) => config.adminUsers.includes(n));
 }
 
 const registrationSchema = z.enum(['open', 'first', 'closed']);
@@ -50,70 +45,79 @@ const loginSchema = z.object({
   passwordLogin: z.boolean(),
   registration: registrationSchema,
 });
-const newUserSchema = z.object({ username: z.string().max(500), password: z.string().max(1000), admin: z.boolean().default(false) });
-const patchUserSchema = z.object({ admin: z.boolean().optional(), password: z.string().max(1000).optional() });
+const newUserSchema = z.object({ username: z.string().max(500), password: z.string().max(1000), roleId: z.string().max(64).optional() });
+const patchUserSchema = z.object({ roleId: z.string().max(64).optional(), password: z.string().max(1000).optional() });
+const roleSchema = z.object({ name: z.string().trim().min(1).max(60), permissions: z.array(z.string().max(60)).max(100) });
 const testSchema = z.object({ issuerUrl: z.string().max(2000), clientId: z.string().max(500), clientSecret: z.string().max(2000) });
 
 export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps) {
-  const { config, store, sessions, login, pool, mail, firebase } = deps;
-
-  const admin = (req: FastifyRequest, reply: FastifyReply): User | null => {
-    const user = req.user!;
-    if (!isAdmin(config, user)) {
-      void reply.code(403).send({ error: 'Administrators only' });
-      return null;
-    }
-    return user;
-  };
+  const { config, store, sessions, access, login, pool, mail, firebase } = deps;
 
   const view = (u: User & { accounts: number }): AdminUser => ({
     id: u.id,
-    name: u.name,
+    name: u.displayName || u.name,
     username: u.username,
     email: u.email,
     login: u.hasPassword ? 'password' : u.issuer === 'dev-login' ? 'dev' : 'oidc',
-    admin: isAdmin(config, u),
-    adminByEnv: adminByEnv(config, u),
+    roleId: access.superadminByEnv(u) ? SUPERADMIN : u.roleId,
+    adminByEnv: access.superadminByEnv(u),
     accounts: u.accounts,
     createdAt: new Date(u.createdAt).toISOString(),
+    avatar: pictureUrl(store, u),
+    hasPicture: u.avatarVersion > 0,
   });
   const listUsers = () => store.listUsers().map(view);
   const bad = (reply: FastifyReply, error: string) => reply.code(400).send({ error });
+  const may = (req: FastifyRequest, reply: FastifyReply, ...p: Permission[]) => access.require(req, reply, ...p);
+
+  /**
+   * Nobody can hand out more than they have: giving a role (or building one) needs every flag in
+   * it, and only a Superadmin can make Superadmins.
+   */
+  const canGrant = (me: User, role: Role) =>
+    role.id === SUPERADMIN ? access.superadmin(me) : role.permissions.every((p) => access.can(me, p));
 
   // ---- users -----------------------------------------------------------------
 
-  app.get('/api/admin/users', async (req, reply) => (admin(req, reply) ? listUsers() : reply));
+  app.get('/api/admin/users', async (req, reply) => (may(req, reply, 'users.manage', 'roles.manage', 'users.pictures') ? listUsers() : reply));
 
   app.post('/api/admin/users', async (req, reply) => {
-    if (!admin(req, reply)) return reply;
+    if (!may(req, reply, 'users.manage')) return reply;
     const body = newUserSchema.safeParse(req.body);
     if (!body.success) return bad(reply, 'Username and password are required');
     const username = usernameSchema.safeParse(body.data.username);
     if (!username.success) return bad(reply, username.error.issues[0]!.message);
     const password = passwordSchema.safeParse(body.data.password);
     if (!password.success) return bad(reply, password.error.issues[0]!.message);
+    const role = body.data.roleId ? store.getRole(body.data.roleId) : null;
+    if (body.data.roleId && (!role || !canGrant(req.user!, role))) return bad(reply, "You can't give that role");
     const user = store.createPasswordUser(LOCAL_ISSUER, username.data, await hashPassword(password.data));
     if (!user) return reply.code(409).send({ error: 'That username is taken' });
-    if (body.data.admin) store.setAdmin(user.id, true);
+    if (role) store.setUserRole(user.id, role.id);
     return listUsers();
   });
 
   app.patch<{ Params: { id: string } }>('/api/admin/users/:id', async (req, reply) => {
-    const me = admin(req, reply);
-    if (!me) return reply;
+    const me = req.user!;
     const body = patchUserSchema.safeParse(req.body);
     if (!body.success) return bad(reply, 'Invalid request');
     const target = store.getUser(req.params.id);
     if (!target) return reply.code(404).send({ error: 'User not found' });
-    if (body.data.admin !== undefined && body.data.admin !== target.admin) {
-      if (!body.data.admin && target.id === me.id) return bad(reply, "You can't remove your own administrator rights");
-      if (!body.data.admin && target.admin && store.countAdmins() <= 1 && config.adminUsers.length === 0) {
-        return bad(reply, 'Keep at least one administrator');
-      }
-      store.setAdmin(target.id, body.data.admin);
+    if (body.data.roleId !== undefined && body.data.roleId !== target.roleId) {
+      if (!may(req, reply, 'roles.manage')) return reply;
+      const role = store.getRole(body.data.roleId);
+      if (!role) return bad(reply, 'That role no longer exists');
+      if (!canGrant(me, role)) return bad(reply, "You can't give a role with more rights than your own");
+      // Taking a role away is as strong as giving it: only a Superadmin can demote one.
+      if (target.roleId === SUPERADMIN && !access.superadmin(me)) return bad(reply, 'Only a Superadmin can change a Superadmin');
+      if (target.id === me.id) return bad(reply, "You can't change your own role");
+      if (access.lastSuperadmin(target)) return bad(reply, 'Keep at least one Superadmin');
+      store.setUserRole(target.id, role.id);
     }
     if (body.data.password !== undefined) {
+      if (!may(req, reply, 'users.manage')) return reply;
       if (!target.hasPassword) return bad(reply, 'This user signs in with OIDC and has no password');
+      if (target.roleId === SUPERADMIN && !access.superadmin(me)) return bad(reply, "Only a Superadmin can reset a Superadmin's password");
       const password = passwordSchema.safeParse(body.data.password);
       if (!password.success) return bad(reply, password.error.issues[0]!.message);
       store.setPasswordHash(target.id, await hashPassword(password.data));
@@ -122,11 +126,13 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
   });
 
   app.delete<{ Params: { id: string } }>('/api/admin/users/:id', async (req, reply) => {
-    const me = admin(req, reply);
-    if (!me) return reply;
+    if (!may(req, reply, 'users.manage')) return reply;
+    const me = req.user!;
     const target = store.getUser(req.params.id);
     if (!target) return reply.code(404).send({ error: 'User not found' });
     if (target.id === me.id) return bad(reply, "You can't remove yourself");
+    if (target.roleId === SUPERADMIN && !access.superadmin(me)) return bad(reply, 'Only a Superadmin can remove a Superadmin');
+    if (access.lastSuperadmin(target)) return bad(reply, 'Keep at least one Superadmin');
     // Close their mail connections and forget their cached mail before the rows go.
     for (const a of store.listAccounts(target.id)) {
       mail.forgetAccount(target.id, a.id);
@@ -136,12 +142,70 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
     return listUsers();
   });
 
+  // Someone else's profile picture.
+  app.put<{ Params: { id: string } }>('/api/admin/users/:id/picture', async (req, reply) => {
+    if (!may(req, reply, 'users.pictures')) return reply;
+    if (!store.getUser(req.params.id)) return reply.code(404).send({ error: 'User not found' });
+    const body = z.object({ image: z.string().max(500_000) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid picture');
+    try {
+      store.setAvatar(req.params.id, parsePicture(body.data.image));
+    } catch (err) {
+      if (err instanceof PictureError) return bad(reply, err.message);
+      throw err;
+    }
+    return listUsers();
+  });
+  app.delete<{ Params: { id: string } }>('/api/admin/users/:id/picture', async (req, reply) => {
+    if (!may(req, reply, 'users.pictures')) return reply;
+    store.setAvatar(req.params.id, null);
+    return listUsers();
+  });
+
+  // ---- roles -------------------------------------------------------------------
+
+  const rolesView = () => ({ roles: store.listRoles(), defaultRole: store.defaultRole() });
+  app.get('/api/admin/roles', async (req, reply) => (may(req, reply, 'roles.manage', 'users.manage') ? rolesView() : reply));
+
+  const saveRole = (req: FastifyRequest, reply: FastifyReply, id: string | null) => {
+    if (!may(req, reply, 'roles.manage')) return reply;
+    const body = roleSchema.safeParse(req.body);
+    if (!body.success) return bad(reply, 'Give the role a name');
+    const permissions = body.data.permissions.filter(isPermission);
+    const missing = permissions.filter((p) => !access.can(req.user!, p));
+    if (missing.length) return bad(reply, "A role can't have rights you don't have yourself");
+    if (id === SUPERADMIN) return bad(reply, 'Superadmin always has every right and cannot be changed');
+    if (id && store.getRole(id) && !canGrant(req.user!, store.getRole(id)!)) return bad(reply, "You can't change a role with more rights than your own");
+    const role = store.saveRole(id, body.data.name, permissions);
+    return role ? rolesView() : reply.code(404).send({ error: 'Role not found' });
+  };
+  app.post('/api/admin/roles', async (req, reply) => saveRole(req, reply, null));
+  app.put<{ Params: { id: string } }>('/api/admin/roles/:id', async (req, reply) => saveRole(req, reply, req.params.id));
+  app.delete<{ Params: { id: string } }>('/api/admin/roles/:id', async (req, reply) => {
+    if (!may(req, reply, 'roles.manage')) return reply;
+    const role = store.getRole(req.params.id);
+    if (!role) return reply.code(404).send({ error: 'Role not found' });
+    if (role.builtin) return bad(reply, 'Superadmin and User are built in and stay');
+    if (!canGrant(req.user!, role)) return bad(reply, "You can't remove a role with more rights than your own");
+    store.deleteRole(role.id);
+    return rolesView();
+  });
+  app.put('/api/admin/roles-default', async (req, reply) => {
+    if (!may(req, reply, 'roles.manage')) return reply;
+    const body = z.object({ roleId: z.string().max(64) }).safeParse(req.body);
+    const role = body.success ? store.getRole(body.data.roleId) : null;
+    if (!role || role.id === SUPERADMIN) return bad(reply, 'New users can get any role except Superadmin');
+    if (!canGrant(req.user!, role)) return bad(reply, "You can't give that role");
+    store.setDefaultRole(role.id);
+    return rolesView();
+  });
+
   // ---- sign-in settings ------------------------------------------------------------
 
-  app.get('/api/admin/login', async (req, reply) => (admin(req, reply) ? login.view() : reply));
+  app.get('/api/admin/login', async (req, reply) => (may(req, reply, 'signin.manage') ? login.view() : reply));
 
   app.put('/api/admin/login', async (req, reply) => {
-    if (!admin(req, reply)) return reply;
+    if (!may(req, reply, 'signin.manage')) return reply;
     const body = loginSchema.safeParse(req.body);
     if (!body.success) return bad(reply, body.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
     try {
@@ -186,10 +250,10 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
   };
   const firebaseSchema = z.object({ serviceAccount: z.string().max(20_000), apiKey: z.string().max(200), appId: z.string().max(200), senderId: z.string().max(100) });
 
-  app.get('/api/admin/firebase', async (req, reply) => (admin(req, reply) ? firebaseView() : reply));
+  app.get('/api/admin/firebase', async (req, reply) => (may(req, reply, 'android.manage') ? firebaseView() : reply));
 
   app.put('/api/admin/firebase', async (req, reply) => {
-    if (!admin(req, reply)) return reply;
+    if (!may(req, reply, 'android.manage')) return reply;
     const body = firebaseSchema.safeParse(req.body);
     if (!body.success) return bad(reply, 'Invalid request');
     try {
@@ -202,7 +266,7 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
 
   /** Checks that the provider can be discovered with these values (before saving them). */
   app.post('/api/admin/login/test', async (req, reply) => {
-    if (!admin(req, reply)) return reply;
+    if (!may(req, reply, 'signin.manage')) return reply;
     const body = testSchema.safeParse(req.body);
     if (!body.success) return bad(reply, 'Invalid request');
     const current = login.current().oidc;

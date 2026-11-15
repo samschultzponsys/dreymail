@@ -2,8 +2,9 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
 // Modified by samschultzponsys, 2026-11-15: search filter builder, filter chips, save search.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 
-import { AlarmClock, Archive, Bookmark, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
+import { AlarmClock, Archive, Bookmark, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { filterChips, filterCount, hasFilters, withoutFilter, type SearchFilters } from '../../../shared/search';
 import { participants, type ConversationRow } from '../../../shared/threads';
@@ -41,6 +42,8 @@ interface Props {
   onSaveSearch: (name: string) => Promise<boolean>;
   /** The open view is one account's folder. */
   inFolder: boolean;
+  /** Set when the user has no mailboxes yet: the list shows how to add one instead. */
+  noMailboxes?: { canAdd: boolean; onAdd: () => void };
   onOpen: (m: MessageSummary) => void;
   onCheck: (m: MessageSummary, on: boolean) => void;
   onCheckAll: (on: boolean) => void;
@@ -100,6 +103,8 @@ export function MessageList(p: Props) {
             <RefreshCw size={16} />
           </button>
         </div>
+        {!p.noMailboxes && (
+          <>
         <form
           className="search"
           onSubmit={(e) => {
@@ -181,6 +186,8 @@ export function MessageList(p: Props) {
           <input type="checkbox" checked={p.unreadOnly} onChange={(e) => p.onUnreadOnly(e.target.checked)} />
           Unread only
         </label>
+          </>
+        )}
       </div>
 
       {checkedMsgs.length > 0 && (
@@ -231,7 +238,23 @@ export function MessageList(p: Props) {
             <div className="spinner" />
           </div>
         )}
-        {!p.loading && p.messages.length === 0 && !p.listError && (
+        {p.noMailboxes && (
+          <div className="empty-mailboxes">
+            <Inbox size={36} />
+            <h2>Add a mailbox to get started</h2>
+            {p.noMailboxes.canAdd ? (
+              <>
+                <p className="muted">Connect Gmail, Outlook, Purelymail or any other email account. Your mail stays on its server.</p>
+                <button className="btn primary" onClick={p.noMailboxes.onAdd}>
+                  <Plus size={15} /> Add mailbox
+                </button>
+              </>
+            ) : (
+              <p className="muted">Your role doesn't allow adding mailboxes. Ask an administrator to add one for you.</p>
+            )}
+          </div>
+        )}
+        {!p.noMailboxes && !p.loading && p.messages.length === 0 && !p.listError && (
           <div className="center muted" style={{ height: 160 }}>
             {p.unreadOnly ? (
               <div>
@@ -313,9 +336,9 @@ export function MessageList(p: Props) {
         </div>
       </div>
       {/* Phones: Compose sits on the list itself, not only in the folder drawer. */}
-      <button className="fab mobile-only" onClick={p.onCompose} title="Compose" aria-label="Compose">
+      {!p.noMailboxes && <button className="fab mobile-only" onClick={p.onCompose} title="Compose" aria-label="Compose">
         <PenSquare size={22} />
-      </button>
+      </button>}
     </section>
   );
 }

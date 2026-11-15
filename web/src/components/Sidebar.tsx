@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: hides "All inboxes" when turned off in Settings.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: saved searches as smart folders.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -33,6 +34,7 @@ import type { SavedSearch } from '../../../shared/search';
 import type { AccountFolders, AccountView, FolderView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
+import { UserAvatar } from './UserPicture';
 
 const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
   inbox: <Inbox size={16} />,
@@ -65,6 +67,8 @@ interface Props {
   showUnified: boolean;
   /** Full name, for the tooltip when only the first name is shown. */
   userFullName: string;
+  /** Profile picture URL, or null for initials. */
+  userAvatar: string | null;
   accounts: AccountView[];
   folders: AccountFolders[] | undefined;
   sel: MailboxSel;
@@ -82,7 +86,7 @@ interface Props {
   onDeleteSearch: (s: SavedSearch) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, userAvatar, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -97,6 +101,13 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
         <img className="brand-mark day" src="/brand-day.svg" alt="" />
         <img className="brand-mark night" src="/brand-night.svg" alt="" />
         <span className="name" style={{ flex: 1 }}>DreyMail</span>
+        <button
+          className="icon-btn rail-toggle desktop-only"
+          title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => setRail((r) => !r)}
+        >
+          {rail ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+        </button>
         <button className="icon-btn mobile-only" title="Close" onClick={onCloseNav}>
           <X size={18} />
         </button>
@@ -184,9 +195,10 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
         })}
       </nav>
       <div className="sidebar-footer">
-        <span className="who name" title={userFullName}>
-          {userLabel}
-        </span>
+        <button className="footer-me" title={`${userFullName}: profile and settings`} onClick={onSettings}>
+          <UserAvatar src={userAvatar} name={userFullName} size={20} />
+          <span className="who name">{userLabel}</span>
+        </button>
         {version.data && (
           <button
             className={`version-btn name ${version.data.update ? 'has-update' : ''}`}
@@ -206,13 +218,6 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
         </button>
         <button className="icon-btn" title="Sign out" onClick={onLogout}>
           <LogOut size={17} />
-        </button>
-        <button
-          className="icon-btn rail-toggle desktop-only"
-          title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={() => setRail((r) => !r)}
-        >
-          {rail ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
         </button>
       </div>
     </aside>

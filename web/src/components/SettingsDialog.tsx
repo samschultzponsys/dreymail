@@ -12,16 +12,19 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { DomainName, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
+import type { Permission } from '../../../shared/permissions';
+import type { DomainName, Me, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
 import { desktopBridge } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
-import { AndroidAdmin, GoogleAdmin, OutlookAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { ProfilePicture } from './UserPicture';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -42,28 +45,40 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'profile' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
 
-export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { prefs: Preferences; hasPassword: boolean; admin: boolean; myId: string; onClose: () => void }) {
+export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
+  const prefs = me.preferences;
+  const can = (p: Permission) => me.permissions.includes(p);
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
-  const tabs: [SettingsTab, string][] = [
-    ['device', 'This device'],
-    ['general', 'General'],
-    ['signatures', 'Signatures'],
-    ['privacy', 'Images'],
-    ...(hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
-    ...(admin
-      ? [
-          ['users', 'Users'],
-          ['signin', 'Sign-in'],
-          ['outlook', 'Outlook'],
-          ['google', 'Google'],
-          ['android', 'Android'],
-        ] as [SettingsTab, string][]
-      : []),
-  ];
+  // Grouped under headings: what is stored on this device, what belongs to your account (every
+  // device), and administration (what your role allows).
+  type TabGroup = { label: string; tabs: [SettingsTab, string][] };
+  const groups = ([
+    { label: 'This device', tabs: [['device', 'This device']] },
+    {
+      label: 'Your account',
+      tabs: [
+        ['profile', 'Profile'] as [SettingsTab, string],
+        ['general', 'General'] as [SettingsTab, string],
+        ['signatures', 'Signatures'] as [SettingsTab, string],
+        ['privacy', 'Images'] as [SettingsTab, string],
+        ...(me.hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
+      ],
+    },
+    {
+      label: 'Administration',
+      tabs: [
+        ...(can('users.manage') || can('users.pictures') || can('roles.manage') ? [['users', 'Users'] as [SettingsTab, string]] : []),
+        ...(can('roles.manage') ? [['roles', 'Roles'] as [SettingsTab, string]] : []),
+        ...(can('signin.manage') ? [['signin', 'Sign-in'] as [SettingsTab, string]] : []),
+        ...(can('providers.manage') ? ([['outlook', 'Outlook'], ['google', 'Google']] as [SettingsTab, string][]) : []),
+        ...(can('android.manage') ? [['android', 'Android'] as [SettingsTab, string]] : []),
+      ],
+    },
+  ] as TabGroup[]).filter((g) => g.tabs.length > 0);
   const [tab, setTab] = useState<SettingsTab>('device');
 
   const save = async (next: Preferences) => {
@@ -86,11 +101,18 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
             <X size={17} />
           </button>
         </div>
-        <div className="tabs" role="tablist">
-          {tabs.map(([key, label]) => (
-            <button key={key} role="tab" aria-selected={tab === key} className={`tab ${tab === key ? 'on' : ''}`} onClick={() => setTab(key)}>
-              {label}
-            </button>
+        <div className="tabs grouped" role="tablist">
+          {groups.map((g) => (
+            <div className="tab-group" key={g.label} role="group" aria-label={g.label}>
+              <span className="tab-group-label">{g.label}</span>
+              <div className="tab-group-tabs">
+                {g.tabs.map(([key, label]) => (
+                  <button key={key} role="tab" aria-selected={tab === key} className={`tab ${tab === key ? 'on' : ''}`} onClick={() => setTab(key)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
         <div className="dialog-body">
@@ -106,8 +128,6 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
                   ))}
                 </div>
               </div>
-              <YourName />
-              <FullNameToggle v={v} save={save} />
               <div>
                 <label className="label">Messages per page</label>
                 <select className="select" value={v.pageSize} onChange={(e) => void save({ ...v, pageSize: Number(e.target.value) })}>
@@ -172,11 +192,22 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
               </div>
             </>
           )}
+          {tab === 'profile' && (
+            <>
+              <ProfilePicture me={me} />
+              <YourName />
+              <FullNameToggle v={v} save={save} />
+              <div className="hint">
+                Your role: <strong>{me.role.name}</strong>
+              </div>
+            </>
+          )}
           {tab === 'signatures' && <SignaturesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
-          {tab === 'users' && <UsersAdmin myId={myId} />}
+          {tab === 'users' && <UsersAdmin me={me} />}
+          {tab === 'roles' && <RolesAdmin me={me} />}
           {tab === 'signin' && <SignInAdmin />}
           {tab === 'outlook' && <OutlookAdmin />}
           {tab === 'google' && <GoogleAdmin />}

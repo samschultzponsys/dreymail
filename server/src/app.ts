@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions (Access).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,6 +33,7 @@ import { createPushTransport, vapidKeysFromSeed, type PushTransport } from './pu
 import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
+import { Access } from './access.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAndroidPushRoutes } from './routes/android.js';
 import { registerMicrosoftRoutes } from './routes/microsoft.js';
@@ -237,6 +239,7 @@ export async function buildApp(
   app.get('/healthz', async () => ({ ok: true }));
 
   const login = new LoginSettings(config, store);
+  const access = new Access(config, store);
   await registerAuthRoutes(app, config, store, sessions, login);
   await registerApiRoutes(app, {
     config,
@@ -252,11 +255,12 @@ export async function buildApp(
     fetchImage: opts.fetchImage,
     avatars: opts.avatars,
     updates: opts.updates,
+    access,
   });
-  await registerAdminRoutes(app, { config, store, sessions, login, pool, mail, firebase });
+  await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase });
   registerAndroidPushRoutes(app, { store, pool, firebase });
-  registerMicrosoftRoutes(app, { config, store, sessions, microsoft, microsoftConfig });
-  registerGoogleRoutes(app, { config, store, sessions, google, googleConfig });
+  registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
+  registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.

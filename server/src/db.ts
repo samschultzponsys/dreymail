@@ -11,11 +11,13 @@
 // Modified by samschultzponsys, 2026-11-15: Microsoft (OAuth) accounts.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: saved searches.
+// Modified by samschultzponsys, 2026-11-15: roles with permission flags; profile pictures.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { ALL_PERMISSIONS, isPermission, SUPERADMIN, USER_DEFAULTS, USER_ROLE, type Permission, type Role } from '../../shared/permissions.js';
 import { normalizeFilters, type SavedSearch, type SearchFilters } from '../../shared/search.js';
 import type { AccountInput, AccountView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
 import { decrypt, encrypt } from './crypto.js';
@@ -163,6 +165,28 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS saved_searches_user ON saved_searches(user_id);`,
+  // DreyMail: roles with permission flags (they replace the admin yes/no), and profile pictures.
+  // Administrators become Superadmins, everyone else gets the User role.
+  (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS roles (
+               id TEXT PRIMARY KEY,
+               name TEXT NOT NULL,
+               permissions TEXT NOT NULL,
+               created_at INTEGER NOT NULL
+             );`);
+    db.prepare('INSERT OR IGNORE INTO roles (id, name, permissions, created_at) VALUES (?, ?, ?, 0)').run(SUPERADMIN, 'Superadmin', '[]');
+    db.prepare('INSERT OR IGNORE INTO roles (id, name, permissions, created_at) VALUES (?, ?, ?, 1)').run(USER_ROLE, 'User', JSON.stringify(USER_DEFAULTS));
+    const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all() as { name: string }[];
+    const has = (c: string) => cols.some((x) => x.name === c);
+    if (!has('role_id')) {
+      db.exec(`ALTER TABLE users ADD COLUMN role_id TEXT NOT NULL DEFAULT '${USER_ROLE}';`);
+      db.exec(`UPDATE users SET role_id = '${SUPERADMIN}' WHERE is_admin = 1;`);
+    }
+    if (!has('avatar')) db.exec('ALTER TABLE users ADD COLUMN avatar BLOB;');
+    if (!has('avatar_type')) db.exec("ALTER TABLE users ADD COLUMN avatar_type TEXT NOT NULL DEFAULT '';");
+    if (!has('avatar_version')) db.exec('ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0;');
+    if (!has('gravatar')) db.exec('ALTER TABLE users ADD COLUMN gravatar INTEGER NOT NULL DEFAULT 1;');
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -192,8 +216,12 @@ export interface User {
   preferences: Preferences;
   /** Signs in with a username and password (as opposed to OIDC). */
   hasPassword: boolean;
-  /** Administrator (DreyMail): manages users and sign-in settings. */
-  admin: boolean;
+  /** Role (DreyMail): what the user may do, see shared/permissions.ts. */
+  roleId: string;
+  /** Has uploaded a profile picture; changes when it does (for cache busting). */
+  avatarVersion: number;
+  /** Without an uploaded picture, show their Gravatar. */
+  gravatar: boolean;
   /** The name the user chose (DreyMail); empty to use `name`. */
   displayName: string;
   createdAt: number;
@@ -318,12 +346,10 @@ export class Store {
       return this.getUser(existing.id)!;
     }
     const id = crypto.randomUUID();
-    // The first user of an empty instance is its administrator.
+    // The first user of an empty instance is its Superadmin.
     this.db
-      .prepare(
-        'INSERT INTO users (id, issuer, subject, email, name, username, created_at, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COUNT(*) = 0 FROM users))',
-      )
-      .run(id, issuer, subject, email, name, username, Date.now());
+      .prepare('INSERT INTO users (id, issuer, subject, email, name, username, created_at, role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, issuer, subject, email, name, username, Date.now(), this.newUserRole());
     return this.getUser(id)!;
   }
 
@@ -338,7 +364,9 @@ export class Store {
           username: string;
           preferences: string;
           password_hash: string | null;
-          is_admin: number;
+          role_id: string;
+          avatar_version: number;
+          gravatar: number;
           created_at: number;
           display_name: string;
         }
@@ -359,7 +387,9 @@ export class Store {
       username: row.username,
       preferences: { ...DEFAULT_PREFERENCES, ...prefs },
       hasPassword: row.password_hash !== null,
-      admin: row.is_admin === 1,
+      roleId: row.role_id,
+      avatarVersion: row.avatar_version,
+      gravatar: row.gravatar === 1,
       createdAt: row.created_at,
       displayName: row.display_name ?? '',
     };
@@ -378,12 +408,102 @@ export class Store {
     return rows.map((r) => ({ ...this.getUser(r.id)!, accounts: r.n }));
   }
 
-  setAdmin(userId: string, admin: boolean): boolean {
-    return this.db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(admin ? 1 : 0, userId).changes > 0;
+  // ---- roles (DreyMail) ------------------------------------------------------
+
+  /** The role a new user gets: Superadmin for the very first user, else the default role. */
+  private newUserRole(): string {
+    const any = this.db.prepare('SELECT 1 FROM users LIMIT 1').get();
+    return any ? this.defaultRole() : SUPERADMIN;
   }
 
-  countAdmins(): number {
-    return (this.db.prepare('SELECT COUNT(*) AS n FROM users WHERE is_admin = 1').get() as { n: number }).n;
+  defaultRole(): string {
+    const id = this.getSetting<string>('defaultRole');
+    return id && id !== SUPERADMIN && this.getRole(id) ? id : USER_ROLE;
+  }
+
+  setDefaultRole(id: string) {
+    this.setSetting('defaultRole', id);
+  }
+
+  listRoles(): Role[] {
+    const rows = this.db
+      .prepare('SELECT r.id, r.name, r.permissions, (SELECT COUNT(*) FROM users u WHERE u.role_id = r.id) AS n FROM roles r ORDER BY r.created_at, r.name')
+      .all() as { id: string; name: string; permissions: string; n: number }[];
+    return rows.map((r) => this.roleOf(r));
+  }
+
+  getRole(id: string): Role | null {
+    const r = this.db
+      .prepare('SELECT r.id, r.name, r.permissions, (SELECT COUNT(*) FROM users u WHERE u.role_id = r.id) AS n FROM roles r WHERE r.id = ?')
+      .get(id) as { id: string; name: string; permissions: string; n: number } | undefined;
+    return r ? this.roleOf(r) : null;
+  }
+
+  private roleOf(r: { id: string; name: string; permissions: string; n: number }): Role {
+    let perms: Permission[] = [];
+    try {
+      perms = (JSON.parse(r.permissions) as unknown[]).filter(isPermission);
+    } catch {
+      /* none */
+    }
+    // Superadmin has everything, including flags added after the role was stored.
+    if (r.id === SUPERADMIN) perms = [...ALL_PERMISSIONS];
+    return { id: r.id, name: r.name, permissions: perms, builtin: r.id === SUPERADMIN || r.id === USER_ROLE, users: r.n };
+  }
+
+  /** Creates (id null) or changes a role. Superadmin can't be changed; User keeps its name. */
+  saveRole(id: string | null, name: string, permissions: Permission[]): Role | null {
+    const perms = JSON.stringify([...new Set(permissions.filter(isPermission))]);
+    if (id === null) {
+      const newId = crypto.randomUUID();
+      this.db.prepare('INSERT INTO roles (id, name, permissions, created_at) VALUES (?, ?, ?, ?)').run(newId, name, perms, Date.now());
+      return this.getRole(newId);
+    }
+    if (id === SUPERADMIN || !this.getRole(id)) return null;
+    this.db.prepare('UPDATE roles SET name = ?, permissions = ? WHERE id = ?').run(id === USER_ROLE ? 'User' : name, perms, id);
+    return this.getRole(id);
+  }
+
+  /** Deletes a custom role; its users get the default role. */
+  deleteRole(id: string): boolean {
+    if (id === SUPERADMIN || id === USER_ROLE) return false;
+    this.db.exec('BEGIN');
+    try {
+      if (this.defaultRole() === id) this.setDefaultRole(USER_ROLE);
+      this.db.prepare('UPDATE users SET role_id = ? WHERE role_id = ?').run(this.defaultRole(), id);
+      const n = this.db.prepare('DELETE FROM roles WHERE id = ?').run(id).changes;
+      this.db.exec('COMMIT');
+      return n > 0;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  setUserRole(userId: string, roleId: string): boolean {
+    if (!this.getRole(roleId)) return false;
+    return this.db.prepare('UPDATE users SET role_id = ? WHERE id = ?').run(roleId, userId).changes > 0;
+  }
+
+  countRole(roleId: string): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM users WHERE role_id = ?').get(roleId) as { n: number }).n;
+  }
+
+  // ---- profile pictures (DreyMail) ----------------------------------------------
+
+  setAvatar(userId: string, picture: { type: string; body: Buffer } | null) {
+    this.db
+      .prepare('UPDATE users SET avatar = ?, avatar_type = ?, avatar_version = ? WHERE id = ?')
+      .run(picture?.body ?? null, picture?.type ?? '', picture ? Date.now() : 0, userId);
+  }
+
+  getAvatar(userId: string): { type: string; body: Buffer } | null {
+    const r = this.db.prepare('SELECT avatar, avatar_type FROM users WHERE id = ?').get(userId) as { avatar: Uint8Array | null; avatar_type: string } | undefined;
+    return r?.avatar ? { type: r.avatar_type, body: Buffer.from(r.avatar) } : null;
+  }
+
+  setGravatar(userId: string, on: boolean) {
+    this.db.prepare('UPDATE users SET gravatar = ? WHERE id = ?').run(on ? 1 : 0, userId);
   }
 
   /** Deletes a user with everything they own (accounts, signatures, push subscriptions, ...). */
@@ -477,11 +597,11 @@ export class Store {
     const email = username.includes('@') ? username : '';
     const res = this.db
       .prepare(
-        `INSERT INTO users (id, issuer, subject, email, name, username, password_hash, created_at, is_admin)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COUNT(*) = 0 FROM users))
+        `INSERT INTO users (id, issuer, subject, email, name, username, password_hash, created_at, role_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (issuer, subject) DO NOTHING`,
       )
-      .run(id, issuer, username, email, username, username, passwordHash, Date.now());
+      .run(id, issuer, username, email, username, username, passwordHash, Date.now(), this.newUserRole());
     return res.changes > 0 ? this.getUser(id) : null;
   }
 

@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters, all-mail search and saved searches.
+// Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -27,7 +28,8 @@ import { FailureLimiter, hashPassword, passwordSchema, verifyPassword } from '..
 import type { Sessions } from '../auth/session.js';
 import { ComposeError, type ComposeService } from '../mail/send.js';
 import { sanitizeOutgoingHtml } from '../mail/compose.js';
-import { isAdmin } from './admin.js';
+import type { Access } from '../access.js';
+import { gravatarEmail, parsePicture, PictureError, pictureUrl } from '../profilePicture.js';
 import { isNewer, readChangelog, serverVersion, UpdateChecker } from '../version.js';
 import { SnoozeError, type SnoozeService } from '../mail/snooze.js';
 import { PushSubscriptionError, validateSubscription, type PushService } from '../push/service.js';
@@ -163,12 +165,13 @@ export interface ApiDeps {
   fetchImage?: (url: string) => Promise<RemoteImage>;
   /** Replaces the contact picture lookup (tests only). */
   avatars?: AvatarService;
+  access: Access;
   /** Replaces the GitHub release check (tests only). */
   updates?: Pick<UpdateChecker, 'get'>;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
-  const { config, store, sessions, pool, mail, compose, push, snooze, vapidPublicKey, pushHostCheck, fetchImage } = deps;
+  const { config, store, sessions, pool, mail, compose, push, snooze, vapidPublicKey, pushHostCheck, fetchImage, access } = deps;
   const avatars = deps.avatars ?? new AvatarService();
 
   app.decorateRequest('user', null);
@@ -225,8 +228,57 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       preferences: u.preferences,
       hasPassword: u.hasPassword,
       accountDefaults: accountDefaultsFor(config.accountDefaults, templateValues(u)),
-      admin: isAdmin(config, u),
+      role: access.superadminByEnv(u) ? { id: 'superadmin', name: 'Superadmin' } : { id: u.roleId, name: store.getRole(u.roleId)?.name ?? 'User' },
+      permissions: access.permissions(u),
+      avatar: pictureUrl(store, u),
+      gravatar: u.gravatar,
+      hasPicture: u.avatarVersion > 0,
     };
+  });
+
+  // ---- profile pictures (DreyMail) ----------------------------------------------------
+
+  /** Anyone signed in may see a user's picture (for lists of users, shared calendars, ...). */
+  app.get<{ Params: { id: string } }>('/api/users/:id/picture', async (req, reply) => {
+    const user = store.getUser(req.params.id);
+    if (!user) return reply.code(404).send({ error: 'No picture' });
+    const own = store.getAvatar(user.id);
+    let img: { contentType: string; body: Buffer } | null = own ? { contentType: own.type, body: own.body } : null;
+    if (!img && user.gravatar) {
+      const email = gravatarEmail(store, user);
+      const found = email ? await avatars.lookup(user.id, email.toLowerCase()) : null;
+      img = found ? { contentType: found.contentType, body: Buffer.from(found.body) } : null;
+    }
+    // Versioned URLs: an uploaded picture never changes under its URL.
+    reply.header('cache-control', own ? 'private, max-age=31536000, immutable' : `private, max-age=${img ? 86400 : 600}`);
+    if (!img) return reply.code(404).send({ error: 'No picture' });
+    return reply.header('content-type', img.contentType).header('content-security-policy', "default-src 'none'; sandbox").send(img.body);
+  });
+
+  const pictureSchema = z.object({ image: z.string().max(500_000) });
+  app.put('/api/me/picture', async (req, reply) => {
+    if (!access.require(req, reply, 'profile.picture', 'users.pictures')) return reply;
+    const body = pictureSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid picture' });
+    try {
+      store.setAvatar(uid(req), parsePicture(body.data.image));
+    } catch (err) {
+      if (err instanceof PictureError) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+    return { avatar: pictureUrl(store, store.getUser(uid(req))!) };
+  });
+  app.delete('/api/me/picture', async (req, reply) => {
+    if (!access.require(req, reply, 'profile.picture', 'users.pictures')) return reply;
+    store.setAvatar(uid(req), null);
+    return { avatar: pictureUrl(store, store.getUser(uid(req))!) };
+  });
+  app.put('/api/me/gravatar', async (req, reply) => {
+    if (!access.require(req, reply, 'profile.picture', 'users.pictures')) return reply;
+    const body = z.object({ on: z.boolean() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
+    store.setGravatar(uid(req), body.data.on);
+    return { avatar: pictureUrl(store, store.getUser(uid(req))!) };
   });
 
   // ---- version and changelog (DreyMail) ----------------------------------------------
@@ -235,7 +287,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   const updates = deps.updates ?? new UpdateChecker(config.updateCheck);
   let changelog: string | null = null;
   app.get('/api/version', async (req): Promise<VersionInfo> => {
-    const latest = isAdmin(config, req.user!) ? await updates.get() : null;
+    const latest = access.can(req.user!, 'updates.view') ? await updates.get() : null;
     return { version, update: latest && isNewer(latest.version, version) ? latest : null };
   });
   app.get('/api/changelog', async () => ({ markdown: (changelog ??= readChangelog()) }));
@@ -397,6 +449,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   };
 
   app.post('/api/accounts/test', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
     try {
       const body = z.object({ account: accountSchema, id: z.string().optional() }).parse(req.body);
       const existing = body.id ? store.getAccountSecret(uid(req), body.id) : null;
@@ -413,6 +466,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   app.post('/api/accounts', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
     try {
       const input = withDefaultPassword(config.accountDefaults, templateValues(req.user!), accountSchema.parse(req.body));
       if (!input.imap.password) throw new ComposeError('IMAP password is required');
@@ -426,6 +480,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   app.put<{ Params: { id: string } }>('/api/accounts/:id', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
     try {
       const input = accountSchema.parse(req.body);
       const existing = store.getAccountSecret(uid(req), req.params.id);
@@ -448,6 +503,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   app.delete<{ Params: { id: string } }>('/api/accounts/:id', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
     if (!store.deleteAccount(uid(req), req.params.id)) return reply.code(404).send({ error: 'Account not found' });
     mail.forgetAccount(uid(req), req.params.id);
     pool.invalidate(uid(req), req.params.id);

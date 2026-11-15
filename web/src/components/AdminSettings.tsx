@@ -2,27 +2,35 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Lock, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Camera, KeyRound, Lock, Plus, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { AdminUser, LoginSettingsInput, LoginSettingsView, Registration } from '../../../shared/types';
-import { api } from '../api';
+import { PERMISSIONS, SUPERADMIN, USER_DEFAULTS, type Permission, type Role } from '../../../shared/permissions';
+import type { AdminUser, LoginSettingsInput, LoginSettingsView, Me, Registration } from '../../../shared/types';
+import { api, type RolesView } from '../api';
+import { PictureEditor, UserAvatar } from './UserPicture';
 
-/** Settings → Users: everyone on this DreyMail instance (administrators only). */
-export function UsersAdmin({ myId }: { myId: string }) {
+/** Settings → Users: everyone on this DreyMail instance. What can be done depends on the role. */
+export function UsersAdmin({ me }: { me: Me }) {
   const qc = useQueryClient();
+  const myId = me.id;
+  const can = (p: Permission) => me.permissions.includes(p);
+  const superadmin = me.role.id === SUPERADMIN;
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: api.adminUsers });
+  const roles = useQuery({ queryKey: ['admin', 'roles'], queryFn: api.adminRoles, enabled: can('roles.manage') || can('users.manage') });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [picturing, setPicturing] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [makeAdmin, setMakeAdmin] = useState(false);
+  const [newRole, setNewRole] = useState('');
 
   const run = async (fn: () => Promise<AdminUser[]>) => {
     setBusy(true);
     setError(null);
     try {
       qc.setQueryData(['admin', 'users'], await fn());
+      void qc.invalidateQueries({ queryKey: ['admin', 'roles'] });
       return true;
     } catch (err) {
       setError((err as Error).message);
@@ -33,36 +41,58 @@ export function UsersAdmin({ myId }: { myId: string }) {
   };
 
   if (!users.data) return <div className="hint">{users.error ? (users.error as Error).message : 'Loading…'}</div>;
+  const roleList = roles.data?.roles ?? [];
+  const roleName = (id: string) => roleList.find((r) => r.id === id)?.name ?? (id === SUPERADMIN ? 'Superadmin' : id === 'user' ? 'User' : 'Role');
+  // Roles this administrator may hand out: none with rights they don't have themselves.
+  const grantable = roleList.filter((r) => (r.id === SUPERADMIN ? superadmin : r.permissions.every((p) => can(p))));
 
   return (
     <div className="stack">
       <div className="hint">Everyone who can sign in to this DreyMail. Each user only ever sees their own mail accounts.</div>
       <ul className="user-list">
-        {users.data.map((u) => (
-          <li key={u.id}>
-            <div className="user-main">
-              <div className="user-name">
-                {u.name || u.username || u.email}
-                {u.id === myId && <span className="chip">You</span>}
-                {u.admin && (
-                  <span className="chip" title={u.adminByEnv ? 'Administrator through DREYMAIL_ADMIN_USERS' : undefined}>
-                    <ShieldCheck size={12} /> Admin
-                  </span>
-                )}
+        {users.data.map((u) => {
+          const display = u.name || u.username || u.email;
+          const protectedUser = u.roleId === SUPERADMIN && !superadmin;
+          return (
+            <li key={u.id}>
+              <UserAvatar src={u.avatar} name={display} size={36} />
+              <div className="user-main">
+                <div className="user-name">
+                  {display}
+                  {u.id === myId && <span className="chip">You</span>}
+                  {(!can('roles.manage') || u.id === myId || u.adminByEnv || protectedUser) && (
+                    <span className="chip" title={u.adminByEnv ? 'Superadmin through DREYMAIL_ADMIN_USERS' : undefined}>
+                      {u.roleId === SUPERADMIN && <ShieldCheck size={12} />} {roleName(u.roleId)}
+                    </span>
+                  )}
+                </div>
+                <div className="muted user-meta">
+                  {u.login === 'password' ? `Password · ${u.username}` : u.login === 'oidc' ? `OIDC · ${u.email || u.username}` : 'Dev login'} ·{' '}
+                  {u.accounts} mail {u.accounts === 1 ? 'account' : 'accounts'} · since {new Date(u.createdAt).toLocaleDateString()}
+                </div>
               </div>
-              <div className="muted user-meta">
-                {u.login === 'password' ? `Password · ${u.username}` : u.login === 'oidc' ? `OIDC · ${u.email || u.username}` : 'Dev login'} ·{' '}
-                {u.accounts} mail {u.accounts === 1 ? 'account' : 'accounts'} · since {new Date(u.createdAt).toLocaleDateString()}
-              </div>
-            </div>
-            {u.id !== myId && (
               <div className="user-actions">
-                {!u.adminByEnv && (
-                  <button className="btn" disabled={busy} onClick={() => void run(() => api.adminPatchUser(u.id, { admin: !u.admin }))}>
-                    {u.admin ? 'Remove admin' : 'Make admin'}
+                {can('roles.manage') && u.id !== myId && !u.adminByEnv && !protectedUser && (
+                  <select
+                    className="input role-select"
+                    aria-label={`Role of ${display}`}
+                    value={u.roleId}
+                    disabled={busy}
+                    onChange={(e) => void run(() => api.adminPatchUser(u.id, { roleId: e.target.value }))}
+                  >
+                    {(grantable.some((r) => r.id === u.roleId) ? grantable : [...grantable, { id: u.roleId, name: roleName(u.roleId) }]).map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {can('users.pictures') && (
+                  <button className="icon-btn" title="Change profile picture" disabled={busy} onClick={() => setPicturing(picturing === u.id ? null : u.id)}>
+                    <Camera size={16} />
                   </button>
                 )}
-                {u.login === 'password' && (
+                {can('users.manage') && u.login === 'password' && !protectedUser && (
                   <button
                     className="icon-btn"
                     title="Set a new password"
@@ -75,74 +105,242 @@ export function UsersAdmin({ myId }: { myId: string }) {
                     <KeyRound size={16} />
                   </button>
                 )}
-                <button
-                  className="icon-btn danger-text"
-                  title="Remove user"
-                  disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`Remove ${u.name || u.username || u.email}? Their mail account settings, signatures and preferences are deleted. Their mail stays on the mail servers.`)) {
-                      void run(() => api.adminDeleteUser(u.id));
-                    }
-                  }}
-                >
-                  <Trash2 size={16} />
+                {can('users.manage') && u.id !== myId && !protectedUser && (
+                  <button
+                    className="icon-btn danger-text"
+                    title="Remove user"
+                    disabled={busy}
+                    onClick={() => {
+                      if (window.confirm(`Remove ${display}? Their mail account settings, signatures and preferences are deleted. Their mail stays on the mail servers.`)) {
+                        void run(() => api.adminDeleteUser(u.id));
+                      }
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+              {picturing === u.id && (
+                <div className="user-picture-edit">
+                  <PictureEditor
+                    busy={busy}
+                    onCancel={() => setPicturing(null)}
+                    onSave={(d) => void run(() => api.adminSetPicture(u.id, d)).then((ok) => ok && setPicturing(null))}
+                  />
+                  {u.hasPicture && (
+                    <button className="btn" disabled={busy} onClick={() => void run(() => api.adminDeletePicture(u.id)).then((ok) => ok && setPicturing(null))}>
+                      <Trash2 size={15} /> Remove their picture
+                    </button>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {can('users.manage') &&
+        (adding ? (
+          <form
+            className="sig-editor"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(() => api.adminCreateUser({ username, password, ...(newRole ? { roleId: newRole } : {}) })).then((ok) => {
+                if (ok) {
+                  setAdding(false);
+                  setUsername('');
+                  setPassword('');
+                  setNewRole('');
+                }
+              });
+            }}
+          >
+            <div className="grid2">
+              <div>
+                <label className="label" htmlFor="new-user">
+                  Username
+                </label>
+                <input id="new-user" className="input" value={username} autoComplete="off" onChange={(e) => setUsername(e.target.value)} />
+              </div>
+              <div>
+                <label className="label" htmlFor="new-password">
+                  Password
+                </label>
+                <input id="new-password" className="input" type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
+              </div>
+            </div>
+            {can('roles.manage') && grantable.length > 0 && (
+              <div>
+                <label className="label" htmlFor="new-role">
+                  Role
+                </label>
+                <select id="new-role" className="input" value={newRole || roles.data?.defaultRole || 'user'} onChange={(e) => setNewRole(e.target.value)}>
+                  {grantable.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="hint">They sign in with this username and password (password login must be on in Sign-in). OIDC users appear here after their first sign-in.</div>
+            <div className="row-buttons">
+              <span className="grow" />
+              <button type="button" className="btn" onClick={() => setAdding(false)}>
+                Cancel
+              </button>
+              <button className="btn primary" disabled={busy || !username.trim() || !password}>
+                Add user
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <button className="btn" onClick={() => setAdding(true)}>
+              <UserPlus size={15} /> Add user
+            </button>
+          </div>
+        ))}
+      {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/** Settings → Roles: roles and their permission flags, and the role new users get. */
+export function RolesAdmin({ me }: { me: Me }) {
+  const qc = useQueryClient();
+  const roles = useQuery({ queryKey: ['admin', 'roles'], queryFn: api.adminRoles });
+  const [editing, setEditing] = useState<{ id: string | null; name: string; permissions: Permission[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const mine = new Set(me.permissions);
+
+  const run = async (fn: () => Promise<RolesView>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      qc.setQueryData(['admin', 'roles'], await fn());
+      void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      return true;
+    } catch (err) {
+      setError((err as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!roles.data) return <div className="hint">{roles.error ? (roles.error as Error).message : 'Loading…'}</div>;
+  const groups = [...new Set(PERMISSIONS.map((p) => p.group))];
+  const allowedRole = (r: Role) => r.permissions.every((p) => mine.has(p));
+
+  return (
+    <div className="stack">
+      <div className="hint">
+        Every user has one role. <strong>Superadmin</strong> always has every right, including ones added in later versions. <strong>User</strong> is
+        for using DreyMail without administration. Add your own roles for anything in between.
+      </div>
+      <ul className="role-list">
+        {roles.data.roles.map((r) => (
+          <li key={r.id}>
+            <div className="user-main">
+              <div className="user-name">
+                {r.id === SUPERADMIN && <ShieldCheck size={14} />} {r.name}
+                {roles.data.defaultRole === r.id && <span className="chip">New users</span>}
+              </div>
+              <div className="muted user-meta">
+                {r.id === SUPERADMIN ? 'Everything' : r.permissions.length === 0 ? 'Reading and sending mail only' : PERMISSIONS.filter((p) => r.permissions.includes(p.key)).map((p) => p.label).join(' · ')}
+                {' · '}
+                {r.users} {r.users === 1 ? 'user' : 'users'}
+              </div>
+            </div>
+            {r.id !== SUPERADMIN && allowedRole(r) && (
+              <div className="user-actions">
+                <button className="btn" disabled={busy} onClick={() => setEditing({ id: r.id, name: r.name, permissions: r.permissions })}>
+                  Edit
                 </button>
+                {!r.builtin && (
+                  <button
+                    className="icon-btn danger-text"
+                    title="Remove role"
+                    disabled={busy}
+                    onClick={() => {
+                      if (window.confirm(`Remove the role ${r.name}? Its ${r.users} ${r.users === 1 ? 'user gets' : 'users get'} the role new users get.`)) void run(() => api.adminDeleteRole(r.id));
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             )}
           </li>
         ))}
       </ul>
-      {adding ? (
+      {editing ? (
         <form
           className="sig-editor"
           onSubmit={(e) => {
             e.preventDefault();
-            void run(() => api.adminCreateUser({ username, password, admin: makeAdmin })).then((ok) => {
-              if (ok) {
-                setAdding(false);
-                setUsername('');
-                setPassword('');
-                setMakeAdmin(false);
-              }
-            });
+            void run(() => api.adminSaveRole(editing.id, { name: editing.name, permissions: editing.permissions })).then((ok) => ok && setEditing(null));
           }}
         >
-          <div className="grid2">
-            <div>
-              <label className="label" htmlFor="new-user">
-                Username
-              </label>
-              <input id="new-user" className="input" value={username} autoComplete="off" onChange={(e) => setUsername(e.target.value)} />
-            </div>
-            <div>
-              <label className="label" htmlFor="new-password">
-                Password
-              </label>
-              <input id="new-password" className="input" type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
-            </div>
+          <div>
+            <label className="label" htmlFor="role-name">
+              Name
+            </label>
+            <input id="role-name" className="input" value={editing.name} disabled={editing.id === 'user'} maxLength={60} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
           </div>
-          <label className="check">
-            <input type="checkbox" checked={makeAdmin} onChange={(e) => setMakeAdmin(e.target.checked)} />
-            Administrator
-          </label>
-          <div className="hint">They sign in with this username and password (password login must be on in Sign-in). OIDC users appear here after their first sign-in.</div>
+          {groups.map((g) => (
+            <fieldset key={g} className="perm-group">
+              <legend>{g}</legend>
+              {PERMISSIONS.filter((p) => p.group === g).map((p) => (
+                <label key={p.key} className="check" title={mine.has(p.key) ? undefined : "You don't have this right yourself"}>
+                  <input
+                    type="checkbox"
+                    checked={editing.permissions.includes(p.key)}
+                    disabled={!mine.has(p.key)}
+                    onChange={(e) =>
+                      setEditing({ ...editing, permissions: e.target.checked ? [...editing.permissions, p.key] : editing.permissions.filter((x) => x !== p.key) })
+                    }
+                  />
+                  {p.label}
+                </label>
+              ))}
+            </fieldset>
+          ))}
+          <div className="hint">Reading, sending and organising mail, signatures, saved searches and personal settings are always allowed.</div>
           <div className="row-buttons">
             <span className="grow" />
-            <button type="button" className="btn" onClick={() => setAdding(false)}>
+            <button type="button" className="btn" onClick={() => setEditing(null)}>
               Cancel
             </button>
-            <button className="btn primary" disabled={busy || !username.trim() || !password}>
-              Add user
+            <button className="btn primary" disabled={busy || !editing.name.trim()}>
+              {editing.id ? 'Save role' : 'Add role'}
             </button>
           </div>
         </form>
       ) : (
         <div>
-          <button className="btn" onClick={() => setAdding(true)}>
-            <UserPlus size={15} /> Add user
+          <button className="btn" onClick={() => setEditing({ id: null, name: '', permissions: [...USER_DEFAULTS] })}>
+            <Plus size={15} /> Add role
           </button>
         </div>
       )}
+      <div>
+        <label className="label" htmlFor="default-role">
+          Role for new users
+        </label>
+        <select id="default-role" className="input" value={roles.data.defaultRole} disabled={busy} onChange={(e) => void run(() => api.adminDefaultRole(e.target.value))}>
+          {roles.data.roles
+            .filter((r) => r.id !== SUPERADMIN && allowedRole(r))
+            .map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+        </select>
+        <div className="hint">What people get when they register or first sign in with OIDC. The very first user of a new DreyMail is always Superadmin.</div>
+      </div>
       {error && <div className="error-text">{error}</div>}
     </div>
   );
