@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -596,11 +597,30 @@ function YourName() {
 
 /** Settings → General: first name only (default) or the full name at the bottom left. */
 function FullNameToggle({ v, save }: { v: Preferences; save: (p: Preferences) => Promise<void> }) {
+  const shows = v.footerIdentity ?? 'both';
   return (
-    <label className="check">
-      <input type="checkbox" checked={v.showFullName} onChange={(e) => void save({ ...v, showFullName: e.target.checked })} />
-      Show my full name at the bottom left (otherwise only the first name)
-    </label>
+    <div>
+      <label className="label">Bottom left shows</label>
+      <div className="segmented">
+        {(
+          [
+            ['both', 'Photo and name'],
+            ['name', 'Name only'],
+            ['photo', 'Photo only'],
+          ] as const
+        ).map(([key, label]) => (
+          <button key={key} className={shows === key ? 'on' : ''} onClick={() => void save({ ...v, footerIdentity: key })} style={{ padding: '6px 12px' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {shows !== 'photo' && (
+        <label className="check" style={{ marginTop: 10 }}>
+          <input type="checkbox" checked={v.showFullName} onChange={(e) => void save({ ...v, showFullName: e.target.checked })} />
+          Show my full name (otherwise only the first name)
+        </label>
+      )}
+    </div>
   );
 }
 

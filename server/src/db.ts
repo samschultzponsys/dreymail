@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles with permission flags; profile pictures.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -203,6 +204,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   contactPhotos: true,
   unifiedInbox: true,
   showFullName: false,
+  footerIdentity: 'both',
 };
 
 export interface User {

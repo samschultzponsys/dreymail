@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.7): Choose what the bottom left shows
+
+- Settings → Profile → "Bottom left shows": photo and name (default), name only, or photo only;
+  the collapsed sidebar always shows the photo. New `footerIdentity` preference (`shared/types.ts`,
+  `server/src/db.ts`, `server/src/routes/api.ts`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/App.tsx`, `web/src/styles.css`).
+
 ## 2026-11-15 (v2.6): Collapsed sidebar shows only your picture
 
 - With the sidebar collapsed, its footer shows only your profile picture, which opens Settings.

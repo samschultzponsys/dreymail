@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters, saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -569,6 +570,7 @@ export function App() {
         userLabel={userLabel(me.data!, me.data!.preferences.showFullName)}
         userFullName={userLabel(me.data!, true)}
         userAvatar={me.data!.avatar}
+        footerIdentity={me.data!.preferences.footerIdentity}
         onCloseNav={() => closeOverlay('nav')}
         searches={savedSearches.data ?? []}
         activeSearch={activeSearch}

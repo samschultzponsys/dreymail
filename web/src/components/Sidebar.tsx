@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: saved searches as smart folders.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -69,6 +70,8 @@ interface Props {
   userFullName: string;
   /** Profile picture URL, or null for initials. */
   userAvatar: string | null;
+  /** What the bottom left shows: photo and name, name only, or photo only. */
+  footerIdentity?: 'both' | 'name' | 'photo';
   accounts: AccountView[];
   folders: AccountFolders[] | undefined;
   sel: MailboxSel;
@@ -86,7 +89,7 @@ interface Props {
   onDeleteSearch: (s: SavedSearch) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, userAvatar, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -195,9 +198,9 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, folde
         })}
       </nav>
       <div className="sidebar-footer">
-        <button className="footer-me" title={`${userFullName}: profile and settings`} onClick={onSettings}>
+        <button className={`footer-me shows-${footerIdentity}`} title={`${userFullName}: profile and settings`} onClick={onSettings}>
           <UserAvatar src={userAvatar} name={userFullName} size={20} />
-          <span className="who name">{userLabel}</span>
+          {footerIdentity !== 'photo' && <span className="who name">{userLabel}</span>}
         </button>
         {version.data && (
           <button

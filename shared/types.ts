@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: account sign-in kind (password or Microsoft).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 // Types shared between the server API and the web client.
 
@@ -254,6 +255,8 @@ export type NotificationContent = 'full' | 'minimal';
 /** Phone screen transitions (the running squirrel): off, or how quickly it runs. */
 export type TransitionSpeed = 'off' | 'fast' | 'medium' | 'slow';
 
+export type FooterIdentity = 'both' | 'name' | 'photo';
+
 export interface Preferences {
   theme: 'system' | 'light' | 'dark';
   pageSize: number;
@@ -269,6 +272,8 @@ export interface Preferences {
   unifiedInbox: boolean;
   /** Bottom left shows the full name; off (default) shows only the first name. */
   showFullName: boolean;
+  /** Bottom left (DreyMail): photo and name, name only, or photo only. */
+  footerIdentity: FooterIdentity;
 }
 
 /**

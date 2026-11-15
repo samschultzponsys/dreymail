@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters, all-mail search and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
+// Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -95,6 +96,7 @@ export const prefsSchema = z.object({
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),
   showFullName: z.boolean().default(false),
+  footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
 });
 
 /** Collapses spaces and, for all-lowercase input, capitalises each word. Mixed case is kept (McDonald). */
