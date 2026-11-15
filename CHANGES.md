@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.6): Passkeys (fingerprint, face, PIN, security key)
+
+- **Passkeys:** sign in with a fingerprint, face, device PIN or security key, without typing a
+  password. Add and remove them in Settings → Profile → Passkeys; the sign-in page offers **Sign in
+  with a passkey** once one exists. They are discoverable (no username needed), bound to
+  DREYMAIL_BASE_URL's host, need https (or localhost), and work alongside password and OIDC
+  sign-in. Signatures are checked by SimpleWebAuthn (new dependencies `@simplewebauthn/server`
+  14.0.3 and `@simplewebauthn/browser` 14.0.0, MIT). Sign-in attempts are rate-limited, and each
+  challenge works once and only for five minutes.
+- **Files:** new `server/src/auth/passkeys.ts` and the `passkeys` table (`server/src/db.ts`);
+  `server/src/auth/session.ts`, `server/src/auth/routes.ts` (`/auth/methods` says whether passkeys
+  exist), `server/src/app.ts`, `shared/types.ts`; new `web/src/components/Passkeys.tsx`;
+  `web/src/components/Login.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/api.ts`.
+- Tests: `server/test/passkeys.test.ts`; checked end to end with a virtual authenticator (add a
+  passkey, sign out, sign in with it).
+
 ## 2026-11-15 (v3.5): Send later and undo send
 
 - **Send later** from the composer's clock button: tomorrow morning, tomorrow afternoon, Monday

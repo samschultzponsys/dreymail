@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,6 +39,7 @@ import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
+import { registerPasskeyRoutes } from './auth/passkeys.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
 import { AssistantEngine } from './ai/engine.js';
@@ -297,6 +299,7 @@ export async function buildApp(
   registerAndroidPushRoutes(app, { store, pool, firebase });
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
+  registerPasskeyRoutes(app, { config, store, sessions });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
   // Learning periods end on their own: stop watching inboxes that no longer need it.

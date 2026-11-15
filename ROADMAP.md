@@ -23,7 +23,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Gmail specifics: multi-label view and archive vs. delete semantics over IMAP.
 
 ### Security and sessions
-- [ ] Passkey / fingerprint sign-in and app lock (WebAuthn), with device PIN fallback.
+- [ ] App lock with a passkey after being idle (passkey sign-in itself is done).
 - [ ] Sliding sessions on trusted devices (today a session lasts 14 days from sign-in).
 
 ### Configuration

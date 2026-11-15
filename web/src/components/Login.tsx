@@ -4,8 +4,11 @@
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 // Modified by samschultzponsys, 2026-11-13: refetch everything after signing in (accounts stayed empty until a reload).
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import { SourceLink } from './SourceLink';
+import { passkeysAvailable, signInWithPasskey } from './Passkeys';
+import { Fingerprint } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api';
@@ -14,6 +17,7 @@ export function Login() {
   const qc = useQueryClient();
   const methods = useQuery({ queryKey: ['authMethods'], queryFn: api.authMethods, retry: false, staleTime: Infinity });
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -117,6 +121,20 @@ export function Login() {
           </form>
         )}
         {m?.password && (m.oidc || m.dev) && <div className="login-divider">or</div>}
+        {m?.passkeys && passkeysAvailable() && (
+          <button
+            className="btn"
+            onClick={() =>
+              void signInWithPasskey().then(
+                () => void qc.invalidateQueries(),
+                (e: Error) => setPasskeyError(e.name === 'NotAllowedError' ? 'Cancelled.' : e.message),
+              )
+            }
+          >
+            <Fingerprint size={16} /> Sign in with a passkey
+          </button>
+        )}
+        {passkeyError && <div className="error-text">{passkeyError}</div>}
         {m?.oidc && (
           <a className={`btn${m.password ? '' : ' primary'}`} href="/auth/login">
             Sign in with {m.oidc.label}

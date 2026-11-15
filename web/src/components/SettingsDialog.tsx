@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -33,6 +34,7 @@ import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, Users
 import { ProfilePicture } from './UserPicture';
 import { AiConnections } from './AiConnections';
 import { SourceLink } from './SourceLink';
+import { Passkeys } from './Passkeys';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -207,6 +209,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'profile' && (
             <>
               <ProfilePicture me={me} />
+              <Passkeys />
               <YourName />
               <FullNameToggle v={v} save={save} />
               <div className="hint">

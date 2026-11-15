@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { openJson, sealJson } from '../crypto.js';
@@ -13,7 +14,7 @@ const LOGIN_TTL = 10 * 60;
 export interface SessionData {
   uid: string;
   /** How the user signed in. Missing in sessions from before password login existed (those are OIDC). */
-  via?: 'oidc' | 'password' | 'dev';
+  via?: 'oidc' | 'password' | 'dev' | 'passkey';
   /** id_token for RP-initiated logout, if the provider supports it. */
   idt?: string;
 }

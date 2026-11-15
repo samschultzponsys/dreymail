@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -308,6 +309,18 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS scheduled_sends_due ON scheduled_sends(status, send_at);`,
+  // DreyMail: passkeys (fingerprint, face, security key) to sign in with.
+  `CREATE TABLE IF NOT EXISTS passkeys (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     public_key BLOB NOT NULL,
+     counter INTEGER NOT NULL DEFAULT 0,
+     transports TEXT NOT NULL DEFAULT '[]',
+     name TEXT NOT NULL,
+     created_at INTEGER NOT NULL,
+     last_used INTEGER NOT NULL DEFAULT 0
+   );
+   CREATE INDEX IF NOT EXISTS passkeys_user ON passkeys(user_id);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

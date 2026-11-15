@@ -23,7 +23,8 @@
      Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
      Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
      Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
-     Modified by samschultzponsys, 2026-11-15: send later and undo send. -->
+     Modified by samschultzponsys, 2026-11-15: send later and undo send.
+     Modified by samschultzponsys, 2026-11-15: passkey sign-in. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -47,7 +48,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.5**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.6**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -78,6 +79,11 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - Login with a username and password, with any OpenID Connect provider (Authentik, Keycloak, …),
   or both side by side; see [Login](#login). Each user owns their own accounts, with strict
   per-user isolation.
+- **Passkeys:** sign in with your fingerprint, face, device PIN or a security key instead of a
+  password (Settings → Profile → Passkeys). Passkeys need DreyMail on https at the address in
+  `DREYMAIL_BASE_URL`. They work in current browsers. In the desktop and Android apps, support
+  depends on the system (Windows Hello works; Linux and Android WebView vary), and passwords or
+  OIDC keep working there.
 - **Administration in the app, with roles.** Every user has a role made of permission flags:
   - **Superadmin** has every right, including ones added in later versions. The first user is
     Superadmin, and so is anyone named in `DREYMAIL_ADMIN_USERS`.

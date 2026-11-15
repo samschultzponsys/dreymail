@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: sign-in options come from LoginSettings (UI, with environment overrides) and can change at runtime.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import { serverVersion } from '../version.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -59,6 +60,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
       oidc: l.oidc ? { label: l.oidc.label } : null,
       dev: config.devLogin,
       version: serverVersion(),
+      passkeys: !!store.db.prepare('SELECT 1 FROM passkeys LIMIT 1').get(),
     };
   });
 

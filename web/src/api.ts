@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -47,7 +48,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+export async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { 'x-dreymail': '1' };
   let payload: BodyInit | undefined;
   if (body instanceof FormData) payload = body;
@@ -234,3 +235,4 @@ function composeForm(payload: ComposePayload, files: File[], sendAt?: Date): For
   for (const f of files) form.append('files', f, f.name);
   return form;
 }
+export const fetchJson = request;

@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 
 // Types shared between the server API and the web client.
 
@@ -450,6 +451,8 @@ export interface AuthMethods {
   dev: boolean;
   /** Running version (DreyMail), for the source code link on the sign-in page. */
   version?: string;
+  /** Some user has a passkey: offer "Sign in with a passkey" (DreyMail). */
+  passkeys?: boolean;
 }
 
 export type ServerEvent =
