@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: mailbox editing follows the role's permissions.
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -14,6 +15,8 @@ import type { AccountDefaults, AccountInput, AccountView, TlsMode } from '../../
 import { newAccountInput, usesDefaultPassword } from '../accountForm';
 import { api } from '../api';
 import { ACCOUNT_COLORS } from '../util';
+import { labelOn } from '../accountTheme';
+import { MailboxIcon, MailboxIconPicker } from './MailboxIcon';
 
 function fromView(a: AccountView): AccountInput {
   return {
@@ -21,6 +24,7 @@ function fromView(a: AccountView): AccountInput {
     displayName: a.displayName,
     email: a.email,
     color: a.color,
+    icon: a.icon,
     imap: { ...a.imap, password: '' },
     smtp: { ...a.smtp, password: '' },
     appendSent: a.appendSent,
@@ -191,6 +195,7 @@ function AccountForm({
             <div className="hint">The whole app takes on this color while the account is open.</div>
           </div>
         </div>
+        <MailboxIconPicker value={v.icon ?? ''} color={v.color} onChange={(icon) => setV({ ...v, icon })} />
         <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} onChange={(imap) => setV({ ...v, imap })} />
         <ServerFields kind="smtp" value={v.smtp} editing={!!id} passwordHint={smtpHint} onChange={(smtp) => setV({ ...v, smtp })} />
         <label className="check">
@@ -350,7 +355,9 @@ export function AccountsDialog({
               {!canEdit && <div className="hint">Your role doesn't allow changing mailboxes. Ask an administrator.</div>}
               {accounts.map((a) => (
                 <div className="account-card" key={a.id}>
-                  <span className="swatch" style={{ background: a.color, cursor: 'default' }} />
+                  <span className="account-mark" style={{ background: a.color }}>
+                    {a.icon && <MailboxIcon icon={a.icon} color={labelOn(a.color)} size={16} />}
+                  </span>
                   <div className="grow">
                     <div style={{ fontWeight: 600 }}>{a.name}</div>
                     <div className="sub">
@@ -414,6 +421,7 @@ function MicrosoftAccountForm({
   const [name, setName] = useState(account.name);
   const [displayName, setDisplayName] = useState(account.displayName);
   const [color, setColor] = useState(account.color);
+  const [icon, setIcon] = useState(account.icon);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -459,6 +467,7 @@ function MicrosoftAccountForm({
             </label>
           </div>
         </div>
+        <MailboxIconPicker value={icon} color={color} onChange={setIcon} />
         <div className="hint">{account.auth === 'google' ? 'Gmail keeps the copy of sent mail itself.' : 'Sent mail goes through Microsoft, which keeps the copy in Sent Items.'}</div>
         {(error || status) && <div className="error-text">{error ?? status}</div>}
       </div>
@@ -473,7 +482,7 @@ function MicrosoftAccountForm({
           onClick={async () => {
             setBusy(true);
             try {
-              await api.updateAccount(account.id, { ...fromView(account), name: name.trim(), displayName, color });
+              await api.updateAccount(account.id, { ...fromView(account), name: name.trim(), displayName, color, icon });
               onDone();
             } catch (err) {
               setStatus((err as Error).message);

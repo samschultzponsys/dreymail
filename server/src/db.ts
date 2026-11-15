@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles with permission flags; profile pictures.
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
 import crypto from 'node:crypto';
@@ -36,7 +37,7 @@ const SNOOZES_SQL = `CREATE TABLE IF NOT EXISTS snoozes (
    );
    CREATE INDEX IF NOT EXISTS snoozes_until ON snoozes(until);`;
 
-const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
+export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
   `CREATE TABLE users (
      id TEXT PRIMARY KEY,
      issuer TEXT NOT NULL,
@@ -188,6 +189,11 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!has('avatar_version')) db.exec('ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0;');
     if (!has('gravatar')) db.exec('ALTER TABLE users ADD COLUMN gravatar INTEGER NOT NULL DEFAULT 1;');
   },
+  // DreyMail: an icon per mailbox (shared/mailboxIcons.ts), shown with its colour.
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'icon')) db.exec("ALTER TABLE accounts ADD COLUMN icon TEXT NOT NULL DEFAULT '';");
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -273,6 +279,7 @@ interface AccountRow {
   append_sent: number;
   auth?: string;
   oauth_token?: string;
+  icon?: string;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -286,6 +293,7 @@ function toView(r: AccountRow): AccountView {
     displayName: r.display_name,
     email: r.email,
     color: r.color,
+    icon: r.icon ?? '',
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
@@ -703,6 +711,11 @@ export class Store {
   }
 
   /** Label, sender name and colour only (Outlook accounts, whose servers are fixed). */
+  /** A mailbox's icon key (checked by the caller); '' for none. */
+  setAccountIcon(userId: string, accountId: string, icon: string) {
+    this.db.prepare('UPDATE accounts SET icon = ? WHERE user_id = ? AND id = ?').run(icon, userId, accountId);
+  }
+
   updateAccountLabels(userId: string, accountId: string, l: { name: string; displayName: string; color: string }): AccountView | null {
     const changed = this.db
       .prepare('UPDATE accounts SET name = ?, display_name = ?, color = ? WHERE user_id = ? AND id = ?')

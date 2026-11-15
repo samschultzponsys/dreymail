@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 
 // Types shared between the server API and the web client.
 
@@ -22,6 +23,8 @@ export interface AccountInput {
   displayName: string;
   email: string;
   color: string;
+  /** Icon key from shared/mailboxIcons.ts; '' or missing = none. */
+  icon?: string;
   imap: { host: string; port: number; tls: TlsMode; user: string; password?: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string; password?: string };
   appendSent: boolean;
@@ -34,6 +37,8 @@ export interface AccountView {
   displayName: string;
   email: string;
   color: string;
+  /** Icon key from shared/mailboxIcons.ts ('' = the coloured dot) (DreyMail). */
+  icon: string;
   imap: { host: string; port: number; tls: TlsMode; user: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string };
   appendSent: boolean;

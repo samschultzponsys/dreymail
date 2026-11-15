@@ -10,8 +10,10 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters, all-mail search and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 
+import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -62,6 +64,7 @@ const accountSchema = z.object({
   displayName: z.string().trim().max(200),
   email: z.string().trim().min(3).max(320),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  icon: z.string().max(40).optional(),
   imap: server,
   smtp: server,
   appendSent: z.boolean(),
@@ -440,6 +443,9 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     store.deleteSavedSearch(uid(req), req.params.id) ? store.listSavedSearches(uid(req)) : reply.code(404).send({ error: 'Saved search not found' }),
   );
 
+  /** A known icon key, else none. */
+  const iconOf = (icon: string | undefined) => (isMailboxIcon(icon) ? icon : '');
+
   const verify = async (input: AccountInput, existing?: { imap: string; smtp: string }) => {
     const imapPw = input.imap.password || existing?.imap || '';
     const smtpPw = input.smtp.password || existing?.smtp || imapPw;
@@ -473,9 +479,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const input = withDefaultPassword(config.accountDefaults, templateValues(req.user!), accountSchema.parse(req.body));
       if (!input.imap.password) throw new ComposeError('IMAP password is required');
       await verify(input);
-      const account = store.createAccount(uid(req), input);
-      pool.accountAdded(uid(req), account.id);
-      return account;
+      const created = store.createAccount(uid(req), input);
+      store.setAccountIcon(uid(req), created.id, iconOf(input.icon));
+      pool.accountAdded(uid(req), created.id);
+      return store.listAccounts(uid(req)).find((a) => a.id === created.id) ?? created;
     } catch (err) {
       return sendError(reply, err);
     }
@@ -489,10 +496,13 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       if (!existing) throw new NotFoundError('Account not found');
       // Outlook / Google-signed-in accounts: only the label, name and colour can change here.
       if (existing.auth !== 'password') {
+        store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon));
         return store.updateAccountLabels(uid(req), req.params.id, { name: input.name, displayName: input.displayName, color: input.color });
       }
       await verify(input, { imap: existing.imap.password, smtp: existing.smtp.password });
-      const account = store.updateAccount(uid(req), req.params.id, input);
+      store.updateAccount(uid(req), req.params.id, input);
+      store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon));
+      const account = store.listAccounts(uid(req)).find((a) => a.id === req.params.id) ?? null;
       // Another server or login can mean another mailbox: cached mail no longer applies.
       if (existing.imap.host !== input.imap.host || existing.imap.port !== input.imap.port || existing.imap.user !== input.imap.user) {
         mail.forgetAccount(uid(req), req.params.id);

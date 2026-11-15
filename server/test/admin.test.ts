@@ -7,7 +7,7 @@ import type { AdminUser, AuthMethods, LoginSettingsInput, LoginSettingsView, Me 
 import { buildApp, type App } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { Keyring } from '../src/crypto.js';
-import { Store } from '../src/db.js';
+import { MIGRATIONS, Store } from '../src/db.js';
 import { ALL_PERMISSIONS, type Role } from '../../shared/permissions.js';
 
 /** A 1×1 PNG. */
@@ -235,8 +235,10 @@ describe('upgrading to roles', () => {
     store.close();
     // Back to the database as 2.4 left it: admin flag, no role column.
     const db = new DatabaseSync(file);
-    const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-    db.exec(`UPDATE users SET is_admin = (id = '${sam.id}'); ALTER TABLE users DROP COLUMN role_id; DROP TABLE roles; PRAGMA user_version = ${version - 1};`);
+    // Back to just before the roles migration (later ones are idempotent and simply run again).
+    const before = MIGRATIONS.findIndex((m) => String(m).includes('CREATE TABLE IF NOT EXISTS roles'));
+    expect(before).toBeGreaterThan(0);
+    db.exec(`UPDATE users SET is_admin = (id = '${sam.id}'); ALTER TABLE users DROP COLUMN role_id; DROP TABLE roles; PRAGMA user_version = ${before};`);
     db.close();
     store = new Store(file, key);
     expect(store.getUser(sam.id)!.roleId).toBe('superadmin');

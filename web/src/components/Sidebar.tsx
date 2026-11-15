@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-15: saved searches as smart folders.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -36,6 +37,7 @@ import type { AccountFolders, AccountView, FolderView, SpecialUse } from '../../
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
 import { UserAvatar } from './UserPicture';
+import { MailboxIcon } from './MailboxIcon';
 
 const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
   inbox: <Inbox size={16} />,
@@ -161,7 +163,7 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
                 title={acc.name}
               >
                 {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                <span className="dot" style={{ background: acc.color }} />
+                <MailboxIcon icon={acc.icon} color={acc.color} size={13} />
                 <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
               </button>
               {!isCollapsed && (

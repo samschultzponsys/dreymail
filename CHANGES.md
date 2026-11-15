@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.9): Mailbox icons
+
+- **An icon per mailbox** (38 to choose from, or the coloured dot as before), picked next to the
+  colour in Accounts. It shows in the mailbox's colour in the sidebar and the account list.
+  `accounts.icon` (`server/src/db.ts`), the `icon` field (`shared/types.ts`,
+  `server/src/routes/api.ts`). New `shared/mailboxIcons.ts`, generated from Lucide icons (ISC
+  licence, credited in the file) by the new `scripts/mailbox-icons.mjs`. New
+  `web/src/components/MailboxIcon.tsx`; `web/src/components/AccountsDialog.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/styles.css`.
+- **Notifications show it:** the icon on a tile in the mailbox colour.
+  - **Desktop app:** `web/src/desktop.ts`, `web/src/App.tsx`.
+  - **Browsers:** the push payload carries the colour and icon shape, and the service worker
+    draws it where the browser can (`server/src/push/notify.ts`, `server/src/push/service.ts`,
+    `web/public/sw.js`).
+  - **Android app:** both the large icon and the status-bar icon (`web/src/android.ts`,
+    `android/.../Notifier.kt`).
+- Release workflow: the manual-release input asks for the full commit SHA.
+- Tests: `server/test/mailboxIcons.test.ts`.
+
 ## 2026-11-15 (v2.8): Initials in the app colour; Node 24
 
 - Without a profile photo, the round initials (first letter, or first and last) are filled with the

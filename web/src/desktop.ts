@@ -4,6 +4,9 @@
 // The DreyMail desktop app (desktop/) loads this web app and exposes a small bridge as
 // `window.dreymailDesktop`. In a normal browser it is absent and none of this does anything.
 
+import { MAILBOX_ICONS } from '../../shared/mailboxIcons';
+import { labelOn } from './accountTheme';
+
 export interface DesktopNotification {
   title: string;
   body: string;
@@ -34,13 +37,24 @@ export function desktopBridge(): DesktopBridge | undefined {
 
 const iconCache = new Map<string, string>();
 
-/** A 128px notification icon: DreyMail's envelope in the account colour on night navy. */
-export function accountIcon(color: string): string {
-  const cached = iconCache.get(color);
+/**
+ * A 128px notification icon: the mailbox's own icon on its colour, or without one DreyMail's
+ * envelope in the account colour on night navy.
+ */
+export function accountIcon(color: string, icon = ''): string {
+  const key = `${color}|${icon}`;
+  const cached = iconCache.get(key);
   if (cached) return cached;
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const g = c.getContext('2d')!;
+  const path = MAILBOX_ICONS[icon]?.path;
+  if (path) {
+    drawMailboxIcon(g, 128, color, path);
+    const url = c.toDataURL('image/png');
+    iconCache.set(key, url);
+    return url;
+  }
   g.fillStyle = '#141b34';
   g.beginPath();
   g.roundRect(0, 0, 128, 128, 28);
@@ -60,6 +74,24 @@ export function accountIcon(color: string): string {
   g.lineTo(100, 40);
   g.stroke();
   const url = c.toDataURL('image/png');
-  iconCache.set(color, url);
+  iconCache.set(key, url);
   return url;
+}
+
+/** A rounded tile in the mailbox colour with its icon drawn in a readable colour on top. */
+export function drawMailboxIcon(g: CanvasRenderingContext2D, size: number, color: string, path: string) {
+  g.fillStyle = color;
+  g.beginPath();
+  g.roundRect(0, 0, size, size, size * 0.22);
+  g.fill();
+  const scale = (size * 0.58) / 24;
+  g.save();
+  g.translate((size - 24 * scale) / 2, (size - 24 * scale) / 2);
+  g.scale(scale, scale);
+  g.strokeStyle = labelOn(color);
+  g.lineWidth = 2;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.stroke(new Path2D(path));
+  g.restore();
 }

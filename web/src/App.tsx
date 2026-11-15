@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: search filters, saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -206,8 +207,8 @@ export function App() {
     (ev: NotifyEvent) => {
       const bridge = desktopBridge();
       if (!bridge || (document.visibilityState === 'visible' && document.hasFocus())) return;
-      const color = accountMap.get(ev.accountId)?.color ?? BRAND_CYAN;
-      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(color) });
+      const acc = accountMap.get(ev.accountId);
+      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(acc?.color ?? BRAND_CYAN, acc?.icon) });
     },
     [accountMap],
   );

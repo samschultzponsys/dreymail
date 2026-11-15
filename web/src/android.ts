@@ -4,6 +4,7 @@
 // The DreyMail Android app (android/) loads this web app in a WebView and adds a bridge as
 // `window.DreyMailAndroid`. In a browser it is absent and none of this does anything.
 
+import { MAILBOX_ICONS } from '../../shared/mailboxIcons';
 import type { AccountView } from '../../shared/types';
 import { api } from './api';
 
@@ -40,7 +41,8 @@ export function androidInfo(): { version: string; installKind: string } | null {
 
 /** Keeps the app's notification channels in step with the accounts. */
 export function syncAndroidAccounts(accounts: AccountView[]) {
-  androidBridge()?.setAccounts(JSON.stringify(accounts.map((a) => ({ id: a.id, name: a.name, color: a.color }))));
+  // icon: the mailbox icon's 24x24 SVG path (shared/mailboxIcons.ts), drawn by the app's notifications.
+  androidBridge()?.setAccounts(JSON.stringify(accounts.map((a) => ({ id: a.id, name: a.name, color: a.color, icon: MAILBOX_ICONS[a.icon]?.path ?? '' }))));
 }
 
 let registering = false;

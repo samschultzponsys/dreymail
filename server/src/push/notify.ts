@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: mailbox icons.
+
 import type { Address, NotificationContent } from '../../../shared/types.js';
 
 /** A message that just arrived in an INBOX, as reported by the IMAP watcher. */
@@ -28,6 +32,9 @@ export interface NotificationPayload {
   url: string;
   /** Unread count for the app icon badge, if known. */
   badge?: number;
+  /** The mailbox's colour and icon (a 24x24 SVG path), for the service worker to draw (DreyMail). */
+  color?: string;
+  iconPath?: string;
 }
 
 /**
