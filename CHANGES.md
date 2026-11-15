@@ -19,6 +19,10 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   the collapsed sidebar always shows the photo. New `footerIdentity` preference (`shared/types.ts`,
   `server/src/db.ts`, `server/src/routes/api.ts`, `web/src/components/SettingsDialog.tsx`,
   `web/src/components/Sidebar.tsx`, `web/src/App.tsx`, `web/src/styles.css`).
+- **Releases:** runs now queue per version, so a quick push of the next version no longer drops
+  the previous version's release (2.6 lost its run that way). `latest` only goes to the version
+  main carries. A missed version can be released by hand with its commit
+  (`.github/workflows/release.yml`).
 
 ## 2026-11-15 (v2.6): Collapsed sidebar shows only your picture
 

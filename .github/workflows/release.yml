@@ -3,6 +3,8 @@
 # Modified by samschultzponsys, 2026-11-13: release on push to main when package.json carries a new
 # MAJOR.MINOR version; image goes to ghcr.io/samschultzponsys/dreymail; every release gets a GitHub Release.
 # Modified by samschultzponsys, 2026-11-13: desktop apps (deb, rpm, flatpak, Windows installer) built and attached to each release.
+# Modified by samschultzponsys, 2026-11-15: runs queue per version (a newer push no longer drops an older version's
+# release); `latest` only for the version on main; a missed version can be released by hand with its commit.
 name: Release
 
 # Every push to main runs the tests. When package.json carries a version that has no tag yet
@@ -10,6 +12,8 @@ name: Release
 #   - the image ghcr.io/<owner>/dreymail tagged 1.3 and latest
 #   - the tag v1.3 and a GitHub Release (no files attached; notes generated from commits)
 # To release: bump package.json to the next version (scripts/release-version.sh next) and push.
+# A version whose release never ran (e.g. pushed while another was building): run this workflow by
+# hand (Actions → Release → Run workflow) with that version's commit in "sha".
 # Versions are MAJOR.MINOR and roll over after .9 (1.9 -> 2.0).
 #
 # Kept within GitHub's free tier: public repo (Actions minutes and public GHCR images are free),
@@ -18,41 +22,80 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit on main to release (for a version whose release never ran). Empty: the tip of main."
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
-# Two runs at once could both try to publish the same version.
-concurrency:
-  group: release
-  cancel-in-progress: false
-
 jobs:
-  release:
+  # Which commit and version this run is about. Kept apart so the release job can queue per version:
+  # two runs of the same version wait for each other (only one publishes), different versions don't
+  # drop each other's runs.
+  version:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
     outputs:
-      version: ${{ steps.version.outputs.value }}
+      value: ${{ steps.version.outputs.value }}
       publish: ${{ steps.version.outputs.publish }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+          ref: ${{ inputs.sha || github.sha }}
       - name: Work out the version
         id: version
         run: |
+          sha="$(git rev-parse HEAD)"
+          git fetch -q origin main
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha is not on main"; exit 1
+          fi
           version="$(scripts/release-version.sh current)"
           echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
           if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "v$version is already released; tests only."
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "Will release v$version."
+          fi
+
+  release:
+    needs: version
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ needs.version.outputs.value }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      version: ${{ needs.version.outputs.value }}
+      publish: ${{ steps.again.outputs.publish }}
+      sha: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.version.outputs.sha }}
+
+      # A run of the same version may have published while this one waited.
+      - name: Still unreleased?
+        id: again
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          git fetch -q --tags origin
+          if [ "${{ needs.version.outputs.publish }}" = true ] && ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/setup-node@v4
@@ -65,23 +108,34 @@ jobs:
       - run: npm run test:integration
       - run: npm run build
 
-      - if: steps.version.outputs.publish == 'true'
+      # `latest` only for the version main carries now, so an older version released late (or by
+      # hand) never takes it back.
+      - name: Latest?
+        id: latest
+        if: steps.again.outputs.publish == 'true'
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          git fetch -q origin main
+          main="$(git show origin/main:package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s).version.split(".");console.log(v[0]+"."+v[1])})')"
+          if [ "$main" = "$VERSION" ]; then echo "value=true" >> "$GITHUB_OUTPUT"; else echo "value=false" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.again.outputs.publish == 'true'
         uses: docker/setup-buildx-action@v3
-      - if: steps.version.outputs.publish == 'true'
+      - if: steps.again.outputs.publish == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.version.outputs.publish == 'true'
+      - if: steps.again.outputs.publish == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.value }}
-            type=raw,value=latest
-      - if: steps.version.outputs.publish == 'true'
+            type=raw,value=${{ needs.version.outputs.value }}
+            type=raw,value=latest,enable=${{ steps.latest.outputs.value == 'true' }}
+      - if: steps.again.outputs.publish == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -93,16 +147,17 @@ jobs:
 
       # Last, so a failed build never leaves a tag or release without an image behind it.
       - name: Publish the GitHub Release
-        if: steps.version.outputs.publish == 'true'
+        if: steps.again.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.value }}
+          VERSION: ${{ needs.version.outputs.value }}
+          SHA: ${{ needs.version.outputs.sha }}
         run: >
           gh release create "v$VERSION"
-          --target "$GITHUB_SHA"
+          --target "$SHA"
           --title "DreyMail v$VERSION"
           --generate-notes
-          --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\` (also \`latest\`). See CHANGES.md for the dated change log."
+          --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\`. See CHANGES.md for the dated change log."
 
   # ---- desktop apps, attached to the GitHub Release just created ------------------------------
   # File names carry the version: DreyMail-1.7-amd64.deb, DreyMail-1.7-x86_64.rpm,
@@ -121,6 +176,8 @@ jobs:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -158,6 +215,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -189,6 +248,8 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
       - name: Signing key
         id: key
         env:
