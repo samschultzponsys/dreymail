@@ -13,7 +13,8 @@
    Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
    Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
    Modified by samschultzponsys, 2026-11-15: search filter panel, chips and saved searches.
-   Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen. */
+   Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+   Modified by samschultzponsys, 2026-11-15: collapsed sidebar shows only the profile picture. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -673,7 +674,11 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .footer-me .who { padding-left: 0; }
 .sidebar-footer { gap: 2px; }
 .sidebar-footer .icon-btn { width: 28px; }
-.sidebar.rail .brand { flex-direction: column; gap: 6px; }
+/* Collapsed sidebar (desktop): just your picture at the bottom; it opens Settings. */
+@media (min-width: 1025px) {
+  .sidebar.rail .brand { flex-direction: column; gap: 6px; }
+  .sidebar.rail .sidebar-footer .icon-btn { display: none; }
+}
 .sidebar.rail .footer-me { justify-content: center; padding: 2px; flex: none; }
 .profile-picture { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .picture-editor { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }

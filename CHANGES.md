@@ -13,6 +13,11 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.6): Collapsed sidebar shows only your picture
+
+- With the sidebar collapsed, its footer shows only your profile picture, which opens Settings.
+  Accounts, Settings and Sign out are back when it's expanded (`web/src/styles.css`).
+
 ## 2026-11-15 (v2.5): Roles and permissions, profile pictures, grouped settings
 
 - **Roles with permission flags** replace the administrator yes/no.
