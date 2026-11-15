@@ -13,6 +13,31 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.0): automatic single sign-on, /login, easier OIDC setup; credits trimmed
+
+- **Sign in automatically with OIDC** (Settings → Sign-in, or `DREYMAIL_OIDC_AUTO_LOGIN=true`, which
+  wins and shows locked): opening DreyMail goes straight to the provider.
+  - **`/login`** always shows the sign-in page with every option (password, passkey, the provider
+    button): the way back in when the provider is down.
+  - No loops: after signing out DreyMail waits on the sign-in page; a failed or refused sign-in,
+    or a provider that can't be reached, comes back to `/login` with the reason (it used to show a
+    bare error page); and it never retries automatically within a minute.
+- **OIDC setup:** Settings → Sign-in shows the redirect URI and sign-out redirect URI for the address
+  you're on, with Copy buttons, and warns when that differs from `DREYMAIL_BASE_URL`.
+- **Credits:** the app is DreyMail's own. The sign-in page, Settings, What's new and the desktop
+  app's About box no longer name the project DreyMail started from; the source code link the
+  AGPL requires stays ("DreyMail X.Y · Source code · AGPL-3.0"). The README credits it once, in a
+  short section at the very end. `NOTICE` keeps the copyright notices; its additional term now
+  only asks that the file is preserved. What's new shows the latest 10 versions, without license
+  bookkeeping, and links to the full history.
+- **README:** status wording, the old note about variable names, and calendars no longer listed as
+  out of scope.
+- **Files:** `server/src/config.ts`, `server/src/loginSettings.ts`, `server/src/auth/routes.ts`,
+  `server/src/routes/admin.ts`, `shared/types.ts`, `web/src/components/Login.tsx`, `App.tsx`,
+  `AdminSettings.tsx`, `SourceLink.tsx`, `ChangelogDialog.tsx`, `web/src/styles.css`,
+  `desktop/main.cjs`, `desktop/electron-builder.yml`, `NOTICE`, `README.md`, `CLAUDE.md`, tests
+  (`server/test/admin.test.ts`, `web/test/changelog.test.ts`), `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v3.9): Google, Outlook and CalDAV calendars; answering invitations
 
 - **Docs:** `ROADMAP.md` has its own Calendar section; `CLAUDE.md` asks for the roadmap to be

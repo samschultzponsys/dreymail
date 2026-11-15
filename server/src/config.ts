@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -85,6 +86,7 @@ export interface LoginEnv {
   label?: string;
   passwordLogin?: boolean;
   registration?: Registration;
+  oidcAutoLogin?: boolean;
 }
 
 /** Environment variable behind each sign-in field (shown in the UI next to locked fields). */
@@ -96,6 +98,7 @@ export const LOGIN_ENV_NAMES: Record<keyof LoginEnv, string> = {
   label: 'OIDC_LABEL',
   passwordLogin: 'DREYMAIL_PASSWORD_LOGIN',
   registration: 'DREYMAIL_REGISTRATION',
+  oidcAutoLogin: 'DREYMAIL_OIDC_AUTO_LOGIN',
 };
 
 export interface CacheConfig {
@@ -250,6 +253,7 @@ function loginEnvFrom(env: NodeJS.ProcessEnv, passwordLogin: boolean, registrati
   if (set('OIDC_LABEL')) out.label = env.OIDC_LABEL!.trim();
   if (set('DREYMAIL_PASSWORD_LOGIN')) out.passwordLogin = passwordLogin;
   if (set('DREYMAIL_REGISTRATION')) out.registration = registration;
+  if (set('DREYMAIL_OIDC_AUTO_LOGIN')) out.oidcAutoLogin = bool(env.DREYMAIL_OIDC_AUTO_LOGIN, false);
   return out;
 }
 

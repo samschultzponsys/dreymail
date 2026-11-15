@@ -13,8 +13,14 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
 ### License (AGPL-3.0-only, inherited; never change it)
 - **Never edit, shorten or replace `LICENSE`.**
 - **Never remove or reword existing copyright/license notices**: the `"license"` field in
-  `package.json`, the credit in `NOTICE` and `README.md`, or any notice in a file header. New
-  credit goes *next to* existing credit, never in place of it.
+  `package.json`, the upstream copyright paragraph in `NOTICE`, the Credits section at the very
+  bottom of `README.md`, or any notice in a file header. New credit goes *next to* existing
+  credit, never in place of it.
+- **Upstream credit stays minimal (owner's choice: DreyMail is its own app).** Credit the project
+  DreyMail started from only where the license needs it: `NOTICE`, file-header notices,
+  `CHANGES.md` history, and one short Credits section at the very bottom of `README.md`. Never in
+  the app's UI (sign-in page, Settings, What's new, desktop/Android About), release notes or the
+  top of the README.
 - **Mark every modified upstream file** (AGPL §5(a)). Under the file's existing header (or at the
   top if there is none), add or extend:
   ```
@@ -40,12 +46,11 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
   ```
 - **Update `CHANGES.md`** with every change: a dated entry with the version, listing what changed
   and in which files.
-- **Network-use source offer (AGPL §13):** if anyone other than the owner ever uses a deployed
-  instance, the UI **must** link to this project's source code (the repo URL, at the exact
-  version running). It's not built yet; it's on `ROADMAP.md` and must ship before the instance is
-  shared.
+- **Network-use source offer (AGPL §13):** the UI links to this project's source code at the
+  exact running version ("DreyMail X.Y · Source code · AGPL-3.0", `web/src/components/SourceLink.tsx`)
+  on the sign-in page, in Settings and in What's new. Never remove it.
 - `NOTICE` carries an AGPL §7(b) additional term: anyone redistributing or hosting DreyMail
-  keeps the NOTICE attribution (DreyMail + Ratatoskr) and the in-UI attribution/source link intact.
+  preserves the NOTICE file and its copyright notices.
 
 ### Git
 - **Never push to `upstream`.** Its push URL is set to `DISABLED`; leave it that way.

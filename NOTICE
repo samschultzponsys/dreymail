@@ -27,10 +27,7 @@ upstream Ratatoskr material):
 
   Anyone who conveys this work or a modified version of it, or makes it
   available to users over a network, must preserve this NOTICE file,
-  including the attribution to both DreyMail and Ratatoskr above, and
-  must keep the attribution and source-code link shown in the
-  application's user interface (where present) intact and reasonably
-  visible.
+  including the copyright notices above.
 
 See CHANGES.md for a dated record of modifications made to the upstream
 code.

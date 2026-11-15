@@ -25,7 +25,8 @@
      Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
      Modified by samschultzponsys, 2026-11-15: send later and undo send.
      Modified by samschultzponsys, 2026-11-15: passkey sign-in.
-     Modified by samschultzponsys, 2026-11-15: automatic inbox tabs. -->
+     Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+     Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -35,21 +36,9 @@
 A self-hosted webmail portal for Gmail, Outlook / Microsoft 365, Purelymail and any other IMAP/SMTP
 account, in the browser, as desktop apps for Linux and Windows, and as an Android app.
 
-## Credits / Origin
-
-DreyMail is based on **[Ratatoskr](https://github.com/magnuspihl/Ratatoskr)** by **Magnus Pihl**
-and contributors, licensed under the GNU AGPL v3.0. It started from upstream commit
-[`e2abaa4`](https://github.com/magnuspihl/Ratatoskr/commit/e2abaa4c585a2e0edc8a09b082208941c32afcdc)
-(2026-10-27). The full upstream history is kept in this repository. Nearly all of the code and
-documentation below is Magnus's work. DreyMail's changes are listed in [`CHANGES.md`](CHANGES.md).
-
-DreyMail is an independent project. It is **not affiliated with or endorsed by** the original
-author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#license) and
-[`NOTICE`](NOTICE).
-
 ## Status
 
-Current version: **3.9**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **4.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -433,10 +422,8 @@ networks:
 3. Point your reverse proxy at `dreymail:8080`, open `https://mail.example.com`, sign in, and add
    your first mail account.
 
-The variables still use the upstream `DREYMAIL_*` names so existing deployments keep working.
-Renaming them, with the old names still accepted, is on the [roadmap](ROADMAP.md). So is a
-settings page for all configuration (OIDC and the rest), with compose environment values
-overriding what's set there.
+Most settings can also be made in the app (Settings), and a value given in the compose file always
+wins over the app and shows there as locked.
 
 Images are published to `ghcr.io/samschultzponsys/dreymail` for every release (see
 [Releasing](#releasing)), tagged with the version (`1.0`, `1.1`, …) and `latest`. You can also
@@ -503,7 +490,7 @@ compose file instead, which then wins over the UI:
 ## Upgrading to 1.5 (new names)
 
 DreyMail 1.5 uses its own names throughout. In your compose file, rename every environment variable
-that starts with the old upstream prefix to start with `DREYMAIL_` instead (same suffix, e.g. the
+that starts with the old prefix to start with `DREYMAIL_` instead (same suffix, e.g. the
 secret key becomes `DREYMAIL_SECRET_KEY`). DreyMail refuses to start with the old names and lists
 each one with its new name, so nothing is silently ignored. On first start it upgrades your data
 volume by itself:
@@ -528,6 +515,7 @@ volume by itself:
 | `OIDC_CLIENT_SECRET` | usually | – | Client secret (confidential client). |
 | `OIDC_SCOPES` | no | `openid email profile` | Requested scopes. |
 | `OIDC_LABEL` | no | `Single sign-on` | Provider name on the login button ("Sign in with …"), e.g. `Authentik`. |
+| `DREYMAIL_OIDC_AUTO_LOGIN` | no | `false` | `true`: opening DreyMail goes straight to the OIDC provider. `/login` still shows the sign-in page. |
 | `DREYMAIL_TRUST_PROXY` | no | `false` | Trust `X-Forwarded-*` headers. Set to `true` behind a reverse proxy. |
 | `DREYMAIL_DATA_DIR` | no | `./data` (`/data` in the image) | Where `dreymail.db` and the mail cache `cache.db` (SQLite) live. |
 | `PUID` / `PGID` | no | `1000` / `1000` | Docker image only: user and group the server runs as and that owns the data directory. |
@@ -676,6 +664,16 @@ Create an OAuth2/OpenID Connect application (confidential client, authorization 
 - Redirect URI: `https://mail.example.com/auth/callback`
 - Post-logout redirect URI (optional): `https://mail.example.com/`
 - Scopes: `openid email profile`
+
+Settings → Sign-in shows both URIs for the address you have DreyMail open at, with Copy buttons,
+and warns if that differs from `DREYMAIL_BASE_URL`.
+
+**Sign in automatically** (Settings → Sign-in, or `DREYMAIL_OIDC_AUTO_LOGIN=true`): opening DreyMail
+goes straight to the provider, with no sign-in page in between. The sign-in page with every other
+option stays at **`/login`** (e.g. `https://mail.example.com/login`): use it when the provider is
+down or to sign in with a password or passkey, so keep one of those for an administrator. After
+signing out, DreyMail waits on the sign-in page instead of signing straight back in, and a failed
+sign-in comes back to `/login` with the reason instead of trying again.
 
 **Authentik:** create an *OAuth2/OpenID Provider* and an *Application*. The issuer URL looks like
 `https://auth.example.com/application/o/<application-slug>/`. Use Authentik's application
@@ -899,11 +897,17 @@ folders use the same cursors, so a page can come from the cache and the next fro
   A woken message is a new copy in INBOX, so it gets a new UID.
 - Use app passwords where the provider
   supports them.
-- Out of scope: server-side filters, calendar/contacts, JMAP, PGP, local full-text search.
+- Out of scope: server-side filters, contacts, JMAP, PGP, local full-text search.
 
 ## License
 
-DreyMail is licensed under the [GNU Affero General Public License v3.0](LICENSE)
-(AGPL-3.0-only), the same license as Ratatoskr. See [`NOTICE`](NOTICE) for the attribution
-requirements and [`CHANGES.md`](CHANGES.md) for what changed from upstream. If you run a modified
-version as a service for others, you must offer them its source code.
+DreyMail is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
+If you run a modified version as a service for others, you must offer them its source code;
+DreyMail's own "Source code" link (on the sign-in page and in Settings) does that for the running
+version. See [`NOTICE`](NOTICE) and [`CHANGES.md`](CHANGES.md).
+
+## Credits
+
+DreyMail started from [Ratatoskr](https://github.com/magnuspihl/Ratatoskr) by Magnus Pihl and
+contributors (AGPL-3.0, commit `e2abaa4`, 2026-10-27), whose history is kept in this repository.
+DreyMail is an independent project, not affiliated with or endorsed by its author.

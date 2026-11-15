@@ -5,7 +5,7 @@
 # with --config.artifactName; see .github/workflows/release.yml.
 appId: io.github.samschultzponsys.dreymail
 productName: DreyMail
-copyright: Copyright (C) 2026 samschultzponsys. Based on Ratatoskr by Magnus Pihl. AGPL-3.0-only.
+copyright: Copyright (C) 2026 samschultzponsys. AGPL-3.0-only.
 # Releases are uploaded by the Release workflow, not by electron-builder.
 publish: []
 directories:

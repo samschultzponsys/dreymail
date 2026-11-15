@@ -19,12 +19,15 @@ interface StoredLogin {
   label?: string;
   passwordLogin?: boolean;
   registration?: Registration;
+  oidcAutoLogin?: boolean;
 }
 
 export interface EffectiveLogin {
   oidc: Config['oidc'];
   passwordLogin: boolean;
   registration: Registration;
+  /** Opening DreyMail goes straight to the OIDC provider (/login still shows the sign-in page). */
+  oidcAutoLogin: boolean;
 }
 
 export class LoginSettingsError extends Error {}
@@ -81,7 +84,7 @@ export class LoginSettings {
       : null;
     // Without OIDC, password login is on unless switched off explicitly.
     const passwordLogin = env.passwordLogin ?? s.passwordLogin ?? !oidc;
-    return { oidc, passwordLogin, registration: env.registration ?? s.registration ?? 'first' };
+    return { oidc, passwordLogin, registration: env.registration ?? s.registration ?? 'first', oidcAutoLogin: !!oidc && (env.oidcAutoLogin ?? s.oidcAutoLogin ?? false) };
   }
 
   view(): LoginSettingsView {
@@ -102,6 +105,7 @@ export class LoginSettings {
       label: env.label ?? (s.label || DEFAULT_LABEL),
       passwordLogin: e.passwordLogin,
       registration: e.registration,
+      oidcAutoLogin: env.oidcAutoLogin ?? s.oidcAutoLogin ?? false,
       locked,
       callbackUrl: new URL('/auth/callback', this.config.baseUrl).toString(),
     };
@@ -120,6 +124,7 @@ export class LoginSettings {
       label: input.label.trim(),
       passwordLogin: input.passwordLogin,
       registration: input.registration,
+      oidcAutoLogin: !!input.oidcAutoLogin,
     };
     const env = this.config.loginEnv;
     if (input.oidcEnabled && env.issuerUrl === undefined) {

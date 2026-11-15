@@ -283,7 +283,7 @@ function buildMenu() {
             void dialog.showMessageBox(win, {
               type: 'info',
               message: `DreyMail ${update.displayVersion(app.getVersion())}`,
-              detail: `Installed as: ${installKind}.\n\nCopyright (C) 2026 samschultzponsys. A modified version of Ratatoskr by Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only.\n\nSource code: ${SOURCE_URL}`,
+              detail: `Installed as: ${installKind}.\n\nCopyright (C) 2026 samschultzponsys. Licensed under the GNU AGPL v3.0 only.\n\nSource code: ${SOURCE_URL}`,
             }),
         },
       ],

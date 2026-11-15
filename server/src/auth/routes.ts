@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
+// Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 
 import { serverVersion } from '../version.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -57,7 +58,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     return {
       password: l.passwordLogin,
       registration: registrationOpen(l, store),
-      oidc: l.oidc ? { label: l.oidc.label } : null,
+      oidc: l.oidc ? { label: l.oidc.label, auto: l.oidcAutoLogin } : null,
       dev: config.devLogin,
       version: serverVersion(),
       passkeys: !!store.db.prepare('SELECT 1 FROM passkeys LIMIT 1').get(),
@@ -66,8 +67,14 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
 
   app.get('/auth/login', async (req, reply) => {
     const o = login.current().oidc;
-    if (!o) return reply.redirect(config.devLogin ? '/auth/dev-login' : '/');
-    const cfg = await getConfig();
+    if (!o) return reply.redirect(config.devLogin ? '/auth/dev-login' : '/login');
+    let cfg: Awaited<ReturnType<typeof getConfig>>;
+    try {
+      cfg = await getConfig();
+    } catch (err) {
+      req.log.warn({ err: (err as Error).message }, 'OIDC provider unreachable');
+      return reply.redirect(`/login?${new URLSearchParams({ error: `Couldn't reach ${o.label}. Try again in a moment, or sign in another way.` })}`);
+    }
     const verifier = oidc.randomPKCECodeVerifier();
     const state = oidc.randomState();
     const nonce = oidc.randomNonce();
@@ -85,7 +92,12 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
 
   app.get('/auth/callback', async (req, reply) => {
     const tx = sessions.takeLogin(req, reply);
-    if (!tx) return reply.code(400).type('text/plain').send('Login expired or invalid. Please try again.');
+    // Back to the sign-in page with the reason (never straight back to the provider, so a broken
+    // provider can't cause a redirect loop with automatic sign-in).
+    const failed = (message: string) => reply.redirect(`/login?${new URLSearchParams({ error: message })}`);
+    const providerError = (req.query as { error?: string; error_description?: string }).error;
+    if (providerError) return failed(`Single sign-on said: ${((req.query as { error_description?: string }).error_description ?? providerError).slice(0, 200)}`);
+    if (!tx) return failed('That sign-in took too long or was started elsewhere. Please try again.');
     try {
       const cfg = await getConfig();
       // Rebuild the callback URL from the configured base URL, not from request headers.
@@ -116,7 +128,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
       return reply.redirect('/');
     } catch (err) {
       req.log.warn({ err: (err as Error).message }, 'OIDC callback failed');
-      return reply.code(400).type('text/plain').send('Login failed. Please try again.');
+      return failed('Single sign-on failed. Please try again, or ask your administrator.');
     }
   });
 

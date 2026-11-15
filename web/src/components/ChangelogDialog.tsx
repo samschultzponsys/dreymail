@@ -1,7 +1,7 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-import { SourceLink } from './SourceLink';
+import { REPO_URL, SourceLink } from './SourceLink';
 import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
@@ -25,14 +25,27 @@ function inline(text: string): ReactNode[] {
   return out;
 }
 
-/** The release entries of CHANGES.md (from the first "## " heading), as headings, bullets and paragraphs. */
-export function renderChangelog(markdown: string): ReactNode[] {
+/** How many versions "What's new" shows; the full history is CHANGES.md on GitHub. */
+export const RECENT_VERSIONS = 10;
+/** License and attribution bookkeeping: kept in CHANGES.md, not shown in the app. */
+const BOOKKEEPING = /\b(NOTICE|AGPL|attribution|upstream)\b/i;
+
+/**
+ * The newest release entries of CHANGES.md (from the first "## " heading), as headings, bullets and
+ * paragraphs. License bookkeeping about the code DreyMail started from stays in CHANGES.md only.
+ */
+export function renderChangelog(markdown: string, versions = RECENT_VERSIONS): ReactNode[] {
   const start = markdown.search(/^## /m);
-  const lines = (start >= 0 ? markdown.slice(start) : markdown).split('\n');
+  let body = start >= 0 ? markdown.slice(start) : markdown;
+  const heads = [...body.matchAll(/^## /gm)];
+  if (heads.length > versions) body = body.slice(0, heads[versions]!.index);
+  const lines = body.split('\n');
   const blocks: ReactNode[] = [];
   let list: string[] = [];
   let para: string[] = [];
   const flush = () => {
+    list = list.filter((li) => !BOOKKEEPING.test(li));
+    if (para.some((l) => BOOKKEEPING.test(l))) para = [];
     if (list.length) blocks.push(<ul key={`u${blocks.length}`}>{list.map((li, i) => <li key={i}>{inline(li)}</li>)}</ul>);
     if (para.length) blocks.push(<p key={`p${blocks.length}`}>{inline(para.join(' '))}</p>);
     list = [];
@@ -85,6 +98,11 @@ export function ChangelogDialog({ version, onClose }: { version: VersionInfo; on
             </div>
           )}
           {log.data ? renderChangelog(log.data.markdown) : <div className="hint">{log.error ? (log.error as Error).message : 'Loading…'}</div>}
+          {log.data && (
+            <a className="hint" href={`${REPO_URL}/blob/main/CHANGES.md`} target="_blank" rel="noreferrer">
+              Full history
+            </a>
+          )}
         </div>
       </div>
     </div>

@@ -18,6 +18,16 @@ describe('changelog and name', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
+  it('shows the newest versions only, without license bookkeeping', () => {
+    const entries = Array.from({ length: 12 }, (_, i) => `## v${12 - i}\n\n- Feature ${12 - i}\n- **Attribution:** NOTICE updated\n`).join('\n');
+    const html = renderToStaticMarkup(createElement(Fragment, null, ...renderChangelog(`# Changes\n\n${entries}`, 10)));
+    expect(html).toContain('v12');
+    expect(html).toContain('v3');
+    expect(html).not.toContain('v2<');
+    expect(html).toContain('Feature 12');
+    expect(html).not.toContain('NOTICE');
+  });
+
   it('shows the first name unless the full name is asked for', () => {
     const me = { name: 'sam', displayName: 'Sam Schultz', email: 'sam@example.com' };
     expect(userLabel(me)).toBe('Sam');

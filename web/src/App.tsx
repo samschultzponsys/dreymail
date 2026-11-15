@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: calendar.
+// Modified by samschultzponsys, 2026-11-15: automatic single sign-on waits after signing out; /login.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -34,7 +35,7 @@ import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './andro
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
-import { Login } from './components/Login';
+import { Login, SIGNED_OUT_KEY } from './components/Login';
 import { MessageList } from './components/MessageList';
 import { quotableDetail, Reader, replyTarget, type ReplyKind } from './components/Reader';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -65,6 +66,10 @@ export function userLabel(me: { name: string; displayName: string; email: string
 export function App() {
   const qc = useQueryClient();
   const me = useMe();
+  // /login is the sign-in page's own address; once signed in, it's just the app.
+  useEffect(() => {
+    if (me.data && window.location.pathname.replace(/\/+$/, '') === '/login') window.history.replaceState(window.history.state, '', '/');
+  }, [me.data]);
   const loggedIn = !!me.data;
   const theme = useTheme(me.data?.preferences.theme);
   // Only once signed in: asked earlier it fails with 401 and wouldn't be asked again after login.
@@ -571,6 +576,12 @@ export function App() {
     setAppBadge(0);
     const { redirect } = await api.logout();
     qc.clear();
+    // With automatic single sign-on, the sign-in page waits instead of signing straight back in.
+    try {
+      sessionStorage.setItem(SIGNED_OUT_KEY, '1');
+    } catch {
+      /* private mode */
+    }
     window.location.href = redirect;
   };
 

@@ -184,10 +184,41 @@ describe('sign-in settings in the UI', () => {
     expect(res.json).toMatchObject({ oidcEnabled: true, issuerUrl: 'https://auth.example.com/', hasClientSecret: true, label: 'Authentik' });
     expect(JSON.stringify(res.json)).not.toContain('top-secret');
     const methods = (await ctx!.app.inject({ method: 'GET', url: '/auth/methods' })).json() as AuthMethods;
-    expect(methods.oidc).toEqual({ label: 'Authentik' });
+    expect(methods.oidc).toEqual({ label: 'Authentik', auto: false });
     // A blank secret keeps the stored one.
     const again = await call<LoginSettingsView>(sam, 'PUT', '/api/admin/login', loginInput({ oidcEnabled: true, issuerUrl: 'https://auth.example.com/', clientId: 'dreymail' }));
     expect(again.json.hasClientSecret).toBe(true);
+  });
+
+  it('automatic single sign-on: set in the UI or the environment, only with OIDC on', async () => {
+    await start();
+    const sam = await register('sam');
+    const methods = async () => ((await ctx!.app.inject({ method: 'GET', url: '/auth/methods' })).json() as AuthMethods).oidc;
+    // Without OIDC the switch does nothing.
+    await call(sam, 'PUT', '/api/admin/login', loginInput({ oidcAutoLogin: true }));
+    expect(await methods()).toBeNull();
+    const res = await call<LoginSettingsView>(sam, 'PUT', '/api/admin/login', loginInput({ oidcEnabled: true, issuerUrl: 'https://auth.example.com/', clientId: 'dreymail', oidcAutoLogin: true }));
+    expect(res.json.oidcAutoLogin).toBe(true);
+    expect(await methods()).toEqual({ label: 'Single sign-on', auto: true });
+    await ctx!.app.close();
+    ctx = null;
+
+    await start({ OIDC_ISSUER_URL: 'https://env.example.com/', OIDC_CLIENT_ID: 'from-env', DREYMAIL_OIDC_AUTO_LOGIN: 'true', DREYMAIL_PASSWORD_LOGIN: 'true' });
+    const admin = await register('sam');
+    const view = await call<LoginSettingsView>(admin, 'PUT', '/api/admin/login', loginInput({ oidcEnabled: true, issuerUrl: 'https://env.example.com/', clientId: 'from-env', oidcAutoLogin: false }));
+    expect(view.json).toMatchObject({ oidcAutoLogin: true, locked: { oidcAutoLogin: 'DREYMAIL_OIDC_AUTO_LOGIN' } });
+    expect(await methods()).toEqual({ label: 'Single sign-on', auto: true });
+  });
+
+  it('a failed single sign-on goes back to /login with the reason (never back to the provider)', async () => {
+    await start({ OIDC_ISSUER_URL: 'https://auth.invalid/', OIDC_CLIENT_ID: 'rk', DREYMAIL_OIDC_AUTO_LOGIN: 'true' });
+    const expired = await ctx!.app.inject({ method: 'GET', url: '/auth/callback?code=x&state=y' });
+    expect(expired.statusCode).toBe(302);
+    expect(expired.headers.location).toMatch(/^\/login\?error=/);
+    const down = await ctx!.app.inject({ method: 'GET', url: '/auth/login' });
+    expect(down.headers.location).toMatch(/^\/login\?error=Couldn/);
+    const denied = await ctx!.app.inject({ method: 'GET', url: '/auth/callback?error=access_denied&error_description=User%20said%20no' });
+    expect(decodeURIComponent(String(denied.headers.location).replace(/\+/g, ' '))).toBe('/login?error=Single sign-on said: User said no');
   });
 
   it('environment variables override the UI and show as locked', async () => {

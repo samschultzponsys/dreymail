@@ -89,13 +89,15 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Administration and security
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
+- [x] Automatic single sign-on with `/login` as the way back in; OIDC redirect URIs shown for the
+      address you're on (4.0).
 - [x] User management in the app (1.4); roles with permission flags (Superadmin, User and custom
       roles) and per-flag checks on every administrative action (2.5).
 - [x] Outlook, Google and Android (Firebase) setup in the UI with walkthroughs (2.0–2.3).
 
 ### License compliance
-- [x] Source code link (AGPL §13) with the attribution, on the sign-in page, in What's new and in
-      Settings (3.2).
+- [x] Source code link (AGPL §13) on the sign-in page, in What's new and in Settings (3.2; credit
+      trimmed to the README's end in 4.0).
 
 ### Releases
 - [x] Every version gets a GitHub Release with the image, desktop apps and APK; runs queue per

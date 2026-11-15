@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 
 // Types shared between the server API and the web client.
 
@@ -373,8 +374,10 @@ export interface LoginSettingsView {
   label: string;
   passwordLogin: boolean;
   registration: Registration;
+  /** Opening DreyMail signs in with OIDC straight away; /login still shows the sign-in page (DreyMail). */
+  oidcAutoLogin: boolean;
   /** Fields set by environment variables (compose file): field -> variable name. They override the UI. */
-  locked: Partial<Record<'oidcEnabled' | 'issuerUrl' | 'clientId' | 'clientSecret' | 'scopes' | 'label' | 'passwordLogin' | 'registration', string>>;
+  locked: Partial<Record<'oidcEnabled' | 'issuerUrl' | 'clientId' | 'clientSecret' | 'scopes' | 'label' | 'passwordLogin' | 'registration' | 'oidcAutoLogin', string>>;
   /** Redirect URI to register at the provider. */
   callbackUrl: string;
 }
@@ -390,6 +393,7 @@ export interface LoginSettingsInput {
   label: string;
   passwordLogin: boolean;
   registration: Registration;
+  oidcAutoLogin?: boolean;
 }
 
 /** Settings → Outlook (administrators): the Microsoft app registration for Outlook sign-in. */
@@ -456,7 +460,8 @@ export interface AuthMethods {
   password: boolean;
   /** A new password account can be created right now. */
   registration: boolean;
-  oidc: { label: string } | null;
+  /** auto: go to the provider as soon as the sign-in page opens (except at /login) (DreyMail). */
+  oidc: { label: string; auto?: boolean } | null;
   dev: boolean;
   /** Running version (DreyMail), for the source code link on the sign-in page. */
   version?: string;

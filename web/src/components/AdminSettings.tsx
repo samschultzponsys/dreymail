@@ -448,9 +448,31 @@ export function SignInAdmin() {
         <Field label="Scopes" lockedBy={locked.scopes} htmlFor="oidc-scopes">
           <input id="oidc-scopes" className="input" value={v.scopes} disabled={!!locked.scopes} onChange={(e) => set({ scopes: e.target.value })} />
         </Field>
-        <div className="hint">
-          Redirect URI to register at your provider: <code className="copyable">{s.callbackUrl}</code>
-        </div>
+        {(() => {
+          // Read from the address this page is open at, so it can be pasted into the provider as is.
+          const here = window.location.origin;
+          const serverOrigin = new URL(s.callbackUrl).origin;
+          return (
+            <div className="oidc-uris">
+              <div className="label">For your provider's settings</div>
+              <div className="oidc-uri">
+                <span className="muted">Redirect URI</span>
+                <CopyValue value={`${here}/auth/callback`} />
+              </div>
+              <div className="oidc-uri">
+                <span className="muted">Sign-out redirect URI (optional)</span>
+                <CopyValue value={`${here}/`} />
+              </div>
+              {serverOrigin !== here && (
+                <div className="oidc-warn">
+                  DreyMail&apos;s address is set to <code>{serverOrigin}</code> (<code>DREYMAIL_BASE_URL</code>), but you&apos;re on <code>{here}</code>. Sign-in
+                  returns to the set address, so register <code>{s.callbackUrl}</code>, or set <code>DREYMAIL_BASE_URL={here}</code> in the compose file
+                  if this is the address people use.
+                </div>
+              )}
+            </div>
+          );
+        })()}
         <div>
           <button
             className="btn"
@@ -459,6 +481,17 @@ export function SignInAdmin() {
           >
             Test connection
           </button>
+        </div>
+        <Field label="" lockedBy={locked.oidcAutoLogin}>
+          <label className="check">
+            <input type="checkbox" checked={!!v.oidcAutoLogin} disabled={!!locked.oidcAutoLogin || !v.oidcEnabled} onChange={(e) => set({ oidcAutoLogin: e.target.checked })} />
+            Sign in automatically: opening DreyMail goes straight to the provider
+          </label>
+        </Field>
+        <div className="hint">
+          The sign-in page with every other option stays at <CopyValue value={`${window.location.origin}/login`} />. Use it if single sign-on is down
+          (keep password sign-in or a passkey for an administrator), or to sign in another way. After signing out, DreyMail waits on the sign-in
+          page instead of signing straight back in.
         </div>
       </fieldset>
       <fieldset className="group">
@@ -512,7 +545,30 @@ function fromView(s: LoginSettingsView): LoginSettingsInput {
     label: s.label,
     passwordLogin: s.passwordLogin,
     registration: s.registration,
+    oidcAutoLogin: s.oidcAutoLogin,
   };
+}
+
+/** A value to paste into another site's settings, with a Copy button. */
+function CopyValue({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="copy-value">
+      <code className="copyable">{value}</code>
+      <button
+        type="button"
+        className="btn"
+        onClick={() =>
+          void navigator.clipboard?.writeText(value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+        }
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </span>
+  );
 }
 
 /** Settings → Android (administrators): Firebase, which wakes the Android app when mail arrives. */

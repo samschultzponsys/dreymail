@@ -46,6 +46,7 @@ const loginSchema = z.object({
   scopes: z.string().max(500),
   label: z.string().max(100),
   passwordLogin: z.boolean(),
+  oidcAutoLogin: z.boolean().optional(),
   registration: registrationSchema,
 });
 const newUserSchema = z.object({ username: z.string().max(500), password: z.string().max(1000), roleId: z.string().max(64).optional() });
