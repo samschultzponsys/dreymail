@@ -13,6 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.0): Your own picture as a mailbox icon
+
+- Next to the 38 built-in icons, a mailbox can use **a picture you upload**: zoom (smaller or
+  larger), drag it into place, and choose a transparent, white or black background. The browser
+  makes the final 256px image (new `MailboxImageEditor`, picker changes in
+  `web/src/components/MailboxIcon.tsx`, `web/src/components/AccountsDialog.tsx`). Choosing a
+  built-in icon keeps the picture for later; it can be removed.
+- Server: stored with the mailbox (`accounts.icon_image`, `server/src/db.ts`); `GET/PUT/DELETE
+  /api/accounts/:id/icon` (checked image types, owner only, `mail.accounts` to change;
+  `server/src/routes/api.ts`); `AccountView.iconImage` (`shared/types.ts`).
+- Shown in the sidebar and account list. Notifications use it as the large icon:
+  - Desktop app: `web/src/desktop.ts`, `web/src/App.tsx`.
+  - Browsers: the service worker fetches it (`web/public/sw.js`, `server/src/push/*.ts`).
+  - Android app: `web/src/android.ts`, `Notifier.kt`. Android's status-bar icon has to be a plain
+    shape, so it stays the envelope there.
+- Tests: `server/test/mailboxIcons.test.ts`.
+
 ## 2026-11-15 (v2.9): Mailbox icons
 
 - **An icon per mailbox** (38 to choose from, or the coloured dot as before), picked next to the

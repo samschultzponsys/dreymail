@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import { MAILBOX_ICONS } from '../../../shared/mailboxIcons.js';
 import crypto from 'node:crypto';
@@ -139,7 +140,8 @@ export class PushService {
     if (!built) return;
     // The browser draws the notification icon in the mailbox's colour, with its icon if it has one.
     const iconPath = MAILBOX_ICONS[account.icon]?.path;
-    const payload: NotificationPayload = { ...built, color: account.color, ...(iconPath ? { iconPath } : {}) };
+    const iconImage = account.icon === 'image' ? account.iconImage : null;
+    const payload: NotificationPayload = { ...built, color: account.color, ...(iconPath ? { iconPath } : {}), ...(iconImage ? { iconImage } : {}) };
     const badge = await this.opts.unreadCount?.(userId).catch(() => null);
     const delivered = await this.send(userId, typeof badge === 'number' ? { ...payload, badge } : payload, NOTIFICATION_TTL_S);
     if (delivered === 0) return;

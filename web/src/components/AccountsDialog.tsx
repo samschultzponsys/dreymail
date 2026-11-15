@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: mailbox editing follows the role's permissions.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -101,14 +102,21 @@ function AccountForm({
   defaults,
   onDone,
   onCancel,
+  image: initialImage = null,
+  onPicture,
 }: {
   initial: AccountInput;
   id?: string;
   defaults: AccountDefaults;
   onDone: () => void;
   onCancel: () => void;
+  /** The mailbox's uploaded picture, if any. */
+  image?: string | null;
+  /** The picture changed (saved right away, unlike the rest of the form). */
+  onPicture?: () => void;
 }) {
   const [v, setV] = useState(initial);
+  const [image, setImage] = useState(initialImage);
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -195,7 +203,17 @@ function AccountForm({
             <div className="hint">The whole app takes on this color while the account is open.</div>
           </div>
         </div>
-        <MailboxIconPicker value={v.icon ?? ''} color={v.color} onChange={(icon) => setV({ ...v, icon })} />
+        <MailboxIconPicker
+          value={v.icon ?? ''}
+          color={v.color}
+          onChange={(icon) => setV((cur) => ({ ...cur, icon }))}
+          accountId={id ?? null}
+          image={image}
+          onAccount={(a) => {
+            setImage(a.iconImage);
+            onPicture?.();
+          }}
+        />
         <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} onChange={(imap) => setV({ ...v, imap })} />
         <ServerFields kind="smtp" value={v.smtp} editing={!!id} passwordHint={smtpHint} onChange={(smtp) => setV({ ...v, smtp })} />
         <label className="check">
@@ -273,6 +291,7 @@ export function AccountsDialog({
             account={editingMicrosoft}
             onReconnect={() => void signIn(editingMicrosoft.auth === 'google' ? 'google' : 'microsoft', editingMicrosoft.color)}
             error={msError}
+            onPicture={refresh}
             onCancel={() => setEditingMicrosoft(null)}
             onDone={() => {
               refresh();
@@ -341,6 +360,8 @@ export function AccountsDialog({
           <AccountForm
             initial={editing.input}
             id={editing.id}
+            image={accounts.find((a) => a.id === editing.id)?.iconImage ?? null}
+            onPicture={refresh}
             defaults={defaults}
             onCancel={() => (accounts.length ? setEditing(null) : onClose())}
             onDone={() => {
@@ -355,9 +376,13 @@ export function AccountsDialog({
               {!canEdit && <div className="hint">Your role doesn't allow changing mailboxes. Ask an administrator.</div>}
               {accounts.map((a) => (
                 <div className="account-card" key={a.id}>
-                  <span className="account-mark" style={{ background: a.color }}>
-                    {a.icon && <MailboxIcon icon={a.icon} color={labelOn(a.color)} size={16} />}
-                  </span>
+                  {a.icon === 'image' && a.iconImage ? (
+                    <img className="account-mark" src={a.iconImage} alt="" />
+                  ) : (
+                    <span className="account-mark" style={{ background: a.color }}>
+                      {a.icon && <MailboxIcon icon={a.icon} color={labelOn(a.color)} size={16} />}
+                    </span>
+                  )}
                   <div className="grow">
                     <div style={{ fontWeight: 600 }}>{a.name}</div>
                     <div className="sub">
@@ -411,17 +436,20 @@ function MicrosoftAccountForm({
   error,
   onCancel,
   onDone,
+  onPicture,
 }: {
   account: AccountView;
   onReconnect: () => void;
   error: string | null;
   onCancel: () => void;
   onDone: () => void;
+  onPicture?: () => void;
 }) {
   const [name, setName] = useState(account.name);
   const [displayName, setDisplayName] = useState(account.displayName);
   const [color, setColor] = useState(account.color);
   const [icon, setIcon] = useState(account.icon);
+  const [image, setImage] = useState(account.iconImage);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -467,7 +495,7 @@ function MicrosoftAccountForm({
             </label>
           </div>
         </div>
-        <MailboxIconPicker value={icon} color={color} onChange={setIcon} />
+        <MailboxIconPicker value={icon} color={color} onChange={setIcon} accountId={account.id} image={image} onAccount={(a) => { setImage(a.iconImage); onPicture?.(); }} />
         <div className="hint">{account.auth === 'google' ? 'Gmail keeps the copy of sent mail itself.' : 'Sent mail goes through Microsoft, which keeps the copy in Sent Items.'}</div>
         {(error || status) && <div className="error-text">{error ?? status}</div>}
       </div>

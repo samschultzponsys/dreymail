@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles with permission flags; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -194,6 +195,14 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
     if (!cols.some((c) => c.name === 'icon')) db.exec("ALTER TABLE accounts ADD COLUMN icon TEXT NOT NULL DEFAULT '';");
   },
+  // DreyMail: a picture the user uploaded as a mailbox's icon (already cropped and scaled).
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    const has = (c: string) => cols.some((x) => x.name === c);
+    if (!has('icon_image')) db.exec('ALTER TABLE accounts ADD COLUMN icon_image BLOB;');
+    if (!has('icon_image_type')) db.exec("ALTER TABLE accounts ADD COLUMN icon_image_type TEXT NOT NULL DEFAULT '';");
+    if (!has('icon_image_version')) db.exec('ALTER TABLE accounts ADD COLUMN icon_image_version INTEGER NOT NULL DEFAULT 0;');
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -280,6 +289,7 @@ interface AccountRow {
   auth?: string;
   oauth_token?: string;
   icon?: string;
+  icon_image_version?: number;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -293,7 +303,8 @@ function toView(r: AccountRow): AccountView {
     displayName: r.display_name,
     email: r.email,
     color: r.color,
-    icon: r.icon ?? '',
+    icon: r.icon === 'image' && !r.icon_image_version ? '' : (r.icon ?? ''),
+    iconImage: r.icon_image_version ? `/api/accounts/${r.id}/icon?v=${r.icon_image_version}` : null,
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
@@ -711,6 +722,22 @@ export class Store {
   }
 
   /** Label, sender name and colour only (Outlook accounts, whose servers are fixed). */
+  /** A mailbox's uploaded picture (null removes it; the icon falls back to none if it was in use). */
+  setAccountIconImage(userId: string, accountId: string, picture: { type: string; body: Buffer } | null): boolean {
+    const n = this.db
+      .prepare('UPDATE accounts SET icon_image = ?, icon_image_type = ?, icon_image_version = ? WHERE user_id = ? AND id = ?')
+      .run(picture?.body ?? null, picture?.type ?? '', picture ? Date.now() : 0, userId, accountId).changes;
+    if (n) this.db.prepare(`UPDATE accounts SET icon = ? WHERE user_id = ? AND id = ? AND (icon = 'image' OR ?)`).run(picture ? 'image' : '', userId, accountId, picture ? 1 : 0);
+    return n > 0;
+  }
+
+  getAccountIconImage(userId: string, accountId: string): { type: string; body: Buffer } | null {
+    const r = this.db.prepare('SELECT icon_image, icon_image_type FROM accounts WHERE user_id = ? AND id = ?').get(userId, accountId) as
+      | { icon_image: Uint8Array | null; icon_image_type: string }
+      | undefined;
+    return r?.icon_image ? { type: r.icon_image_type, body: Buffer.from(r.icon_image) } : null;
+  }
+
   /** A mailbox's icon key (checked by the caller); '' for none. */
   setAccountIcon(userId: string, accountId: string, icon: string) {
     this.db.prepare('UPDATE accounts SET icon = ? WHERE user_id = ? AND id = ?').run(icon, userId, accountId);

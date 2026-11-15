@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import type { Address, NotificationContent } from '../../../shared/types.js';
 
@@ -35,6 +36,8 @@ export interface NotificationPayload {
   /** The mailbox's colour and icon (a 24x24 SVG path), for the service worker to draw (DreyMail). */
   color?: string;
   iconPath?: string;
+  /** Same-origin URL of the mailbox's uploaded picture, when that is its icon. */
+  iconImage?: string;
 }
 
 /**

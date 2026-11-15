@@ -5,6 +5,7 @@
 // `window.DreyMailAndroid`. In a browser it is absent and none of this does anything.
 
 import { MAILBOX_ICONS } from '../../shared/mailboxIcons';
+import { loadMailboxPicture } from './desktop';
 import type { AccountView } from '../../shared/types';
 import { api } from './api';
 
@@ -40,9 +41,21 @@ export function androidInfo(): { version: string; installKind: string } | null {
 }
 
 /** Keeps the app's notification channels in step with the accounts. */
-export function syncAndroidAccounts(accounts: AccountView[]) {
-  // icon: the mailbox icon's 24x24 SVG path (shared/mailboxIcons.ts), drawn by the app's notifications.
-  androidBridge()?.setAccounts(JSON.stringify(accounts.map((a) => ({ id: a.id, name: a.name, color: a.color, icon: MAILBOX_ICONS[a.icon]?.path ?? '' }))));
+export async function syncAndroidAccounts(accounts: AccountView[]) {
+  const bridge = androidBridge();
+  if (!bridge) return;
+  // icon: the mailbox icon's 24x24 SVG path (shared/mailboxIcons.ts); image: its uploaded picture as
+  // a data: URL. The app's notifications draw them.
+  const list = await Promise.all(
+    accounts.map(async (a) => ({
+      id: a.id,
+      name: a.name,
+      color: a.color,
+      icon: MAILBOX_ICONS[a.icon]?.path ?? '',
+      image: a.icon === 'image' && a.iconImage ? ((await loadMailboxPicture(a.iconImage)) ?? '') : '',
+    })),
+  );
+  bridge.setAccounts(JSON.stringify(list));
 }
 
 let registering = false;

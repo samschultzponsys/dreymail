@@ -16,7 +16,8 @@
    Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
    Modified by samschultzponsys, 2026-11-15: collapsed sidebar shows only the profile picture.
    Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
-   Modified by samschultzponsys, 2026-11-15: mailbox icons. */
+   Modified by samschultzponsys, 2026-11-15: mailbox icons.
+   Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -710,5 +711,10 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .icon-choice:hover { border-color: var(--border-strong); background: var(--hover); }
 .icon-choice.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); background: var(--accent-soft); }
 .icon-choice .dot { width: 10px; height: 10px; border-radius: 50%; }
+.mailbox-image { border-radius: 4px; object-fit: cover; }
+.mailbox-crop { width: 140px; height: 140px; border-radius: 22%; cursor: grab; touch-action: none; box-shadow: 0 0 0 1px var(--border-strong); }
+.mailbox-crop:active { cursor: grabbing; }
+.mailbox-crop.bg-transparent { background: repeating-conic-gradient(#d4d4d8 0% 25%, #ffffff 0% 50%) 50% / 16px 16px; }
+img.account-mark { object-fit: cover; }
 .account-mark { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
 .btn .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }

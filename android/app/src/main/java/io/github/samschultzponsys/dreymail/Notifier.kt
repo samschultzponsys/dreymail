@@ -10,6 +10,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -41,7 +42,7 @@ object Notifier {
         m.createNotificationChannel(NotificationChannel(GENERAL, "DreyMail", NotificationManager.IMPORTANCE_DEFAULT))
     }
 
-    /** accountsJson: [{ id, name, color, icon }] (icon: a 24x24 SVG path, or ''). Creates/renames channels; removes those of deleted accounts. */
+    /** accountsJson: [{ id, name, color, icon, image }] (icon: a 24x24 SVG path, or ''; image: the uploaded picture as a data: URL, or ''). Creates/renames channels; removes those of deleted accounts. */
     fun syncChannels(context: Context, accountsJson: String) {
         val m = manager(context)
         ensureGeneral(context)
@@ -98,6 +99,24 @@ object Notifier {
         return null
     }
 
+    /** The mailbox's uploaded picture, when that is its icon. */
+    private fun picture(context: Context, accountId: String): Bitmap? {
+        val json = Prefs.of(context).getString("accounts", null) ?: return null
+        val accounts = runCatching { JSONArray(json) }.getOrNull() ?: return null
+        for (i in 0 until accounts.length()) {
+            val a = accounts.getJSONObject(i)
+            if (a.optString("id") != accountId) continue
+            val data = a.optString("image")
+            val comma = data.indexOf(',')
+            if (!data.startsWith("data:image/") || comma < 0) return null
+            return runCatching {
+                val bytes = android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { Bitmap.createScaledBitmap(it, 192, 192, true) }
+            }.getOrNull()
+        }
+        return null
+    }
+
     private fun luminance(color: Int): Double {
         fun ch(v: Int): Double { val c = v / 255.0; return if (c <= 0.03928) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4) }
         return 0.2126 * ch(Color.red(color)) + 0.7152 * ch(Color.green(color)) + 0.0722 * ch(Color.blue(color))
@@ -148,6 +167,7 @@ object Notifier {
         val accountId = d["accountId"].orEmpty()
         val color = parseColor(d["color"])
         val icon = iconPath(context, accountId)
+        val pic = picture(context, accountId)
         val m = manager(context)
         val channel = channelId(accountId).takeIf { accountId.isNotEmpty() && m.getNotificationChannel(it) != null } ?: GENERAL
         val open = Intent(context, MainActivity::class.java)
@@ -159,7 +179,7 @@ object Notifier {
         val n = NotificationCompat.Builder(context, channel)
             .apply { if (icon != null) setSmallIcon(smallIcon(icon)) else setSmallIcon(R.drawable.ic_notification) }
             .setColor(color)
-            .setLargeIcon(if (icon != null) largeIcon(color, icon) else largeIcon(color))
+            .setLargeIcon(pic ?: if (icon != null) largeIcon(color, icon) else largeIcon(color))
             .setContentTitle(d["title"] ?: "DreyMail")
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

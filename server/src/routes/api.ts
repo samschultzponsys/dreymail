@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
@@ -444,7 +445,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   );
 
   /** A known icon key, else none. */
-  const iconOf = (icon: string | undefined) => (isMailboxIcon(icon) ? icon : '');
+  const iconOf = (icon: string | undefined, accountId?: string, userId?: string) =>
+    isMailboxIcon(icon) ? icon : icon === 'image' && accountId && userId && store.getAccountIconImage(userId, accountId) ? 'image' : '';
 
   const verify = async (input: AccountInput, existing?: { imap: string; smtp: string }) => {
     const imapPw = input.imap.password || existing?.imap || '';
@@ -496,12 +498,12 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       if (!existing) throw new NotFoundError('Account not found');
       // Outlook / Google-signed-in accounts: only the label, name and colour can change here.
       if (existing.auth !== 'password') {
-        store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon));
+        store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon, req.params.id, uid(req)));
         return store.updateAccountLabels(uid(req), req.params.id, { name: input.name, displayName: input.displayName, color: input.color });
       }
       await verify(input, { imap: existing.imap.password, smtp: existing.smtp.password });
       store.updateAccount(uid(req), req.params.id, input);
-      store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon));
+      store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon, req.params.id, uid(req)));
       const account = store.listAccounts(uid(req)).find((a) => a.id === req.params.id) ?? null;
       // Another server or login can mean another mailbox: cached mail no longer applies.
       if (existing.imap.host !== input.imap.host || existing.imap.port !== input.imap.port || existing.imap.user !== input.imap.user) {
@@ -520,6 +522,35 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     mail.forgetAccount(uid(req), req.params.id);
     pool.invalidate(uid(req), req.params.id);
     return { ok: true };
+  });
+
+  // ---- mailbox pictures (DreyMail) -------------------------------------------------
+
+  app.get<{ Params: { id: string } }>('/api/accounts/:id/icon', async (req, reply) => {
+    const img = store.getAccountIconImage(uid(req), req.params.id);
+    if (!img) return reply.code(404).send({ error: 'No picture' });
+    return reply
+      .header('content-type', img.type)
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .send(img.body);
+  });
+  app.put<{ Params: { id: string } }>('/api/accounts/:id/icon', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    const body = z.object({ image: z.string().max(500_000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid picture' });
+    try {
+      if (!store.setAccountIconImage(uid(req), req.params.id, parsePicture(body.data.image))) return reply.code(404).send({ error: 'Account not found' });
+    } catch (err) {
+      if (err instanceof PictureError) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+    return store.listAccounts(uid(req)).find((a) => a.id === req.params.id);
+  });
+  app.delete<{ Params: { id: string } }>('/api/accounts/:id/icon', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    if (!store.setAccountIconImage(uid(req), req.params.id, null)) return reply.code(404).send({ error: 'Account not found' });
+    return store.listAccounts(uid(req)).find((a) => a.id === req.params.id);
   });
 
   // ---- folders ----------------------------------------------------------------

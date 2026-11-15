@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 // Types shared between the server API and the web client.
 
@@ -37,8 +38,10 @@ export interface AccountView {
   displayName: string;
   email: string;
   color: string;
-  /** Icon key from shared/mailboxIcons.ts ('' = the coloured dot) (DreyMail). */
+  /** Icon key from shared/mailboxIcons.ts, 'image' for an uploaded picture, '' for the coloured dot (DreyMail). */
   icon: string;
+  /** URL of the uploaded picture (whether or not it is the chosen icon), or null. */
+  iconImage: string | null;
   imap: { host: string; port: number; tls: TlsMode; user: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string };
   appendSent: boolean;

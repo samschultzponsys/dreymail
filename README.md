@@ -16,7 +16,8 @@
      Modified by samschultzponsys, 2026-11-15: v2.3 (Sign in with Google for Gmail).
      Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
      Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
-     Modified by samschultzponsys, 2026-11-15: mailbox icons. -->
+     Modified by samschultzponsys, 2026-11-15: mailbox icons.
+     Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -40,7 +41,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.9**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.0**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -90,7 +91,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   so you always know which mailbox you're in. Button labels and accent text automatically stay
   readable for any colour, in light and dark mode. Each mailbox can also have an **icon**
   (briefcase, house, cart, plane… 38 to choose from) shown in its colour in the sidebar and on its
-  notifications in the desktop app, the Android app (status-bar and large icon) and browsers.
+  notifications in the desktop app, the Android app (status-bar and large icon) and browsers. Or
+  upload your own picture: size it, drag it into place, and put it on a transparent, white or black
+  background.
 - **Profile pictures.** Upload a picture and place it in the circle (drag and zoom; it's resized in
   the browser). Without one, DreyMail shows your Gravatar (fetched by the server, so Gravatar never
   sees your browser), or your initials in a circle filled with the app's current colour. The User role may change its own picture; a role flag

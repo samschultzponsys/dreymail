@@ -36,6 +36,39 @@ export function desktopBridge(): DesktopBridge | undefined {
 }
 
 const iconCache = new Map<string, string>();
+/** Uploaded mailbox pictures as data: URLs, by picture URL (fetched ahead, so notifying stays instant). */
+const pictures = new Map<string, string>();
+
+/** Fetches a mailbox picture once and keeps it as a data: URL; null if it can't be loaded. */
+export async function loadMailboxPicture(url: string): Promise<string | null> {
+  const known = pictures.get(url);
+  if (known) return known;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const data = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+    pictures.set(url, data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/** The notification icon for a mailbox: its uploaded picture when that's its icon (and loaded). */
+export function mailboxNotificationIcon(a: { color: string; icon: string; iconImage: string | null } | undefined, fallback: string): string {
+  if (a?.icon === 'image' && a.iconImage) {
+    const data = pictures.get(a.iconImage);
+    if (data) return data;
+    void loadMailboxPicture(a.iconImage);
+  }
+  return accountIcon(a?.color ?? fallback, a?.icon === 'image' ? '' : a?.icon);
+}
 
 /**
  * A 128px notification icon: the mailbox's own icon on its colour, or without one DreyMail's

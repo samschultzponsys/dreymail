@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles, permissions and profile pictures.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import type { Permission, Role } from '../../shared/permissions';
 import type { SavedSearch } from '../../shared/search';
@@ -108,6 +109,8 @@ export const api = {
     request<RolesView>(id ? 'PUT' : 'POST', id ? `/api/admin/roles/${encodeURIComponent(id)}` : '/api/admin/roles', r),
   adminDeleteRole: (id: string) => request<RolesView>('DELETE', `/api/admin/roles/${encodeURIComponent(id)}`),
   adminDefaultRole: (roleId: string) => request<RolesView>('PUT', '/api/admin/roles-default', { roleId }),
+  setAccountIcon: (id: string, image: string) => request<AccountView>('PUT', `/api/accounts/${encodeURIComponent(id)}/icon`, { image }),
+  deleteAccountIcon: (id: string) => request<AccountView>('DELETE', `/api/accounts/${encodeURIComponent(id)}/icon`),
   setPicture: (image: string) => request<{ avatar: string | null }>('PUT', '/api/me/picture', { image }),
   deletePicture: () => request<{ avatar: string | null }>('DELETE', '/api/me/picture'),
   setGravatar: (on: boolean) => request<{ avatar: string | null }>('PUT', '/api/me/gravatar', { on }),

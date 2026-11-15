@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: notification icon drawn in the mailbox's colour with its icon.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 // DreyMail service worker: phone/desktop notifications only. It deliberately has no fetch handler
 // and caches nothing, so the app stays a thin client that always talks to the server.
@@ -49,7 +50,7 @@ self.addEventListener('push', (event) => {
       await self.registration.showNotification(title, {
         body: typeof data.body === 'string' ? data.body : '',
         tag: typeof data.tag === 'string' ? data.tag : undefined,
-        icon: (await mailboxIcon(data.color, data.iconPath)) || '/icons/icon-192.png',
+        icon: (await mailboxPicture(data.iconImage)) || (await mailboxIcon(data.color, data.iconPath)) || '/icons/icon-192.png',
         badge: '/icons/badge-96.png',
         data: { url: sameOriginPath(data.url || '/') },
       });
@@ -57,6 +58,21 @@ self.addEventListener('push', (event) => {
     })(),
   );
 });
+
+/** The mailbox's uploaded picture (a same-origin URL) as a data: URL, or null (DreyMail). */
+async function mailboxPicture(url) {
+  try {
+    if (typeof url !== 'string' || !/^\/api\/accounts\/[\w-]+\/icon\?v=\d+$/.test(url)) return null;
+    const res = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok || !/^image\/(png|jpeg|webp)$/.test(res.headers.get('content-type') || '')) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return `data:${res.headers.get('content-type')};base64,${btoa(bin)}`;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The mailbox's icon on its colour, as a PNG data: URL (DreyMail), drawn like the app draws it

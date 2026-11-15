@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,7 +24,7 @@ import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
 import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme';
-import { accountIcon, desktopBridge } from './desktop';
+import { desktopBridge, loadMailboxPicture, mailboxNotificationIcon } from './desktop';
 import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
@@ -207,16 +208,20 @@ export function App() {
     (ev: NotifyEvent) => {
       const bridge = desktopBridge();
       if (!bridge || (document.visibilityState === 'visible' && document.hasFocus())) return;
-      const acc = accountMap.get(ev.accountId);
-      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(acc?.color ?? BRAND_CYAN, acc?.icon) });
+      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: mailboxNotificationIcon(accountMap.get(ev.accountId), BRAND_CYAN) });
     },
     [accountMap],
   );
   useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify);
+  // Desktop app: have uploaded mailbox pictures ready for notifications.
+  useEffect(() => {
+    if (!desktopBridge()) return;
+    for (const a of accounts) if (a.icon === 'image' && a.iconImage) void loadMailboxPicture(a.iconImage);
+  }, [accounts]);
   // Android app: a notification channel per account, and this phone registered for notifications.
   useEffect(() => {
     if (!androidBridge() || !accountsQ.data) return;
-    syncAndroidAccounts(accountsQ.data);
+    void syncAndroidAccounts(accountsQ.data);
     void registerAndroidPush().catch(() => {});
   }, [accountsQ.data]);
   useEffect(() => {

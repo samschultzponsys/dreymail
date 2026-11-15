@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -163,7 +164,7 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
                 title={acc.name}
               >
                 {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                <MailboxIcon icon={acc.icon} color={acc.color} size={13} />
+                <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
                 <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
               </button>
               {!isCollapsed && (
