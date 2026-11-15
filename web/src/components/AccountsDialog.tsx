@@ -397,7 +397,7 @@ export function AccountsDialog({
                     <li>No app password; keeps working when you change your Google password</li>
                   </ul>
                   <ul className="losses">
-                    <li>Needs a one-time setup by an administrator (Settings → Google)</li>
+                    {!google.data?.available && <li>Needs a one-time setup by an administrator (Settings → Google)</li>}
                     <li>Google shows an “unverified app” notice when you sign in</li>
                   </ul>
                   <button className="btn primary" disabled={!google.data?.available} onClick={() => void signIn('google', ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)}>

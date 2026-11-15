@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -258,7 +258,7 @@ automatically.
 | --- | --- | --- |
 | Google Calendar in DreyMail | ✅ edited both ways | ❌ (DreyMail's own calendars still work) |
 | Answering invitations | Through Google Calendar | By email |
-| Setup | One-time, by an administrator (below) | None; create an app password at Google |
+| Setup | One-time, by an administrator (below); the note goes away once it's done | None; create an app password at Google |
 | Needs 2-Step Verification | No | Yes |
 | After changing your Google password | Keeps working | Stops; make a new app password |
 | Sign-in screen | Google shows an "unverified app" notice | — |

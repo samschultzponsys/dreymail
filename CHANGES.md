@@ -13,6 +13,12 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.5): Gmail choice without the setup note once it's done
+
+- **Add account → Gmail:** "Needs a one-time setup by an administrator" only shows while Sign in with
+  Google isn't set up on the server.
+- **Files:** `web/src/components/AccountsDialog.tsx`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.4): connect single sign-on to your account
 
 - **Settings → Profile → Single sign-on → Connect** (the provider's name): connects the server's
