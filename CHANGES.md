@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.2): Gmail's two ways, side by side
+
+- **Add account → Gmail / Google Workspace** now shows both ways next to each other, each with what
+  you get and what you give up: **Sign in with Google** (Google Calendar, invitations answered
+  through Google, no app password; needs the one-time admin setup and shows Google's "unverified
+  app" notice) and **App password** (works right away; no Google Calendar, invitations answered by
+  email, needs 2-Step Verification, stops when you change your Google password). The app password
+  way fills in Gmail's servers, and links to where Google makes app passwords. Other providers
+  are under "Other email".
+- **README:** the same comparison as a table, and how to switch an existing Gmail.
+- **Files:** `web/src/components/AccountsDialog.tsx`, `web/src/accountForm.ts`, `web/src/styles.css`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.1): privacy page
 
 - **Privacy page** at `/privacy` (e.g. `https://mail.example.com/privacy`): what a DreyMail server

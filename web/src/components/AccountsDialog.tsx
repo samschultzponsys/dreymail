@@ -7,13 +7,14 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox editing follows the role's permissions.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: Gmail's two ways side by side, with what each gives and costs.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { DEFAULT_PORTS } from '../../../shared/mailPorts';
 import type { AccountDefaults, AccountInput, AccountView, TlsMode } from '../../../shared/types';
-import { newAccountInput, usesDefaultPassword } from '../accountForm';
+import { gmailAppPasswordInput, newAccountInput, usesDefaultPassword } from '../accountForm';
 import { api } from '../api';
 import { ACCOUNT_COLORS } from '../util';
 import { labelOn } from '../accountTheme';
@@ -320,21 +321,54 @@ export function AccountsDialog({
                 </span>
               </span>
             </button>
-            <button
-              className="provider-choice"
-              disabled={!google.data?.available}
-              onClick={() => void signIn('google', ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)}
-            >
-              <span className="provider-mark google" aria-hidden="true">G</span>
-              <span className="grow">
-                <strong>Gmail: Sign in with Google</strong>
-                <span className="sub">
-                  {google.data?.available
-                    ? 'Gmail and Google Workspace. You sign in on Google’s page; no app password needed.'
-                    : 'Not set up on this server yet: an administrator adds it in Settings → Google. Gmail still works with an app password below.'}
-                </span>
-              </span>
-            </button>
+            <div className="google-choice">
+              <div className="google-choice-head">
+                <span className="provider-mark google" aria-hidden="true">G</span>
+                <strong>Gmail / Google Workspace</strong>
+                <span className="muted">Two ways; pick one.</span>
+              </div>
+              <div className="google-options">
+                <div className="google-option">
+                  <strong>Sign in with Google</strong>
+                  <ul className="gains">
+                    <li>Your Google calendars in DreyMail, edited both ways</li>
+                    <li>Invitations answered through Google Calendar</li>
+                    <li>No app password; keeps working when you change your Google password</li>
+                  </ul>
+                  <ul className="losses">
+                    <li>Needs a one-time setup by an administrator (Settings → Google)</li>
+                    <li>Google shows an “unverified app” notice when you sign in</li>
+                  </ul>
+                  <button className="btn primary" disabled={!google.data?.available} onClick={() => void signIn('google', ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)}>
+                    Sign in with Google
+                  </button>
+                  {!google.data?.available && <div className="hint">Not set up on this server yet.</div>}
+                </div>
+                <div className="google-option">
+                  <strong>App password</strong>
+                  <ul className="gains">
+                    <li>Works right away, no setup</li>
+                  </ul>
+                  <ul className="losses">
+                    <li>No Google Calendar in DreyMail (DreyMail&apos;s own calendars still work)</li>
+                    <li>Invitations are answered by email instead</li>
+                    <li>Needs 2-Step Verification, and stops working when you change your Google password</li>
+                  </ul>
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setChoosing(false);
+                      setEditing({ input: gmailAppPasswordInput(accounts.length, defaults) });
+                    }}
+                  >
+                    Use an app password
+                  </button>
+                  <a className="hint" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
+                    Create an app password at Google
+                  </a>
+                </div>
+              </div>
+            </div>
             <button
               className="provider-choice"
               onClick={() => {
@@ -344,8 +378,8 @@ export function AccountsDialog({
             >
               <span className="provider-mark" aria-hidden="true">@</span>
               <span className="grow">
-                <strong>Gmail (app password) or other email</strong>
-                <span className="sub">Gmail (with an app password), iCloud, Yahoo, Purelymail, Fastmail, your own server: any IMAP/SMTP account.</span>
+                <strong>Other email</strong>
+                <span className="sub">iCloud, Yahoo, Purelymail, Fastmail, your own server: any IMAP/SMTP account.</span>
               </span>
             </button>
             {msError && <div className="error-text">{msError}</div>}

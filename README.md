@@ -27,7 +27,8 @@
      Modified by samschultzponsys, 2026-11-15: passkey sign-in.
      Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
      Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end.
-     Modified by samschultzponsys, 2026-11-15: privacy page. -->
+     Modified by samschultzponsys, 2026-11-15: privacy page.
+     Modified by samschultzponsys, 2026-11-15: Gmail's two ways compared. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -39,7 +40,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -244,7 +245,21 @@ and sent through Microsoft Graph, which works even where an organization has swi
 sending, and Microsoft keeps the copy in Sent. The sign-in is stored encrypted and renewed
 automatically.
 
-**Sign in with Google** (optional; app passwords keep working): Settings → **Google** walks you
+**Gmail: two ways.** *Add account* offers both, side by side:
+
+| | Sign in with Google | App password |
+| --- | --- | --- |
+| Google Calendar in DreyMail | ✅ edited both ways | ❌ (DreyMail's own calendars still work) |
+| Answering invitations | Through Google Calendar | By email |
+| Setup | One-time, by an administrator (below) | None; create an app password at Google |
+| Needs 2-Step Verification | No | Yes |
+| After changing your Google password | Keeps working | Stops; make a new app password |
+| Sign-in screen | Google shows an "unverified app" notice | — |
+
+Both read mail over IMAP and send over SMTP. To switch an existing Gmail from an app password, add it
+again with Sign in with Google, then remove the old entry in Accounts (nothing changes at Google).
+
+**Sign in with Google** setup (optional; app passwords keep working): Settings → **Google** walks you
 through creating a free OAuth client in Google Cloud (about 10 minutes). Publish the app there, or
 Google ends the sign-in every 7 days; as it's your own unverified app, Google shows a "hasn't
 verified this app" screen once (*Advanced → Go to DreyMail*). Google asks for a privacy policy before

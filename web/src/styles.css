@@ -936,3 +936,18 @@ img.account-mark { object-fit: cover; }
 .copy-value { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; }
 .copy-value .btn { font-size: 12px; min-height: 26px; padding: 2px 8px; }
 .oidc-warn { font-size: 12px; color: var(--text-2); background: color-mix(in srgb, #eab308 14%, transparent); border-radius: var(--radius-sm); padding: 6px 8px; }
+
+/* ---- Add account: Gmail's two ways ------------------------------------------------------- */
+.google-choice { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.google-choice-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.google-choice-head .muted { font-size: 12.5px; }
+.google-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .google-options { grid-template-columns: 1fr; } }
+.google-option { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: 13px; }
+.google-option ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.google-option li { padding-left: 18px; position: relative; }
+.google-option .gains li::before { content: '✓'; position: absolute; left: 0; color: #16a34a; font-weight: 700; }
+.google-option .losses li::before { content: '–'; position: absolute; left: 2px; color: var(--muted); font-weight: 700; }
+.google-option .losses li { color: var(--text-2); }
+.google-option .btn { margin-top: auto; align-self: flex-start; }
+.google-option > .hint { margin-top: 0; }
