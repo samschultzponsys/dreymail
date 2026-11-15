@@ -11,7 +11,8 @@
    Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
    Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
    Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
-   Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail. */
+   Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+   Modified by samschultzponsys, 2026-11-15: search filter panel, chips and saved searches. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -213,6 +214,48 @@ svg { flex-shrink: 0; }
 .search { position: relative; }
 .search svg { position: absolute; left: 10px; top: 9px; color: var(--muted); }
 .search .input { padding-left: 32px; background: var(--surface-2); border-color: var(--border); }
+.search .input { padding-right: 40px; }
+.search .filter-btn { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; }
+.search .filter-btn svg { position: static; color: inherit; }
+.search .filter-btn.on { color: var(--accent); }
+.filter-count {
+  position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 999px;
+  background: var(--accent-fill); color: var(--accent-text); font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
+}
+.search-panel {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface-2);
+}
+.sp-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sp-label { font-size: 12px; font-weight: 600; color: var(--text-2); min-width: 64px; }
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 10px; }
+.sp-field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-2); min-width: 0; }
+.sp-field .input { background: var(--surface); }
+.sp-accounts, .sp-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-account, .sp-toggle {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); font-size: 12px; cursor: pointer;
+}
+.sp-account .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--acct); opacity: 0.35; }
+.sp-account.on { border-color: var(--acct); color: var(--text); font-weight: 600; }
+.sp-account.on .dot { opacity: 1; }
+.sp-toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.sp-actions { display: flex; gap: 8px; align-items: center; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.filter-chip, .save-search { cursor: pointer; height: 24px; }
+.filter-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.save-search { background: none; border-style: dashed; }
+.save-search:hover { color: var(--accent); border-color: var(--accent); }
+.save-search-form { display: flex; gap: 6px; flex: 1; min-width: 220px; }
+.save-search-form .input { flex: 1; min-width: 0; height: 30px; }
+.saved-search { padding: 0; gap: 0; }
+.saved-search .saved-open { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.saved-search .saved-remove { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: var(--radius-sm); opacity: 0; }
+.saved-search:hover .saved-remove, .saved-search .saved-remove:focus-visible { opacity: 1; }
+.saved-search .saved-remove:hover { color: var(--danger); background: var(--hover); }
+@media (hover: none) { .saved-search .saved-remove { opacity: 0.7; } }
+.sidebar.rail .saved-search .saved-open { justify-content: center; padding: 0; }
+.sidebar.rail .saved-search .saved-remove { display: none; }
 .bulk-bar { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
 .bulk-bar .count { flex: 1; font-size: 13px; font-weight: 600; padding-left: 4px; }
 .rows { flex: 1; overflow-y: auto; }

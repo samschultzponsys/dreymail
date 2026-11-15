@@ -8,7 +8,9 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: search filters, all-mail search and saved searches.
 
+import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef, VersionInfo } from '../../../shared/types.js';
@@ -363,6 +365,27 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     store.deleteSignature(uid(req), req.params.id) ? { ok: true } : reply.code(404).send({ error: 'Signature not found' }),
   );
 
+  // ---- saved searches (DreyMail) ---------------------------------------------------
+
+  const savedSearchSchema = z.object({
+    name: z.string().trim().min(1).max(80),
+    q: z.string().trim().max(500).default(''),
+    unread: z.boolean().default(false),
+    filters: z.unknown(),
+    accountId: z.string().max(64).nullable().default(null),
+    folder: z.string().max(1000).default('INBOX'),
+  });
+  app.get('/api/searches', async (req) => store.listSavedSearches(uid(req)));
+  app.post('/api/searches', async (req, reply) => {
+    const body = savedSearchSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Give the search a name' });
+    if (store.listSavedSearches(uid(req)).length >= 50) return reply.code(400).send({ error: 'You can keep up to 50 saved searches' });
+    return store.saveSearch(uid(req), { ...body.data, filters: normalizeFilters(body.data.filters) });
+  });
+  app.delete<{ Params: { id: string } }>('/api/searches/:id', async (req, reply) =>
+    store.deleteSavedSearch(uid(req), req.params.id) ? store.listSavedSearches(uid(req)) : reply.code(404).send({ error: 'Saved search not found' }),
+  );
+
   const verify = async (input: AccountInput, existing?: { imap: string; smtp: string }) => {
     const imapPw = input.imap.password || existing?.imap || '';
     const smtpPw = input.smtp.password || existing?.smtp || imapPw;
@@ -449,22 +472,33 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
           cursor: z.string().max(10_000).optional(),
           q: z.string().trim().max(500).optional(),
           unread: z.enum(['0', '1']).optional(),
+          // Filter builder choices, JSON (see shared/search.ts).
+          filter: z.string().max(4000).optional(),
           // 1: the user asked to refresh, so the cache must check with the IMAP server first.
           fresh: z.enum(['0', '1']).optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),
         })
         .parse(req.query);
       const userId = uid(req);
+      const filters = decodeFilters(q.filter);
+      const where = filters.where ?? 'folder';
+      // Accounts to look in: the filter's choice (the user's own only), else all of them.
+      const own = store.listAccounts(userId).map((a) => a.id);
+      const picked = filters.accounts?.length ? own.filter((id) => filters.accounts!.includes(id)) : own;
       let sources: ListSource[];
-      if (q.accountId) {
+      if (q.accountId && where === 'folder') {
         requireAccount(userId, q.accountId);
         sources = [{ accountId: q.accountId, folder: q.folder || 'INBOX' }];
+      } else if (where === 'all') {
+        // All mail: each account's folders (Gmail's All Mail alone, where there is one).
+        const lists = await Promise.all(picked.map(async (accountId) => (await mail.allMailFolders(userId, accountId).catch(() => ['INBOX'])).map((folder) => ({ accountId, folder }))));
+        sources = lists.flat();
       } else {
-        // Unified view: every account's INBOX.
-        sources = store.listAccounts(userId).map((a) => ({ accountId: a.id, folder: 'INBOX' }));
+        // Unified view, or "All inboxes": every (picked) account's INBOX.
+        sources = picked.map((accountId) => ({ accountId, folder: 'INBOX' }));
       }
       const limit = q.limit ?? req.user!.preferences.pageSize;
-      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1' }, { fresh: q.fresh === '1' });
+      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1' });
       const until = snoozedUntil(userId);
       for (const m of [...list.messages, ...list.related]) {
         const t = until(m);

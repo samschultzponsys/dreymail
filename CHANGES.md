@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.4): Search filters and saved searches
+
+- **Filter builder** (no query syntax): where to look (this folder, all inboxes, all mail), accounts,
+  from, to, subject, message text, date (presets or a range), size, has attachment, starred,
+  replied to. New `shared/search.ts` (filter model, validation, date ranges, chips) used by both
+  sides; IMAP SEARCH criteria and the "all mail" folder choice in `server/src/imap/mail.ts`
+  (attachments: Gmail's own search first, then `multipart/mixed`); `/api/messages` takes `filter`
+  (`server/src/routes/api.ts`).
+- **Saved searches** as sidebar smart folders: `saved_searches` table and store methods
+  (`server/src/db.ts`), `/api/searches` (`server/src/routes/api.ts`).
+- **Web:** new `web/src/components/SearchPanel.tsx`; filter button, chips and Save search in
+  `web/src/components/MessageList.tsx`; saved searches in `web/src/components/Sidebar.tsx`; filters
+  and messages opened from another folder in the URL (`web/src/routing.ts`); `web/src/App.tsx`,
+  `web/src/api.ts`, `web/src/hooks.ts`, `web/src/styles.css`. Tests: `server/test/searchFilters.test.ts`,
+  `web/test/routing.test.ts`, `web/test/sidebar.test.ts`.
+
 ## 2026-11-15 (v2.3): Gmail with Sign in with Google
 
 - **Sign in with Google** as a second way to add Gmail (app passwords keep working): new

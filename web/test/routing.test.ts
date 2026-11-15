@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: routes carry search filters.
+
 import { describe, expect, it } from 'vitest';
 import { buildUrl, HOME, listRoute, openMessageFolder, parseLocation, readHistoryState, sameRoute, viewKey, type Route } from '../src/routing';
 
@@ -17,20 +21,20 @@ describe('routing', () => {
 
   it.each<Route>([
     HOME,
-    { accountId: ACC, folder: 'INBOX', q: '', unread: false, open: null },
-    { accountId: ACC, folder: 'INBOX', q: 'invoice', unread: true, open: null },
-    { accountId: null, folder: 'INBOX', q: '', unread: true, open: { accountId: ACC, uidValidity: '7', uid: 3 } },
-    { accountId: ACC, folder: 'INBOX.Sent', q: '', unread: false, open: null },
-    { accountId: ACC, folder: 'Archive/2026/Receipts', q: '', unread: false, open: null },
-    { accountId: ACC, folder: 'Entwürfe & Notizen #1?', q: 'a b&c=d', unread: false, open: null },
-    { accountId: ACC, folder: 'INBOX', q: '', unread: false, open: { accountId: ACC, uidValidity: '1792243501', uid: 42 } },
-    { accountId: null, folder: 'INBOX', q: 'x', unread: false, open: { accountId: ACC, uidValidity: '7', uid: 1 } },
+    { accountId: ACC, folder: 'INBOX', q: '', unread: false, filters: {}, open: null },
+    { accountId: ACC, folder: 'INBOX', q: 'invoice', unread: true, filters: {}, open: null },
+    { accountId: null, folder: 'INBOX', q: '', unread: true, filters: {}, open: { accountId: ACC, uidValidity: '7', uid: 3 } },
+    { accountId: ACC, folder: 'INBOX.Sent', q: '', unread: false, filters: {}, open: null },
+    { accountId: ACC, folder: 'Archive/2026/Receipts', q: '', unread: false, filters: {}, open: null },
+    { accountId: ACC, folder: 'Entwürfe & Notizen #1?', q: 'a b&c=d', unread: false, filters: {}, open: null },
+    { accountId: ACC, folder: 'INBOX', q: '', unread: false, filters: {}, open: { accountId: ACC, uidValidity: '1792243501', uid: 42 } },
+    { accountId: null, folder: 'INBOX', q: 'x', unread: false, filters: {}, open: { accountId: ACC, uidValidity: '7', uid: 1 } },
   ])('round-trips %j', (route) => {
     expect(parse(buildUrl(route))).toEqual(route);
   });
 
   it('encodes folder separators so a folder is one path segment', () => {
-    const url = buildUrl({ accountId: ACC, folder: 'A/B', q: '', unread: false, open: null });
+    const url = buildUrl({ accountId: ACC, folder: 'A/B', q: '', unread: false, filters: {}, open: null });
     expect(url).toBe(`/mail/${ACC}/A%2FB`);
     // A hand-typed unencoded separator still works.
     expect(parse(`/mail/${ACC}/A/B`).folder).toBe('A/B');
@@ -77,3 +81,20 @@ describe('routing', () => {
     expect(readHistoryState({ app: true, overlay: 'evil' })).toEqual({ app: true });
   });
 });
+
+describe('search filters and messages from other folders in the URL', () => {
+  it('round-trips filters and the open message folder', () => {
+    const r = { accountId: ACC, folder: 'INBOX', q: 'bill', unread: false, filters: { where: 'all' as const, attachment: true }, open: { accountId: 'other', uidValidity: '9', uid: 4, folder: '[Gmail]/All Mail' } };
+    expect(parseLocation(...(splitUrl(buildUrl(r)) as [string, string]))).toEqual(r);
+  });
+
+  it('a message of another account is only kept while the search looks beyond the folder', () => {
+    const url = buildUrl({ accountId: ACC, folder: 'INBOX', q: '', unread: false, filters: {}, open: { accountId: 'other', uidValidity: '9', uid: 4 } });
+    expect(parseLocation(...(splitUrl(url) as [string, string])).open).toBeNull();
+  });
+});
+
+function splitUrl(url: string) {
+  const i = url.indexOf('?');
+  return i === -1 ? [url, ''] : [url.slice(0, i), url.slice(i)];
+}

@@ -10,11 +10,13 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Microsoft (OAuth) accounts.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: saved searches.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { normalizeFilters, type SavedSearch, type SearchFilters } from '../../shared/search.js';
 import type { AccountInput, AccountView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
 import { decrypt, encrypt } from './crypto.js';
 
@@ -150,6 +152,17 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all() as { name: string }[];
     if (!cols.some((c) => c.name === 'display_name')) db.exec("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT '';");
   },
+  // DreyMail: saved searches (the sidebar's smart folders). `query` is JSON: q, unread, filters.
+  `CREATE TABLE IF NOT EXISTS saved_searches (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     query TEXT NOT NULL,
+     account_id TEXT,
+     folder TEXT NOT NULL DEFAULT 'INBOX',
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS saved_searches_user ON saved_searches(user_id);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -725,6 +738,45 @@ export class Store {
 
   deleteSignature(userId: string, id: string): boolean {
     return this.db.prepare('DELETE FROM signatures WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
+  }
+
+  // ---- saved searches (DreyMail) ----------------------------------------------
+
+  listSavedSearches(userId: string): SavedSearch[] {
+    const rows = this.db
+      .prepare('SELECT id, name, query, account_id, folder FROM saved_searches WHERE user_id = ? ORDER BY created_at, id')
+      .all(userId) as { id: string; name: string; query: string; account_id: string | null; folder: string }[];
+    return rows.map((r) => {
+      let q: { q?: unknown; unread?: unknown; filters?: unknown } = {};
+      try {
+        q = JSON.parse(r.query) as typeof q;
+      } catch {
+        /* keep the name, drop the broken query */
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        q: typeof q.q === 'string' ? q.q.slice(0, 500) : '',
+        unread: q.unread === true,
+        filters: normalizeFilters(q.filters),
+        accountId: r.account_id,
+        folder: r.folder,
+      };
+    });
+  }
+
+  saveSearch(userId: string, input: { name: string; q: string; unread: boolean; filters: SearchFilters; accountId: string | null; folder: string }): SavedSearch[] {
+    // A search scoped to a folder must be in one of the user's own accounts.
+    const accountId = input.accountId && this.listAccounts(userId).some((a) => a.id === input.accountId) ? input.accountId : null;
+    const query = JSON.stringify({ q: input.q, unread: input.unread, filters: normalizeFilters(input.filters) });
+    this.db
+      .prepare('INSERT INTO saved_searches (id, user_id, name, query, account_id, folder, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), userId, input.name, query, accountId, accountId ? input.folder : 'INBOX', Date.now());
+    return this.listSavedSearches(userId);
+  }
+
+  deleteSavedSearch(userId: string, id: string): boolean {
+    return this.db.prepare('DELETE FROM saved_searches WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
   }
 
   // ---- recent recipients (address autocomplete) ----------------------------

@@ -1,9 +1,11 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: spacing and layout fixes (account tag, phone Compose button).
+// Modified by samschultzponsys, 2026-11-15: search filter builder, filter chips, save search.
 
-import { AlarmClock, Archive, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, Star, Trash2, X, Reply } from 'lucide-react';
+import { AlarmClock, Archive, Bookmark, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { filterChips, filterCount, hasFilters, withoutFilter, type SearchFilters } from '../../../shared/search';
 import { participants, type ConversationRow } from '../../../shared/threads';
 import type { AccountFolders, AccountView, MessageAction, MessageSummary, SwipeAction } from '../../../shared/types';
 import type { Direction } from '../swipe';
@@ -12,6 +14,7 @@ import { displayName, formatListDate, refKey } from '../util';
 import { MoveMenu } from './MoveMenu';
 import { SnoozeMenu } from './SnoozeMenu';
 import { formatSnoozeTime } from '../snooze';
+import { SearchPanel } from './SearchPanel';
 
 interface Props {
   title: string;
@@ -30,6 +33,14 @@ interface Props {
   checked: Set<string>;
   query: string;
   onQuery: (q: string) => void;
+  /** Filter builder choices (see shared/search.ts). */
+  filters: SearchFilters;
+  /** New filters, and the search box text when it changed with them. */
+  onFilters: (f: SearchFilters, q?: string) => void;
+  /** Save the current search under a name (sidebar smart folder). */
+  onSaveSearch: (name: string) => Promise<boolean>;
+  /** The open view is one account's folder. */
+  inFolder: boolean;
   onOpen: (m: MessageSummary) => void;
   onCheck: (m: MessageSummary, on: boolean) => void;
   onCheckAll: (on: boolean) => void;
@@ -51,10 +62,16 @@ interface Props {
 
 export function MessageList(p: Props) {
   const [q, setQ] = useState(p.query);
+  const [panel, setPanel] = useState(false);
+  const [saveName, setSaveName] = useState<string | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const { hasMore, fetchingMore, onLoadMore } = p;
 
   useEffect(() => setQ(p.query), [p.query]);
+  const accountList = [...p.accounts.values()];
+  const chips = filterChips(p.filters, (id) => p.accounts.get(id)?.name ?? 'Account');
+  const searching = !!p.query || hasFilters(p.filters);
+  const nFilters = filterCount(p.filters) + (p.filters.where ? 1 : 0);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -93,7 +110,7 @@ export function MessageList(p: Props) {
           <Search size={15} />
           <input
             className="input"
-            placeholder={p.unified ? 'Search all inboxes' : 'Search this folder'}
+            placeholder={p.filters.where === 'all' ? 'Search all mail' : p.filters.where === 'inboxes' || p.unified ? 'Search all inboxes' : 'Search this folder'}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -106,7 +123,60 @@ export function MessageList(p: Props) {
               }
             }}
           />
+          <button
+            type="button"
+            className={`icon-btn filter-btn ${panel || nFilters ? 'on' : ''}`}
+            title="Filters"
+            aria-label="Filters"
+            aria-expanded={panel}
+            onClick={() => setPanel((v) => !v)}
+          >
+            <SlidersHorizontal size={15} />
+            {nFilters > 0 && <span className="filter-count">{nFilters}</span>}
+          </button>
         </form>
+        {panel && (
+          <SearchPanel
+            filters={p.filters}
+            inFolder={p.inFolder}
+            accounts={accountList}
+            onApply={(f) => {
+              p.onFilters(f, q.trim());
+              setPanel(false);
+            }}
+            onClose={() => setPanel(false)}
+          />
+        )}
+        {(chips.length > 0 || searching) && !panel && (
+          <div className="filter-chips">
+            {chips.map((c) => (
+              <button key={c.key} className="chip filter-chip" title="Remove this filter" onClick={() => p.onFilters(withoutFilter(p.filters, c.key))}>
+                {c.label} <X size={12} />
+              </button>
+            ))}
+            {saveName === null ? (
+              <button className="chip save-search" onClick={() => setSaveName(p.query || chips[0]?.label || 'Search')} title="Keep this search in the sidebar">
+                <Bookmark size={12} /> Save search
+              </button>
+            ) : (
+              <form
+                className="save-search-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (saveName.trim()) void p.onSaveSearch(saveName.trim()).then((ok) => ok && setSaveName(null));
+                }}
+              >
+                <input className="input" autoFocus value={saveName} maxLength={80} onChange={(e) => setSaveName(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setSaveName(null)} aria-label="Name for this search" />
+                <button className="btn primary" type="submit">
+                  Save
+                </button>
+                <button className="btn" type="button" onClick={() => setSaveName(null)}>
+                  Cancel
+                </button>
+              </form>
+            )}
+          </div>
+        )}
         <label className="check unread-toggle">
           <input type="checkbox" checked={p.unreadOnly} onChange={(e) => p.onUnreadOnly(e.target.checked)} />
           Unread only
@@ -167,10 +237,10 @@ export function MessageList(p: Props) {
               <div>
                 <MailCheck size={28} style={{ opacity: 0.5 }} />
                 <div style={{ marginTop: 6 }}>
-                  {p.query ? 'No unread messages match your search.' : "You're all caught up. No unread messages here."}
+                  {searching ? 'No unread messages match your search.' : "You're all caught up. No unread messages here."}
                 </div>
               </div>
-            ) : p.query ? (
+            ) : searching ? (
               'No messages match your search.'
             ) : (
               'No messages here.'

@@ -13,7 +13,8 @@
      Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog).
      Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet).
      Modified by samschultzponsys, 2026-11-15: v2.2 (Outlook and Microsoft 365, This device).
-     Modified by samschultzponsys, 2026-11-15: v2.3 (Sign in with Google for Gmail). -->
+     Modified by samschultzponsys, 2026-11-15: v2.3 (Sign in with Google for Gmail).
+     Modified by samschultzponsys, 2026-11-15: search filters and saved searches. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -37,11 +38,12 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.3**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.4**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
-encrypted notifications that sound and look different per account. What's planned is in
+encrypted notifications that sound and look different per account, and point-and-click search
+filters with saved searches. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -118,7 +120,21 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   with DreyMail" makes the browser send `mailto:` links on any website here too; the installed app
   (PWA) registers for them on its own where the browser supports it. Only recipients, subject and
   a plain-text body are taken from a link, and nothing is sent until you press Send.
-- Server-side IMAP search in the current folder, or across all inboxes in the unified view.
+- Search without query syntax. Type words in the search box, or open the filter panel (the
+  sliders button) and pick what you want:
+  - **Look in:** this folder, all inboxes, or all mail (Gmail's All Mail; on other servers, every
+    folder except Trash, Junk, Drafts and Snoozed).
+  - **Accounts:** one or several, by their colours.
+  - **From and To,** with suggestions from people you've written to.
+  - **Subject has** and **Message has.**
+  - **Date:** today, the past week, month or year, or dates you choose.
+  - **Size:** over 1, 5, 10 or 25 MB.
+  - **Has attachment, Starred, Replied to.**
+
+  Active filters show as chips under the search box; click one to remove it. **Save search**
+  keeps the search in the sidebar as a smart folder that is re-run each time you open it, so
+  "past week" always means the past week. The IMAP server does the searching; DreyMail keeps no
+  index of your mail.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get
   dark styling. Heavily designed mail (newsletters) is shown on a light "paper" card instead of
   being force-inverted, with a per-message toggle.

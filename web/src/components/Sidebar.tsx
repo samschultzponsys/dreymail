@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 // Modified by samschultzponsys, 2026-11-13: hides "All inboxes" when turned off in Settings.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: saved searches as smart folders.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -24,9 +25,11 @@ import {
   Trash2,
   UserCog,
   Layers,
+  Search,
   X,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import type { SavedSearch } from '../../../shared/search';
 import type { AccountFolders, AccountView, FolderView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -72,9 +75,14 @@ interface Props {
   onLogout: () => void;
   userLabel: string;
   onCloseNav: () => void;
+  /** Saved searches, listed as smart folders. */
+  searches: SavedSearch[];
+  activeSearch: string | null;
+  onSearch: (s: SavedSearch) => void;
+  onDeleteSearch: (s: SavedSearch) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -99,7 +107,7 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
       <nav className="nav">
         {showUnified && accounts.length > 1 && (
           <button
-            className={`nav-item ${sel.accountId === null ? 'active' : ''} ${totalUnread ? 'unread' : ''}`}
+            className={`nav-item ${sel.accountId === null && !activeSearch ? 'active' : ''} ${totalUnread ? 'unread' : ''}`}
             onClick={() => onSelect({ accountId: null, folder: 'INBOX' })}
             title="All inboxes"
           >
@@ -107,6 +115,26 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
             <span className="name">All inboxes</span>
             {totalUnread > 0 && <span className="count">{totalUnread}</span>}
           </button>
+        )}
+        {searches.length > 0 && (
+          <div className="nav-section">
+            <button className="nav-heading" onClick={() => setCollapsed((c) => ({ ...c, '/searches': !c['/searches'] }))} title="Saved searches">
+              {!rail && collapsed['/searches'] ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+              <span className="name">Saved searches</span>
+            </button>
+            {(rail || !collapsed['/searches']) &&
+              searches.map((s) => (
+                <div key={s.id} className={`nav-item saved-search ${activeSearch === s.id ? 'active' : ''}`}>
+                  <button className="saved-open" onClick={() => onSearch(s)} title={s.name}>
+                    <Search size={16} />
+                    <span className="name">{s.name}</span>
+                  </button>
+                  <button className="saved-remove name" title={`Remove “${s.name}”`} aria-label={`Remove saved search ${s.name}`} onClick={() => onDeleteSearch(s)}>
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+          </div>
         )}
         {accounts.map((acc) => {
           const af = folders?.find((f) => f.accountId === acc.id);
@@ -132,7 +160,7 @@ export function Sidebar({ accounts, showUnified, userFullName, folders, sel, onS
                   {af?.error && <div className="nav-error">{af.error}</div>}
                   {af &&
                     sortFolders(af.folders).map((f) => {
-                      const active = sel.accountId === acc.id && sel.folder === f.path;
+                      const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
                       const showCount = f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed';
                       return (
                         <button

@@ -10,7 +10,9 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: search filters, saved searches.
 
+import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
@@ -29,12 +31,12 @@ import { quotableDetail, Reader, replyTarget, type ReplyKind } from './component
 import { SettingsDialog } from './components/SettingsDialog';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
-import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
+import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
 import { PENDING_MAILTO_KEY, parseMailto } from './mailto';
 import { blankComposer, composerFor, composerForMailto } from './replies';
 import { useRouter, type Location } from './router';
 import { disablePush, notificationTarget, registerServiceWorker, setAppBadge, syncPush } from './push';
-import { HOME, listRoute, openMessageFolder, parseLocation, viewKey, type Route } from './routing';
+import { HOME, listRoute, openMessageFolder, parseLocation, viewKey, type OpenMessage, type Route } from './routing';
 import { updateSticky, withSticky } from './sticky';
 import { removesFromList, swipeToAction, type Direction, type UndoStep } from './swipe';
 import { formatSnoozeTime } from './snooze';
@@ -143,7 +145,9 @@ export function App() {
         : sel,
     [sel, accounts, unifiedInbox],
   );
-  const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0);
+  const filterParam = encodeFilters(route.filters);
+  const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0, filterParam);
+  const savedSearches = useSavedSearches(loggedIn);
   const serverMessages = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.messages) ?? [], [messagesQ.data]);
 
   // "Unread only": messages read in this view stay listed (dimmed) until the view changes or is
@@ -293,17 +297,31 @@ export function App() {
     if (r.ok && r.account) navigate({ ...HOME, accountId: r.account, folder: 'INBOX' }, { replace: true });
   }, [loggedIn, qc, push, navigate]);
 
+  // The saved search this view is, if any (highlighted in the sidebar).
+  const activeSearch = useMemo(() => {
+    const key = viewKey(route);
+    return (savedSearches.data ?? []).find((s: SavedSearch) => viewKey({ ...HOME, accountId: s.accountId, folder: s.folder, q: s.q, unread: s.unread, filters: s.filters }) === key)?.id ?? null;
+  }, [savedSearches.data, route]);
+
   const runAction = useMessageAction(useCallback((m: string) => push(m, true), [push]));
 
-  const title = effectiveSel.accountId
+  const title = route.filters.where === 'all'
+    ? 'All mail'
+    : route.filters.where === 'inboxes'
+      ? 'All inboxes'
+      : effectiveSel.accountId
     ? `${folderInfo?.specialUse === 'inbox' ? 'Inbox' : (folderInfo?.name ?? effectiveSel.folder)}${accounts.length > 1 ? ` · ${accountMap.get(effectiveSel.accountId)?.name ?? ''}` : ''}`
     : 'All inboxes';
 
-  /** Opening a message pushes an entry; switching to another one while open replaces it. */
-  const openMessage = (m: MessageSummary) => {
-    go({ ...route, open: { accountId: m.accountId, uidValidity: m.uidValidity, uid: m.uid } }, !!route.open);
+  /** The route's open message; search results from another folder carry that folder. */
+  const openOf = (r: MessageRef): OpenMessage => {
+    const listFolder = route.accountId ? route.folder : 'INBOX';
+    return { accountId: r.accountId, uidValidity: r.uidValidity, uid: r.uid, ...(r.folder !== listFolder || r.accountId !== (route.accountId ?? r.accountId) ? { folder: r.folder } : {}) };
   };
-  const setOpenRef = (r: MessageRef | null) => go({ ...route, open: r ? { accountId: r.accountId, uidValidity: r.uidValidity, uid: r.uid } : null }, true);
+
+  /** Opening a message pushes an entry; switching to another one while open replaces it. */
+  const openMessage = (m: MessageSummary) => go({ ...route, open: openOf(m) }, !!route.open);
+  const setOpenRef = (r: MessageRef | null) => go({ ...route, open: r ? openOf(r) : null }, true);
 
   /** Move the selection to the neighbour of `ref`'s row (after archive/delete or j/k). */
   const rowIndex = useCallback(
@@ -537,7 +555,7 @@ export function App() {
           setChecked(new Set());
           // From the phone drawer, the folder replaces the drawer entry: Back then returns to the
           // previous folder rather than reopening the drawer.
-          const r: Route = { accountId: s.accountId, folder: s.folder, q: '', unread: false, open: null };
+          const r: Route = { ...HOME, accountId: s.accountId, folder: s.folder };
           if (overlay === 'nav') navigate(r, { replace: true });
           else go(r);
         }}
@@ -548,6 +566,18 @@ export function App() {
         userLabel={userLabel(me.data!, me.data!.preferences.showFullName)}
         userFullName={userLabel(me.data!, true)}
         onCloseNav={() => closeOverlay('nav')}
+        searches={savedSearches.data ?? []}
+        activeSearch={activeSearch}
+        onSearch={(s) => {
+          setChecked(new Set());
+          const r: Route = { ...HOME, accountId: s.accountId, folder: s.folder, q: s.q, unread: s.unread, filters: s.filters };
+          if (overlay === 'nav') navigate(r, { replace: true });
+          else go(r);
+        }}
+        onDeleteSearch={(s) => {
+          if (!confirm(`Remove the saved search “${s.name}”?`)) return;
+          api.deleteSearch(s.id).then((list) => qc.setQueryData(['searches'], list), (e: Error) => push(e.message, true));
+        }}
       />
       <MessageList
         title={title}
@@ -569,6 +599,25 @@ export function App() {
           setChecked(new Set());
           go({ ...route, q, open: null });
         }}
+        filters={route.filters}
+        onFilters={(filters, q) => {
+          setChecked(new Set());
+          go({ ...route, filters, q: q ?? route.q, open: null });
+        }}
+        inFolder={sel.accountId !== null}
+        onSaveSearch={(name) =>
+          api.saveSearch({ name, q: route.q, unread: route.unread, filters: route.filters, accountId: sel.accountId, folder: sel.folder }).then(
+            (list) => {
+              qc.setQueryData(['searches'], list);
+              push(`Saved “${name}” in the sidebar.`);
+              return true;
+            },
+            (e: Error) => {
+              push(e.message, true);
+              return false;
+            },
+          )
+        }
         onOpen={openMessage}
         onCheck={(m, on) =>
           setChecked((c) => {

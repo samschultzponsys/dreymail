@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: useSignatures.
 // Modified by samschultzponsys, 2026-11-13: desktop app: native notifications, update check.
 // Modified by samschultzponsys, 2026-11-13: useAccounts can wait for sign-in.
+// Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -19,11 +20,16 @@ export const useSignatures = (enabled = true) => useQuery({ queryKey: ['signatur
 export const useFolders = (enabled: boolean) =>
   useQuery({ queryKey: ['folders'], queryFn: api.folders, enabled, staleTime: 30_000, refetchInterval: 120_000 });
 
-export function useMessages(sel: MailboxSel, q: string, unread: boolean, enabled: boolean) {
+/** Saved searches (the sidebar's smart folders). */
+export function useSavedSearches(enabled: boolean) {
+  return useQuery({ queryKey: ['searches'], queryFn: api.savedSearches, enabled, staleTime: 60_000 });
+}
+
+export function useMessages(sel: MailboxSel, q: string, unread: boolean, enabled: boolean, filter = '') {
   const qc = useQueryClient();
   return useInfiniteQuery({
-    queryKey: ['messages', sel.accountId, sel.accountId ? sel.folder : '', q, unread],
-    queryFn: ({ pageParam }) => fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread)),
+    queryKey: ['messages', sel.accountId, sel.accountId ? sel.folder : '', q, unread, filter],
+    queryFn: ({ pageParam }) => fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread, filter)),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.cursor,
     enabled,

@@ -8,7 +8,9 @@
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
+// Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 
+import type { SavedSearch } from '../../shared/search';
 import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
@@ -107,7 +109,7 @@ export const api = {
     freshUntil = Date.now() + 5000;
   },
 
-  messages: (sel: MailboxSel, cursor: string | null, q: string, unread: boolean) => {
+  messages: (sel: MailboxSel, cursor: string | null, q: string, unread: boolean, filter = '') => {
     const p = new URLSearchParams();
     if (sel.accountId) {
       p.set('accountId', sel.accountId);
@@ -116,6 +118,7 @@ export const api = {
     if (cursor) p.set('cursor', cursor);
     if (q) p.set('q', q);
     if (unread) p.set('unread', '1');
+    if (filter) p.set('filter', filter);
     if (!cursor && Date.now() < freshUntil) p.set('fresh', '1');
     return request<ListResponse>('GET', `/api/messages?${p.toString()}`);
   },
@@ -135,6 +138,10 @@ export const api = {
   addPushSubscription: (sub: PushSubscriptionInput) => request<{ ok: true }>('POST', '/api/push/subscriptions', sub),
   removePushSubscription: (endpoint: string) => request<{ ok: true }>('DELETE', '/api/push/subscriptions', { endpoint }),
   testPush: () => request<{ delivered: number }>('POST', '/api/push/test'),
+
+  savedSearches: () => request<SavedSearch[]>('GET', '/api/searches'),
+  saveSearch: (s: Omit<SavedSearch, 'id'>) => request<SavedSearch[]>('POST', '/api/searches', s),
+  deleteSearch: (id: string) => request<SavedSearch[]>('DELETE', `/api/searches/${encodeURIComponent(id)}`),
 
   recipients: (q: string) => request<{ name: string; address: string }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}`),
 };

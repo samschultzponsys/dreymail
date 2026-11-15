@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: search filters (sender, dates, size, attachments, flags) and all-mail sources.
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -16,6 +17,7 @@ import type {
   SpecialUse,
   UndoInfo,
 } from '../../../shared/types.js';
+import { dateRange, filterCount, type SearchFilters } from '../../../shared/search.js';
 import type { ThreadHeaders } from '../../../shared/threads.js';
 import { CacheCorruptError, imapFlags, type CachedFolder, type MailCache } from '../cache/store.js';
 import type { CacheSync } from '../cache/sync.js';
@@ -66,10 +68,14 @@ export interface ListFilter {
   /** '' = no text query */
   text: string;
   unread: boolean;
+  /** From the filter builder (see shared/search.ts). */
+  filters?: SearchFilters;
 }
 
 export const NO_FILTER: ListFilter = { text: '', unread: false };
-export const isFiltered = (f: ListFilter) => f.text !== '' || f.unread;
+/** Filtering the IMAP server must do (the cache only answers plain and unread-only listings). */
+export const needsSearch = (f: ListFilter) => f.text !== '' || (!!f.filters && filterCount(f.filters) > 0);
+export const isFiltered = (f: ListFilter) => f.unread || needsSearch(f);
 
 /** A message of a listing, fetched from the IMAP server (`msg`, no snippet yet) or from the cache (`summary`). */
 interface FetchedItem {
@@ -174,17 +180,36 @@ export function mergePages(pages: SourcePage[], limit: number, previous: CursorM
  * reject parts of that (e.g. FROM/TO with spaces), which fails the whole command, so it falls
  * back to the standard TEXT search (headers + body), then to SUBJECT alone.
  */
-export function searchAttempts(filter: ListFilter, cursor?: Pick<AccountCursor, 'beforeUid'>): SearchObject[] {
+export function searchAttempts(filter: ListFilter, cursor?: Pick<AccountCursor, 'beforeUid'>, now = new Date()): SearchObject[] {
   const scope: SearchObject = {};
   if (cursor) scope.uid = `1:${cursor.beforeUid - 1}`;
   if (filter.unread) scope.seen = false;
+  const f = filter.filters ?? {};
+  if (f.from) scope.from = f.from;
+  if (f.to) scope.to = f.to;
+  if (f.subject) scope.subject = f.subject;
+  if (f.body) scope.body = f.body;
+  if (f.flagged) scope.flagged = true;
+  if (f.answered) scope.answered = true;
+  const { since, before } = dateRange(f, now);
+  if (since) scope.since = since;
+  if (before) scope.before = before;
+  if (f.largerMb) scope.larger = f.largerMb * 1024 * 1024;
+  // IMAP has no "has attachment" key. Gmail understands its own search; elsewhere, messages with
+  // attachments are multipart/mixed.
+  const scopes: SearchObject[] = f.attachment
+    ? [
+        { ...scope, gmraw: 'has:attachment' },
+        { ...scope, header: { 'content-type': 'multipart/mixed' } },
+      ]
+    : [scope];
   const q = filter.text;
-  if (!q) return [Object.keys(scope).length ? scope : { all: true }];
-  return [
-    { ...scope, or: [{ subject: q }, { from: q }, { to: q }, { body: q }] },
-    { ...scope, text: q },
-    { ...scope, subject: q },
-  ];
+  if (!q) return scopes.map((s) => (Object.keys(s).length ? s : { all: true }));
+  return scopes.flatMap((s) => [
+    { ...s, or: [{ subject: q }, { from: q }, { to: q }, { body: q }] },
+    { ...s, text: q },
+    { ...s, subject: q },
+  ]);
 }
 
 /** Run the first search attempt the server accepts. */
@@ -288,6 +313,21 @@ export class MailService {
     }
   }
 
+  /**
+   * Folders an "All mail" search looks in: Gmail-style \\All when the server has one (it holds
+   * everything once), otherwise every folder except Trash, Junk, Drafts and Snoozed.
+   */
+  async allMailFolders(userId: string, accountId: string): Promise<string[]> {
+    const list = await this.pool.folders(userId, accountId);
+    const all = list.find((f) => f.specialUse === '\\All' && !f.flags.has('\\Noselect'));
+    if (all) return [all.path];
+    const skip = new Set<SpecialUse | null>(['trash', 'junk', 'drafts', 'snoozed', 'all', 'flagged']);
+    return list
+      .filter((f) => !f.flags.has('\\Noselect') && !f.flags.has('\\NonExistent') && !skip.has(MailService.specialUse(f)))
+      .map((f) => f.path)
+      .slice(0, 40);
+  }
+
   /** Find a special-use folder, preferring server-declared SPECIAL-USE over name matches. */
   async specialFolder(userId: string, accountId: string, use: SpecialUse): Promise<string | null> {
     const list = await this.pool.folders(userId, accountId);
@@ -365,7 +405,7 @@ export class MailService {
    * page reaches below the oldest cached message. Also makes a background sync check for news.
    */
   private cachedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
-    if (!this.cached || filter.text) return null;
+    if (!this.cached || needsSearch(filter)) return null;
     const { accountId, folder } = source;
     return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
       const f = sync.ready(userId, accountId, folder);
@@ -484,7 +524,7 @@ export class MailService {
    * from) are up to date, unless they are known to be. See CacheSync.beforeListing.
    */
   private async prepareCached(userId: string, sources: ListSource[], filter: ListFilter, fresh: boolean) {
-    if (!this.cached || filter.text) return;
+    if (!this.cached || needsSearch(filter)) return;
     const { cache, sync } = this.cached;
     await Promise.all(
       sources.map(async ({ accountId, folder }) => {

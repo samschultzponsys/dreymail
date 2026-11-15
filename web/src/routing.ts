@@ -1,3 +1,9 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: search filters (f) and messages opened from another folder (of).
+
+import { decodeFilters, encodeFilters, type SearchFilters } from '../../shared/search';
+
 /**
  * Navigation state <-> URL. Pure functions, no DOM access, so they can be unit tested.
  *
@@ -5,9 +11,11 @@
  *   /mail/<accountId>/<folder>            a folder of one account (folder is URI-encoded)
  *   ...?q=<text>                          server-side search in that view
  *   ...&unread=1                          only unread messages (IMAP UNSEEN, on the server)
+ *   ...&f=<json>                          filter builder choices (shared/search.ts)
  *   ...?open=<accountId>.<uidValidity>.<uid>
  *                                         an open message. Its folder is always the list's
- *                                         folder (INBOX in the unified view), so it isn't repeated.
+ *                                         folder (INBOX in the unified view), so it isn't repeated,
+ *                                         except for search results from other folders: &of=<folder>.
  *
  * Overlays (compose, settings, accounts, the phone folder drawer) are not part of the URL: they
  * live in history.state on an entry with the same URL, so Back closes them and a reload doesn't
@@ -18,6 +26,8 @@ export interface OpenMessage {
   accountId: string;
   uidValidity: string;
   uid: number;
+  /** Set when the message is in another folder than the list's (search across folders). */
+  folder?: string;
 }
 
 export interface Route {
@@ -26,6 +36,7 @@ export interface Route {
   folder: string;
   q: string;
   unread: boolean;
+  filters: SearchFilters;
   open: OpenMessage | null;
 }
 
@@ -37,24 +48,27 @@ export interface HistoryState {
   overlay?: Overlay;
 }
 
-export const HOME: Route = { accountId: null, folder: 'INBOX', q: '', unread: false, open: null };
+export const HOME: Route = { accountId: null, folder: 'INBOX', q: '', unread: false, filters: {}, open: null };
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-function parseOpen(raw: string | null): OpenMessage | null {
+function parseOpen(raw: string | null, folder: string | null): OpenMessage | null {
   if (!raw) return null;
   const m = /^([A-Za-z0-9_-]{1,64})\.(\d{1,20})\.(\d{1,10})$/.exec(raw);
   if (!m) return null;
   const uid = Number(m[3]);
   if (!Number.isSafeInteger(uid) || uid < 1) return null;
-  return { accountId: m[1]!, uidValidity: m[2]!, uid };
+  const open: OpenMessage = { accountId: m[1]!, uidValidity: m[2]!, uid };
+  if (folder && folder.length <= 1000) open.folder = folder;
+  return open;
 }
 
 export function parseLocation(pathname: string, search: string): Route {
   const params = new URLSearchParams(search);
   const q = (params.get('q') ?? '').slice(0, 500);
   const unread = params.get('unread') === '1';
-  const open = parseOpen(params.get('open'));
+  const filters = decodeFilters(params.get('f'));
+  const open = parseOpen(params.get('open'), params.get('of'));
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] === 'mail' && parts.length >= 3) {
     const accountId = parts[1]!;
@@ -66,10 +80,12 @@ export function parseLocation(pathname: string, search: string): Route {
       return { ...HOME };
     }
     if (!ID_RE.test(accountId) || !folder || folder.length > 1000) return { ...HOME };
-    // An open message must belong to the account whose folder is shown.
-    return { accountId, folder, q, unread, open: open && open.accountId === accountId ? open : null };
+    // An open message must belong to the account whose folder is shown, unless the search looks
+    // beyond this folder.
+    const elsewhere = filters.where === 'inboxes' || filters.where === 'all';
+    return { accountId, folder, q, unread, filters, open: open && (elsewhere || open.accountId === accountId) ? open : null };
   }
-  return { accountId: null, folder: 'INBOX', q, unread, open };
+  return { accountId: null, folder: 'INBOX', q, unread, filters, open };
 }
 
 export function buildUrl(route: Route): string {
@@ -77,7 +93,12 @@ export function buildUrl(route: Route): string {
   const params = new URLSearchParams();
   if (route.q) params.set('q', route.q);
   if (route.unread) params.set('unread', '1');
-  if (route.open) params.set('open', `${route.open.accountId}.${route.open.uidValidity}.${route.open.uid}`);
+  const f = encodeFilters(route.filters);
+  if (f) params.set('f', f);
+  if (route.open) {
+    params.set('open', `${route.open.accountId}.${route.open.uidValidity}.${route.open.uid}`);
+    if (route.open.folder) params.set('of', route.open.folder);
+  }
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 }
@@ -88,7 +109,7 @@ export function sameRoute(a: Route, b: Route): boolean {
 
 /** The folder an open message lives in, given the route it was opened from. */
 export function openMessageFolder(route: Route): string {
-  return route.accountId ? route.folder : 'INBOX';
+  return route.open?.folder ?? (route.accountId ? route.folder : 'INBOX');
 }
 
 /** The list a message view belongs to (used for "back" and for stale-message fallback). */

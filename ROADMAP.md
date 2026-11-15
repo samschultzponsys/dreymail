@@ -25,9 +25,9 @@ on the providers; at most a minimal encrypted cache.
 - [ ] Per-account "save copy to Sent" default: off for Gmail, on/verified for Purelymail.
 - [x] Microsoft sign-in for Outlook.com, Hotmail and Microsoft 365 (v2.2: IMAP with OAuth, sending
       through Microsoft Graph).
-- [ ] Search with a visual filter builder and saved searches (v2.3).
-- [ ] Calendar: DreyMail calendars shared between users, per-account checkboxes (v2.4); sync with
-      Google, Outlook and CalDAV, RSVP from invites (v2.5).
+- [x] Search with a visual filter builder and saved searches (v2.4).
+- [ ] Calendar: DreyMail calendars shared between users, per-account checkboxes (v2.5); sync with
+      Google, Outlook and CalDAV, RSVP from invites (v2.6).
 - [ ] Copy verification codes, unsubscribe button, block sender, send later, undo send, account
       health alerts, passkey/fingerprint login.
 - [ ] Rules/filters with a match preview; automatic tabs (Personal / Updates / Newsletters).
