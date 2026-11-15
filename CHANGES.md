@@ -26,6 +26,8 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
     with me", where each person can hide or leave them. Every request checks access (owner, edit,
     view).
   - Syncing with Google, Outlook and CalDAV and answering invitations come in a later release.
+- **Fix (same version):** the first 3.8 build failed because a file notice in `web/src/styles.css`
+  ended up outside its comment; it is back inside, and 3.8 is released from the fixed commit.
 - **Files:** new `shared/calendar.ts`, `server/src/routes/calendar.ts`,
   `web/src/components/CalendarDialog.tsx`, `server/test/calendar.test.ts`. Also the calendar
   tables migration (`server/src/db.ts`), `server/src/app.ts`, `web/src/components/Sidebar.tsx`,
