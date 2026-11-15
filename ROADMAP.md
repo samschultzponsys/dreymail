@@ -5,9 +5,9 @@
 
 Context for future work. **Nothing here is implemented yet.**
 
-**Use case:** a single-user personal portal for several Gmail and Purelymail accounts. It must
-work in desktop browsers (Windows, Fedora, Debian) and on Android. No iOS requirement. Mail stays
-on the providers; at most a minimal encrypted cache.
+**Use case:** a self-hosted portal for several mail accounts (Gmail, Outlook, Purelymail, any
+IMAP/SMTP) per user. It must work in desktop browsers (Windows, Fedora, Debian), the desktop apps
+and on Android. No iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Accounts and UI
 - [ ] Option to hide the unified "All inboxes" view. Accounts must feel clearly separate.

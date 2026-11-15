@@ -20,7 +20,7 @@ export function registerGoogleRoutes(app: FastifyInstance, deps: { config: Confi
   app.post('/api/oauth/google/start', async (req, reply) => {
     if (!access.require(req, reply, 'mail.accounts')) return reply;
     const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ef4444') }).safeParse(req.body ?? {});
-    if (!body.success) return reply.code(400).send({ error: 'Invalid colour' });
+    if (!body.success) return reply.code(400).send({ error: 'Invalid color' });
     try {
       return { url: google.start(req.user!.id, body.data.color) };
     } catch (err) {

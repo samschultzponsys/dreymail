@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
+// Modified by samschultzponsys, 2026-11-15: American spelling.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -502,7 +503,7 @@ function AndroidNotifications() {
   return (
     <div className="stack">
       <div className="hint">
-        New mail arrives the moment it lands, as a notification in the account’s colour. Each account has its own Android notification channel: pick a
+        New mail arrives the moment it lands, as a notification in the account’s color. Each account has its own Android notification channel: pick a
         different sound, vibration or importance for each one.
       </div>
       <ul className="user-list">
@@ -590,7 +591,7 @@ function YourName() {
         onBlur={() => void save()}
         onKeyDown={(e) => e.key === 'Enter' && void save()}
       />
-      <div className="hint">{status ?? 'Shown at the bottom left. Typed in lower case, it is capitalised for you.'}</div>
+      <div className="hint">{status ?? 'Shown at the bottom left. Typed in lower case, it is capitalized for you.'}</div>
     </div>
   );
 }
@@ -651,7 +652,7 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
       <div>
         {(desktop || android) && <label className="label">Notifications on this device</label>}
         {desktop ? (
-          <div className="hint">On. The desktop app shows new mail as notifications in each account’s colour while it runs, also from the tray.</div>
+          <div className="hint">On. The desktop app shows new mail as notifications in each account’s color while it runs, also from the tray.</div>
         ) : android ? (
           <AndroidNotifications />
         ) : (

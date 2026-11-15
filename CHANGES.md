@@ -29,6 +29,11 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   - Android app: `web/src/android.ts`, `Notifier.kt`. Android's status-bar icon has to be a plain
     shape, so it stays the envelope there.
 - Tests: `server/test/mailboxIcons.test.ts`.
+- **Wording:** American spelling in the README, ROADMAP and app text (color, capitalized,
+  organizing…), and the README now describes DreyMail for anyone rather than one person's
+  accounts (`README.md`, `ROADMAP.md`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/components/AdminSettings.tsx`, `web/src/components/MailboxIcon.tsx`,
+  `server/src/routes/microsoft.ts`, `server/src/routes/google.ts`, `CLAUDE.md`).
 
 ## 2026-11-15 (v2.9): Mailbox icons
 

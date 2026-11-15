@@ -1,7 +1,7 @@
 <!-- Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
      Modified by samschultzponsys, 2026-11-13: rewritten for DreyMail (credits, quick start, releasing); upstream docs kept and rebranded.
      Modified by samschultzponsys, 2026-11-13: v1.1 status (icon, cyan accent).
-     Modified by samschultzponsys, 2026-11-13: v1.2 (account colours, All inboxes switch).
+     Modified by samschultzponsys, 2026-11-13: v1.2 (account colors, All inboxes switch).
      Modified by samschultzponsys, 2026-11-13: v1.3 (signatures, settings tabs).
      Modified by samschultzponsys, 2026-11-13: v1.4 (administration, sign-in settings).
      Modified by samschultzponsys, 2026-11-13: v1.5 (DreyMail's own names; upgrade notes).
@@ -17,15 +17,16 @@
      Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
      Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
      Modified by samschultzponsys, 2026-11-15: mailbox icons.
-     Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon. -->
+     Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+     Modified by samschultzponsys, 2026-11-15: American spelling; describes DreyMail generally. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
 
 *Pronounced "DRAY-mail". A drey is a squirrel's nest.*
 
-A self-hosted webmail portal for my own Gmail and Purelymail accounts (or any IMAP/SMTP
-account), for desktop browsers and Android.
+A self-hosted webmail portal for Gmail, Outlook / Microsoft 365, Purelymail and any other IMAP/SMTP
+account, in the browser, as desktop apps for Linux and Windows, and as an Android app.
 
 ## Credits / Origin
 
@@ -42,7 +43,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 ## Status
 
 Current version: **3.0**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
-indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
+indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
@@ -66,7 +67,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 ## Features
 
 - Several IMAP/SMTP accounts per user (host, port, TLS/STARTTLS, credentials, separate SMTP
-  settings, display name, colour). Connections are tested when you save. Passwords are encrypted
+  settings, display name, color). Connections are tested when you save. Passwords are encrypted
   at rest (AES-256-GCM) and never sent back to the browser.
 - Login with a username and password, with any OpenID Connect provider (Authentik, Keycloak, …),
   or both side by side; see [Login](#login). Each user owns their own accounts, with strict
@@ -85,18 +86,18 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   resets passwords, changes pictures and removes users. Settings → Sign-in sets up OIDC (with a connection test),
   password login and who may register, without a restart. Any of these given as environment
   variables in the compose file win and show as locked in the UI.
-- **Accounts that feel separate.** Each account has its own colour: the first one gets DreyMail
-  cyan, and you can pick from presets or any colour on the colour wheel. While an account is open,
-  the whole app takes on its colour (buttons, highlights, unread dots, a light tint on the page),
+- **Accounts that feel separate.** Each account has its own color: the first one gets DreyMail
+  cyan, and you can pick from presets or any color on the color wheel. While an account is open,
+  the whole app takes on its color (buttons, highlights, unread dots, a light tint on the page),
   so you always know which mailbox you're in. Button labels and accent text automatically stay
-  readable for any colour, in light and dark mode. Each mailbox can also have an **icon**
-  (briefcase, house, cart, plane… 38 to choose from) shown in its colour in the sidebar and on its
+  readable for any color, in light and dark mode. Each mailbox can also have an **icon**
+  (briefcase, house, cart, plane… 38 to choose from) shown in its color in the sidebar and on its
   notifications in the desktop app, the Android app (status-bar and large icon) and browsers. Or
   upload your own picture: size it, drag it into place, and put it on a transparent, white or black
   background.
 - **Profile pictures.** Upload a picture and place it in the circle (drag and zoom; it's resized in
   the browser). Without one, DreyMail shows your Gravatar (fetched by the server, so Gravatar never
-  sees your browser), or your initials in a circle filled with the app's current colour. The User role may change its own picture; a role flag
+  sees your browser), or your initials in a circle filled with the app's current color. The User role may change its own picture; a role flag
   turns that off, and another lets administrators change anyone's.
 - The bottom left shows your photo and name, the name only, or the photo only (Settings →
   Profile). The sidebar collapses to a slim rail of icons, showing only your picture at the bottom.
@@ -109,7 +110,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   opens on your first account. Per-account folder trees with unread counts. Live updates via IMAP
   IDLE pushed over one WebSocket per browser session.
 - Message list with sender, subject, snippet, date, unread/flagged/answered/attachment
-  indicators, and an account colour tag in the unified view.
+  indicators, and an account color tag in the unified view.
 - Conversations, Gmail-style: a message and its replies are one row ("Ada, me 3") and are read
   together, older messages folded. Your replies are found in the Sent folder, also when you
   sent them from another mail client. Messages belong together when they share Message-IDs
@@ -135,7 +136,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   for the accounts that use it. Tick one account for a per-inbox signature, or several to share
   one. Optionally also added to replies and forwards. The composer puts it in below where you
   type (above any quoted message), swaps it when you change the From account, and takes on the
-  From account's colour.
+  From account's color.
 - Compose, reply, reply-all, and forward (with the original attachments). Includes a light
   rich-text editor, an automatic plain-text alternative, attachments, drafts (saved to the
   account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used
@@ -150,7 +151,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   sliders button) and pick what you want:
   - **Look in:** this folder, all inboxes, or all mail (Gmail's All Mail; on other servers, every
     folder except Trash, Junk, Drafts and Snoozed).
-  - **Accounts:** one or several, by their colours.
+  - **Accounts:** one or several, by their colors.
   - **From and To,** with suggestions from people you've written to.
   - **Subject has** and **Message has.**
   - **Date:** today, the past week, month or year, or dates you choose.
@@ -177,7 +178,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Interface size** per device (Settings → This device): Automatic is larger in the Android app and
   follows the phone's font size; or pick 90–150%.
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
-  "Show my full name"); typed in lower case it is capitalised for you.
+  "Show my full name"); typed in lower case it is capitalized for you.
 - **Version and what's new.** The server's version sits next to your name; click it for the
   changelog. When a newer image is released, Superadmins (and roles allowed to see new versions) see a blinking dot on it and the
   changelog says how to update (redeploy the stack in Arcane). The server checks GitHub at most
@@ -197,11 +198,11 @@ app password). Anything that allows that works:
 | iCloud Mail | ✅ | An **app-specific password** from your Apple account |
 | Yahoo, AOL | ✅ | An **app password** |
 | **Outlook.com, Hotmail, Live** | ✅ | **Add account → Outlook / Microsoft 365**: you sign in on Microsoft's own page |
-| **Microsoft 365** (work/school Outlook) | ✅ | The same button. Some organisations require their IT admin to approve the app once |
+| **Microsoft 365** (work/school Outlook) | ✅ | The same button. Some organizations require their IT admin to approve the app once |
 
 Microsoft no longer accepts passwords from mail apps, so Outlook accounts use Microsoft sign-in
 (OAuth): DreyMail never sees the password. Mail is read over IMAP with a Microsoft access token
-and sent through Microsoft Graph, which works even where an organisation has switched off SMTP
+and sent through Microsoft Graph, which works even where an organization has switched off SMTP
 sending, and Microsoft keeps the copy in Sent. The sign-in is stored encrypted and renewed
 automatically.
 
@@ -220,8 +221,9 @@ default).
 ## Quick start (Docker Compose)
 
 DreyMail is configured with environment variables written inline in the compose file (no `.env`
-file). This example is how I run it: an Arcane-managed stack on Unraid, a bind mount, `PUID`/`PGID`
-`99:100`, no published ports, and an external network shared with the reverse proxy.
+file). This example is a stack as it would run under Arcane on Unraid: a bind mount, `PUID`/`PGID`
+`99:100`, no published ports, and an external network shared with the reverse proxy. Adjust the
+paths, IDs and network to your setup.
 
 ```yaml
 services:
@@ -283,8 +285,8 @@ Every release has desktop apps attached, with the version in the file name:
 The app asks for your DreyMail server's address once (change it later under *DreyMail → Change
 server…*) and then shows DreyMail in its own window:
 
-- **Notifications in each account's colour.** New mail pops up as a native notification whose
-  icon is the envelope in that account's colour, so you see at a glance which inbox it's for.
+- **Notifications in each account's color.** New mail pops up as a native notification whose
+  icon is the envelope in that account's color, so you see at a glance which inbox it's for.
   Click it to open the message. Closing the window keeps DreyMail running in the tray, so
   notifications keep coming; *Quit* from the tray or menu stops it.
 - **Updates.** The app checks for a newer release every time it starts, and on demand (*DreyMail →
@@ -305,8 +307,8 @@ browser to install apps when Android asks). It asks for your DreyMail server's a
   phone.
 - **Each account sounds and looks different.** Every account is its own Android notification
   channel: Settings → This device in the app lists them, and each one opens Android's own
-  sound/vibration/importance settings. The status-bar icon is tinted in the account's colour and
-  the notification shows the envelope in that colour. Notifications of the same account are
+  sound/vibration/importance settings. The status-bar icon is tinted in the account's color and
+  the notification shows the envelope in that color. Notifications of the same account are
   grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
 - **Private.** Notifications are end-to-end encrypted to the phone (Web Push encryption,
   RFC 8291): Google relays only ciphertext.
@@ -578,7 +580,7 @@ Every message is assumed to be hostile.
 - **HTML mail** is sanitized on the server with `sanitize-html` and a `postcss`-based CSS
   sanitizer. Removed: scripts, event handlers, forms, frames, objects, SVG/MathML,
   meta/base/link, comments, `javascript:`/`data:` links, CSS expressions, `@import`,
-  behaviours, and anything hidden behind CSS escapes. Links are limited to
+  behaviors, and anything hidden behind CSS escapes. Links are limited to
   `http`/`https`/`mailto`/`tel` and open in a new tab with `noopener noreferrer`. `mailto:` links
   are pointed at the app's own composer (`/?mailto=…`) just before display.
 - The result is rendered in an `<iframe sandbox>` **without** `allow-scripts` and
@@ -597,7 +599,7 @@ Every message is assumed to be hostile.
   alt text as a placeholder. Fetched images sit in a small in-memory cache (per user, 10
   minutes, 64 MB) so toggling or reopening a message doesn't download them again.
 - **Sender-domain allowlist.** The server decides when it fetches a message: if the From domain
-  is on the user's list (exact match or a subdomain; case-insensitive, IDN normalised to
+  is on the user's list (exact match or a subdomain; case-insensitive, IDN normalized to
   punycode), images load automatically through the same fetcher. From is easy to forge, so as a
   cheap guard nothing auto-loads when the topmost `Authentication-Results` header (the one added
   by your own mail server) records `dmarc=fail` for the From domain; the user can still click

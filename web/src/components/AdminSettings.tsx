@@ -308,7 +308,7 @@ export function RolesAdmin({ me }: { me: Me }) {
               ))}
             </fieldset>
           ))}
-          <div className="hint">Reading, sending and organising mail, signatures, saved searches and personal settings are always allowed.</div>
+          <div className="hint">Reading, sending and organizing mail, signatures, saved searches and personal settings are always allowed.</div>
           <div className="row-buttons">
             <span className="grow" />
             <button type="button" className="btn" onClick={() => setEditing(null)}>

@@ -53,6 +53,13 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
 - Don't push upstream's tags (e.g. `v0.1.0`); DreyMail has its own version line. Push branches by
   name, never `--tags`.
 
+### Writing style
+- **American English** in everything users read (README, UI text, error messages, release notes):
+  color, organize, capitalize, behavior, license.
+- The README describes DreyMail for anyone who runs it, not the owner's own setup ("for Gmail,
+  Outlook and any IMAP account", not "for my accounts"). The owner's conventions below shape the
+  examples, presented as an example setup.
+
 ### Versions and releases
 - Versions are two-part, `MAJOR.MINOR`, and roll over after `.9`: `1.0` → `1.1` … `1.9` → `2.0`.
   `package.json` (and `package-lock.json`) hold `MAJOR.MINOR.0` because npm needs three parts.

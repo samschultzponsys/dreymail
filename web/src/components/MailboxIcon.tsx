@@ -190,7 +190,7 @@ export function MailboxIconPicker({
       <label className="label">Icon</label>
       {open ? (
         <div className="icon-grid" role="radiogroup" aria-label="Mailbox icon">
-          <button type="button" role="radio" aria-checked={!value} className={`icon-choice ${!value ? 'on' : ''}`} title="No icon (coloured dot)" onClick={() => onChange('')}>
+          <button type="button" role="radio" aria-checked={!value} className={`icon-choice ${!value ? 'on' : ''}`} title="No icon (colored dot)" onClick={() => onChange('')}>
             <span className="dot" style={{ background: color }} />
           </button>
           {image && (
