@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -276,6 +277,19 @@ export function App() {
   useEffect(() => {
     if (loggedIn && accountsQ.isSuccess && accounts.length === 0) openOverlay('accounts');
   }, [loggedIn, accountsQ.isSuccess, accounts.length, openOverlay]);
+
+  // Back from adding an Outlook account (see main.tsx).
+  useEffect(() => {
+    if (!loggedIn) return;
+    const raw = sessionStorage.getItem('dreymail.outlook');
+    if (!raw) return;
+    sessionStorage.removeItem('dreymail.outlook');
+    const r = JSON.parse(raw) as { ok: boolean; message: string; account: string };
+    void qc.invalidateQueries({ queryKey: ['accounts'] });
+    void qc.invalidateQueries({ queryKey: ['folders'] });
+    push(r.ok ? 'Outlook account connected.' : `Outlook sign-in didn’t work: ${r.message}`);
+    if (r.ok && r.account) navigate({ ...HOME, accountId: r.account, folder: 'INBOX' }, { replace: true });
+  }, [loggedIn, qc, push, navigate]);
 
   const runAction = useMessageAction(useCallback((m: string) => push(m, true), [push]));
 

@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android: change server.
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -19,7 +20,7 @@ import { api } from '../api';
 import { desktopBridge } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
-import { AndroidAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { AndroidAdmin, OutlookAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -40,27 +41,28 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'android';
+type SettingsTab = 'device' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'signin' | 'outlook' | 'android';
 
 export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { prefs: Preferences; hasPassword: boolean; admin: boolean; myId: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
   const tabs: [SettingsTab, string][] = [
+    ['device', 'This device'],
     ['general', 'General'],
     ['signatures', 'Signatures'],
-    ['notifications', 'Notifications'],
     ['privacy', 'Images'],
     ...(hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
     ...(admin
       ? [
           ['users', 'Users'],
           ['signin', 'Sign-in'],
+          ['outlook', 'Outlook'],
           ['android', 'Android'],
         ] as [SettingsTab, string][]
       : []),
   ];
-  const [tab, setTab] = useState<SettingsTab>('general');
+  const [tab, setTab] = useState<SettingsTab>('device');
 
   const save = async (next: Preferences) => {
     setV(next);
@@ -104,7 +106,6 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
               </div>
               <YourName />
               <FullNameToggle v={v} save={save} />
-              <InterfaceSize />
               <div>
                 <label className="label">Messages per page</label>
                 <select className="select" value={v.pageSize} onChange={(e) => void save({ ...v, pageSize: Number(e.target.value) })}>
@@ -167,16 +168,15 @@ export function SettingsDialog({ prefs, hasPassword, admin, myId, onClose }: { p
                 </select>
                 <div className="hint">On phones, the squirrel runs across the screen when you open the menu or a message.</div>
               </div>
-              <EmailLinks />
-              <DesktopApp />
             </>
           )}
           {tab === 'signatures' && <SignaturesSettings />}
-          {tab === 'notifications' && (androidBridge() ? <AndroidNotifications /> : <Notifications prefs={v} save={save} />)}
+          {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
           {tab === 'users' && <UsersAdmin myId={myId} />}
           {tab === 'signin' && <SignInAdmin />}
+          {tab === 'outlook' && <OutlookAdmin />}
           {tab === 'android' && <AndroidAdmin />}
           {error && <div className="error-text">{error}</div>}
         </div>
@@ -451,11 +451,9 @@ function DesktopApp() {
         <button className="btn" onClick={() => (desktop ? desktop.checkForUpdates() : androidBridge()?.checkForUpdates())}>
           Check for updates
         </button>
-        {!desktop && (
-          <button className="btn" onClick={() => androidBridge()?.changeServer()}>
-            Change server
-          </button>
-        )}
+        <button className="btn" onClick={() => (desktop ? desktop.changeServer() : androidBridge()?.changeServer())}>
+          Change server
+        </button>
       </div>
       <div className="hint">Updates are also checked every time the app starts.</div>
     </div>
@@ -569,6 +567,45 @@ function FullNameToggle({ v, save }: { v: Preferences; save: (p: Preferences) =>
       <input type="checkbox" checked={v.showFullName} onChange={(e) => void save({ ...v, showFullName: e.target.checked })} />
       Show my full name at the bottom left (otherwise only the first name)
     </label>
+  );
+}
+
+/** Which client this is, for "This device". */
+function deviceName(): string {
+  const desktop = desktopBridge();
+  if (desktop) return desktop.installKind === 'windows' ? 'Windows app' : `Linux app${desktop.installKind !== 'unknown' ? ` (${desktop.installKind})` : ''}`;
+  if (androidBridge()) return 'Android app';
+  return typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches ? 'Installed web app' : 'Web browser';
+}
+
+/**
+ * Settings → This device: everything that belongs to this device rather than to the account (app
+ * version and updates, server address, interface size, this device's notifications, email links).
+ * All other tabs are the account's and apply everywhere.
+ */
+function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences) => Promise<void> }) {
+  const desktop = desktopBridge();
+  const android = androidBridge();
+  return (
+    <>
+      <div className="device-card">
+        <strong>{deviceName()}</strong>
+        <span className="muted">These settings are stored on this device only. Every other tab belongs to your account and applies on all your devices.</span>
+      </div>
+      <DesktopApp />
+      <InterfaceSize />
+      <div>
+        {(desktop || android) && <label className="label">Notifications on this device</label>}
+        {desktop ? (
+          <div className="hint">On. The desktop app shows new mail as notifications in each account’s colour while it runs, also from the tray.</div>
+        ) : android ? (
+          <AndroidNotifications />
+        ) : (
+          <Notifications prefs={prefs} save={save} />
+        )}
+      </div>
+      {!desktop && !android && <EmailLinks />}
+    </>
   );
 }
 

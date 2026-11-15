@@ -23,9 +23,14 @@ on the providers; at most a minimal encrypted cache.
 - [ ] Verify Gmail label/folder mirroring with Inbox Zero labels; handle Gmail IMAP semantics
       (multi-label, archive vs. delete).
 - [ ] Per-account "save copy to Sent" default: off for Gmail, on/verified for Purelymail.
-- [ ] **Microsoft sign-in (OAuth / XOAUTH2) so Outlook.com, Hotmail and Microsoft 365 accounts
-      can be added** (Microsoft no longer accepts passwords for IMAP/SMTP). Needs a free Azure app
-      registration entered in admin settings; refresh tokens stored encrypted. High priority.
+- [x] Microsoft sign-in for Outlook.com, Hotmail and Microsoft 365 (v2.2: IMAP with OAuth, sending
+      through Microsoft Graph).
+- [ ] Search with a visual filter builder and saved searches (v2.3).
+- [ ] Calendar: DreyMail calendars shared between users, per-account checkboxes (v2.4); sync with
+      Google, Outlook and CalDAV, RSVP from invites (v2.5).
+- [ ] Copy verification codes, unsubscribe button, block sender, send later, undo send, account
+      health alerts, passkey/fingerprint login.
+- [ ] Rules/filters with a match preview; automatic tabs (Personal / Updates / Newsletters).
 - [ ] Gmail OAuth (XOAUTH2) as an alternative to app passwords (same mechanism). Low priority.
 
 ## Configuration and deployment

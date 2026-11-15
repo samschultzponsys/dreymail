@@ -26,4 +26,5 @@ contextBridge.exposeInMainWorld('dreymailDesktop', {
     ipcRenderer.on('dreymail:open', (_e, url) => cb(String(url)));
   },
   checkForUpdates: () => ipcRenderer.send('dreymail:check-updates'),
+  changeServer: () => ipcRenderer.send('dreymail:change-server'),
 });

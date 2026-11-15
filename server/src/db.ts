@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Microsoft (OAuth) accounts.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -135,6 +136,13 @@ const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS fcm_tokens_user ON fcm_tokens(user_id);`,
+  // DreyMail: accounts that sign in with Microsoft (Outlook, Microsoft 365) instead of a password.
+  // oauth_token holds the encrypted refresh token.
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'auth')) db.exec("ALTER TABLE accounts ADD COLUMN auth TEXT NOT NULL DEFAULT 'password';");
+    if (!cols.some((c) => c.name === 'oauth_token')) db.exec("ALTER TABLE accounts ADD COLUMN oauth_token TEXT NOT NULL DEFAULT '';");
+  },
   // DreyMail: the name a user chose for themselves (Settings → General). Kept apart from `name`,
   // which an OIDC provider overwrites at every sign-in.
   (db) => {
@@ -190,8 +198,15 @@ export interface Snooze {
 /** Full account including decrypted credentials. Server-side only, never serialise to clients. */
 export interface AccountSecret extends AccountView {
   userId: string;
-  imap: AccountView['imap'] & { password: string };
-  smtp: AccountView['smtp'] & { password: string };
+  imap: AccountView['imap'] & { password: string; oauth?: OAuthRef };
+  smtp: AccountView['smtp'] & { password: string; oauth?: OAuthRef };
+}
+
+/** Marks server settings that log in with an OAuth access token (fetched just before connecting). */
+export interface OAuthRef {
+  provider: 'microsoft';
+  userId: string;
+  accountId: string;
 }
 
 interface AccountRow {
@@ -212,6 +227,8 @@ interface AccountRow {
   smtp_user: string;
   smtp_password: string;
   append_sent: number;
+  auth?: string;
+  oauth_token?: string;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -228,6 +245,7 @@ function toView(r: AccountRow): AccountView {
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
+    auth: r.auth === 'microsoft' ? 'microsoft' : 'password',
   };
 }
 
@@ -487,12 +505,69 @@ export class Store {
       .get(userId, accountId) as AccountRow | undefined;
     if (!r) return null;
     const view = toView(r);
+    const oauth: OAuthRef | undefined = view.auth === 'microsoft' ? { provider: 'microsoft', userId, accountId: r.id } : undefined;
     return {
       ...view,
       userId: r.user_id,
-      imap: { ...view.imap, password: decrypt(this.credentialKey, r.imap_password, credAad(userId, r.id, 'imap')) },
-      smtp: { ...view.smtp, password: decrypt(this.credentialKey, r.smtp_password, credAad(userId, r.id, 'smtp')) },
+      imap: { ...view.imap, password: decrypt(this.credentialKey, r.imap_password, credAad(userId, r.id, 'imap')), oauth },
+      smtp: { ...view.smtp, password: decrypt(this.credentialKey, r.smtp_password, credAad(userId, r.id, 'smtp')), oauth },
     };
+  }
+
+  // ---- Microsoft (OAuth) accounts (DreyMail) ---------------------------------------
+
+  /**
+   * Adds an Outlook / Microsoft 365 account signed in with Microsoft, or refreshes the sign-in of
+   * the user's existing account with that address. Mail is read over IMAP with OAuth and sent
+   * through Microsoft Graph (which keeps its own copy in Sent).
+   */
+  saveMicrosoftAccount(userId: string, a: { email: string; name: string; displayName: string; color: string; refreshToken: string }): AccountView {
+    const existing = this.db
+      .prepare("SELECT id FROM accounts WHERE user_id = ? AND auth = 'microsoft' AND lower(email) = lower(?)")
+      .get(userId, a.email) as { id: string } | undefined;
+    const id = existing?.id ?? crypto.randomUUID();
+    if (!existing) {
+      this.createAccount(
+        userId,
+        {
+          name: a.name,
+          displayName: a.displayName,
+          email: a.email,
+          color: a.color,
+          imap: { host: 'outlook.office365.com', port: 993, tls: 'tls', user: a.email, password: '' },
+          smtp: { host: 'graph.microsoft.com', port: 443, tls: 'tls', user: a.email, password: '' },
+          appendSent: false,
+        },
+        id,
+      );
+      this.db.prepare("UPDATE accounts SET auth = 'microsoft' WHERE id = ?").run(id);
+    }
+    this.setOAuthToken(userId, id, a.refreshToken);
+    return this.listAccounts(userId).find((x) => x.id === id)!;
+  }
+
+  /** Label, sender name and colour only (Outlook accounts, whose servers are fixed). */
+  updateAccountLabels(userId: string, accountId: string, l: { name: string; displayName: string; color: string }): AccountView | null {
+    const changed = this.db
+      .prepare('UPDATE accounts SET name = ?, display_name = ?, color = ? WHERE user_id = ? AND id = ?')
+      .run(l.name, l.displayName, l.color, userId, accountId).changes;
+    return changed ? (this.listAccounts(userId).find((a) => a.id === accountId) ?? null) : null;
+  }
+
+  getOAuthToken(userId: string, accountId: string): string | null {
+    const r = this.db.prepare('SELECT oauth_token FROM accounts WHERE user_id = ? AND id = ?').get(userId, accountId) as { oauth_token: string } | undefined;
+    if (!r?.oauth_token) return null;
+    try {
+      return decrypt(this.credentialKey, r.oauth_token, `account-oauth:${userId}:${accountId}`);
+    } catch {
+      return null;
+    }
+  }
+
+  setOAuthToken(userId: string, accountId: string, refreshToken: string) {
+    this.db
+      .prepare('UPDATE accounts SET oauth_token = ? WHERE user_id = ? AND id = ?')
+      .run(encrypt(this.credentialKey, refreshToken, `account-oauth:${userId}:${accountId}`), userId, accountId);
   }
 
   /** Creates an account. Passwords are required on create. */

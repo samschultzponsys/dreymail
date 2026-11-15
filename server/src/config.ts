@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -65,6 +66,8 @@ export interface Config {
   loginEnv: LoginEnv;
   /** Usernames or emails that are always administrators (DREYMAIL_ADMIN_USERS), lower case. */
   adminUsers: string[];
+  /** Microsoft app registration (Outlook sign-in) set in the environment; overrides the UI. */
+  microsoftEnv: { clientId?: string; clientSecret?: string; tenant?: string };
   /** Check GitHub for a newer DreyMail release (DREYMAIL_UPDATE_CHECK, default on). */
   updateCheck: boolean;
   /** Firebase (Android app notifications) set in the environment; overrides the UI. */
@@ -212,6 +215,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     accountDefaults,
     loginEnv: loginEnvFrom(env, passwordLogin, registration),
     updateCheck: bool(env.DREYMAIL_UPDATE_CHECK, true),
+    microsoftEnv: {
+      ...(env.DREYMAIL_MICROSOFT_CLIENT_ID ? { clientId: env.DREYMAIL_MICROSOFT_CLIENT_ID } : {}),
+      ...(env.DREYMAIL_MICROSOFT_CLIENT_SECRET ? { clientSecret: env.DREYMAIL_MICROSOFT_CLIENT_SECRET } : {}),
+      ...(env.DREYMAIL_MICROSOFT_TENANT ? { tenant: env.DREYMAIL_MICROSOFT_TENANT } : {}),
+    },
     firebaseEnv: {
       ...(env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT ? { serviceAccount: env.DREYMAIL_FIREBASE_SERVICE_ACCOUNT } : {}),
       ...(env.DREYMAIL_FIREBASE_API_KEY ? { apiKey: env.DREYMAIL_FIREBASE_API_KEY } : {}),

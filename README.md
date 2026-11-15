@@ -11,7 +11,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached).
      Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates).
      Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog).
-     Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet). -->
+     Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet).
+     Modified by samschultzponsys, 2026-11-15: v2.2 (Outlook and Microsoft 365, This device). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -35,7 +36,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **2.1**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **2.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colours that recolour the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -127,7 +128,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Phones, tablets and foldables.** Phones show one pane at a time. Tablets and unfolded
   foldables show the message list on the left and the open message on the right, with the
   folders in a slide-in drawer. Desktops show all three columns.
-- **Interface size** per device (Settings → General): Automatic is larger in the Android app and
+- **Settings → This device** gathers everything that belongs to the device you're on: which app
+  and version it is, updates, server address, interface size, this device's notifications and
+  email links. Every other tab is your account and applies on all your devices.
+- **Interface size** per device (Settings → This device): Automatic is larger in the Android app and
   follows the phone's font size; or pick 90–150%.
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
   "Show my full name"); typed in lower case it is capitalised for you.
@@ -149,11 +153,20 @@ app password). Anything that allows that works:
 | Gmail / Google Workspace | ✅ | Turn on 2-Step Verification, then create an **app password** and use that |
 | iCloud Mail | ✅ | An **app-specific password** from your Apple account |
 | Yahoo, AOL | ✅ | An **app password** |
-| **Outlook.com, Hotmail, Live** | ❌ not yet | Microsoft only allows "Sign in with Microsoft" (OAuth) for mail apps now; passwords and app passwords are refused |
-| **Microsoft 365** (work/school Outlook) | ❌ not yet | Same: Microsoft retired password sign-in for IMAP/SMTP |
+| **Outlook.com, Hotmail, Live** | ✅ | **Add account → Outlook / Microsoft 365**: you sign in on Microsoft's own page |
+| **Microsoft 365** (work/school Outlook) | ✅ | The same button. Some organisations require their IT admin to approve the app once |
 
-Microsoft sign-in (OAuth) is on the [roadmap](ROADMAP.md) so Outlook and Microsoft 365 accounts
-can be added too.
+Microsoft no longer accepts passwords from mail apps, so Outlook accounts use Microsoft sign-in
+(OAuth): DreyMail never sees the password. Mail is read over IMAP with a Microsoft access token
+and sent through Microsoft Graph, which works even where an organisation has switched off SMTP
+sending, and Microsoft keeps the copy in Sent. The sign-in is stored encrypted and renewed
+automatically.
+
+**One-time setup** (administrator, about 5 minutes, free): Settings → **Outlook** walks you
+through registering DreyMail in Microsoft's Entra admin center and pasting two values. Or set them
+in the compose file, which then wins over the UI: `DREYMAIL_MICROSOFT_CLIENT_ID`,
+`DREYMAIL_MICROSOFT_CLIENT_SECRET` and optionally `DREYMAIL_MICROSOFT_TENANT` (`common` by
+default).
 
 ## Quick start (Docker Compose)
 
@@ -226,7 +239,7 @@ server…*) and then shows DreyMail in its own window:
   Click it to open the message. Closing the window keeps DreyMail running in the tray, so
   notifications keep coming; *Quit* from the tray or menu stops it.
 - **Updates.** The app checks for a newer release every time it starts, and on demand (*DreyMail →
-  Check for updates…*, the tray menu, or Settings → General). It knows how it was installed and
+  Check for updates…*, the tray menu, or Settings → This device). It knows how it was installed and
   shows the exact upgrade for that: the flatpak, apt or dnf command (copied to your clipboard,
   with the download opened), or on Windows it downloads the new installer and runs it.
 - Links in mail open in your normal browser; the window only shows your DreyMail server and its
@@ -242,14 +255,14 @@ browser to install apps when Android asks). It asks for your DreyMail server's a
   and Gmail do. No polling, no permanent "checking mail" notification, no mail passwords on the
   phone.
 - **Each account sounds and looks different.** Every account is its own Android notification
-  channel: Settings → Notifications in the app lists them, and each one opens Android's own
+  channel: Settings → This device in the app lists them, and each one opens Android's own
   sound/vibration/importance settings. The status-bar icon is tinted in the account's colour and
   the notification shows the envelope in that colour. Notifications of the same account are
   grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
 - **Private.** Notifications are end-to-end encrypted to the phone (Web Push encryption,
   RFC 8291): Google relays only ciphertext.
 - **Updates built in.** The app checks for a newer release when it starts, when you come back to it
-  after a few hours, and from Settings → General. "Update now" downloads it inside the app (with a
+  after a few hours, and from Settings → This device. "Update now" downloads it inside the app (with a
   progress notification) and opens Android's install screen; the first time, Android asks you to
   allow DreyMail to install updates. Your login and settings stay.
 
@@ -351,7 +364,7 @@ browsers' standard Web Push services. No native app, no Firebase or Apple develo
 no extra configuration are needed. The push keys (VAPID) are derived from
 `DREYMAIL_SECRET_KEY`. HTTPS is required.
 
-Each user turns notifications on per device in **Settings → Notifications**:
+Each user turns notifications on per device in **Settings → This device**:
 
 - **Android** (Chrome, Firefox, Edge, Samsung Internet) and **desktop browsers**: turn the switch on.
   Installing the app ("Add to Home screen" / "Install app") is optional.
@@ -652,8 +665,7 @@ folders use the same cursors, so a page can come from the cache and the next fro
 - Snoozing is a DreyMail feature: other mail apps see the messages in the Snoozed folder, but only
   DreyMail brings them back, and only while it is running (late ones come back when it starts).
   A woken message is a new copy in INBOX, so it gets a new UID.
-- No OAuth2 IMAP yet (XOAUTH2), so **Outlook.com and Microsoft 365 can't be added** (see
-  [Which mail providers work](#which-mail-providers-work)). Use app passwords where the provider
+- Gmail still uses an app password (Sign in with Google is on the roadmap). Use app passwords where the provider
   supports them.
 - Out of scope: server-side filters, calendar/contacts, JMAP, PGP, local full-text search.
 

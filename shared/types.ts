@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: account sign-in kind (password or Microsoft).
 
 // Types shared between the server API and the web client.
 
@@ -31,7 +32,11 @@ export interface AccountView {
   imap: { host: string; port: number; tls: TlsMode; user: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string };
   appendSent: boolean;
+  /** How DreyMail signs in (DreyMail): a password, or Microsoft sign-in (OAuth) for Outlook/Microsoft 365. */
+  auth: AccountAuth;
 }
+
+export type AccountAuth = 'password' | 'microsoft';
 
 /**
  * What the "Add account" form starts with for this user: the admin's defaults with tokens such as
@@ -329,6 +334,17 @@ export interface LoginSettingsInput {
   label: string;
   passwordLogin: boolean;
   registration: Registration;
+}
+
+/** Settings → Outlook (administrators): the Microsoft app registration for Outlook sign-in. */
+export interface MicrosoftSettingsView {
+  configured: boolean;
+  clientId: string;
+  hasClientSecret: boolean;
+  tenant: string;
+  /** Redirect URI to enter in the app registration. */
+  redirectUri: string;
+  locked: Partial<Record<'clientId' | 'clientSecret' | 'tenant', string>>;
 }
 
 /** GET /api/version (DreyMail). */

@@ -6,8 +6,9 @@
 // Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
+import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -62,6 +63,10 @@ export const api = {
   savePreferences: (p: Preferences) => request<Preferences>('PUT', '/api/preferences', p),
   saveName: (name: string) => request<{ name: string }>('PUT', '/api/me/name', { name }),
   version: () => request<VersionInfo>('GET', '/api/version'),
+  microsoftAvailable: () => request<{ available: boolean }>('GET', '/api/oauth/microsoft'),
+  startMicrosoft: (color: string) => request<{ url: string }>('POST', '/api/oauth/microsoft/start', { color }),
+  adminMicrosoft: () => request<MicrosoftSettingsView>('GET', '/api/admin/microsoft'),
+  adminSaveMicrosoft: (s: { clientId: string; clientSecret: string; tenant: string }) => request<MicrosoftSettingsView>('PUT', '/api/admin/microsoft', s),
   changelog: () => request<{ markdown: string }>('GET', '/api/changelog'),
   logout: () => request<{ redirect: string }>('POST', '/auth/logout'),
   authMethods: () => request<AuthMethods>('GET', '/auth/methods'),

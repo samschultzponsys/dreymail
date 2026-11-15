@@ -13,6 +13,32 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.2): Outlook and Microsoft 365, "This device" settings
+
+- **Outlook / Microsoft 365 accounts** with Microsoft sign-in (OAuth 2.0 authorization code +
+  PKCE), new `server/src/oauth/microsoft.ts`: app registration in Settings → Outlook (client
+  secret encrypted; `DREYMAIL_MICROSOFT_CLIENT_ID`, `_CLIENT_SECRET`, `_TENANT` override,
+  `server/src/config.ts`); access tokens per resource, cached and refreshed, refresh tokens
+  rotated and stored encrypted (`accounts.auth`, `accounts.oauth_token`, `Store.saveMicrosoftAccount`
+  in `server/src/db.ts`). IMAP logs in with the token (`setOAuthTokenProvider` in
+  `server/src/imap/connect.ts`); sending goes through Microsoft Graph with the complete MIME message
+  (Bcc kept for Graph, Sent copy by Microsoft; `server/src/mail/send.ts`). Routes: new
+  `server/src/routes/microsoft.ts` (start, callback, admin); Outlook accounts only allow label/name/
+  colour edits (`server/src/routes/api.ts`). Wiring in `server/src/app.ts`; types in `shared/types.ts`.
+  Tests: `server/test/microsoft.test.ts`.
+- **Web:** Add account first asks "Outlook / Microsoft 365" or "Gmail or other email"; Outlook
+  accounts get their own edit screen with Reconnect (`web/src/components/AccountsDialog.tsx`); the
+  result of signing in is announced when you come back (`web/src/main.tsx`, `web/src/App.tsx`);
+  Settings → Outlook for administrators (`web/src/components/AdminSettings.tsx`).
+- **Settings → This device** (first tab): which client and version, updates, change server (now
+  also in the desktop app: `desktop/main.cjs`, `desktop/preload.cjs`, `web/src/desktop.ts`), interface
+  size, this device's notifications and email links. The Notifications tab moved into it
+  (`web/src/components/SettingsDialog.tsx`, `web/src/styles.css`).
+- **Notice fix:** seven files written for DreyMail (`desktop/main.cjs`, `desktop/preload.cjs`,
+  `server/src/routes/admin.ts`, `web/src/components/AdminSettings.tsx`, `web/src/desktop.ts`, two
+  tests) had wrongly been given the "modified version of Ratatoskr" file notice; they now carry
+  DreyMail's own header, as they contain no upstream code.
+
 ## 2026-11-15 (docs, ships with v2.2): which mail providers work
 
 - README: new "Which mail providers work" section. Outlook.com/Hotmail/Live and Microsoft 365

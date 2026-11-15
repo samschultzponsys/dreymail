@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: your name; interface size.
 // Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+// Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -13,7 +14,7 @@ import type { AccountInput, ActionResult, ComposePayload, Me, MessageRef, Versio
 import { accountDefaultsFor, withDefaultPassword, type TemplateValues } from '../accountDefaults.js';
 import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
-import { MailServerError, testConnection } from '../imap/connect.js';
+import { connectImap, MailServerError, testConnection } from '../imap/connect.js';
 import { MessageGoneError, StaleError, type ListSource, type MailService } from '../imap/mail.js';
 import { NotFoundError, type ImapPool } from '../imap/pool.js';
 import { AvatarService, normaliseEmail } from '../net/avatars.js';
@@ -375,7 +376,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     try {
       const body = z.object({ account: accountSchema, id: z.string().optional() }).parse(req.body);
       const existing = body.id ? store.getAccountSecret(uid(req), body.id) : null;
-      if (existing) await verify(body.account, { imap: existing.imap.password, smtp: existing.smtp.password });
+      if (existing?.auth === 'microsoft') {
+        // Outlook: reading over IMAP (with Microsoft sign-in) is what can be tested; sending goes through Graph.
+        const client = await connectImap(existing.imap, { blockPrivateHosts: false });
+        await client.logout().catch(() => client.close());
+      } else if (existing) await verify(body.account, { imap: existing.imap.password, smtp: existing.smtp.password });
       else await verify(withDefaultPassword(config.accountDefaults, templateValues(req.user!), body.account));
       return { ok: true };
     } catch (err) {
@@ -401,6 +406,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const input = accountSchema.parse(req.body);
       const existing = store.getAccountSecret(uid(req), req.params.id);
       if (!existing) throw new NotFoundError('Account not found');
+      // Outlook accounts sign in with Microsoft: only the label, name and colour can change here.
+      if (existing.auth === 'microsoft') {
+        return store.updateAccountLabels(uid(req), req.params.id, { name: input.name, displayName: input.displayName, color: input.color });
+      }
       await verify(input, { imap: existing.imap.password, smtp: existing.smtp.password });
       const account = store.updateAccount(uid(req), req.params.id, input);
       // Another server or login can mean another mailbox: cached mail no longer applies.

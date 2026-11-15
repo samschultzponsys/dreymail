@@ -24,6 +24,8 @@ export interface DesktopBridge {
   onOpen(cb: (url: string) => void): void;
   /** Checks GitHub for a newer release and shows the result (with upgrade instructions). */
   checkForUpdates(): void;
+  /** Asks for a different DreyMail server address. */
+  changeServer(): void;
 }
 
 export function desktopBridge(): DesktopBridge | undefined {

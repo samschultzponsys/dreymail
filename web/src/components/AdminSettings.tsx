@@ -1,7 +1,3 @@
-// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
-// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-13: Android app: notifications and Firebase settings.
-
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
@@ -387,6 +383,109 @@ export function AndroidAdmin() {
         />
       </Field>
       <div className="hint">The service account is stored encrypted and never sent to browsers or phones.</div>
+      {status && <div className={status.ok ? 'success-text' : 'error-text'}>{status.text}</div>}
+      <div className="row-buttons">
+        <span className="grow" />
+        <button className="btn primary" disabled={busy} onClick={() => void save()}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Settings → Outlook (administrators): the Microsoft app registration behind "Add Outlook account". */
+export function OutlookAdmin() {
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['admin', 'microsoft'], queryFn: api.adminMicrosoft });
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState('');
+  const [tenant, setTenant] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!settings.data) return <div className="hint">{settings.error ? (settings.error as Error).message : 'Loading…'}</div>;
+  const s = settings.data;
+  const v = { clientId: clientId ?? s.clientId, tenant: tenant ?? s.tenant };
+
+  const save = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      qc.setQueryData(['admin', 'microsoft'], await api.adminSaveMicrosoft({ clientId: v.clientId, clientSecret, tenant: v.tenant }));
+      await qc.invalidateQueries({ queryKey: ['microsoftAvailable'] });
+      setClientSecret('');
+      setStatus({ ok: true, text: 'Saved. "Add account → Outlook / Microsoft 365" now works for everyone on this DreyMail.' });
+    } catch (err) {
+      setStatus({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stack">
+      <div className="hint">
+        Microsoft no longer lets mail apps sign in to Outlook.com, Hotmail, Live or Microsoft 365 with a password. With this set up, users add those
+        accounts by signing in on Microsoft’s own page; DreyMail never sees their password.
+      </div>
+      <div className={s.configured ? 'success-text' : 'muted'}>{s.configured ? 'Set up: Outlook accounts can be added.' : 'Not set up yet.'}</div>
+      <fieldset className="group">
+        <legend>One-time setup in the Microsoft Entra admin center (free)</legend>
+        <ol className="steps">
+          <li>
+            Open <code className="copyable">entra.microsoft.com</code> and sign in with any Microsoft account (a personal Outlook.com one works). Go to{' '}
+            <em>Applications → App registrations → New registration</em>.
+          </li>
+          <li>
+            Name: <code className="copyable">DreyMail</code>. Supported account types:{' '}
+            <em>Accounts in any organizational directory and personal Microsoft accounts</em>.
+          </li>
+          <li>
+            Redirect URI: platform <em>Web</em>, address <code className="copyable">{s.redirectUri}</code>. Click <em>Register</em>.
+          </li>
+          <li>
+            Copy the <strong>Application (client) ID</strong> from the overview page into the field below.
+          </li>
+          <li>
+            <em>Certificates &amp; secrets → New client secret</em> (pick the longest expiry), then copy its <strong>Value</strong> (not the ID) below.
+          </li>
+          <li>
+            Nothing else: people grant the mail permissions themselves when they sign in. (In some work tenants an admin must approve the app once.)
+          </li>
+        </ol>
+      </fieldset>
+      <div className="grid2">
+        <Field label="Application (client) ID" lockedBy={s.locked.clientId} htmlFor="ms-client">
+          <input id="ms-client" className="input" value={v.clientId} disabled={!!s.locked.clientId} placeholder="00000000-0000-0000-0000-000000000000" onChange={(e) => setClientId(e.target.value)} />
+        </Field>
+        <Field label="Client secret value" lockedBy={s.locked.clientSecret} htmlFor="ms-secret">
+          <input
+            id="ms-secret"
+            className="input"
+            type="password"
+            value={clientSecret}
+            disabled={!!s.locked.clientSecret}
+            autoComplete="new-password"
+            placeholder={s.hasClientSecret ? '•••••••• (saved; type to replace)' : ''}
+            onChange={(e) => setClientSecret(e.target.value)}
+          />
+        </Field>
+      </div>
+      <Field label="Who may sign in" lockedBy={s.locked.tenant} htmlFor="ms-tenant">
+        <select id="ms-tenant" className="select" value={['common', 'consumers', 'organizations'].includes(v.tenant) ? v.tenant : 'custom'} disabled={!!s.locked.tenant} onChange={(e) => setTenant(e.target.value === 'custom' ? '' : e.target.value)}>
+          <option value="common">Personal and work/school accounts (recommended)</option>
+          <option value="consumers">Personal accounts only (Outlook.com, Hotmail, Live)</option>
+          <option value="organizations">Work/school accounts only</option>
+          <option value="custom">One organization (tenant ID)…</option>
+        </select>
+      </Field>
+      {!['common', 'consumers', 'organizations'].includes(v.tenant) && (
+        <Field label="Tenant ID" htmlFor="ms-tenant-id">
+          <input id="ms-tenant-id" className="input" value={v.tenant} onChange={(e) => setTenant(e.target.value)} placeholder="contoso.onmicrosoft.com or tenant GUID" />
+        </Field>
+      )}
+      <div className="hint">The client secret is stored encrypted. Microsoft secrets expire (up to 2 years): put a reminder in your calendar to renew it.</div>
       {status && <div className={status.ok ? 'success-text' : 'error-text'}>{status.text}</div>}
       <div className="row-buttons">
         <span className="grow" />

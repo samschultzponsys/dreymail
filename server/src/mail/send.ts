@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
+
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
 import { createSmtpTransport, describeError, MailServerError } from '../imap/connect.js';
@@ -12,7 +16,12 @@ export class ComposeService {
   constructor(
     private readonly store: Store,
     private readonly mail: MailService,
-    private readonly opts: { maxMessageBytes: number; blockPrivateHosts: boolean },
+    private readonly opts: {
+      maxMessageBytes: number;
+      blockPrivateHosts: boolean;
+      /** Sends a complete MIME message through Microsoft Graph (Outlook / Microsoft 365 accounts). */
+      graphSend?: (userId: string, accountId: string, raw: Buffer) => Promise<void>;
+    },
   ) {}
 
   private async prepare(userId: string, p: ComposePayload, uploads: OutgoingAttachment[], requireRecipients: boolean) {
@@ -58,9 +67,19 @@ export class ComposeService {
 
   async send(userId: string, p: ComposePayload, uploads: OutgoingAttachment[]): Promise<SendResult> {
     const { account, recipients, message } = await this.prepare(userId, p, uploads, true);
-    const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: false });
+    // Graph takes the recipients from the headers, so Outlook messages keep Bcc (Exchange strips it
+    // from what recipients get); SMTP gets them in the envelope instead.
+    const viaGraph = account.auth === 'microsoft';
+    const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: viaGraph });
 
-    try {
+    if (viaGraph) {
+      if (!this.opts.graphSend) throw new ComposeError('Outlook sending is not available on this server');
+      try {
+        await this.opts.graphSend(userId, account.id, raw);
+      } catch (err) {
+        throw new MailServerError((err as Error).message, 'protocol');
+      }
+    } else try {
       if (this.opts.blockPrivateHosts) await assertPublicHost(account.smtp.host);
       const transport = createSmtpTransport(account.smtp);
       try {
@@ -74,7 +93,8 @@ export class ComposeService {
 
     // From here on the message is sent; failures are reported as warnings, not errors.
     const warnings: string[] = [];
-    let savedToSent = false;
+    // Microsoft files Graph-sent mail in Sent itself.
+    let savedToSent = viaGraph;
     if (account.appendSent) {
       try {
         const sent = await this.mail.specialFolder(userId, account.id, 'sent');

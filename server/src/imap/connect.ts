@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
@@ -13,6 +14,14 @@ export interface ServerSettings {
   tls: TlsMode;
   user: string;
   password: string;
+  /** Logs in with an OAuth access token instead of the password (Outlook / Microsoft 365). */
+  oauth?: { provider: 'microsoft'; userId: string; accountId: string };
+}
+
+/** Fetches OAuth access tokens for IMAP (set at startup; see oauth/microsoft.ts). */
+let oauthToken: ((o: NonNullable<ServerSettings['oauth']>) => Promise<string>) | null = null;
+export function setOAuthTokenProvider(fn: typeof oauthToken) {
+  oauthToken = fn;
 }
 
 export interface ConnectOptions {
@@ -48,13 +57,13 @@ export function describeError(err: unknown, server: string): MailServerError {
   return new MailServerError(`${server}: ${e.responseText || e.message || 'unknown error'}`, 'protocol');
 }
 
-export function createImapClient(s: ServerSettings, opts: ConnectOptions): ImapFlow {
+export function createImapClient(s: ServerSettings, opts: ConnectOptions, accessToken?: string): ImapFlow {
   const client = new ImapFlow({
     host: s.host,
     port: s.port,
     secure: s.tls === 'tls',
     doSTARTTLS: s.tls === 'starttls' ? true : s.tls === 'none' ? false : undefined,
-    auth: { user: s.user, pass: s.password },
+    auth: accessToken ? { user: s.user, accessToken } : { user: s.user, pass: s.password },
     logger: false,
     disableAutoIdle: !opts.autoIdle,
     // Watchers only issue the odd command; go back to IDLE quickly so arrivals aren't held back
@@ -74,7 +83,16 @@ export function createImapClient(s: ServerSettings, opts: ConnectOptions): ImapF
 export async function connectImap(s: ServerSettings, opts: ConnectOptions): Promise<ImapFlow> {
   try {
     if (opts.blockPrivateHosts) await assertPublicHost(s.host);
-    const client = createImapClient(s, opts);
+    let accessToken: string | undefined;
+    if (s.oauth) {
+      if (!oauthToken) throw new MailServerError('Outlook sign-in is not available on this server', 'auth');
+      try {
+        accessToken = await oauthToken(s.oauth);
+      } catch (err) {
+        throw new MailServerError((err as Error).message, 'auth');
+      }
+    }
+    const client = createImapClient(s, opts, accessToken);
     await client.connect();
     return client;
   } catch (err) {

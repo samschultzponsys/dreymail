@@ -181,6 +181,10 @@ ipcMain.on('dreymail:notify', (e, n) => {
   note.show();
 });
 
+ipcMain.on('dreymail:change-server', (e) => {
+  if (isServerPage(e.senderFrame.url)) showSetup();
+});
+
 ipcMain.on('dreymail:check-updates', (e) => {
   if (isServerPage(e.senderFrame.url)) void checkForUpdates(true);
 });
