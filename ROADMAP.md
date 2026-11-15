@@ -23,7 +23,10 @@ on the providers; at most a minimal encrypted cache.
 - [ ] Verify Gmail label/folder mirroring with Inbox Zero labels; handle Gmail IMAP semantics
       (multi-label, archive vs. delete).
 - [ ] Per-account "save copy to Sent" default: off for Gmail, on/verified for Purelymail.
-- [ ] Gmail OAuth (XOAUTH2) as an alternative to app passwords. Low priority.
+- [ ] **Microsoft sign-in (OAuth / XOAUTH2) so Outlook.com, Hotmail and Microsoft 365 accounts
+      can be added** (Microsoft no longer accepts passwords for IMAP/SMTP). Needs a free Azure app
+      registration entered in admin settings; refresh tokens stored encrypted. High priority.
+- [ ] Gmail OAuth (XOAUTH2) as an alternative to app passwords (same mechanism). Low priority.
 
 ## Configuration and deployment
 - [ ] All remaining configuration possible in the UI (default account settings, cache,

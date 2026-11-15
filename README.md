@@ -10,7 +10,8 @@
      Modified by samschultzponsys, 2026-11-13: v1.8 (Android app).
      Modified by samschultzponsys, 2026-11-13: v1.9 (Android app attached).
      Modified by samschultzponsys, 2026-11-13: v2.0 (tablets/foldables, interface size, your name, Android updates).
-     Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog). -->
+     Modified by samschultzponsys, 2026-11-13: v2.1 (version, update dot, changelog).
+     Modified by samschultzponsys, 2026-11-15: provider compatibility (Outlook/Microsoft 365 not yet). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -136,6 +137,23 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   every 6 hours; `DREYMAIL_UPDATE_CHECK=false` turns that off.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,
   `b` snooze, `#` delete, `s` flag, `u` mark unread, `c` compose, `Ctrl/Cmd+Enter` to send.
+
+## Which mail providers work
+
+DreyMail signs in to your mail server with IMAP and SMTP using a username and password (or an
+app password). Anything that allows that works:
+
+| Provider | Works? | How |
+| --- | --- | --- |
+| Purelymail, Fastmail, Migadu, mailbox.org, Proton (via Bridge), your own server | ✅ | Your normal password (or the provider's app password) |
+| Gmail / Google Workspace | ✅ | Turn on 2-Step Verification, then create an **app password** and use that |
+| iCloud Mail | ✅ | An **app-specific password** from your Apple account |
+| Yahoo, AOL | ✅ | An **app password** |
+| **Outlook.com, Hotmail, Live** | ❌ not yet | Microsoft only allows "Sign in with Microsoft" (OAuth) for mail apps now; passwords and app passwords are refused |
+| **Microsoft 365** (work/school Outlook) | ❌ not yet | Same: Microsoft retired password sign-in for IMAP/SMTP |
+
+Microsoft sign-in (OAuth) is on the [roadmap](ROADMAP.md) so Outlook and Microsoft 365 accounts
+can be added too.
 
 ## Quick start (Docker Compose)
 
@@ -634,7 +652,8 @@ folders use the same cursors, so a page can come from the cache and the next fro
 - Snoozing is a DreyMail feature: other mail apps see the messages in the Snoozed folder, but only
   DreyMail brings them back, and only while it is running (late ones come back when it starts).
   A woken message is a new copy in INBOX, so it gets a new UID.
-- No OAuth2 IMAP (XOAUTH2 for Gmail/Microsoft 365). Use app passwords where the provider
+- No OAuth2 IMAP yet (XOAUTH2), so **Outlook.com and Microsoft 365 can't be added** (see
+  [Which mail providers work](#which-mail-providers-work)). Use app passwords where the provider
   supports them.
 - Out of scope: server-side filters, calendar/contacts, JMAP, PGP, local full-text search.
 

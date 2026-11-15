@@ -13,6 +13,12 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (docs, ships with v2.2): which mail providers work
+
+- README: new "Which mail providers work" section. Outlook.com/Hotmail/Live and Microsoft 365
+  can't be added yet (Microsoft requires OAuth sign-in); Gmail, iCloud and Yahoo work with app
+  passwords. Microsoft OAuth added to `ROADMAP.md` as high priority.
+
 ## 2026-11-14 (v2.1): version, update dot and changelog at the bottom left
 
 - Bottom left shows the first name only (new preference `showFullName`, Settings → General) and
