@@ -17,6 +17,8 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 - With the sidebar collapsed, its footer shows only your profile picture, which opens Settings.
   Accounts, Settings and Sign out are back when it's expanded (`web/src/styles.css`).
+- Saved searches made in the same millisecond keep their order (`server/src/db.ts`; fixes an
+  intermittent test failure).
 
 ## 2026-11-15 (v2.5): Roles and permissions, profile pictures, grouped settings
 

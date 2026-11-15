@@ -864,7 +864,7 @@ export class Store {
 
   listSavedSearches(userId: string): SavedSearch[] {
     const rows = this.db
-      .prepare('SELECT id, name, query, account_id, folder FROM saved_searches WHERE user_id = ? ORDER BY created_at, id')
+      .prepare('SELECT id, name, query, account_id, folder FROM saved_searches WHERE user_id = ? ORDER BY created_at, rowid')
       .all(userId) as { id: string; name: string; query: string; account_id: string | null; folder: string }[];
     return rows.map((r) => {
       let q: { q?: unknown; unread?: unknown; filters?: unknown } = {};
