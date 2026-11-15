@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v2.8): Initials in the app colour; Node 24
+
+- Without a profile photo, the round initials (first letter, or first and last) are filled with the
+  current UI colour and change with it as you switch accounts (`web/src/styles.css`).
+- **Node 24 everywhere:** the image is built on `node:24-alpine` (`Dockerfile`); `engines` asks for
+  Node 24 (`package.json`, `package-lock.json`); CI and releases test on Node 24 and use the GitHub
+  Actions versions that run on Node 24 (checkout, setup-node, setup-java v5, setup-gradle v5, docker
+  setup-buildx/login v4, metadata v6, build-push v7) (`.github/workflows/ci.yml`,
+  `.github/workflows/release.yml`). Unit and integration tests pass on Node 24.22.
+
 ## 2026-11-15 (v2.7): Choose what the bottom left shows
 
 - Settings → Profile → "Bottom left shows": photo and name (default), name only, or photo only;

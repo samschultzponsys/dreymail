@@ -73,7 +73,7 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
 
 ## Architecture
 
-- **Language:** TypeScript end to end (Node.js ≥ 22.13; uses the built-in `node:sqlite`).
+- **Language:** TypeScript end to end (Node.js 24; never Node 20 or 22; uses the built-in `node:sqlite`).
 - **Server:** Fastify 5 (`server/src`): IMAP via `imapflow`, SMTP/MIME via `nodemailer`,
   OIDC via `openid-client`, HTML sanitizing via `sanitize-html` + `postcss`, Web Push (own VAPID +
   RFC 8291), WebSocket live updates (IMAP IDLE). SQLite: `dreymail.db` (users, encrypted

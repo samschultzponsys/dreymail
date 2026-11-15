@@ -668,7 +668,7 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   flex: none; border-radius: 50%; object-fit: cover; display: inline-grid; place-items: center;
   background: var(--accent-soft); color: var(--text); font-weight: 700; letter-spacing: 0.02em; user-select: none;
 }
-.user-avatar.initials { border: 1px solid var(--border); }
+.user-avatar.initials { background: var(--accent-fill); color: var(--accent-text); transition: background-color 0.2s, color 0.2s; }
 .sidebar-footer .user-avatar.initials { font-size: 9px !important; }
 .footer-me { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; border: 0; background: none; padding: 3px 4px; border-radius: var(--radius-sm); cursor: pointer; color: inherit; font: inherit; text-align: left; }
 .footer-me:hover { background: var(--hover); }

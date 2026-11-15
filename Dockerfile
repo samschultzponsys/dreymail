@@ -3,16 +3,17 @@
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 # Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
+# Modified by samschultzponsys, 2026-11-15: Node 24 (image, CI and GitHub Actions on their Node 24 versions).
 
 # ---- base: runtime OS plus the entrypoint that drops to PUID:PGID ------------
 # Its own stage so the entrypoint tests can build it without compiling the app.
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 RUN apk add --no-cache su-exec
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/dreymail-entrypoint
 ENTRYPOINT ["dreymail-entrypoint"]
 
 # ---- build: install all dependencies and compile server + web client -------
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -23,7 +24,7 @@ COPY web ./web
 RUN npm run build
 
 # ---- prod-deps: runtime dependencies only ----------------------------------
-FROM node:22-alpine AS prod-deps
+FROM node:24-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force

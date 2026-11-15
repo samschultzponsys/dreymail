@@ -1,11 +1,11 @@
 {
   "name": "dreymail",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "description": "A simple, good-looking, self-hosted webmail client for any IMAP/SMTP account.",
   "type": "module",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "node --disable-warning=ExperimentalWarning scripts/dev.mjs",
