@@ -13,6 +13,11 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (docs): Roadmap brought up to date
+
+- `ROADMAP.md` rewritten: what DreyMail already does (with the version it arrived in), what is
+  planned (including the AI mailbox assistant) and what is not planned (JMAP, export).
+
 ## 2026-11-15 (v3.0): Your own picture as a mailbox icon
 
 - Next to the 38 built-in icons, a mailbox can use **a picture you upload**: zoom (smaller or
