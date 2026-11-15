@@ -951,3 +951,6 @@ img.account-mark { object-fit: cover; }
 .google-option .losses li { color: var(--text-2); }
 .google-option .btn { margin-top: auto; align-self: flex-start; }
 .google-option > .hint { margin-top: 0; }
+.provider-pick { display: flex; flex-direction: column; gap: 2px; }
+.provider-pick .select { max-width: 340px; }
+.server-known { font-size: 13px; padding: 2px 0 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

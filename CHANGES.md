@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v4.3): mail providers to pick from
+
+- **Add account → Other email** starts with a **Mail provider** list: iCloud, Yahoo, AOL, Fastmail,
+  Purelymail, Proton Mail (Bridge), Zoho (and EU), mailbox.org, Posteo, Migadu, Runbox, Disroot, GMX
+  (two regions), WEB.DE, mail.com, Yandex, Xfinity, AT&T, Namecheap Private Email, Hostinger, IONOS,
+  Infomaniak and Gmail (app password). Picking one fills in the IMAP and SMTP servers, ports,
+  security and the "save a copy to Sent" choice, and shows what else the provider needs (an app
+  password, turning IMAP on…); the server fields then collapse to a summary. Typing your address
+  picks the provider by itself; Outlook addresses are pointed to Microsoft sign-in. **Custom**
+  (or "Change them") shows every field to type in. Editing an account shows its provider.
+- **Files:** new `shared/mailProviders.ts`, `server/test/mailProviders.test.ts`;
+  `web/src/components/AccountsDialog.tsx`, `web/src/accountForm.ts`, `web/src/styles.css`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.2): Gmail's two ways, side by side
 
 - **Add account → Gmail / Google Workspace** now shows both ways next to each other, each with what

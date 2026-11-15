@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: Gmail's two ways side by side, with what each gives and costs.
+// Modified by samschultzponsys, 2026-11-15: provider list with server settings filled in, or custom.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -15,6 +16,7 @@ import { useState } from 'react';
 import { DEFAULT_PORTS } from '../../../shared/mailPorts';
 import type { AccountDefaults, AccountInput, AccountView, TlsMode } from '../../../shared/types';
 import { gmailAppPasswordInput, newAccountInput, usesDefaultPassword } from '../accountForm';
+import { MAIL_PROVIDERS, isMicrosoftAddress, providerForEmail, providerForServers, type MailProvider } from '../../../shared/mailProviders';
 import { api } from '../api';
 import { ACCOUNT_COLORS } from '../util';
 import { labelOn } from '../accountTheme';
@@ -39,6 +41,7 @@ function ServerFields({
   onChange,
   editing,
   passwordHint,
+  serverKnown = false,
 }: {
   kind: 'imap' | 'smtp';
   value: AccountInput['imap'];
@@ -46,10 +49,17 @@ function ServerFields({
   editing: boolean;
   /** Placeholder for a blank password on a new account. */
   passwordHint: string;
+  /** A known provider's server: show it instead of the server, security and port fields. */
+  serverKnown?: boolean;
 }) {
   return (
     <fieldset>
       <legend>{kind === 'imap' ? 'Incoming (IMAP)' : 'Outgoing (SMTP)'}</legend>
+      {serverKnown ? (
+        <div className="server-known muted">
+          {value.host}:{value.port} · {value.tls === 'tls' ? 'SSL/TLS' : value.tls === 'starttls' ? 'STARTTLS' : 'no encryption'}
+        </div>
+      ) : (
       <div className="grid3">
         <div>
           <label className="label">Server</label>
@@ -75,6 +85,7 @@ function ServerFields({
           <input className="input" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: Number(e.target.value) })} />
         </div>
       </div>
+      )}
       <div className="grid2">
         <div>
           <label className="label">Username</label>
@@ -118,6 +129,23 @@ function AccountForm({
 }) {
   const [v, setV] = useState(initial);
   const [image, setImage] = useState(initialImage);
+  // The provider whose server settings are used ('custom': typed in). Chosen from the address
+  // until the user picks one themselves.
+  const [providerId, setProviderId] = useState(() => providerForServers(initial.imap.host, initial.smtp.host)?.id ?? 'custom');
+  const [pickedProvider, setPickedProvider] = useState(!!id || !!initial.imap.host);
+  const provider = MAIL_PROVIDERS.find((p) => p.id === providerId) ?? null;
+  const withProvider = (cur: AccountInput, p: MailProvider): AccountInput => ({
+    ...cur,
+    imap: { ...cur.imap, ...p.imap },
+    smtp: { ...cur.smtp, ...p.smtp },
+    appendSent: p.appendSent,
+  });
+  const chooseProvider = (pid: string) => {
+    setPickedProvider(true);
+    setProviderId(pid);
+    const p = MAIL_PROVIDERS.find((x) => x.id === pid);
+    if (p) setV((cur) => withProvider(cur, p));
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -151,14 +179,19 @@ function AccountForm({
   const smtpHint = v.imap.password ? 'Same as IMAP' : defaultPw('smtp') ? 'Default password' : defaultPw('imap') ? '' : 'Same as IMAP';
 
   const setEmail = (email: string) => {
-    // Fill obvious defaults while the user types the address.
-    setV((cur) => ({
-      ...cur,
-      email,
-      name: cur.name && cur.name !== cur.email ? cur.name : email,
-      imap: { ...cur.imap, user: cur.imap.user && cur.imap.user !== cur.email ? cur.imap.user : email },
-      smtp: { ...cur.smtp, user: cur.smtp.user && cur.smtp.user !== cur.email ? cur.smtp.user : email },
-    }));
+    // Fill obvious defaults while the user types the address, including the provider's servers.
+    const detected = pickedProvider ? null : providerForEmail(email);
+    if (!pickedProvider) setProviderId(detected?.id ?? 'custom');
+    setV((prev) => {
+      const cur = detected ? withProvider(prev, detected) : prev;
+      return {
+        ...cur,
+        email,
+        name: cur.name && cur.name !== cur.email ? cur.name : email,
+        imap: { ...cur.imap, user: cur.imap.user && cur.imap.user !== cur.email ? cur.imap.user : email },
+        smtp: { ...cur.smtp, user: cur.smtp.user && cur.smtp.user !== cur.email ? cur.smtp.user : email },
+      };
+    });
   };
 
   return (
@@ -215,8 +248,36 @@ function AccountForm({
             onPicture?.();
           }}
         />
-        <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} onChange={(imap) => setV({ ...v, imap })} />
-        <ServerFields kind="smtp" value={v.smtp} editing={!!id} passwordHint={smtpHint} onChange={(smtp) => setV({ ...v, smtp })} />
+        <div className="provider-pick">
+          <div>
+            <label className="label" htmlFor="acct-provider">
+              Mail provider
+            </label>
+            <select id="acct-provider" className="select" value={providerId} onChange={(e) => chooseProvider(e.target.value)}>
+              <option value="custom">Custom: type the server settings</option>
+              {MAIL_PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {provider ? (
+            <div className="hint">
+              Server settings filled in for {provider.name}
+              {provider.note ? `. ${provider.note}` : '.'}{' '}
+              <button type="button" className="link-btn" onClick={() => (setPickedProvider(true), setProviderId('custom'))}>
+                Change them
+              </button>
+            </div>
+          ) : isMicrosoftAddress(v.email) ? (
+            <div className="hint">Outlook, Hotmail and Live addresses sign in with Microsoft: go back and choose Outlook / Microsoft 365.</div>
+          ) : (
+            <div className="hint">Not listed? Your provider&apos;s help pages name the IMAP and SMTP servers.</div>
+          )}
+        </div>
+        <ServerFields kind="imap" value={v.imap} editing={!!id} passwordHint={imapHint} serverKnown={!!provider} onChange={(imap) => setV({ ...v, imap })} />
+        <ServerFields kind="smtp" value={v.smtp} editing={!!id} passwordHint={smtpHint} serverKnown={!!provider} onChange={(smtp) => setV({ ...v, smtp })} />
         <label className="check">
           <input type="checkbox" checked={v.appendSent} onChange={(e) => setV({ ...v, appendSent: e.target.checked })} />
           Save a copy of sent mail to the Sent folder

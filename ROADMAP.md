@@ -59,6 +59,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Outlook.com, Hotmail and Microsoft 365 with Microsoft sign-in (2.2).
 - [x] Gmail with Sign in with Google, next to app passwords (2.3); both offered side by side with
       what each gives and costs (4.2).
+- [x] Provider list with server settings filled in (and picked from your address), or custom (4.3).
 - [x] Search with a visual filter builder (accounts, where, from/to, subject, text, dates, size,
       attachments, starred, replied) and saved searches as smart folders (2.4).
 

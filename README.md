@@ -28,7 +28,8 @@
      Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
      Modified by samschultzponsys, 2026-11-15: calendar; automatic single sign-on; credits moved to the end.
      Modified by samschultzponsys, 2026-11-15: privacy page.
-     Modified by samschultzponsys, 2026-11-15: Gmail's two ways compared. -->
+     Modified by samschultzponsys, 2026-11-15: Gmail's two ways compared.
+     Modified by samschultzponsys, 2026-11-15: provider list. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -40,7 +41,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -228,7 +229,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 ## Which mail providers work
 
 DreyMail signs in to your mail server with IMAP and SMTP using a username and password (or an
-app password). Anything that allows that works:
+app password). Under *Add account → Other email*, pick your provider from the list and the server
+settings are filled in (typing your address picks it by itself): iCloud, Yahoo, AOL, Fastmail,
+Purelymail, Proton Mail (Bridge), Zoho, mailbox.org, Posteo, Migadu, Runbox, Disroot, GMX, WEB.DE,
+mail.com, Yandex, Xfinity, AT&T, Namecheap, Hostinger, IONOS, Infomaniak and Gmail (app password),
+with a note where a provider needs something extra, like an app password. *Custom* takes any other
+server. Anything that allows IMAP and SMTP works:
 
 | Provider | Works? | How |
 | --- | --- | --- |
