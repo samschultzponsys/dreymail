@@ -12,10 +12,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-### Must do before anyone else uses an instance
-- [ ] "Source code" link in the UI (AGPL §13): link to this repository at the running version, with
-      the DreyMail attribution next to it.
-
 ### Mail
 - [ ] Calendar: DreyMail calendars shared between users, a calendar list with per-account
       checkboxes, month/week/day/agenda views.
@@ -25,8 +21,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Send later and undo send.
 - [ ] Account health alerts (sign-in expired, mailbox unreachable, quota).
 - [ ] Rules with a match preview; automatic tabs (Personal / Updates / Newsletters).
-- [ ] AI assistant: one-time cleanup of existing mail (in batches, with progress and limits) and bulk
-      sender cleanup (unsubscribe / archive all by sender).
 - [ ] AI assistant learning mode: per mailbox, for up to a month, learns from how you handle mail and
       suggests rules; a review screen when it ends.
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
@@ -84,12 +78,18 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       connections (Anthropic, Gemini, OpenAI-style, local LM Studio/Ollama/…) per user or shared,
       per mailbox, with daily limits; accuracy slider; at-your-own-risk notice; permission and
       per-user switch (3.1).
+- [x] Clean up: sort existing mail in batches with progress; senders grouped by volume with archive
+      all, always archive and one-click unsubscribe (3.2).
 
 ### Administration and security
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
 - [x] User management in the app (1.4); roles with permission flags (Superadmin, User and custom
       roles) and per-flag checks on every administrative action (2.5).
 - [x] Outlook, Google and Android (Firebase) setup in the UI with walkthroughs (2.0–2.3).
+
+### License compliance
+- [x] Source code link (AGPL §13) with the attribution, on the sign-in page, in What's new and in
+      Settings (3.2).
 
 ### Releases
 - [x] Every version gets a GitHub Release with the image, desktop apps and APK; runs queue per

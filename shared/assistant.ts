@@ -88,3 +88,26 @@ export interface AssistantStatus {
   /** The user accepted the "AI can make mistakes" notice. */
   acceptedTerms: boolean;
 }
+
+/** A one-time cleanup of existing mail (progress). */
+export interface ScanStatus {
+  running: boolean;
+  total: number;
+  done: number;
+  acted: number;
+  errors: number;
+  lastError: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+/** Inbox mail of one sender (the senders cleanup). */
+export interface SenderGroup {
+  address: string;
+  name: string;
+  count: number;
+  unread: number;
+  latest: string;
+  /** How to unsubscribe, from the List-Unsubscribe header: one-click (RFC 8058), a web page, or an email. */
+  unsubscribe: { oneClick: string | null; url: string | null; mailto: string | null } | null;
+}

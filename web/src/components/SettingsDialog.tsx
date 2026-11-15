@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: American spelling.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -29,6 +30,7 @@ import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { ProfilePicture } from './UserPicture';
 import { AiConnections } from './AiConnections';
+import { SourceLink } from './SourceLink';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -57,6 +59,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
   const can = (p: Permission) => me.permissions.includes(p);
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
+  const versionQ = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000 });
   const aiStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, staleTime: 60_000 });
   const myAccounts = useAccounts();
   // Grouped under headings: what is stored on this device, what belongs to your account (every
@@ -207,6 +210,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               <div className="hint">
                 Your role: <strong>{me.role.name}</strong>
               </div>
+              <SourceLink version={versionQ.data?.version} />
             </>
           )}
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}

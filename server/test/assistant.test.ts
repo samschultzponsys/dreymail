@@ -148,3 +148,17 @@ describe('assistant API', () => {
     expect((await call(eve, 'GET', '/api/assistant/connections')).json()).toEqual([]);
   });
 });
+
+describe('unsubscribe headers', () => {
+  it('finds one-click, web and mail targets', async () => {
+    const { parseUnsubscribe } = await import('../src/ai/engine.js');
+    expect(parseUnsubscribe('<mailto:u@list.example?subject=unsub>, <https://list.example/u/123>', 'List-Unsubscribe=One-Click')).toEqual({
+      oneClick: 'https://list.example/u/123',
+      url: 'https://list.example/u/123',
+      mailto: 'mailto:u@list.example?subject=unsub',
+    });
+    expect(parseUnsubscribe('<https://list.example/u/123>', '')).toMatchObject({ oneClick: null, url: 'https://list.example/u/123' });
+    // Plain http is never followed.
+    expect(parseUnsubscribe('<http://list.example/u>', 'List-Unsubscribe=One-Click')).toBeNull();
+  });
+});

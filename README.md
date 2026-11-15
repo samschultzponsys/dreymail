@@ -19,7 +19,8 @@
      Modified by samschultzponsys, 2026-11-15: mailbox icons.
      Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
      Modified by samschultzponsys, 2026-11-15: American spelling; describes DreyMail generally.
-     Modified by samschultzponsys, 2026-11-15: AI mailbox assistant. -->
+     Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+     Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -43,7 +44,7 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.1**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.2**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -323,9 +324,18 @@ applies one. **History** lists everything the assistant did, with **Undo**.
   rule says.
 - Keys are encrypted in DreyMail's database and never sent back to the browser.
 
-**Coming next:** one-time cleanup of existing mail, bulk sender cleanup (unsubscribe/archive by
-sender), and a *learning mode* that watches how you handle your mail for a period you choose and
-suggests rules (see [`ROADMAP.md`](ROADMAP.md)).
+### Clean up
+
+- **Sort existing mail:** runs your rules once over the newest 50–2,500 inbox messages, with
+  progress and Stop.
+- **Senders:** your inbox grouped by sender, biggest first, with no AI involved. For each sender:
+  - **Archive all** (undo in History).
+  - **Always archive** (adds a rule that needs no AI).
+  - **Unsubscribe:** DreyMail does it for you where the sender supports one-click unsubscribe;
+    otherwise it opens their unsubscribe page.
+
+**Coming next:** a *learning mode* that watches how you handle your mail for a period you choose
+and suggests rules (see [`ROADMAP.md`](ROADMAP.md)).
 
 ## Quick start (Docker Compose)
 

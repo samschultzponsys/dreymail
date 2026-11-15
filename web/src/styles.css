@@ -18,7 +18,8 @@
    Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
    Modified by samschultzponsys, 2026-11-15: mailbox icons.
    Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
-   Modified by samschultzponsys, 2026-11-15: AI mailbox assistant. */
+   Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+   Modified by samschultzponsys, 2026-11-15: source code link; AI cleanup. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -770,3 +771,12 @@ img.account-mark { object-fit: cover; }
 .decisions li.undone { opacity: 0.6; }
 .decision-subject { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .decision-rule { font-size: 13px; margin-top: 2px; }
+
+/* AGPL §13 source code offer and attribution (DreyMail). */
+.source-link { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.login-card .source-link { margin-top: 8px; text-align: center; }
+.changelog .source-link { margin-bottom: 4px; }
+.scan-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.scan-progress .bar { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.scan-progress .bar span { display: block; height: 100%; background: var(--accent-fill); transition: width 0.4s; }
+.senders .user-actions { display: flex; gap: 4px; align-items: center; }

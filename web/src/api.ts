@@ -14,7 +14,7 @@
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
-import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput } from '../../shared/assistant';
+import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, ScanStatus, SenderGroup } from '../../shared/assistant';
 import type { Permission, Role } from '../../shared/permissions';
 
 export interface AiConnectionInput {
@@ -144,6 +144,12 @@ export const api = {
     request<{ decisions: AssistantDecision[] }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/preview`, { limit, ...(rule ? { rule } : {}) }),
   assistantApply: (accountId: string, d: AssistantDecision) =>
     request<{ ok: true }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/apply`, { ruleId: d.ruleId, folder: d.folder, uidValidity: d.uidValidity, uid: d.uid, subject: d.subject, from: d.from }),
+  assistantScan: (accountId: string) => request<ScanStatus>('GET', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan`),
+  assistantStartScan: (accountId: string, limit: number) => request<ScanStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan`, { limit }),
+  assistantStopScan: (accountId: string) => request<ScanStatus>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/scan/stop`),
+  assistantSenders: (accountId: string, limit: number) => request<SenderGroup[]>('GET', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/senders?limit=${limit}`),
+  assistantArchiveSender: (accountId: string, address: string) => request<{ archived: number }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/senders/archive`, { address }),
+  assistantUnsubscribe: (accountId: string, oneClick: string) => request<{ ok: true }>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/senders/unsubscribe`, { oneClick }),
   assistantHistory: (accountId: string) => request<HistoryEntry[]>('GET', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/history`),
   assistantUndo: (accountId: string, id: number) => request<HistoryEntry[]>('POST', `/api/assistant/mailbox/${encodeURIComponent(accountId)}/history/${id}/undo`),
 

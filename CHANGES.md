@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.2): Source code link; AI cleanup of existing mail and senders
+
+- **Source code link (AGPL §13):** "DreyMail X.Y · Source code · based on Ratatoskr by Magnus Pihl ·
+  AGPL-3.0" on the sign-in page, in What's new and in Settings → Profile. It links to this
+  repository at the running version (new `web/src/components/SourceLink.tsx`;
+  `/auth/methods` carries the version, `server/src/auth/routes.ts`, `shared/types.ts`,
+  `web/src/components/Login.tsx`, `web/src/components/ChangelogDialog.tsx`,
+  `web/src/components/SettingsDialog.tsx`).
+- **AI assistant → Clean up:**
+  - **Sort existing mail:** runs the rules once over the newest 50–2,500 inbox messages, in the
+    background, with progress and Stop. It stops by itself at the daily limit.
+  - **Senders:** the inbox grouped by sender (no AI), with Archive all (undoable), Always archive
+    (adds a conditions-only rule) and Unsubscribe. Unsubscribe is done by DreyMail where the
+    sender offers one-click (RFC 8058, https only); otherwise it opens their unsubscribe page.
+  - Files: `server/src/ai/engine.ts`, `server/src/routes/assistant.ts`, `shared/assistant.ts`,
+    `web/src/components/AssistantDialog.tsx`, `web/src/api.ts`, `web/src/styles.css`. Tests:
+    `server/test/assistant.test.ts`, `server/test/auth.test.ts`.
+
 ## 2026-11-15 (v3.1): AI mailbox assistant (part 1)
 
 - **AI mailbox assistant**, opened per mailbox from the sidebar. Rules are written in plain

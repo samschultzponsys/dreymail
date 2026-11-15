@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
+// Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 
 // Types shared between the server API and the web client.
 
@@ -427,6 +428,8 @@ export interface AuthMethods {
   registration: boolean;
   oidc: { label: string } | null;
   dev: boolean;
+  /** Running version (DreyMail), for the source code link on the sign-in page. */
+  version?: string;
 }
 
 export type ServerEvent =

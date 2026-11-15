@@ -288,6 +288,77 @@ export function registerAssistantRoutes(
     }
   });
 
+  // ---- one-time cleanup and senders ----------------------------------------------------------
+
+  app.get<P>('/api/assistant/mailbox/:accountId/scan', async (req, reply) => {
+    const user = mailbox(req, reply);
+    return user ? engine.scanStatus(user.id, req.params.accountId) : reply;
+  });
+  app.post<P>('/api/assistant/mailbox/:accountId/scan', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    if (needsTerms(user.id, reply)) return reply;
+    const body = z.object({ limit: z.number().int().min(1).max(5000) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      return engine.startScan(user.id, req.params.accountId, body.data.limit);
+    } catch (err) {
+      return bad(reply, (err as Error).message);
+    }
+  });
+  app.post<P>('/api/assistant/mailbox/:accountId/scan/stop', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    engine.stopScan(user.id, req.params.accountId);
+    return engine.scanStatus(user.id, req.params.accountId);
+  });
+
+  app.get<{ Params: { accountId: string }; Querystring: { limit?: string } }>('/api/assistant/mailbox/:accountId/senders', async (req, reply) => {
+    const user = allowed(req, reply);
+    if (!user) return reply;
+    if (!ownsAccount(user.id, req.params.accountId)) return bad(reply, 'Mailbox not found', 404);
+    const limit = Math.min(5000, Math.max(50, Number(req.query.limit) || 1000));
+    try {
+      return await engine.senders(user.id, req.params.accountId, limit);
+    } catch (err) {
+      return bad(reply, (err as Error).message, 502);
+    }
+  });
+  app.post<P>('/api/assistant/mailbox/:accountId/senders/archive', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    const body = z.object({ address: z.string().trim().min(3).max(320) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      return { archived: await engine.archiveSender(user.id, req.params.accountId, body.data.address) };
+    } catch (err) {
+      return bad(reply, (err as Error).message, 502);
+    }
+  });
+
+  /**
+   * One-click unsubscribe (RFC 8058): DreyMail posts "List-Unsubscribe=One-Click" to the sender's
+   * https address. Senders without one-click get their link or address back to open.
+   */
+  app.post<P>('/api/assistant/mailbox/:accountId/senders/unsubscribe', async (req, reply) => {
+    const user = mailbox(req, reply);
+    if (!user) return reply;
+    const body = z.object({ oneClick: z.string().url().max(2000) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    const url = new URL(body.data.oneClick);
+    if (url.protocol !== 'https:') return bad(reply, 'Only https unsubscribe links are followed');
+    try {
+      await assertPublicHost(url.hostname);
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 15_000);
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click', redirect: 'manual', signal: ctl.signal }).finally(() => clearTimeout(timer));
+      if (res.status >= 400) return bad(reply, `The sender's server answered ${res.status}; try their unsubscribe page instead`, 502);
+      return { ok: true };
+    } catch (err) {
+      return bad(reply, `Could not unsubscribe: ${(err as Error).message}`, 502);
+    }
+  });
+
   app.get<P>('/api/assistant/mailbox/:accountId/history', async (req, reply) => {
     const user = mailbox(req, reply);
     return user ? ai.listHistory(user.id, req.params.accountId) : reply;

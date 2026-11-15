@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: sign-in methods also carry the version.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -142,7 +143,7 @@ describe('password login over HTTP', () => {
 
   it('lets the first user register and signs them in straight away', async () => {
     await start();
-    expect((await ctx!.app.inject({ url: '/auth/methods' })).json()).toEqual({ password: true, registration: true, oidc: null, dev: false });
+    expect((await ctx!.app.inject({ url: '/auth/methods' })).json()).toMatchObject({ password: true, registration: true, oidc: null, dev: false });
     const res = await post('/auth/password/register', { username: 'Alice', password: 'a long password' });
     expect(res.statusCode).toBe(200);
     const profile = await me(cookieOf(res));

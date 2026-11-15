@@ -3,7 +3,9 @@
 // Modified by samschultzponsys, 2026-11-13: user-visible name changed from "Ratatoskr" to "DreyMail".
 // Modified by samschultzponsys, 2026-11-13: day/night DreyMail logo instead of the favicon.
 // Modified by samschultzponsys, 2026-11-13: refetch everything after signing in (accounts stayed empty until a reload).
+// Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 
+import { SourceLink } from './SourceLink';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api';
@@ -125,6 +127,7 @@ export function Login() {
             Dev login
           </a>
         )}
+        <SourceLink version={m?.version} />
       </div>
     </div>
   );

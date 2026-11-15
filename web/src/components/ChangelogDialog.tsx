@@ -1,6 +1,7 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
+import { SourceLink } from './SourceLink';
 import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
@@ -73,6 +74,7 @@ export function ChangelogDialog({ version, onClose }: { version: VersionInfo; on
           </button>
         </div>
         <div className="dialog-body changelog">
+          <SourceLink version={version.version} />
           {version.update && (
             <div className="update-banner">
               <strong>DreyMail {version.update.version} is available.</strong> Pull the new image to update: in Arcane, redeploy the DreyMail stack

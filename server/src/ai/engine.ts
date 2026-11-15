@@ -11,7 +11,7 @@
 import { convert } from 'html-to-text';
 import type { ImapFlow, MessageStructureObject } from 'imapflow';
 import { z } from 'zod';
-import type { AssistantDecision, AssistantRule, MailboxAssistantSettings, RuleAction } from '../../../shared/assistant.js';
+import type { AssistantDecision, AssistantRule, MailboxAssistantSettings, RuleAction, ScanStatus, SenderGroup } from '../../../shared/assistant.js';
 import type { Access } from '../access.js';
 import type { Store, User } from '../db.js';
 import type { MailService } from '../imap/mail.js';
@@ -70,9 +70,21 @@ export function systemPrompt(rules: AssistantRule[]): string {
   ].join('\n');
 }
 
+/** The List-Unsubscribe header's targets (RFC 2369 / 8058). */
+export function parseUnsubscribe(listUnsub: string, listUnsubPost: string): SenderGroup['unsubscribe'] {
+  const targets = [...listUnsub.matchAll(/<([^>]+)>/g)].map((m) => m[1]!.trim());
+  const url = targets.find((t) => /^https:\/\//i.test(t)) ?? null;
+  const mailto = targets.find((t) => /^mailto:/i.test(t)) ?? null;
+  if (!url && !mailto) return null;
+  const oneClick = url && /List-Unsubscribe=One-Click/i.test(listUnsubPost) ? url : null;
+  return { oneClick, url, mailto };
+}
+
 export class AssistantEngine {
   /** Mailboxes being worked on, so the same message isn't handled twice at once. */
   private readonly busy = new Set<string>();
+  /** One-time cleanups, per user and mailbox. */
+  private readonly scans = new Map<string, ScanStatus & { stop: boolean }>();
 
   constructor(
     private readonly deps: {
@@ -336,6 +348,125 @@ export class AssistantEngine {
     } finally {
       this.busy.delete(key);
     }
+  }
+
+  // ---- one-time cleanup ----------------------------------------------------------------
+
+  scanStatus(userId: string, accountId: string): ScanStatus {
+    const s = this.scans.get(`${userId}:${accountId}`);
+    if (!s) return { running: false, total: 0, done: 0, acted: 0, errors: 0, lastError: null, startedAt: null, finishedAt: null };
+    const { stop: _stop, ...status } = s;
+    return status;
+  }
+
+  stopScan(userId: string, accountId: string) {
+    const s = this.scans.get(`${userId}:${accountId}`);
+    if (s) s.stop = true;
+  }
+
+  /**
+   * Run the rules over existing INBOX mail, newest first, up to `limit` messages, in the
+   * background. Progress: scanStatus. Stops at the daily limit or when asked.
+   */
+  startScan(userId: string, accountId: string, limit: number): ScanStatus {
+    const key = `${userId}:${accountId}`;
+    if (this.scans.get(key)?.running) return this.scanStatus(userId, accountId);
+    const settings = this.deps.ai.mailbox(userId, accountId);
+    const connection = settings.connectionId ? this.deps.ai.connection(userId, settings.connectionId, true) : null;
+    if (!connection) throw new AiError('Choose an AI connection for this mailbox first');
+    const rules = this.deps.ai.listRules(userId, accountId);
+    if (!rules.some((r) => r.enabled)) throw new AiError('Add a rule first');
+    const job: ScanStatus & { stop: boolean } = { running: true, total: 0, done: 0, acted: 0, errors: 0, lastError: null, startedAt: new Date().toISOString(), finishedAt: null, stop: false };
+    this.scans.set(key, job);
+    void (async () => {
+      try {
+        const uids = await this.deps.pool.withMailbox(userId, accountId, 'INBOX', async (client, mailbox) => {
+          if (!mailbox.exists) return [] as number[];
+          return ((await client.search({ all: true }, { uid: true })) || []).sort((a, b) => b - a).slice(0, limit);
+        });
+        job.total = uids.length;
+        for (let i = 0; i < uids.length && !job.stop; i += 10) {
+          for (const m of await this.view(userId, accountId, 'INBOX', uids.slice(i, i + 10), settings.accuracy)) {
+            if (job.stop) break;
+            try {
+              const { rule, reason } = await this.decide(connection, rules, m);
+              if (rule) {
+                const undo = await this.apply(userId, accountId, m, rule.actions);
+                this.deps.ai.addHistory(userId, accountId, 'scan', this.toDecision(m, rule, reason), undo);
+                job.acted++;
+              }
+            } catch (err) {
+              job.errors++;
+              job.lastError = (err as Error).message;
+              // A spent limit, a refused key or an unreachable service won't fix itself mid-run.
+              if (err instanceof AiError && /limit|key|reach|rate/i.test(err.message)) job.stop = true;
+            }
+            job.done++;
+          }
+        }
+      } catch (err) {
+        job.errors++;
+        job.lastError = (err as Error).message;
+      } finally {
+        job.running = false;
+        job.finishedAt = new Date().toISOString();
+      }
+    })();
+    return this.scanStatus(userId, accountId);
+  }
+
+  // ---- senders (no AI) ---------------------------------------------------------------------
+
+  /** INBOX grouped by sender (the newest `limit` messages), biggest first. */
+  async senders(userId: string, accountId: string, limit: number): Promise<SenderGroup[]> {
+    return this.deps.pool.withMailbox(userId, accountId, 'INBOX', async (client, mailbox) => {
+      if (!mailbox.exists) return [];
+      const uids = ((await client.search({ all: true }, { uid: true })) || []).sort((a, b) => b - a).slice(0, limit);
+      if (!uids.length) return [];
+      const groups = new Map<string, SenderGroup>();
+      for await (const msg of client.fetch(uids.join(','), { uid: true, envelope: true, flags: true, headers: ['list-unsubscribe', 'list-unsubscribe-post'] }, { uid: true })) {
+        const from = msg.envelope?.from?.[0];
+        const address = (from?.address ?? '').toLowerCase();
+        if (!address) continue;
+        const g = groups.get(address) ?? { address, name: from?.name ?? '', count: 0, unread: 0, latest: '', unsubscribe: null };
+        g.count++;
+        if (!msg.flags?.has('\\Seen')) g.unread++;
+        const date = new Date(msg.envelope?.date ?? 0).toISOString();
+        if (date > g.latest) g.latest = date;
+        if (!g.unsubscribe && msg.headers) {
+          const h = msg.headers.toString('utf8').replace(/\r?\n[ \t]+/g, ' ');
+          const lu = /^list-unsubscribe:\s*(.+)$/im.exec(h)?.[1] ?? '';
+          const lp = /^list-unsubscribe-post:\s*(.+)$/im.exec(h)?.[1] ?? '';
+          if (lu) g.unsubscribe = parseUnsubscribe(lu, lp);
+        }
+        groups.set(address, g);
+      }
+      return [...groups.values()].sort((a, b) => b.count - a.count || b.latest.localeCompare(a.latest));
+    });
+  }
+
+  /** Archive every INBOX message from this sender. Returns how many. */
+  async archiveSender(userId: string, accountId: string, address: string): Promise<number> {
+    const { uids, uidValidity } = await this.deps.pool.withMailbox(userId, accountId, 'INBOX', async (client, mailbox) => ({
+      uids: ((await client.search({ from: address }, { uid: true })) || []).filter(Boolean),
+      uidValidity: mailbox.uidValidity.toString(),
+    }));
+    if (!uids.length) return 0;
+    const res = await this.deps.mail.applyAction(userId, accountId, 'INBOX', uidValidity, uids, { type: 'archive' });
+    const undo: UndoStep[] = res.undo ? [{ type: 'move', from: res.undo.folder, uidValidity: res.undo.uidValidity, uids: res.undo.uids, to: res.undo.restoreTo }] : [];
+    this.deps.ai.addHistory(userId, accountId, 'manual', {
+      uid: uids[0]!,
+      uidValidity,
+      folder: 'INBOX',
+      subject: `${uids.length} message${uids.length === 1 ? '' : 's'} from ${address}`,
+      from: address,
+      date: new Date().toISOString(),
+      ruleId: null,
+      ruleName: 'Archive all from sender',
+      reason: 'Senders cleanup',
+      actions: [{ type: 'archive' }],
+    }, undo);
+    return uids.length;
   }
 
   /** What the rules would do with the newest messages of INBOX, without doing it. */

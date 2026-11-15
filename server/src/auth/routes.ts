@@ -2,7 +2,9 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: sign-in options come from LoginSettings (UI, with environment overrides) and can change at runtime.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-15: source code link (AGPL §13) with attribution.
 
+import { serverVersion } from '../version.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
@@ -56,6 +58,7 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
       registration: registrationOpen(l, store),
       oidc: l.oidc ? { label: l.oidc.label } : null,
       dev: config.devLogin,
+      version: serverVersion(),
     };
   });
 

@@ -6,16 +6,16 @@
 // of what it did, with undo.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, History, ListChecks, Pencil, Plus, Settings2, Sparkles, Trash2, Undo2, X, FlaskConical } from 'lucide-react';
+import { AlertTriangle, Archive, Ban, Eraser, MailX, Square, ArrowDown, ArrowUp, Check, History, ListChecks, Pencil, Plus, Settings2, Sparkles, Trash2, Undo2, X, FlaskConical } from 'lucide-react';
 import { useState } from 'react';
 import { ACCURACY_LEVELS } from '../../../shared/aiProviders';
-import { RULE_ACTION_LABELS, type AssistantDecision, type AssistantRule, type RuleAction, type RuleInput } from '../../../shared/assistant';
+import { RULE_ACTION_LABELS, type AssistantDecision, type AssistantRule, type RuleAction, type RuleInput, type SenderGroup } from '../../../shared/assistant';
 import type { AccountFolders, AccountView } from '../../../shared/types';
 import { api } from '../api';
 import { AiGuideLink, ConnectionForm, useAiConnections } from './AiConnections';
 import { MailboxIcon } from './MailboxIcon';
 
-type Tab = 'setup' | 'rules' | 'test' | 'history';
+type Tab = 'setup' | 'rules' | 'test' | 'cleanup' | 'history';
 
 function Notice({ onAccept }: { onAccept: () => void }) {
   const [ok, setOk] = useState(false);
@@ -270,6 +270,148 @@ function Decisions({ items, rules, onApply, busy }: { items: AssistantDecision[]
   );
 }
 
+/** Clean up: run the rules over older mail once, and tidy up by sender (no AI needed for that). */
+function CleanupTab({ accountId, hasConnection, hasRules, onRules }: { accountId: string; hasConnection: boolean; hasRules: boolean; onRules: (r: AssistantRule[]) => void }) {
+  const qc = useQueryClient();
+  const [limit, setLimit] = useState(250);
+  const scan = useQuery({
+    queryKey: ['ai', 'scan', accountId],
+    queryFn: () => api.assistantScan(accountId),
+    refetchInterval: (q) => (q.state.data?.running ? 1500 : false),
+  });
+  const [senders, setSenders] = useState<SenderGroup[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = async (key: string, fn: () => Promise<void>) => {
+    setBusy(key);
+    setNote(null);
+    try {
+      await fn();
+    } catch (err) {
+      setNote({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const s = scan.data;
+  const pct = s && s.total ? Math.round((s.done / s.total) * 100) : 0;
+
+  return (
+    <div className="stack">
+      <div>
+        <label className="label">Sort existing mail</label>
+        <div className="hint">Run your rules once over mail already in the inbox, newest first. Each message is one AI request (rules with only exact conditions are free).</div>
+        <div className="row-buttons" style={{ marginTop: 8 }}>
+          <select className="input" style={{ width: 'auto' }} value={limit} disabled={s?.running} onChange={(e) => setLimit(Number(e.target.value))}>
+            {[50, 100, 250, 500, 1000, 2500].map((n) => (
+              <option key={n} value={n}>
+                Newest {n.toLocaleString()}
+              </option>
+            ))}
+          </select>
+          {s?.running ? (
+            <button className="btn" onClick={() => void run('stop', async () => (qc.setQueryData(['ai', 'scan', accountId], await api.assistantStopScan(accountId)), undefined))}>
+              <Square size={14} /> Stop
+            </button>
+          ) : (
+            <button className="btn primary" disabled={!hasConnection || !hasRules || !!busy} onClick={() => void run('scan', async () => (qc.setQueryData(['ai', 'scan', accountId], await api.assistantStartScan(accountId, limit)), undefined))}>
+              <Eraser size={14} /> Start cleanup
+            </button>
+          )}
+        </div>
+        {(!hasConnection || !hasRules) && <div className="hint">Needs an AI connection (Setup) and at least one rule.</div>}
+        {s && (s.running || s.finishedAt) && (
+          <div className="scan-progress">
+            <div className="bar">
+              <span style={{ width: `${pct}%` }} />
+            </div>
+            <div className="hint">
+              {s.running ? 'Working… ' : 'Finished. '}
+              {s.done} of {s.total} checked · {s.acted} sorted{s.errors ? ` · ${s.errors} problem${s.errors === 1 ? '' : 's'}` : ''}
+              {s.lastError && <span className="error-text"> · {s.lastError}</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="label">Senders</label>
+        <div className="hint">Who fills your inbox, biggest first. Archive everything from a sender, keep archiving them automatically, or unsubscribe. No AI is used here.</div>
+        <div className="row-buttons" style={{ marginTop: 8 }}>
+          <button className="btn" disabled={!!busy} onClick={() => void run('senders', async () => setSenders(await api.assistantSenders(accountId, 1000)))}>
+            {busy === 'senders' ? 'Looking…' : senders ? 'Refresh' : 'Show senders'}
+          </button>
+        </div>
+        {note && <div className={note.ok ? 'hint ok-text' : 'error-text'}>{note.text}</div>}
+        {senders && (
+          <ul className="decisions senders">
+            {senders.slice(0, 100).map((g) => (
+              <li key={g.address}>
+                <div className="user-main">
+                  <div className="decision-subject">{g.name || g.address}</div>
+                  <div className="muted user-meta">
+                    {g.name ? `${g.address} · ` : ''}
+                    {g.count} message{g.count === 1 ? '' : 's'} · {g.unread} unread · latest {new Date(g.latest).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="user-actions">
+                  <button
+                    className="icon-btn"
+                    title="Archive all from this sender"
+                    disabled={!!busy}
+                    onClick={() =>
+                      void run(g.address, async () => {
+                        const r = await api.assistantArchiveSender(accountId, g.address);
+                        setSenders((cur) => (cur ?? []).filter((x) => x.address !== g.address));
+                        setNote({ ok: true, text: `Archived ${r.archived} from ${g.address}. Undo in History.` });
+                        void qc.invalidateQueries({ queryKey: ['messages'] });
+                      })
+                    }
+                  >
+                    <Archive size={16} />
+                  </button>
+                  <button
+                    className="icon-btn"
+                    title="Always archive mail from this sender (adds a rule)"
+                    disabled={!!busy}
+                    onClick={() =>
+                      void run(g.address, async () => {
+                        onRules(await api.saveAssistantRule(accountId, null, { name: `Archive ${g.name || g.address}`, instructions: '', conditions: { from: g.address }, actions: [{ type: 'archive' }], enabled: true }));
+                        setNote({ ok: true, text: `Added a rule: mail from ${g.address} is archived from now on (no AI needed).` });
+                      })
+                    }
+                  >
+                    <Ban size={16} />
+                  </button>
+                  {g.unsubscribe &&
+                    (g.unsubscribe.oneClick ? (
+                      <button
+                        className="btn"
+                        disabled={!!busy}
+                        onClick={() =>
+                          void run(g.address, async () => {
+                            await api.assistantUnsubscribe(accountId, g.unsubscribe!.oneClick!);
+                            setNote({ ok: true, text: `Unsubscribed from ${g.address}.` });
+                          })
+                        }
+                      >
+                        <MailX size={14} /> Unsubscribe
+                      </button>
+                    ) : (
+                      <a className="btn" href={g.unsubscribe.url ?? g.unsubscribe.mailto ?? '#'} target="_blank" rel="noreferrer noopener">
+                        <MailX size={14} /> Unsubscribe…
+                      </a>
+                    ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AssistantDialog({ account, folders, onClose }: { account: AccountView; folders: AccountFolders | undefined; onClose: () => void }) {
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus });
@@ -321,6 +463,7 @@ export function AssistantDialog({ account, folders, onClose }: { account: Accoun
               ['setup', 'Setup', Settings2],
               ['rules', `Rules (${rules.length})`, ListChecks],
               ['test', 'Test', FlaskConical],
+              ['cleanup', 'Clean up', Eraser],
               ['history', 'History', History],
             ] as const
           ).map(([key, label, Icon]) => (
@@ -494,6 +637,8 @@ export function AssistantDialog({ account, folders, onClose }: { account: Accoun
               )}
             </div>
           )}
+
+          {tab === 'cleanup' && <CleanupTab accountId={account.id} hasConnection={!!settings.connectionId} hasRules={rules.some((r) => r.enabled)} onRules={setRules} />}
 
           {tab === 'history' && (
             <div className="stack">
