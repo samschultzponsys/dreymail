@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-15: saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles with permission flags; profile pictures.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant (connections, rules, history, usage).
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 
@@ -202,6 +203,64 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!has('icon_image')) db.exec('ALTER TABLE accounts ADD COLUMN icon_image BLOB;');
     if (!has('icon_image_type')) db.exec("ALTER TABLE accounts ADD COLUMN icon_image_type TEXT NOT NULL DEFAULT '';");
     if (!has('icon_image_version')) db.exec('ALTER TABLE accounts ADD COLUMN icon_image_version INTEGER NOT NULL DEFAULT 0;');
+  },
+  // DreyMail: the AI mailbox assistant. Connections hold an AI service and its sealed key (user_id
+  // NULL = shared by an administrator); each mailbox picks one, has rules, and keeps a history.
+  (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS ai_connections (
+               id TEXT PRIMARY KEY,
+               user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+               name TEXT NOT NULL,
+               preset TEXT NOT NULL,
+               api TEXT NOT NULL,
+               base_url TEXT NOT NULL,
+               model TEXT NOT NULL,
+               api_key TEXT NOT NULL DEFAULT '',
+               daily_limit INTEGER NOT NULL DEFAULT 500,
+               created_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS ai_mailboxes (
+               account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+               connection_id TEXT REFERENCES ai_connections(id) ON DELETE SET NULL,
+               enabled INTEGER NOT NULL DEFAULT 0,
+               accuracy INTEGER NOT NULL DEFAULT 4
+             );
+             CREATE TABLE IF NOT EXISTS ai_rules (
+               id TEXT PRIMARY KEY,
+               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+               account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+               name TEXT NOT NULL,
+               instructions TEXT NOT NULL,
+               conditions TEXT NOT NULL,
+               actions TEXT NOT NULL,
+               enabled INTEGER NOT NULL DEFAULT 1,
+               position INTEGER NOT NULL,
+               created_at INTEGER NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS ai_rules_account ON ai_rules(account_id, position);
+             CREATE TABLE IF NOT EXISTS ai_history (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+               account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+               at INTEGER NOT NULL,
+               source TEXT NOT NULL,
+               decision TEXT NOT NULL,
+               undo TEXT NOT NULL DEFAULT '[]',
+               undone INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE INDEX IF NOT EXISTS ai_history_account ON ai_history(account_id, at);
+             CREATE TABLE IF NOT EXISTS ai_usage (
+               connection_id TEXT NOT NULL,
+               day TEXT NOT NULL,
+               requests INTEGER NOT NULL DEFAULT 0,
+               input_tokens INTEGER NOT NULL DEFAULT 0,
+               output_tokens INTEGER NOT NULL DEFAULT 0,
+               PRIMARY KEY (connection_id, day)
+             );`);
+    const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'ai_access')) db.exec("ALTER TABLE users ADD COLUMN ai_access TEXT NOT NULL DEFAULT '';");
+    if (!cols.some((c) => c.name === 'ai_terms_at')) db.exec('ALTER TABLE users ADD COLUMN ai_terms_at INTEGER NOT NULL DEFAULT 0;');
   },
 ];
 

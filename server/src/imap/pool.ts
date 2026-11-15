@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: new mail is also reported for open desktop-app sessions.
+// Modified by samschultzponsys, 2026-11-15: inboxes also watched for the AI assistant.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -52,6 +53,8 @@ export class ImapPool {
   private readonly watchers = new Map<string, Map<string, Watcher>>();
   private readonly watchRefs = new Map<string, number>();
   private readonly background = new Set<string>();
+  /** Users with the AI assistant on for some mailbox: their inboxes are watched for new mail too (DreyMail). */
+  private readonly assistant = new Set<string>();
   /** Open sessions that show their own notifications (the desktop app), per user. */
   private readonly liveNotify = new Map<string, number>();
   private readonly sweeper: NodeJS.Timeout;
@@ -183,14 +186,19 @@ export class ImapPool {
   // ---- live updates --------------------------------------------------------
 
   private watching(userId: string): boolean {
-    return (this.watchRefs.get(userId) ?? 0) > 0 || this.background.has(userId);
+    return (this.watchRefs.get(userId) ?? 0) > 0 || this.keepsWatching(userId);
+  }
+
+  /** Watched without a browser session: notifications on some device, or the AI assistant. */
+  private keepsWatching(userId: string): boolean {
+    return this.background.has(userId) || this.assistant.has(userId);
   }
 
   /** Called when a browser session for this user opens. Reference counted per user. */
   watch(userId: string) {
     const refs = (this.watchRefs.get(userId) ?? 0) + 1;
     this.watchRefs.set(userId, refs);
-    if (refs > 1 || this.background.has(userId)) return;
+    if (refs > 1 || this.keepsWatching(userId)) return;
     for (const acc of this.store.listAccounts(userId)) this.startWatcher(userId, acc.id);
   }
 
@@ -201,7 +209,7 @@ export class ImapPool {
       return;
     }
     this.watchRefs.delete(userId);
-    if (!this.background.has(userId)) this.stopAll(userId);
+    if (!this.keepsWatching(userId)) this.stopAll(userId);
   }
 
   /**
@@ -216,7 +224,7 @@ export class ImapPool {
     if (on === this.background.has(userId)) return;
     if (!on) {
       this.background.delete(userId);
-      if ((this.watchRefs.get(userId) ?? 0) === 0) this.stopAll(userId);
+      if ((this.watchRefs.get(userId) ?? 0) === 0 && !this.assistant.has(userId)) this.stopAll(userId);
       return;
     }
     if (fromNow) this.store.clearInboxState(userId);
@@ -228,8 +236,34 @@ export class ImapPool {
     }
   }
 
-  /** Report new mail (onNewMail) for this user: notifications on a device, or a desktop app open. */
+  /**
+   * Watch a user's inboxes for the AI assistant (DreyMail), or stop. Like setBackground, but mail
+   * that arrived while it was off is never handed to it: it starts from now.
+   */
+  setAssistant(userId: string, on: boolean) {
+    if (on === this.assistant.has(userId)) return;
+    if (!on) {
+      this.assistant.delete(userId);
+      if ((this.watchRefs.get(userId) ?? 0) === 0 && !this.background.has(userId)) this.stopAll(userId);
+      return;
+    }
+    const wasReporting = this.wantsNewMail(userId);
+    if (!wasReporting) this.store.clearInboxState(userId);
+    this.assistant.add(userId);
+    for (const acc of this.store.listAccounts(userId)) {
+      const w = this.watchers.get(userId)?.get(acc.id);
+      if (!w) this.startWatcher(userId, acc.id);
+      else if (w.client?.usable) this.checkNewMail(userId, acc.id, w, w.client);
+    }
+  }
+
+  /** Report new mail (onNewMail) for this user: notifications on a device, a desktop app open, or the AI assistant. */
   private wantsNewMail(userId: string): boolean {
+    return this.background.has(userId) || this.assistant.has(userId) || (this.liveNotify.get(userId) ?? 0) > 0;
+  }
+
+  /** Whether new mail of this user should become notifications (as opposed to only reaching the assistant). */
+  notifiesNewMail(userId: string): boolean {
     return this.background.has(userId) || (this.liveNotify.get(userId) ?? 0) > 0;
   }
 
@@ -242,7 +276,7 @@ export class ImapPool {
     const after = Math.max(0, before + (on ? 1 : -1));
     if (after) this.liveNotify.set(userId, after);
     else this.liveNotify.delete(userId);
-    if (before === 0 && after > 0 && !this.background.has(userId)) {
+    if (before === 0 && after > 0 && !this.background.has(userId) && !this.assistant.has(userId)) {
       // Start from now: don't report mail that arrived while nothing was listening.
       this.store.clearInboxState(userId);
       for (const [accountId, w] of this.watchers.get(userId) ?? []) if (w.client?.usable) this.checkNewMail(userId, accountId, w, w.client);
@@ -401,6 +435,7 @@ export class ImapPool {
   async close() {
     clearInterval(this.sweeper);
     this.background.clear();
+    this.assistant.clear();
     for (const userId of [...this.watchers.keys()]) this.stopAll(userId);
     for (const userId of [...this.watchRefs.keys()]) {
       this.watchRefs.set(userId, 1);

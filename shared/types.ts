@@ -413,6 +413,8 @@ export interface AdminUser {
   adminByEnv: boolean;
   avatar: string | null;
   hasPicture: boolean;
+  /** AI assistant for this user: '' = as the role says, or switched on/off for them. */
+  aiAccess: '' | 'on' | 'off';
   accounts: number;
   createdAt: string;
 }

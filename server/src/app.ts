@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions (Access).
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,6 +35,10 @@ import type { AvatarService } from './net/avatars.js';
 import type { RemoteImage } from './net/remoteImages.js';
 import { registerApiRoutes } from './routes/api.js';
 import { Access } from './access.js';
+import { AssistantEngine } from './ai/engine.js';
+import { AiClient, type FetchLike as AiFetch } from './ai/providers.js';
+import { AssistantStore } from './ai/store.js';
+import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAndroidPushRoutes } from './routes/android.js';
 import { registerMicrosoftRoutes } from './routes/microsoft.js';
@@ -97,6 +102,8 @@ export async function buildApp(
     fetchImage?: (url: string) => Promise<RemoteImage>;
     /** Replaces the contact picture lookup (tests only). */
     avatars?: AvatarService;
+    /** Replaces fetch for AI services (tests only). */
+    aiFetch?: AiFetch;
     /** Replaces real Web Push delivery (tests only). */
     pushTransport?: PushTransport;
     /** Replaces HTTP calls to Google for the Android app's notifications (tests only). */
@@ -198,13 +205,23 @@ export async function buildApp(
     emit: (userId, event) => pool.onEvent(userId, event),
     log: (msg, extra) => app.log.warn(extra ?? {}, msg),
   });
+  // AI mailbox assistant: acts on new mail before it becomes a notification.
+  const access = new Access(config, store);
+  const assistantStore = new AssistantStore(store);
+  const aiClient = new AiClient(opts.aiFetch);
+  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg) });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
-    const fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));
-    if (fresh.length > 0) {
+    let fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));
+    if (fresh.length === 0) return;
+    void (async () => {
+      // Mail the assistant moves out of the inbox doesn't need a notification.
+      const stays = await assistant.handleNew(userId, accountId, fresh.map((m) => m.uid)).catch(() => null);
+      if (stays) fresh = fresh.filter((m) => stays.includes(m.uid));
+      if (fresh.length === 0 || !pool.notifiesNewMail(userId)) return;
       liveNotify(userId, accountId, (account, content) => buildNotification(account, fresh, content));
-      void push.notifyNewMail(userId, accountId, fresh);
-    }
+      await push.notifyNewMail(userId, accountId, fresh);
+    })();
   };
   // Mail read (or moved away) elsewhere: close its notifications on the user's devices.
   pool.onInboxChanged = (userId, accountId) => push.inboxChanged(userId, accountId);
@@ -239,7 +256,6 @@ export async function buildApp(
   app.get('/healthz', async () => ({ ok: true }));
 
   const login = new LoginSettings(config, store);
-  const access = new Access(config, store);
   await registerAuthRoutes(app, config, store, sessions, login);
   await registerApiRoutes(app, {
     config,
@@ -257,10 +273,12 @@ export async function buildApp(
     updates: opts.updates,
     access,
   });
-  await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase });
+  await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase, onAiAccess: (id) => assistant.syncWatching(id) });
   registerAndroidPushRoutes(app, { store, pool, firebase });
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
+  registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
+  assistant.syncWatching();
   live = await registerWebSocket(app, config, store, sessions, pool);
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.

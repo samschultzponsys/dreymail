@@ -13,6 +13,7 @@ import { isPermission, SUPERADMIN, type Permission, type Role } from '../../../s
 import type { AdminUser, FirebaseSettingsView } from '../../../shared/types.js';
 import type { Access } from '../access.js';
 import { parsePicture, PictureError, pictureUrl } from '../profilePicture.js';
+import { AssistantStore } from '../ai/store.js';
 import { hashPassword, LOCAL_ISSUER, passwordSchema, usernameSchema } from '../auth/password.js';
 import type { Sessions } from '../auth/session.js';
 import type { Config } from '../config.js';
@@ -31,6 +32,8 @@ export interface AdminDeps {
   pool: ImapPool;
   mail: MailService;
   firebase: FirebaseConfig;
+  /** A user's AI assistant switch changed (start or stop watching their inboxes). */
+  onAiAccess?: (userId: string) => void;
 }
 
 const registrationSchema = z.enum(['open', 'first', 'closed']);
@@ -46,12 +49,13 @@ const loginSchema = z.object({
   registration: registrationSchema,
 });
 const newUserSchema = z.object({ username: z.string().max(500), password: z.string().max(1000), roleId: z.string().max(64).optional() });
-const patchUserSchema = z.object({ roleId: z.string().max(64).optional(), password: z.string().max(1000).optional() });
+const patchUserSchema = z.object({ roleId: z.string().max(64).optional(), password: z.string().max(1000).optional(), aiAccess: z.enum(['', 'on', 'off']).optional() });
 const roleSchema = z.object({ name: z.string().trim().min(1).max(60), permissions: z.array(z.string().max(60)).max(100) });
 const testSchema = z.object({ issuerUrl: z.string().max(2000), clientId: z.string().max(500), clientSecret: z.string().max(2000) });
 
 export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps) {
   const { config, store, sessions, access, login, pool, mail, firebase } = deps;
+  const ai = new AssistantStore(store);
 
   const view = (u: User & { accounts: number }): AdminUser => ({
     id: u.id,
@@ -65,6 +69,7 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
     createdAt: new Date(u.createdAt).toISOString(),
     avatar: pictureUrl(store, u),
     hasPicture: u.avatarVersion > 0,
+    aiAccess: ai.access(u.id),
   });
   const listUsers = () => store.listUsers().map(view);
   const bad = (reply: FastifyReply, error: string) => reply.code(400).send({ error });
@@ -113,6 +118,11 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
       if (target.id === me.id) return bad(reply, "You can't change your own role");
       if (access.lastSuperadmin(target)) return bad(reply, 'Keep at least one Superadmin');
       store.setUserRole(target.id, role.id);
+    }
+    if (body.data.aiAccess !== undefined) {
+      if (!may(req, reply, 'users.manage')) return reply;
+      ai.setAccess(target.id, body.data.aiAccess);
+      deps.onAiAccess?.(target.id);
     }
     if (body.data.password !== undefined) {
       if (!may(req, reply, 'users.manage')) return reply;
