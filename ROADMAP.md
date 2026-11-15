@@ -25,9 +25,11 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Send later and undo send.
 - [ ] Account health alerts (sign-in expired, mailbox unreachable, quota).
 - [ ] Rules with a match preview; automatic tabs (Personal / Updates / Newsletters).
-- [ ] AI mailbox assistant: rules written in plain language, run on new mail and on demand against
-      existing mail, with a preview and history; uses your own API key (Anthropic, Google, OpenAI,
-      DeepSeek or any OpenAI-compatible endpoint). Being designed; not built yet.
+- [ ] AI assistant: one-time cleanup of existing mail (in batches, with progress and limits) and bulk
+      sender cleanup (unsubscribe / archive all by sender).
+- [ ] AI assistant learning mode: per mailbox, for up to a month, learns from how you handle mail and
+      suggests rules; a review screen when it ends.
+- [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
       Outlook sign-in accounts already let the provider file sent mail).
 - [ ] Gmail specifics: multi-label view and archive vs. delete semantics over IMAP.
@@ -76,6 +78,12 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       notifications and an updater that knows how it was installed (1.6).
 - [x] Android app with instant, end-to-end encrypted notifications (Firebase), a notification
       channel per account (own sound), tinted and colored icons, and an in-app updater (1.9, 2.0).
+
+### AI mailbox assistant
+- [x] Plain-language rules with exact conditions, run on new mail, test, history with undo; AI
+      connections (Anthropic, Gemini, OpenAI-style, local LM Studio/Ollama/…) per user or shared,
+      per mailbox, with daily limits; accuracy slider; at-your-own-risk notice; permission and
+      per-user switch (3.1).
 
 ### Administration and security
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).

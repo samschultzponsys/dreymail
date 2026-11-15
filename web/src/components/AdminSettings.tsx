@@ -87,6 +87,20 @@ export function UsersAdmin({ me }: { me: Me }) {
                     ))}
                   </select>
                 )}
+                {can('users.manage') && (
+                  <select
+                    className="input role-select"
+                    aria-label={`AI assistant for ${display}`}
+                    title="AI assistant"
+                    value={u.aiAccess}
+                    disabled={busy}
+                    onChange={(e) => void run(() => api.adminPatchUser(u.id, { aiAccess: e.target.value as '' | 'on' | 'off' }))}
+                  >
+                    <option value="">AI: as role</option>
+                    <option value="on">AI: on</option>
+                    <option value="off">AI: off</option>
+                  </select>
+                )}
                 {can('users.pictures') && (
                   <button className="icon-btn" title="Change profile picture" disabled={busy} onClick={() => setPicturing(picturing === u.id ? null : u.id)}>
                     <Camera size={16} />

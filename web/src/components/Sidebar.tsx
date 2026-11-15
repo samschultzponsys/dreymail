@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -30,6 +31,7 @@ import {
   UserCog,
   Layers,
   Search,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -90,9 +92,11 @@ interface Props {
   activeSearch: string | null;
   onSearch: (s: SavedSearch) => void;
   onDeleteSearch: (s: SavedSearch) => void;
+  /** Open the AI assistant for a mailbox (only when the user may use it). */
+  onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch }: Props) {
+export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -158,15 +162,22 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
           const isCollapsed = !rail && collapsed[acc.id];
           return (
             <div className="nav-section" key={acc.id}>
-              <button
-                className="nav-heading"
-                onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
-                title={acc.name}
-              >
-                {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
-                <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
-              </button>
+              <div className="nav-heading-row">
+                <button
+                  className="nav-heading"
+                  onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
+                  title={acc.name}
+                >
+                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                  <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
+                  <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
+                </button>
+                {onAssistant && (
+                  <button className="nav-assistant name" title={`AI assistant for ${acc.name}`} aria-label={`AI assistant for ${acc.name}`} onClick={() => onAssistant(acc.id)}>
+                    <Sparkles size={13} />
+                  </button>
+                )}
+              </div>
               {!isCollapsed && (
                 <>
                   {!af && (

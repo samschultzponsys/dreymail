@@ -18,7 +18,8 @@
      Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
      Modified by samschultzponsys, 2026-11-15: mailbox icons.
      Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
-     Modified by samschultzponsys, 2026-11-15: American spelling; describes DreyMail generally. -->
+     Modified by samschultzponsys, 2026-11-15: American spelling; describes DreyMail generally.
+     Modified by samschultzponsys, 2026-11-15: AI mailbox assistant. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -42,12 +43,13 @@ author. DreyMail stays under the same license, AGPL-3.0-only; see [License](#lic
 
 ## Status
 
-Current version: **3.0**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
+Current version: **3.1**. Upstream's feature set with DreyMail's own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
-filters with saved searches, and roles with permission flags. What's planned is in
+filters with saved searches, roles with permission flags, and an optional [AI mailbox
+assistant](#ai-mailbox-assistant) that sorts mail by rules you write in plain language. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
 ## What it does
@@ -217,6 +219,113 @@ through registering DreyMail in Microsoft's Entra admin center and pasting two v
 in the compose file, which then wins over the UI: `DREYMAIL_MICROSOFT_CLIENT_ID`,
 `DREYMAIL_MICROSOFT_CLIENT_SECRET` and optionally `DREYMAIL_MICROSOFT_TENANT` (`common` by
 default).
+
+## AI mailbox assistant
+
+An optional assistant that sorts mail by **rules you write in plain language**, using an AI service
+you choose: a cloud service with your own API key, or a model on your own hardware so your mail
+never leaves your network. Open it with the ✨ button next to a mailbox in the sidebar.
+
+> **AI can make mistakes.** The assistant acts on your mail (moving, labeling, archiving, deleting)
+> according to your rules, and an AI can misread a message or pick the wrong rule. **You use it at
+> your own risk.** Test rules first and check the History tab; most actions can be undone there.
+> DreyMail shows this notice before first use.
+
+**How it works:**
+- **Changes happen in your mailbox.** Folders, labels, moves and flags are made on Gmail, Outlook or
+  your IMAP server, so every app sees them.
+- **DreyMail does the thinking.** It evaluates the rules, keeps the history and stores your keys
+  (encrypted). No mail is stored.
+- **It runs on its own.** New mail is sorted as it arrives, before any notification, even while
+  DreyMail isn't open in a browser.
+
+**Who can use it:** the role permission *Use the AI mailbox assistant*, which the built-in User
+role doesn't have; add it in Settings → Roles. Or switch it on or off for one person in Settings →
+Users. *Set up shared AI connections* lets administrators add a connection everyone allowed may
+use (they never see its key), including servers on the local network.
+
+### Setting up an AI connection
+
+Settings → **AI connections** (or **Add AI connection** in the assistant): pick a service, paste a
+key, pick a model (**Load models** lists what the service offers), **Test**, save. Then tick the
+mailboxes that should use it. One connection can serve all mailboxes, or each mailbox can have its
+own.
+
+| Service | Get a key | Models to try for sorting mail |
+|---|---|---|
+| Anthropic (Claude) | [console.anthropic.com](https://console.anthropic.com/settings/keys) → API keys | `claude-haiku-5-5`: fast and very inexpensive, recommended. `claude-sonnet-5-5` for tricky rules (about 20× the price). `claude-opus-5-5` is rarely needed. |
+| Google Gemini | [aistudio.google.com](https://aistudio.google.com/app/apikey) → Get API key | A *Flash* or *Flash-Lite* model |
+| OpenAI (ChatGPT) | [platform.openai.com](https://platform.openai.com/api-keys) → API keys | A *mini* or *nano* model |
+| DeepSeek | [platform.deepseek.com](https://platform.deepseek.com/api_keys) | `deepseek-chat` |
+| Mistral, Groq, xAI | their consoles | a small / fast model |
+| OpenRouter (many providers, one key) | [openrouter.ai](https://openrouter.ai/keys) | any small model (*mini*, *flash*, *haiku*) |
+| **LM Studio** (local) | no key | any instruction model you've loaded; 7–14B models sort mail well |
+| **Ollama** (local) | no key | e.g. a 7–14B instruct model you've pulled |
+| vLLM, llama.cpp server, LocalAI, … | usually none | anything that speaks the OpenAI chat API |
+
+**Sorting mail is a simple job:** a small, inexpensive model is usually all it takes, and large
+models cost more without sorting much better.
+
+**Local models (LM Studio, Ollama, …):**
+- **LM Studio:** Developer → *Start server*; the address is `http://<computer>:1234/v1`.
+- **Ollama:** listens on `http://<computer>:11434/v1`. Set `OLLAMA_HOST=0.0.0.0` if DreyMail runs
+  on another machine.
+- **DreyMail in Docker:** `localhost` is the container itself, not your computer. Use the host's
+  LAN IP, or the container name if the model server is on the same Docker network (e.g.
+  `customnetex`).
+- **Who can add one:** local addresses can only be added by an administrator, as a shared
+  connection, so users can't point DreyMail at other machines on your network.
+
+**Keeping costs down:**
+- Each message the AI looks at is one request, and every connection has a **daily limit** (500 by
+  default).
+- Rules with only exact conditions (sender, subject…) never use the AI.
+- A lower accuracy level sends less text.
+
+### Accuracy: what the AI sees
+
+A slider per mailbox. Hold it to see exactly what is sent. The default is Full.
+
+| Level | The AI sees |
+|---|---|
+| Private | Sender and subject |
+| Balanced | + recipients and the first ~300 characters |
+| High | + the first ~2,000 characters |
+| Full | + the whole text (up to ~12,000 characters) and attachment names |
+
+### Rules
+
+Built point-and-click in the **Rules** tab:
+- **A name.**
+- **"Which mail is this for?"** in your own words, e.g. *newsletters and marketing I didn't ask
+  for, except from my bank*.
+- **Optional exact conditions:** from, to, subject, attachments.
+- **What to do:** move to a folder (created if needed), add a label, archive, mark read, star, move
+  to Trash, mark as spam.
+
+Rules are checked from the top; the first that applies wins. **Test this rule** shows what it would
+do with your newest messages before you save it.
+
+**Labels by provider:**
+
+| Provider | Labels |
+|---|---|
+| Gmail | real Gmail labels |
+| Other IMAP servers that allow custom keywords | keywords (tags) |
+| Others, including Outlook | a copy in a folder of that name; the message stays where it is |
+
+**Test** runs all your rules over your newest 10–100 messages without changing anything; **Do it**
+applies one. **History** lists everything the assistant did, with **Undo**.
+
+**Safety:**
+- The AI only ever chooses **one of your own rules**. The email's text is treated as data, so a
+  message trying to instruct the AI can at worst make it pick the wrong rule, never do something no
+  rule says.
+- Keys are encrypted in DreyMail's database and never sent back to the browser.
+
+**Coming next:** one-time cleanup of existing mail, bulk sender cleanup (unsubscribe/archive by
+sender), and a *learning mode* that watches how you handle your mail for a period you choose and
+suggests rules (see [`ROADMAP.md`](ROADMAP.md)).
 
 ## Quick start (Docker Compose)
 

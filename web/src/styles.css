@@ -17,7 +17,8 @@
    Modified by samschultzponsys, 2026-11-15: collapsed sidebar shows only the profile picture.
    Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
    Modified by samschultzponsys, 2026-11-15: mailbox icons.
-   Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon. */
+   Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+   Modified by samschultzponsys, 2026-11-15: AI mailbox assistant. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -718,3 +719,54 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 img.account-mark { object-fit: cover; }
 .account-mark { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
 .btn .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* ---- AI mailbox assistant (DreyMail) ---------------------------------------------- */
+.nav-heading-row { display: flex; align-items: center; }
+.nav-heading-row .nav-heading { flex: 1; min-width: 0; }
+.nav-assistant { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border: 0; background: none; color: var(--muted); border-radius: var(--radius-sm); cursor: pointer; opacity: 0; }
+.nav-section:hover .nav-assistant, .nav-assistant:focus-visible { opacity: 1; }
+.nav-assistant:hover { color: var(--accent); background: var(--hover); }
+@media (hover: none) { .nav-assistant { opacity: 0.8; } }
+.sidebar.rail .nav-assistant { display: none; }
+.guide-link { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.model-tips { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.model-tips .chip { cursor: pointer; font-family: var(--mono, ui-monospace, monospace); }
+.chip.on { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.ai-conn { align-items: flex-start !important; }
+.ai-conn-boxes { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; }
+.ai-conn-boxes .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.assistant-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.assistant-title svg:first-child { color: var(--accent); }
+.tab svg { vertical-align: -2px; margin-right: 2px; }
+.assistant-notice { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+.assistant-notice > svg { color: #eab308; }
+.assistant-notice h3 { margin: 0; font-size: 17px; }
+.assistant-notice p, .assistant-notice ul { margin: 0; line-height: 1.55; }
+.assistant-notice ul { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.warn-text { color: var(--text-2); }
+.warn-text svg { color: #eab308; vertical-align: -2px; }
+.ok-text { color: var(--success, #16a34a); }
+.assistant-switch { align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.assistant-switch > span { display: flex; flex-direction: column; gap: 2px; }
+.accuracy-track { position: relative; padding-top: 4px; max-width: 460px; }
+.accuracy-track input { width: 100%; accent-color: var(--accent); }
+.accuracy-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.accuracy-labels .on { color: var(--text); font-weight: 600; }
+.accuracy-bubble {
+  position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); width: 240px; padding: 8px 10px; z-index: 5;
+  background: var(--text); color: var(--surface); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.4;
+  display: flex; flex-direction: column; gap: 2px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); pointer-events: none;
+}
+.accuracy-bubble { left: 0; }
+.rule-editor textarea { resize: vertical; min-height: 64px; font: inherit; }
+.rule-action { display: flex; gap: 8px; align-items: center; }
+.rule-action select { width: auto; min-width: 150px; }
+.rule-off .user-main { opacity: 0.55; }
+.role-list li > .check { flex: none; }
+.decisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.decisions li { display: flex; gap: 12px; align-items: center; padding: 10px 4px; border-top: 1px solid var(--border); }
+.decisions li:first-child { border-top: 0; }
+.decisions li.hit .decision-rule svg { color: var(--accent); }
+.decisions li.undone { opacity: 0.6; }
+.decision-subject { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.decision-rule { font-size: 13px; margin-top: 2px; }

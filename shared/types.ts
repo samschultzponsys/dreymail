@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 // Types shared between the server API and the web client.
 

@@ -13,6 +13,41 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-15 (v3.1): AI mailbox assistant (part 1)
+
+- **AI mailbox assistant**, opened per mailbox from the sidebar. Rules are written in plain
+  language, with optional exact conditions, and run on new mail before notifications. It adds
+  **Test** against recent mail with "Do it", and **History** with undo. Actions happen on the mail
+  server itself:
+  - moves, with folders created when missing (`server/src/imap/pool.ts`, `server/src/app.ts`)
+  - Gmail labels, or IMAP keywords, or copies into a folder
+  - archive, read, star, Trash, spam
+- **AI connections**, per user or shared by administrators, with mailbox checkboxes and a daily
+  limit. Services:
+  - Anthropic through its official SDK (new dependency `@anthropic-ai/sdk`)
+  - Google Gemini
+  - OpenAI-style APIs: OpenAI, DeepSeek, Mistral, Groq, OpenRouter, xAI
+  - local servers: LM Studio, Ollama, vLLM, llama.cpp
+  - Model suggestions steer toward inexpensive models.
+- **Accuracy slider** per mailbox (Private to Full, default Full); holding it shows exactly what
+  the AI sees.
+- **At-your-own-risk notice** before first use.
+- **Permissions:** `ai.assistant` (Use the AI mailbox assistant) and `ai.manage` (shared and local
+  connections), plus a per-user on/off switch in Settings → Users. Local-network addresses are
+  only for administrators.
+- **Files:**
+  - Server: new `server/src/ai/providers.ts`, `server/src/ai/store.ts`, `server/src/ai/engine.ts`,
+    `server/src/routes/assistant.ts`; `server/src/db.ts` (tables, `users.ai_access`/`ai_terms_at`),
+    `server/src/routes/admin.ts`.
+  - Shared: new `shared/aiProviders.ts` and `shared/assistant.ts`; `shared/permissions.ts`,
+    `shared/types.ts`.
+  - Web: new `web/src/components/AssistantDialog.tsx` and `web/src/components/AiConnections.tsx`;
+    `web/src/components/Sidebar.tsx`, `web/src/components/SettingsDialog.tsx`,
+    `web/src/components/AdminSettings.tsx`, `web/src/App.tsx`, `web/src/api.ts`, `web/src/styles.css`.
+  - README: new section "AI mailbox assistant" with a guide to services, keys, models and local
+    servers, linked from the app.
+- Tests: `server/test/assistant.test.ts`.
+
 ## 2026-11-15 (docs): Roadmap brought up to date
 
 - `ROADMAP.md` rewritten: what DreyMail already does (with the version it arrived in), what is

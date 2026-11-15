@@ -15,9 +15,10 @@
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
 import { groupConversations, rowOf } from '../../shared/threads';
@@ -33,6 +34,7 @@ import { Login } from './components/Login';
 import { MessageList } from './components/MessageList';
 import { quotableDetail, Reader, replyTarget, type ReplyKind } from './components/Reader';
 import { SettingsDialog } from './components/SettingsDialog';
+import { AssistantDialog } from './components/AssistantDialog';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
 import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
@@ -152,6 +154,8 @@ export function App() {
   const filterParam = encodeFilters(route.filters);
   const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0, filterParam);
   const savedSearches = useSavedSearches(loggedIn);
+  const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
+  const [assistantFor, setAssistantFor] = useState<string | null>(null);
   const serverMessages = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.messages) ?? [], [messagesQ.data]);
 
   // "Unread only": messages read in this view stay listed (dimmed) until the view changes or is
@@ -586,6 +590,7 @@ export function App() {
           if (overlay === 'nav') navigate(r, { replace: true });
           else go(r);
         }}
+        onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor(id) : undefined}
         onDeleteSearch={(s) => {
           if (!confirm(`Remove the saved search “${s.name}”?`)) return;
           api.deleteSearch(s.id).then((list) => qc.setQueryData(['searches'], list), (e: Error) => push(e.message, true));
@@ -702,6 +707,9 @@ export function App() {
         />
       )}
       {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} onClose={() => closeOverlay('accounts')} />}
+      {assistantFor && accountMap.get(assistantFor) && (
+        <AssistantDialog account={accountMap.get(assistantFor)!} folders={folders.data?.find((f) => f.accountId === assistantFor)} onClose={() => setAssistantFor(null)} />
+      )}
       {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       <div className="toast-stack" role="status" aria-live="polite">

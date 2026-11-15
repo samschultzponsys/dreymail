@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: choose what the bottom left shows (photo, name or both).
 // Modified by samschultzponsys, 2026-11-15: American spelling.
+// Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -27,6 +28,7 @@ import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } 
 import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { ProfilePicture } from './UserPicture';
+import { AiConnections } from './AiConnections';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -47,7 +49,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'profile' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
 
 export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -55,6 +57,8 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
   const can = (p: Permission) => me.permissions.includes(p);
   const [v, setV] = useState(prefs);
   const [error, setError] = useState<string | null>(null);
+  const aiStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, staleTime: 60_000 });
+  const myAccounts = useAccounts();
   // Grouped under headings: what is stored on this device, what belongs to your account (every
   // device), and administration (what your role allows).
   type TabGroup = { label: string; tabs: [SettingsTab, string][] };
@@ -68,6 +72,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
         ['signatures', 'Signatures'] as [SettingsTab, string],
         ['privacy', 'Images'] as [SettingsTab, string],
         ...(me.hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
+        ...(aiStatus.data?.allowed ? [['ai', 'AI connections'] as [SettingsTab, string]] : []),
       ],
     },
     {
@@ -204,6 +209,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               </div>
             </>
           )}
+          {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}
           {tab === 'signatures' && <SignaturesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'privacy' && <ImageDomains />}
