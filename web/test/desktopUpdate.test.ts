@@ -49,7 +49,7 @@ describe('desktop app updates', () => {
     expect(flatpak.command).toBe(
       'curl -fL -o /tmp/DreyMail-1.8-x86_64.flatpak https://github.com/samschultzponsys/dreymail/releases/download/v1.8/DreyMail-1.8-x86_64.flatpak && flatpak install --user --reinstall -y /tmp/DreyMail-1.8-x86_64.flatpak',
     );
-    expect(flatpak.fallback?.command).toBe('flatpak install --user --reinstall -y ./DreyMail-1.8-x86_64.flatpak');
+    expect(flatpak.fallback?.command).toBe('flatpak install --user --reinstall -y "$(xdg-user-dir DOWNLOAD 2>/dev/null || echo ~/Downloads)/DreyMail-1.8-x86_64.flatpak"');
     expect(update.upgradeInstructions('deb', 'v1.8', 'x64').command).toBe('sudo apt install ./DreyMail-1.8-amd64.deb');
     expect(update.upgradeInstructions('rpm', 'v1.8', 'x64').command).toBe('sudo dnf install ./DreyMail-1.8-x86_64.rpm');
     expect(update.upgradeInstructions('windows', 'v1.8', 'x64').command).toBeNull();

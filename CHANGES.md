@@ -13,6 +13,15 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.6): flatpak fallback command works from any folder
+
+- **Desktop app, flatpak:** the fallback update command ("Download instead") pointed at the file in
+  the current folder (`./DreyMail-…flatpak`), which fails when the terminal opens in the home folder.
+  It now points at the Downloads folder (`xdg-user-dir DOWNLOAD`, else `~/Downloads`). The main
+  command (curl, then install) is unchanged.
+- **Files:** `desktop/update.cjs`, `web/test/desktopUpdate.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.5): signatures made for Outlook; pictures sent as inline attachments
 
 - **Import from Outlook files** (Settings → Signatures → a signature): choose the .zip a signature

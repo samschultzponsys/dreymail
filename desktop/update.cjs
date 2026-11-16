@@ -85,8 +85,10 @@ function upgradeInstructions(kind, version, arch) {
         text: 'Run this command in a terminal. It downloads the new version and installs it over this one, keeping your settings.',
         command: `curl -fL -o /tmp/${file} ${assetUrl(version, file)} && flatpak install --user --reinstall -y /tmp/${file}`,
         fallback: {
-          text: `Or download ${file} and run this command in the folder you saved it to:`,
-          command: `flatpak install --user --reinstall -y ./${file}`,
+          // Saved by the browser into the Downloads folder (wherever the desktop has it), so the
+          // command works from any folder.
+          text: `Or download ${file} into your Downloads folder and run:`,
+          command: `flatpak install --user --reinstall -y "$(xdg-user-dir DOWNLOAD 2>/dev/null || echo ~/Downloads)/${file}"`,
         },
       };
     case 'deb':
