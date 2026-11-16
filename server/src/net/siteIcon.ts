@@ -6,7 +6,8 @@
 // lists (rel="icon" / "apple-touch-icon"), largest first, then the usual /apple-touch-icon.png and
 // /favicon.ico. Like remote images, only public addresses are fetched, with size limits.
 // The icon picker can also name a provider from a list, or any website, when the address doesn't
-// say which provider the mailbox is with.
+// say which provider the mailbox is with. When the site itself gives nothing, the public favicon
+// services (Google's, DuckDuckGo's) are asked, with the domain only.
 
 import http from 'node:http';
 import https from 'node:https';
@@ -16,6 +17,8 @@ import { isPublicAddress, publicOnlyLookup } from './ssrf.js';
 import { fetchRemoteImage, type RemoteImage } from './remoteImages.js';
 
 const MAX_PAGE = 512 * 1024;
+/** Many sites (behind Cloudflare, Akamai…) turn away requests that don't look like a browser. */
+const BROWSER_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 const MAX_ICON = 512 * 1024;
 
 /** Where each provider's own icon is: the page whose icons show its mail product. The ones with
@@ -77,7 +80,7 @@ const getPage: GetPage = (raw) =>
       if (hops > 4 || !/^https?:$/.test(url.protocol) || !['', '80', '443'].includes(url.port)) return resolve(null);
       if (net.isIP(url.hostname) && !isPublicAddress(url.hostname)) return resolve(null);
       const mod = url.protocol === 'https:' ? https : http;
-      const req = mod.get(url, { lookup: publicOnlyLookup as never, timeout: 8000, headers: { accept: 'text/html', 'user-agent': 'Mozilla/5.0 (compatible; DreyMail)' } }, (res) => {
+      const req = mod.get(url, { lookup: publicOnlyLookup as never, timeout: 8000, headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': BROWSER_UA } }, (res) => {
         const loc = res.headers.location;
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && loc) {
           res.resume();
@@ -150,14 +153,19 @@ export async function providerIcon(
   const page = deps.getPage ?? getPage;
   const fetchImage = deps.fetchImage ?? ((url: string) => fetchRemoteImage(url, { maxBytes: MAX_ICON }));
   const candidates: string[] = [];
+  let host = '';
   for (const p of site.pages) {
     const got = await page(p);
     if (got) candidates.push(...iconLinks(got.html, got.url));
     const origin = new URL(got?.url ?? p).origin;
+    host ||= new URL(p).hostname.replace(/^www\./, '');
     candidates.push(`${origin}/apple-touch-icon.png`, `${origin}/favicon.ico`);
     if (candidates.length > 2) break;
   }
-  for (const url of [...new Set(candidates)].slice(0, 8)) {
+  // Sites that turn servers away (or only redirect to a sign-in page) still have an icon in the
+  // public favicon services: Google's (up to 128 px), then DuckDuckGo's. Only the domain is sent.
+  const services = host ? [`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`, `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`] : [];
+  for (const url of [...[...new Set(candidates)].slice(0, 8), ...services]) {
     try {
       const image = await fetchImage(url);
       if (image.body.length > 0) return { name: site.name, image };

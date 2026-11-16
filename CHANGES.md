@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.9): desktop notifications for every mailbox; provider icons that work
+
+- **Desktop app notifications:** new mail became a notification only while the window wasn't in
+  front, so mail for a second mailbox went unnoticed while you worked in the first. Now every
+  mailbox's new mail is a notification, always. The title ends with the mailbox's name and the icon
+  is the mailbox's icon in its color. Settings → This device → "Send a test notification for each
+  mailbox". The window no longer slows down while hidden (`backgroundThrottling: false`), so
+  notifications keep coming from the tray.
+- **Provider icons:** Microsoft 365, Outlook/Hotmail and many company sites turned the server away
+  (they refuse requests that don't look like a browser, or only redirect to a sign-in page). Pages
+  and icons are now fetched with a browser user agent, and when the site gives nothing the public
+  favicon services are asked (Google's, up to 128 px, then DuckDuckGo's), with the domain only.
+- **Files:** `web/src/App.tsx`, `web/src/components/SettingsDialog.tsx`, `desktop/main.cjs`,
+  `server/src/net/siteIcon.ts`, `server/src/net/remoteImages.ts`, `server/test/siteIcon.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.8): bigger toolbar with names; buttons on each message
 
 - **Reading toolbar:** a small arrow at its right end switches between compact icons and bigger

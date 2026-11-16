@@ -35,7 +35,7 @@ import { useEffect, useState } from 'react';
 import type { Permission } from '../../../shared/permissions';
 import { DEFAULT_MESSAGE_BUTTONS, type DomainName, type Me, type MessageButton, type NotificationContent, type Preferences, type SwipeAction, type TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
-import { desktopBridge } from '../desktop';
+import { desktopBridge, mailboxNotificationIcon } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
@@ -622,6 +622,33 @@ function DesktopApp() {
   );
 }
 
+/** Desktop app: one sample notification per mailbox, to see each one's color and icon. */
+function DesktopTestNotifications() {
+  const accounts = useAccounts();
+  const desktop = desktopBridge();
+  if (!desktop) return null;
+  return (
+    <div className="row-buttons" style={{ marginTop: 6 }}>
+      <button
+        className="btn"
+        onClick={() => {
+          for (const a of accounts.data ?? []) {
+            desktop.notify({
+              title: `Test · ${a.name}`,
+              body: 'This is how new mail for this mailbox looks.',
+              tag: `test:${a.id}`,
+              url: '/',
+              icon: mailboxNotificationIcon(a, '#22d3ee'),
+            });
+          }
+        }}
+      >
+        Send a test notification for each mailbox
+      </button>
+    </div>
+  );
+}
+
 /** Desktop app: minimizing sends the window to the tray; a click on the tray icon brings it back. */
 function TrayOption() {
   const desktop = desktopBridge();
@@ -873,7 +900,11 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
         {(desktop || android) && <label className="label">Notifications on this device</label>}
         {desktop ? (
           <>
-            <div className="hint">On. The desktop app shows new mail as notifications in each account’s color while it runs, also from the tray.</div>
+            <div className="hint">
+              On, for every mailbox, whether the window is in front or not. Each notification shows the mailbox’s name and its icon in its
+              color, and keeps coming while DreyMail runs in the tray.
+            </div>
+            <DesktopTestNotifications />
             <TrayOption />
           </>
         ) : android ? (

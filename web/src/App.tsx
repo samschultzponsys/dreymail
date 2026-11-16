@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name to edit it.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
+// Modified by samschultzponsys, 2026-11-16: desktop notifications for every mailbox, always, with the mailbox's name.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -242,13 +243,16 @@ export function App() {
     },
     [push, go],
   );
-  // Desktop app: new mail as a native notification in the account's colour, while the window
-  // isn't in front (browsers get Web Push instead).
+  // Desktop app: new mail as a native notification in the mailbox's colour and icon, with its name
+  // in the title, for every mailbox, always (also while the window is in front: the mail may well
+  // be for another mailbox than the one open). Browsers get Web Push instead.
   const onNotify = useCallback(
     (ev: NotifyEvent) => {
       const bridge = desktopBridge();
-      if (!bridge || (document.visibilityState === 'visible' && document.hasFocus())) return;
-      bridge.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: mailboxNotificationIcon(accountMap.get(ev.accountId), BRAND_CYAN) });
+      if (!bridge) return;
+      const account = accountMap.get(ev.accountId);
+      const title = account && !ev.title.includes(account.name) ? `${ev.title} · ${account.name}` : ev.title;
+      bridge.notify({ title, body: ev.body, tag: ev.tag, url: ev.url, icon: mailboxNotificationIcon(account, BRAND_CYAN) });
     },
     [accountMap],
   );

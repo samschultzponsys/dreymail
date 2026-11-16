@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Desktop notifications for every mailbox, always, with the mailbox's name, icon and color, and a
+      test button; provider icons from the favicon services when a site refuses servers (6.9).
 - [x] Reading toolbar: bigger buttons with names (arrow, per device); buttons pinned to each
       message of a conversation, chosen in Settings → General (6.8).
 - [x] Conversations scroll as one page (each message as tall as it is); faster opening (folder

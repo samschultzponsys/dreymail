@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-16: a message waits at most 5 s for its pictures.
+// Modified by samschultzponsys, 2026-11-16: browser user agent (sites behind Cloudflare/Akamai).
 
 import http from 'node:http';
 import https from 'node:https';
@@ -74,7 +75,8 @@ function getOnce(url: URL, maxBytes: number): Promise<{ status: number; headers:
         timeout: TIMEOUT_MS,
         headers: {
           // Deliberately generic: no cookies, no referer, nothing identifying the reader.
-          'user-agent': 'Mozilla/5.0 (compatible; DreyMail image fetcher)',
+          // Image hosts behind Cloudflare/Akamai often refuse anything that doesn't look like a browser.
+          'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
           accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8',
         },
       },

@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.9**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -104,7 +104,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   provider's…) fetches the provider's own icon from its website into the same editor. When the
   address doesn't say which provider it is (your own domain, say), pick one from **Icon of a
   provider…** (Gmail, Outlook / Hotmail, MSN, Yahoo, AOL, Purelymail and more) or choose **Another
-  website…** and type its address. DreyMail doesn't ship other companies' logos.
+  website…** and type its address. When a site turns servers away, the icon comes from the public
+  favicon services (Google's, then DuckDuckGo's; only the domain is sent). DreyMail doesn't ship
+  other companies' logos.
 - **Mailbox groups** (Accounts → Groups): put mailboxes in groups such as Work and Personal. Each
   group is a section in the sidebar that expands and collapses, with its own icon, color and total
   unread count. Optionally its mailboxes take the group's color and icon, and one switch turns
@@ -509,7 +511,10 @@ server…*) and then shows DreyMail in its own window:
 - **Notifications in each account's color.** New mail pops up as a native notification whose
   icon is the envelope in that account's color, so you see at a glance which inbox it's for.
   Click it to open the message. Closing the window keeps DreyMail running in the tray, so
-  notifications keep coming; *Quit* from the tray or menu stops it. **Minimize to the tray** (on
+  notifications keep coming; *Quit* from the tray or menu stops it. New mail for **every mailbox**
+  becomes a notification, also while the window is in front, with the mailbox's name in its title
+  and its icon in its color (Settings → This device → "Send a test notification for each
+  mailbox" shows them). **Minimize to the tray** (on
   by default; Settings → This device, the tray menu or the DreyMail menu) makes minimizing hide the
   window from the taskbar too. A click on the tray icon brings the window back and the next click
   sends it away again (on Linux desktops where a click opens the tray menu, use *Show / hide

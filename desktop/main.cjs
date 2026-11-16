@@ -105,6 +105,8 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: true,
+      // A mail app in the tray must keep hearing about new mail: no slowing down while hidden.
+      backgroundThrottling: false,
     },
   });
 

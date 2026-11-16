@@ -46,4 +46,22 @@ describe("a mail provider's own icon", () => {
     expect(tried).toEqual(['https://purelymail.com/broken.png', 'https://purelymail.com/apple-touch-icon.png']);
     expect(await providerIcon('sam@nowhere.example', { getPage: async () => null, fetchImage: async () => Promise.reject(new Error('no')) })).toBeNull();
   });
+
+  it('asks the public favicon services when the site turns servers away', async () => {
+    const tried: string[] = [];
+    const found = await providerIcon('x@ponsys.com', {
+      getPage: async () => null, // blocked
+      fetchImage: async (url) => {
+        tried.push(url);
+        if (!url.startsWith('https://www.google.com/s2/favicons')) throw new Error('403');
+        return { contentType: 'image/png', body: Buffer.from([1, 2, 3]) };
+      },
+    });
+    expect(found).not.toBeNull();
+    expect(tried.at(-1)).toBe('https://www.google.com/s2/favicons?domain=ponsys.com&sz=128');
+    expect(tried).toContain('https://ponsys.com/favicon.ico');
+    // A provider from the list: its own site's domain.
+    const ms = await providerIcon('', { getPage: async () => null, fetchImage: async (url) => { if (!url.includes('s2/favicons')) throw new Error('no'); return { contentType: 'image/png', body: Buffer.from([1]) }; } }, providerByKey('microsoft-365'));
+    expect(ms?.name).toBe('Microsoft 365');
+  });
 });
