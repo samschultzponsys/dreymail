@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.8): bigger toolbar with names; buttons on each message
+
+- **Reading toolbar:** a small arrow at its right end switches between compact icons and bigger
+  buttons with their names (Reply, Reply all, Forward, Unread, Flag, Archive, Snooze, Move,
+  Delete). Kept per device.
+- **Buttons on each message:** in a conversation, each opened message has small buttons in its
+  header that act on that message only: Reply, Reply all, Forward and Delete by default. Settings →
+  General → "Buttons on each message of a conversation" picks them (also Mark read/unread, Flag,
+  Archive). New preference `messageButtons`.
+- **Files:** `web/src/components/Reader.tsx`, `web/src/components/SnoozeMenu.tsx`,
+  `web/src/components/MoveMenu.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/App.tsx`,
+  `web/src/styles.css`, `shared/types.ts`, `server/src/db.ts`, `server/src/routes/api.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.7): conversations scroll as one page; faster opening
 
 - **Conversations:** each message's frame is as tall as the message, so a conversation scrolls as

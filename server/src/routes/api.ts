@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 // Modified by samschultzponsys, 2026-11-16: provider icon from a list or any website.
 // Modified by samschultzponsys, 2026-11-16: signatures up to 1.5 MB, pictures included.
+// Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -36,6 +37,7 @@ import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AccountInput, ActionResult, ComposePayload, Me, MessageAction, MessageRef, VersionInfo } from '../../../shared/types.js';
+import { DEFAULT_MESSAGE_BUTTONS, MESSAGE_BUTTONS, type MessageButton } from '../../../shared/types.js';
 import { accountDefaultsFor, withDefaultPassword, type TemplateValues } from '../accountDefaults.js';
 import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
@@ -126,6 +128,7 @@ export const prefsSchema = z.object({
   sidebarCalendar: z.boolean().default(true),
   sidebarScheduled: z.boolean().default(true),
   sidebarSearches: z.boolean().default(true),
+  messageButtons: z.array(z.enum(MESSAGE_BUTTONS as [MessageButton, ...MessageButton[]])).max(MESSAGE_BUTTONS.length).default([...DEFAULT_MESSAGE_BUTTONS]),
   undoSendSeconds: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(20), z.literal(30)]).default(10),
 });
 

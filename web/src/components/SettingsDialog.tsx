@@ -27,12 +27,13 @@
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 // Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
 // Modified by samschultzponsys, 2026-11-16: desktop app: minimize to the tray.
+// Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Permission } from '../../../shared/permissions';
-import type { DomainName, Me, NotificationContent, Preferences, SwipeAction, TransitionSpeed } from '../../../shared/types';
+import { DEFAULT_MESSAGE_BUTTONS, type DomainName, type Me, type MessageButton, type NotificationContent, type Preferences, type SwipeAction, type TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
 import { desktopBridge } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
@@ -244,6 +245,37 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
                 </label>
               </div>
               <div className="hint">Folders can be pinned in the sidebar itself (the pin next to each folder).</div>
+            </div>
+          )}
+          {tab === 'general' && (
+            <div>
+              <label className="label">Buttons on each message of a conversation</label>
+              <div className="check-list">
+                {(
+                  [
+                    ['reply', 'Reply'],
+                    ['replyAll', 'Reply all'],
+                    ['forward', 'Forward'],
+                    ['seen', 'Mark read / unread'],
+                    ['flag', 'Flag'],
+                    ['archive', 'Archive'],
+                    ['delete', 'Delete'],
+                  ] as [MessageButton, string][]
+                ).map(([b, label]) => {
+                  const pinned = v.messageButtons ?? DEFAULT_MESSAGE_BUTTONS;
+                  return (
+                    <label key={b} className="check">
+                      <input
+                        type="checkbox"
+                        checked={pinned.includes(b)}
+                        onChange={(e) => void save({ ...v, messageButtons: e.target.checked ? [...pinned, b] : pinned.filter((x) => x !== b) })}
+                      />{' '}
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="hint">Small buttons in each message’s header that act on that message only. The bar at the top acts on the whole conversation; the arrow at its right end makes its buttons bigger, with names.</div>
             </div>
           )}
           {tab === 'general' && (

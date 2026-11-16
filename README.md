@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -128,6 +128,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Pinned folders:** hover a folder in the sidebar and click the pin. Once a mailbox has pinned
   folders, it shows just those; the line with the ⌄ under them shows all its folders (with the
   unread count of the hidden ones), and ⌃ folds them away again.
+- **Reading toolbar:** the arrow at its right end switches between compact icons and bigger buttons
+  with their names (kept per device). In a conversation, each message also has small buttons of its
+  own (Reply, Reply all, Forward and Delete by default; Settings → General picks which, from those
+  plus Mark read/unread, Flag and Archive) that act on that message only.
 - **Right-click a mailbox's name** in the folder bar (web and desktop app) to edit the mailbox
   (name, color, icon, conversations…), collapse or expand it, show all its folders, or open its AI
   assistant.

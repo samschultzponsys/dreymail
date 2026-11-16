@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
+// Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 
 // Types shared between the server API and the web client.
 
@@ -322,6 +323,11 @@ export type TransitionSpeed = 'off' | 'fast' | 'medium' | 'slow';
 
 export type FooterIdentity = 'both' | 'name' | 'photo';
 
+/** Small buttons on each message of a conversation (DreyMail). */
+export type MessageButton = 'reply' | 'replyAll' | 'forward' | 'archive' | 'delete' | 'flag' | 'seen';
+export const MESSAGE_BUTTONS: readonly MessageButton[] = ['reply', 'replyAll', 'forward', 'archive', 'delete', 'flag', 'seen'];
+export const DEFAULT_MESSAGE_BUTTONS: MessageButton[] = ['reply', 'replyAll', 'forward', 'delete'];
+
 export interface Preferences {
   theme: 'system' | 'light' | 'dark';
   pageSize: number;
@@ -353,6 +359,8 @@ export interface Preferences {
   sidebarCalendar: boolean;
   sidebarScheduled: boolean;
   sidebarSearches: boolean;
+  /** Buttons pinned to each message's header in a conversation (DreyMail). */
+  messageButtons: MessageButton[];
 }
 
 /**

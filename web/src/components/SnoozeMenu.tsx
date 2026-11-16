@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: a name shown next to the icon in the larger toolbar.
+
 import { AlarmClock } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { defaultCustomTime, formatSnoozeTime, fromLocalInput, snoozePresets, toLocalInput } from '../snooze';
@@ -8,10 +12,12 @@ interface Props {
   /** Opens the menu whenever this number changes (keyboard shortcut). */
   openSignal?: number;
   onSnooze: (until: Date) => void;
+  /** Its name, shown in the larger toolbar. */
+  label?: string;
 }
 
 /** Snooze button: quick choices plus a date and time picker. */
-export function SnoozeMenu({ disabled, iconSize, openSignal, onSnooze }: Props) {
+export function SnoozeMenu({ disabled, iconSize, openSignal, onSnooze, label }: Props) {
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState('');
   const [now, setNow] = useState(() => new Date());
@@ -54,6 +60,7 @@ export function SnoozeMenu({ disabled, iconSize, openSignal, onSnooze }: Props) 
     <div className="menu-wrap" ref={ref}>
       <button className="icon-btn" title="Snooze (b)" disabled={disabled} onClick={() => (open ? setOpen(false) : show())}>
         <AlarmClock size={iconSize} />
+        {label && <span className="tb-label">{label}</span>}
       </button>
       {open && (
         <div className="menu snooze-menu">

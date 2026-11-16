@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: tablet/foldable two-pane layout; interface size.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe and block sender.
 // Modified by samschultzponsys, 2026-11-15: calendar invitation card.
+// Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -12,6 +13,8 @@ import {
   Archive,
   ArrowLeft,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleAlert,
   Download,
   Flag,
@@ -33,7 +36,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ConversationRow } from '../../../shared/threads';
-import type { AccountFolders, AccountView, AttachmentView, DomainName, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../../shared/types';
+import { DEFAULT_MESSAGE_BUTTONS, type AccountFolders, type AccountView, type AttachmentView, type DomainName, type MessageAction, type MessageButton, type MessageDetail, type MessageRef, type MessageSummary } from '../../../shared/types';
 import { api, ApiError } from '../api';
 import type { ResolvedTheme } from '../hooks';
 import { displayName, formatFullDate, formatListDate, formatSize, refKey, toRef } from '../util';
@@ -124,11 +127,37 @@ interface Props {
   onBack: () => void;
   /** The message is gone (404) or its folder's UIDVALIDITY changed (stale). */
   onGone: (stale: boolean) => void;
+  /** Buttons pinned to each message of a conversation (Settings → General). */
+  messageButtons?: MessageButton[];
+}
+
+/** The toolbar's size, per device: compact icons, or larger buttons with their names. */
+function useBigToolbar(): [boolean, (big: boolean) => void] {
+  const read = () => {
+    try {
+      return localStorage.getItem('dm-toolbar-big') === '1';
+    } catch {
+      return false;
+    }
+  };
+  const [big, setBig] = useState(read);
+  return [
+    big,
+    (v: boolean) => {
+      setBig(v);
+      try {
+        localStorage.setItem('dm-toolbar-big', v ? '1' : '0');
+      } catch {
+        /* this device only, best effort */
+      }
+    },
+  ];
 }
 
 const retry = (n: number, err: Error) => !(err instanceof ApiError && err.status < 500) && n < 1;
 
-export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone }: Props) {
+export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone, messageButtons = DEFAULT_MESSAGE_BUTTONS }: Props) {
+  const [bigToolbar, setBigToolbar] = useBigToolbar();
   const key = openRef ? refKey(openRef) : '';
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -220,7 +249,7 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
 
   return (
     <section className="pane reader">
-      <div className="reader-toolbar">
+      <div className={`reader-toolbar ${bigToolbar ? 'big' : ''}`}>
         <button className="icon-btn phone-only" onClick={onBack} title="Back">
           <ArrowLeft size={18} />
         </button>
@@ -232,29 +261,44 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
           <>
             <button className="icon-btn" title="Reply (r)" disabled={!d} onClick={() => d && replyWith('reply', d)}>
               <Reply size={17} />
+              <span className="tb-label">Reply</span>
             </button>
             <button className="icon-btn" title="Reply all (a)" disabled={!d} onClick={() => d && replyWith('replyAll', d)}>
               <ReplyAll size={17} />
+              <span className="tb-label">Reply all</span>
             </button>
             <button className="icon-btn" title="Forward (f)" disabled={!d} onClick={() => d && replyWith('forward', d)}>
               <Forward size={17} />
+              <span className="tb-label">Forward</span>
             </button>
           </>
         )}
         <span className="spacer" />
         <button className="icon-btn" title={seen ? 'Mark unread (u)' : 'Mark read'} onClick={() => onAction([ref], { type: 'seen', value: !seen })}>
           {seen ? <Mail size={17} /> : <MailOpen size={17} />}
+          <span className="tb-label">{seen ? 'Unread' : 'Read'}</span>
         </button>
         <button className={`icon-btn ${flagged ? 'active' : ''}`} title="Flag (s)" onClick={() => onAction([ref], { type: 'flagged', value: !flagged })}>
           <Flag size={17} fill={flagged ? 'currentColor' : 'none'} />
+          <span className="tb-label">{flagged ? 'Unflag' : 'Flag'}</span>
         </button>
         <button className="icon-btn" title="Archive (e)" onClick={() => onAction([ref], { type: 'archive' })}>
           <Archive size={17} />
+          <span className="tb-label">Archive</span>
         </button>
-        <SnoozeMenu iconSize={17} openSignal={snoozeSignal} onSnooze={(until) => onAction([ref], { type: 'snooze', until: until.toISOString() })} />
-        <MoveMenu account={folders} exclude={ref.folder} icon={<FolderInput size={17} />} onMove={(destination) => onAction([ref], { type: 'move', destination })} />
+        <SnoozeMenu iconSize={17} label="Snooze" openSignal={snoozeSignal} onSnooze={(until) => onAction([ref], { type: 'snooze', until: until.toISOString() })} />
+        <MoveMenu account={folders} label="Move" exclude={ref.folder} icon={<FolderInput size={17} />} onMove={(destination) => onAction([ref], { type: 'move', destination })} />
         <button className="icon-btn" title="Delete (#)" onClick={() => onAction([ref], { type: 'delete' })}>
           <Trash2 size={17} />
+          <span className="tb-label">Delete</span>
+        </button>
+        <button
+          className="icon-btn tb-size"
+          title={bigToolbar ? 'Smaller buttons' : 'Bigger buttons with names'}
+          aria-pressed={bigToolbar}
+          onClick={() => setBigToolbar(!bigToolbar)}
+        >
+          {bigToolbar ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
 
@@ -284,6 +328,8 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
               onAction={onAction}
               onMailto={onMailto}
               onGone={k === key ? onGone : undefined}
+              buttons={threaded && !isDrafts ? messageButtons : []}
+              onReply={replyWith}
             />
           );
         })}
@@ -347,6 +393,9 @@ export function AttachmentChip({ url, attachment: a, initialState = { status: 'i
 }
 
 /** One message of the open conversation: just a summary line when collapsed. */
+/** The order pinned buttons appear in, whatever order they were picked in. */
+const MESSAGE_BUTTON_ORDER: MessageButton[] = ['reply', 'replyAll', 'forward', 'seen', 'flag', 'archive', 'delete'];
+
 function MessageCard({
   msgRef,
   summary,
@@ -361,6 +410,8 @@ function MessageCard({
   onAction,
   onMailto,
   onGone,
+  buttons = [],
+  onReply,
 }: {
   msgRef: MessageRef;
   summary?: MessageSummary;
@@ -377,6 +428,9 @@ function MessageCard({
   onMailto: (mailto: string) => void;
   /** Only for the open message: it is gone or its folder changed. */
   onGone?: (stale: boolean) => void;
+  /** Small buttons in this message's header, acting on this message (in a conversation). */
+  buttons?: MessageButton[];
+  onReply?: (kind: ReplyKind, detail: MessageDetail) => void;
 }) {
   const [remote, setRemote] = useState(false);
   const [modeOverride, setModeOverride] = useState<'dark' | 'paper' | null>(null);
@@ -483,6 +537,28 @@ function MessageCard({
               </div>
             </div>
             <div className="msg-date">{formatFullDate(d.date)}</div>
+            {buttons.length > 0 && (
+              // Pinned in Settings → General; they act on this message only.
+              <div className="msg-buttons" onClick={(e) => e.stopPropagation()}>
+                {MESSAGE_BUTTON_ORDER.filter((b) => buttons.includes(b)).map((b) => {
+                  const act: Record<MessageButton, { title: string; icon: ReactNode; run: () => void }> = {
+                    reply: { title: 'Reply', icon: <Reply size={15} />, run: () => onReply?.('reply', d) },
+                    replyAll: { title: 'Reply all', icon: <ReplyAll size={15} />, run: () => onReply?.('replyAll', d) },
+                    forward: { title: 'Forward', icon: <Forward size={15} />, run: () => onReply?.('forward', d) },
+                    archive: { title: 'Archive', icon: <Archive size={15} />, run: () => onAction([msgRef], { type: 'archive' }) },
+                    delete: { title: 'Delete', icon: <Trash2 size={15} />, run: () => onAction([msgRef], { type: 'delete' }) },
+                    flag: { title: d.flagged ? 'Unflag' : 'Flag', icon: <Flag size={15} fill={d.flagged ? 'currentColor' : 'none'} />, run: () => onAction([msgRef], { type: 'flagged', value: !d.flagged }) },
+                    seen: { title: d.seen ? 'Mark unread' : 'Mark read', icon: d.seen ? <Mail size={15} /> : <MailOpen size={15} />, run: () => onAction([msgRef], { type: 'seen', value: !d.seen }) },
+                  };
+                  const a = act[b];
+                  return (
+                    <button key={b} className="icon-btn small" title={`${a.title} (this message)`} aria-label={a.title} onClick={a.run}>
+                      {a.icon}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {(d.unsubscribe || d.from[0]?.address) && (

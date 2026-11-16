@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on waits after signing out; /login.
 // Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name to edit it.
+// Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -768,6 +769,7 @@ export function App() {
         theme={theme}
         markReadOnOpen={me.data!.preferences.markReadOnOpen}
         contactPhotos={me.data!.preferences.contactPhotos}
+        messageButtons={me.data!.preferences.messageButtons}
         onAction={(refs, a) => void act(refs, a)}
         snoozeSignal={snoozeSignal}
         onReply={reply}

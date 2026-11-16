@@ -27,6 +27,7 @@
 // Modified by samschultzponsys, 2026-11-16: mailbox groups.
 // Modified by samschultzponsys, 2026-11-16: threaded or single view per mailbox.
 // Modified by samschultzponsys, 2026-11-16: pinned folders.
+// Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -35,6 +36,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { ALL_PERMISSIONS, isPermission, SUPERADMIN, USER_DEFAULTS, USER_ROLE, type Permission, type Role } from '../../shared/permissions.js';
 import { normalizeFilters, type SavedSearch, type SearchFilters } from '../../shared/search.js';
 import type { AccountInput, AccountView, MailboxGroupInput, MailboxGroupView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
+import { DEFAULT_MESSAGE_BUTTONS } from '../../shared/types.js';
 import { decrypt, encrypt } from './crypto.js';
 
 // Snoozed messages: where each one waits (IMAP folder, UIDVALIDITY, UID) and when it returns to
@@ -464,6 +466,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarCalendar: true,
   sidebarScheduled: true,
   sidebarSearches: true,
+  messageButtons: [...DEFAULT_MESSAGE_BUTTONS],
 };
 
 export interface User {
