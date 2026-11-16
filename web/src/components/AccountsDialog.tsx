@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: Gmail's two ways side by side, with what each gives and costs.
 // Modified by samschultzponsys, 2026-11-15: provider list with server settings filled in, or custom.
+// Modified by samschultzponsys, 2026-11-16: your own picture as the icon while adding a mailbox.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -129,6 +130,8 @@ function AccountForm({
 }) {
   const [v, setV] = useState(initial);
   const [image, setImage] = useState(initialImage);
+  /** Adding a mailbox: its own picture as the icon, uploaded right after it's saved. */
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   // The provider whose server settings are used ('custom': typed in). Chosen from the address
   // until the user picks one themselves.
   const [providerId, setProviderId] = useState(() => providerForServers(initial.imap.host, initial.smtp.host)?.id ?? 'custom');
@@ -163,7 +166,18 @@ function AccountForm({
         setStatus({ ok: true, text: 'Connection successful (IMAP and SMTP).' });
       } else {
         if (id) await api.updateAccount(id, normalized());
-        else await api.createAccount(normalized());
+        else {
+          const usePicture = v.icon === 'image' && pendingImage;
+          const created = await api.createAccount(usePicture ? { ...normalized(), icon: '' } : normalized());
+          if (usePicture) {
+            try {
+              await api.setAccountIcon(created.id, pendingImage);
+            } catch (err) {
+              // The mailbox is added (saving again would add it twice); only the picture didn't make it.
+              window.alert(`The mailbox was added, but its picture couldn't be saved (${(err as Error).message}). Edit the mailbox to add it again.`);
+            }
+          }
+        }
         onDone();
       }
     } catch (err) {
@@ -243,6 +257,8 @@ function AccountForm({
           onChange={(icon) => setV((cur) => ({ ...cur, icon }))}
           accountId={id ?? null}
           image={image}
+          pending={pendingImage}
+          onPending={id ? undefined : setPendingImage}
           onAccount={(a) => {
             setImage(a.iconImage);
             onPicture?.();

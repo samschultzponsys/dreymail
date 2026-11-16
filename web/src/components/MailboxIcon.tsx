@@ -144,16 +144,18 @@ export function MailboxImageEditor({ onSave, onCancel, busy }: { onSave: (dataUr
 }
 
 /**
- * Pick an icon (or none, or an uploaded picture) for a mailbox. Pictures need the mailbox to exist,
- * so `accountId` is null while adding one.
+ * Pick an icon (or none, or an uploaded picture) for a mailbox. While adding one (`accountId` null)
+ * the picture is kept in the form (`pending`) and uploaded once the mailbox is saved.
  */
 export function MailboxIconPicker({
   value,
   color,
   onChange,
   accountId = null,
-  image = null,
+  image: savedImage = null,
   onAccount,
+  pending = null,
+  onPending,
 }: {
   value: string;
   color: string;
@@ -162,11 +164,15 @@ export function MailboxIconPicker({
   image?: string | null;
   /** The mailbox after its picture changed. */
   onAccount?: (a: AccountView) => void;
+  /** Adding a mailbox: the picture chosen so far (a data URL), and changing it. */
+  pending?: string | null;
+  onPending?: (dataUrl: string | null) => void;
 }) {
   const [open, setOpen] = useState(!!value);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const image = accountId ? savedImage : pending;
 
   const run = async (fn: () => Promise<AccountView | undefined>) => {
     setBusy(true);
@@ -211,23 +217,45 @@ export function MailboxIconPicker({
       )}
       {open && (
         <div className="row-buttons" style={{ marginTop: 8 }}>
-          {accountId ? (
+          {accountId || onPending ? (
             <>
               <button type="button" className="btn" disabled={busy} onClick={() => setEditing(true)}>
                 <ImagePlus size={15} /> {image ? 'Upload another picture' : 'Upload a picture'}
               </button>
               {image && (
-                <button type="button" className="btn" disabled={busy} onClick={() => void run(() => api.deleteAccountIcon(accountId))}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => {
+                    if (accountId) void run(() => api.deleteAccountIcon(accountId));
+                    else {
+                      onPending?.(null);
+                      if (value === 'image') onChange('');
+                    }
+                  }}
+                >
                   <Trash2 size={15} /> Remove picture
                 </button>
               )}
             </>
-          ) : (
-            <span className="hint">To use your own picture, save the mailbox first, then edit it.</span>
-          )}
+          ) : null}
         </div>
       )}
-      {editing && accountId && <MailboxImageEditor busy={busy} onCancel={() => setEditing(false)} onSave={(d) => void run(() => api.setAccountIcon(accountId, d))} />}
+      {editing && (accountId || onPending) && (
+        <MailboxImageEditor
+          busy={busy}
+          onCancel={() => setEditing(false)}
+          onSave={(d) => {
+            if (accountId) void run(() => api.setAccountIcon(accountId, d));
+            else {
+              onPending?.(d);
+              onChange('image');
+              setEditing(false);
+            }
+          }}
+        />
+      )}
       {error && <div className="error-text">{error}</div>}
       <div className="hint">Shown in the sidebar and on this mailbox's notifications (desktop app, Android app and browsers that can draw it).</div>
     </div>

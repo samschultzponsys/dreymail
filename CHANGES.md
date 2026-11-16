@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v4.7): your own picture while adding a mailbox
+
+- **Add account:** the icon picker's "Upload a picture" works right away; the picture is kept in the
+  form and saved with the new mailbox (it used to need saving the mailbox first, then editing it).
+- **Files:** `web/src/components/MailboxIcon.tsx`, `web/src/components/AccountsDialog.tsx`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-15 (v4.6): fix "no such column: auth" when signing in with Google or Microsoft
 
 - **Fix:** servers first set up on 2.0 or 2.1 never got the database columns for Google and Microsoft
