@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-16: the list's width can be dragged (tablets and PCs).
 
 import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -22,6 +23,8 @@ import { formatSnoozeTime } from '../snooze';
 import { SearchPanel } from './SearchPanel';
 
 interface Props {
+  /** Tablets and PCs: dragging the right edge sets the list's width (null: back to the default). */
+  onResize?: (width: number | null, done: boolean) => void;
   title: string;
   unified: boolean;
   isSentLike: boolean;
@@ -127,6 +130,35 @@ export function MessageList(p: Props) {
 
   return (
     <section className="pane list">
+      {p.onResize && (
+        <div
+          className="list-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the message list"
+          title="Drag to resize · double-click to reset"
+          onDoubleClick={() => p.onResize!(null, true)}
+          onPointerDown={(e) => {
+            const pane = (e.currentTarget as HTMLElement).parentElement!;
+            const app = pane.parentElement!;
+            const zoom = Number(getComputedStyle(app).getPropertyValue('--ui-zoom')) || 1;
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            const left = pane.getBoundingClientRect().left;
+            const room = app.getBoundingClientRect().right - left;
+            const widthAt = (x: number) => Math.round(Math.min(Math.max((x - left) / zoom, 260), (room - 320 * zoom) / zoom));
+            const move = (ev: PointerEvent) => p.onResize!(widthAt(ev.clientX), false);
+            const up = (ev: PointerEvent) => {
+              p.onResize!(widthAt(ev.clientX), true);
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', up);
+              document.body.classList.remove('resizing');
+            };
+            document.body.classList.add('resizing');
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+          }}
+        />
+      )}
       <div className="list-header">
         <div className="list-title">
           <button className="icon-btn mobile-only" onClick={p.onNav} title="Folders">

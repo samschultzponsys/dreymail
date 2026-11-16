@@ -30,7 +30,8 @@ export function useFolders(accountIds: string[], enabled: boolean): { data: Acco
       queryFn: async () => (await api.folders(id))[0] ?? null,
       enabled,
       staleTime: 30_000,
-      refetchInterval: 120_000,
+      // The server answered with the last known list while it fetches a fresh one: ask again soon.
+      refetchInterval: (q: { state: { data?: AccountFolders | null } }) => (q.state.data?.refreshing ? 3000 : 120_000),
     })),
   });
   const loaded = results.map((r) => r.data).filter((d): d is AccountFolders => !!d);

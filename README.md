@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **5.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **5.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -221,6 +221,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   icon. Install DreyMail as an app (PWA) from the browser; see [Notifications](#notifications).
 - On phones, a floating Compose button sits on the message list. Compose writes from the account
   you're in (the first account in "All inboxes"); the From menu switches it.
+- **Message list width:** on tablets and PCs, drag the list's right edge to make it wider or narrower;
+  each device remembers its own width (double-click the edge to reset).
 - **Phones, tablets and foldables.** Phones show one pane at a time. Tablets and unfolded
   foldables show the message list on the left and the open message on the right, with the
   folders in a slide-in drawer. Desktops show all three columns.

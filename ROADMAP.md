@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Message list width dragged and kept per device; folder lists shown at once from the last known
+      one; Settings tabs fit on phones (5.4).
 - [x] Images load by themselves for your own domains, people you write to, and (optional) images on
       the sender's own domain; folder lists load per mailbox; Calendar, Scheduled and Saved searches
       can be hidden from the sidebar (5.3).

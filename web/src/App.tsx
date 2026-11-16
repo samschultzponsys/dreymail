@@ -37,6 +37,7 @@ import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
 import { Login, SIGNED_OUT_KEY } from './components/Login';
+import { useListWidth } from './listWidth';
 import { MessageList } from './components/MessageList';
 import { quotableDetail, Reader, replyTarget, type ReplyKind } from './components/Reader';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -76,6 +77,7 @@ export function App() {
   // Only once signed in: asked earlier it fails with 401 and wouldn't be asked again after login.
   const accountsQ = useAccounts(loggedIn);
   const groupsQ = useQuery({ queryKey: ['groups'], queryFn: api.groups, enabled: loggedIn });
+  const [listWidth, setListWidth] = useListWidth();
   const accounts = useMemo(() => (loggedIn ? (accountsQ.data ?? []) : []), [accountsQ.data, loggedIn]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const folders = useFolders(useMemo(() => accounts.map((a) => a.id), [accounts]), loggedIn && accounts.length > 0);
@@ -603,7 +605,7 @@ export function App() {
   };
 
   return (
-    <div className="app" data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
+    <div className={`app ${listWidth ? 'list-sized' : ''}`} style={listWidth ? ({ ['--list-w' as string]: `${listWidth}px` } as React.CSSProperties) : undefined} data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
@@ -658,6 +660,7 @@ export function App() {
         }}
       />
       <MessageList
+        onResize={(w, done) => setListWidth(w, done)}
         title={title}
         unified={effectiveSel.accountId === null}
         isSentLike={isSentLike}

@@ -117,6 +117,8 @@ export interface FolderView {
 }
 
 export interface AccountFolders {
+  /** The last known list, sent at once while a fresh one is fetched (DreyMail). */
+  refreshing?: boolean;
   accountId: string;
   folders: FolderView[];
   error?: string;

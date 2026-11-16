@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.4): resizable message list, folders at once, Settings tabs on phones
+
+- **Message list width:** on tablets and PCs, drag the right edge of the message list (the line
+  turns cyan); the width is kept per device (browser storage), double-click resets it, and the
+  reading pane always keeps at least 320 px.
+- **Folders at once:** the server remembers each mailbox's last folder list and answers with it
+  right away while it fetches a fresh one (the sidebar picks that up seconds later), so opening
+  DreyMail no longer waits for the mail server to reconnect and recount every folder. (It isn't
+  stored per computer; the wait came from the server's idle connection being closed.)
+- **Settings on phones:** each tab group gets a full-width row whose tabs scroll sideways, instead
+  of the groups wrapping into a staircase.
+- **Files:** new `web/src/listWidth.ts`; `server/src/imap/mail.ts`, `server/src/routes/api.ts`,
+  `shared/types.ts`, `web/src/hooks.ts`, `web/src/App.tsx`, `web/src/components/MessageList.tsx`,
+  `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.3): images from people you know, faster sidebar, sidebar choices
 
 - **Settings → Images → Load images by themselves:** in mail from your own domains (the domains of

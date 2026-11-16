@@ -587,6 +587,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         mail.forgetAccount(uid(req), req.params.id);
       }
       pool.invalidate(uid(req), req.params.id);
+      mail.forgetFolders(uid(req), req.params.id);
       return account;
     } catch (err) {
       return sendError(reply, err);
@@ -598,6 +599,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     if (!store.deleteAccount(uid(req), req.params.id)) return reply.code(404).send({ error: 'Account not found' });
     mail.forgetAccount(uid(req), req.params.id);
     pool.invalidate(uid(req), req.params.id);
+      mail.forgetFolders(uid(req), req.params.id);
     return { ok: true };
   });
 

@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: search filters (sender, dates, size, attachments, flags) and all-mail sources.
 // Modified by samschultzponsys, 2026-11-16: automatic image loading rules (Settings → Images).
+// Modified by samschultzponsys, 2026-11-16: folder lists served at once from the last known one.
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -295,7 +296,43 @@ export class MailService {
     return null;
   }
 
+  /** The last folder list of each mailbox, served at once while a fresh one is fetched (DreyMail). */
+  private readonly folderMemo = new Map<string, { at: number; value: AccountFolders }>();
+  private readonly folderJobs = new Map<string, Promise<AccountFolders>>();
+
+  /**
+   * A mailbox's folders with unread counts. A list fetched in the last 30 seconds is served as is;
+   * an older one comes back at once, marked `refreshing`, while a fresh one is fetched in the
+   * background, so opening DreyMail doesn't wait for the mail server to reconnect and recount.
+   */
   async listFolders(userId: string, accountId: string): Promise<AccountFolders> {
+    const key = `${userId}\u0000${accountId}`;
+    const known = this.folderMemo.get(key);
+    let job = this.folderJobs.get(key);
+    if (!job) {
+      if (known && Date.now() - known.at < 30_000) return known.value;
+      job = this.listFoldersLive(userId, accountId)
+        .then((r) => {
+          if (!r.error) this.folderMemo.set(key, { at: Date.now(), value: r });
+          else this.folderMemo.delete(key);
+          return r;
+        })
+        .finally(() => this.folderJobs.delete(key));
+      this.folderJobs.set(key, job);
+    }
+    if (known) {
+      void job.catch(() => undefined);
+      return { ...known.value, refreshing: true };
+    }
+    return job;
+  }
+
+  /** Forget a mailbox's remembered folder list (after it's edited or removed). */
+  forgetFolders(userId: string, accountId: string) {
+    this.folderMemo.delete(`${userId}\u0000${accountId}`);
+  }
+
+  private async listFoldersLive(userId: string, accountId: string): Promise<AccountFolders> {
     try {
       const list = await this.pool.folders(userId, accountId, true);
       const folders: FolderView[] = list.map((f) => ({
