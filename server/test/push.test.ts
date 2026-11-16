@@ -70,6 +70,9 @@ describe('notification text', () => {
   it('adds the start of the message under the subject when the user chose previews', () => {
     const m = { ...mail(7, 'Alice', 'Lunch tomorrow?'), snippet: 'Are you free at noon?   We could try the new place.' };
     expect(buildNotification(account, [m], 'preview')).toMatchObject({ title: 'Alice', body: 'Lunch tomorrow?\nAre you free at noon? We could try the new place.' });
+    // Paragraphs stay for the expanded notification; long text is cut at about 1,000 characters.
+    expect(buildNotification(account, [{ ...m, snippet: 'One.\n\n\n\nTwo.' }], 'preview')!.body).toBe('Lunch tomorrow?\nOne.\n\nTwo.');
+    expect(buildNotification(account, [{ ...m, snippet: 'y'.repeat(3000) }], 'preview')!.body.length).toBeLessThan(1020);
     // Without a snippet (it couldn't be fetched) it is just sender and subject.
     expect(buildNotification(account, [mail(7, 'Alice', 'Lunch tomorrow?')], 'preview')).toMatchObject({ body: 'Lunch tomorrow?' });
     // Several at once: one line each, as with sender and subject.

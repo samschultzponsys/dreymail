@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: longer previews that keep their paragraphs (notifications).
+
 import type { MessageStructureObject } from 'imapflow';
 import { convert } from 'html-to-text';
 
@@ -87,7 +91,7 @@ function decodeCharset(bytes: Buffer, charset: string): string {
  * Truncation may cut a base64 quantum, a QP escape or a multi-byte character, all of which are
  * tolerated.
  */
-export function snippetFromPart(raw: Buffer, part: TextPart, alreadyDecoded = false): string {
+export function snippetFromPart(raw: Buffer, part: TextPart, alreadyDecoded = false, opts: { length?: number; keepLines?: boolean } = {}): string {
   let bytes = raw;
   if (!alreadyDecoded) {
     if (part.encoding === 'base64') {
@@ -111,11 +115,24 @@ export function snippetFromPart(raw: Buffer, part: TextPart, alreadyDecoded = fa
       ],
     });
   }
+  const length = opts.length ?? SNIPPET_LENGTH;
+  if (opts.keepLines) {
+    // Longer previews (notifications): keep the paragraphs, and stop where the signature or the
+    // quoted earlier message starts.
+    const lines: string[] = [];
+    for (const raw of text.replace(/\r/g, '').split('\n')) {
+      const l = raw.replace(/[ \t\u00a0]+/g, ' ').trim();
+      if (/^-- ?$/.test(raw) || /^On .{1,200} wrote:$/.test(l) || /^-{2,} ?Original Message ?-{2,}$/i.test(l) || /^From: .+/.test(l) && lines.length > 0) break;
+      if (/^>/.test(l)) continue;
+      lines.push(l);
+    }
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, length);
+  }
   return text
     .split('\n')
     .filter((l) => !/^\s*>/.test(l)) // drop quoted lines
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, SNIPPET_LENGTH);
+    .slice(0, length);
 }

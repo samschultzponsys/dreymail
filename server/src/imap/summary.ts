@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs (category of each message).
+// Modified by samschultzponsys, 2026-11-16: longer snippets with paragraphs, for notification previews.
 
 import { categoryFromHeaders } from '../../../shared/categories.js';
 import type { FetchMessageObject, FetchQueryObject, ImapFlow, MessageAddressObject } from 'imapflow';
@@ -74,7 +75,11 @@ export function summaryOf(source: { accountId: string; folder: string }, uidVali
  * Preview snippets for messages of the currently selected mailbox, fetched with LIST_FETCH: the
  * first bytes of each one's text part, one FETCH per kind of part. Keyed by UID.
  */
-export async function fetchSnippets(client: ImapFlow, msgs: FetchMessageObject[]): Promise<Map<number, string>> {
+export async function fetchSnippets(
+  client: ImapFlow,
+  msgs: FetchMessageObject[],
+  opts: { bytes?: number; length?: number; keepLines?: boolean } = {},
+): Promise<Map<number, string>> {
   const out = new Map<number, string>();
   const byPart = new Map<string, { part: TextPart; uids: number[] }>();
   for (const m of msgs) {
@@ -88,12 +93,12 @@ export async function fetchSnippets(client: ImapFlow, msgs: FetchMessageObject[]
   for (const { part, uids } of byPart.values()) {
     const fetched = await client.fetchAll(
       uids.join(','),
-      { uid: true, bodyParts: [{ key: part.part, start: 0, maxLength: SNIPPET_FETCH_BYTES }] },
+      { uid: true, bodyParts: [{ key: part.part, start: 0, maxLength: opts.bytes ?? SNIPPET_FETCH_BYTES }] },
       { uid: true },
     );
     for (const f of fetched) {
       const buf = f.bodyParts ? [...f.bodyParts.values()][0] : undefined;
-      if (buf) out.set(f.uid, snippetFromPart(buf, part, (f.binaryParts?.size ?? 0) > 0));
+      if (buf) out.set(f.uid, snippetFromPart(buf, part, (f.binaryParts?.size ?? 0) > 0, opts));
     }
   }
   return out;

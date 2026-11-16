@@ -12,6 +12,9 @@ import type { NewMail } from '../push/notify.js';
 import { connectImap, MailServerError } from './connect.js';
 import { fetchSnippets } from './summary.js';
 
+/** How much of a new message's text a notification preview shows (the payload has room for it). */
+const NOTIFICATION_PREVIEW_CHARS = 1000;
+
 export interface PoolOptions {
   idleTimeoutMs: number;
   blockPrivateHosts: boolean;
@@ -431,7 +434,8 @@ export class ImapPool {
       if (unread.length === 1 && this.store.getUser(userId)?.preferences.notificationContent === 'preview') {
         try {
           const withParts = await client.fetchAll(String(unread[0]!.uid), { uid: true, bodyStructure: true }, { uid: true });
-          const snippet = (await fetchSnippets(client, withParts)).get(unread[0]!.uid);
+          // Enough for an expanded notification (about 1,000 characters), keeping its paragraphs.
+          const snippet = (await fetchSnippets(client, withParts, { bytes: 16_384, length: NOTIFICATION_PREVIEW_CHARS, keepLines: true })).get(unread[0]!.uid);
           if (snippet) unread[0]!.snippet = snippet;
         } catch (err) {
           this.opts.log?.('notification preview failed', { accountId, error: (err as Error).message });

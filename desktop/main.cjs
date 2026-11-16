@@ -143,6 +143,10 @@ function createWindow() {
       .then(({ response }) => (response === 0 ? showServer() : showSetup()));
   });
 
+  // The mouse's back button (Windows) goes back too.
+  win.on('app-command', (_e, cmd) => {
+    if (cmd === 'browser-backward') goBack();
+  });
   win.on('blur', () => {
     lastBlur = Date.now();
   });
@@ -161,6 +165,12 @@ function createWindow() {
 
 function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) void shell.openExternal(url);
+}
+
+function goBack() {
+  const history = win?.webContents.navigationHistory;
+  if (history?.canGoBack()) history.goBack();
+  else if (win) showServer();
 }
 
 function focusWindow() {
@@ -318,6 +328,9 @@ function buildMenu() {
         { label: 'Minimize to the tray', type: 'checkbox', checked: minimizeToTray(), click: (item) => setMinimizeToTray(item.checked) },
         { type: 'separator' },
         { role: 'reload' },
+        // A way back if the window ever shows another site (e.g. a link that opened in place).
+        { label: 'Back', accelerator: 'Alt+Left', click: goBack },
+        { label: 'Back to DreyMail', accelerator: 'CmdOrCtrl+Shift+H', click: () => { focusWindow(); showServer(); } },
         { type: 'separator' },
         { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => { quitting = true; app.quit(); } },
       ],
@@ -365,6 +378,7 @@ function refreshTrayMenu() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Show / hide DreyMail', click: toggleWindow },
+      { label: 'Back to DreyMail', click: () => { focusWindow(); showServer(); } },
       { label: 'Minimize to the tray', type: 'checkbox', checked: minimizeToTray(), click: (item) => setMinimizeToTray(item.checked) },
       { label: 'Check for updates…', click: () => void checkForUpdates(true) },
       { type: 'separator' },

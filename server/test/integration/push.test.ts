@@ -173,9 +173,10 @@ describe('phone notifications for new mail', () => {
     const me = (await api<Me>('GET', '/api/me')).json;
     expect((await api('PUT', '/api/preferences', { ...me.preferences, notificationContent: 'preview' })).status).toBe(200);
     sent.length = 0;
-    await deliver('Weekend plans', [], 'Are you free on Saturday?\r\n> an older quoted line');
+    await deliver('Weekend plans', [], 'Are you free on Saturday?\r\n\r\nWe could hike in the morning.\r\n> an older quoted line');
     expect(await until(() => sent.some((r) => (r.payload as NotificationPayload).title === 'Bob'))).toBe(true);
-    expect((sent[0]!.payload as NotificationPayload).body).toBe('Weekend plans\nAre you free on Saturday?');
+    // Expanded, the notification shows the message's paragraphs under the subject.
+    expect((sent[0]!.payload as NotificationPayload).body).toBe('Weekend plans\nAre you free on Saturday?\n\nWe could hike in the morning.');
     await api('PUT', '/api/preferences', { ...me.preferences, notificationContent: 'full' });
   });
 

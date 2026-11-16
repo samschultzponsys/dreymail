@@ -4,11 +4,13 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook accounts; This device settings.
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
+// Modified by samschultzponsys, 2026-11-16: links to other sites never replace the app.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { guardLinks } from './linkGuard';
 import { PENDING_MAILTO_KEY, takeMailtoParam } from './mailto';
 import { applyUiScale } from './uiScale';
 import './styles.css';
@@ -17,6 +19,8 @@ import './styles.css';
 document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 // Interface size for this device (Settings → General).
 applyUiScale();
+// Links to other sites open in a new window, never in place of the app.
+guardLinks();
 
 // Opened for a mailto: link (?mailto=…): keep the link for this tab, so it survives a sign-in
 // round trip, and drop it from the URL so a reload doesn't open the composer again.

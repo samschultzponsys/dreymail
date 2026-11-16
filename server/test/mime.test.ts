@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: longer notification previews.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import type { MessageStructureObject } from 'imapflow';
@@ -89,6 +93,17 @@ describe('snippets from BODYSTRUCTURE', () => {
     expect(snippetFromPart(Buffer.from(html.slice(0, 101)), { part: '1', type: 'text/html', encoding: 'base64', charset: 'utf-8' })).toMatch(/^Hello there/);
     const qp = Buffer.from('K=F6ln is nice=\r\n today\r\n> quoted reply\r\nbye =');
     expect(snippetFromPart(qp, { part: '1', type: 'text/plain', encoding: 'quoted-printable', charset: 'iso-8859-1' })).toBe('Köln is nice today bye =');
+  });
+
+  it('makes longer previews with paragraphs for notifications, up to the signature or quote', () => {
+    const plain = { part: '1', type: 'text/plain' as const, encoding: '7bit', charset: 'utf-8' };
+    const body = 'Hi Sam,\r\n\r\n\r\nThe RMA for Myrtle Beach is approved.   Ship it Monday.\r\n\r\nThanks!\r\n-- \r\nDustin\r\nOn Mon, Nov 16, 2026 at 9:00 AM Sam wrote:\r\n> old';
+    expect(snippetFromPart(Buffer.from(body), plain, false, { length: 1000, keepLines: true })).toBe('Hi Sam,\n\nThe RMA for Myrtle Beach is approved. Ship it Monday.\n\nThanks!');
+    const reply = 'Sounds good.\r\n\r\nOn Mon, Nov 16, 2026 at 9:00 AM Sam Schultz <s@example.com> wrote:\r\n> Can you check?';
+    expect(snippetFromPart(Buffer.from(reply), plain, false, { length: 1000, keepLines: true })).toBe('Sounds good.');
+    expect(snippetFromPart(Buffer.from('x'.repeat(5000)), plain, false, { length: 1000, keepLines: true })).toHaveLength(1000);
+    // The list's snippet is unchanged: one line, short.
+    expect(snippetFromPart(Buffer.from(body), plain)).toMatch(/^Hi Sam, The RMA/);
   });
 });
 

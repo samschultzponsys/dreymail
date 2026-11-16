@@ -61,6 +61,12 @@ function clip(s: string, max = MAX_FIELD): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
+/** Like clip, but keeps line breaks (a preview's paragraphs, shown when the notification is expanded). */
+function clipLines(s: string, max: number): string {
+  const text = s.replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 function senderName(a: Address | null): string {
   return clip(a?.name || a?.address || 'Unknown sender', 80);
 }
@@ -84,7 +90,7 @@ export function buildNotification(
   if (count === 1) {
     const m = newest[0]!;
     const subject = clip(m.subject) || '(no subject)';
-    const snippet = content === 'preview' && m.snippet ? clip(m.snippet, 300) : '';
+    const snippet = content === 'preview' && m.snippet ? clipLines(m.snippet, 1000) : '';
     return {
       title: content === 'minimal' ? 'New message' : senderName(m.from),
       body: content === 'minimal' ? accountName : snippet ? `${subject}\n${snippet}` : subject,

@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.4): longer notification previews; links never replace the app
+
+- **Notification previews:** "Sender, subject and the start of the message" now shows up to about
+  1,000 characters of the message with its paragraphs (it was one line of about 180), stopping
+  where the signature ("-- ") or the quoted earlier message ("On … wrote:") starts. Collapsed, the
+  notification shows the subject; expanded, the text.
+- **Links:** a link in DreyMail's own pages (for example in a signature's preview) could open the
+  other site in place of the app; in the desktop and Android apps that left no way back. Links to
+  other sites now always open in a new window (the browser, from the apps); links in text being
+  edited don't open; a signature's preview opens the signature instead.
+- **Desktop app:** DreyMail menu → Back (Alt+Left, or the mouse's back button) and Back to DreyMail
+  (Ctrl+Shift+H, also in the tray menu), in case the window ever shows another site.
+- **Files:** new `web/src/linkGuard.ts`, `web/test/linkGuard.test.ts`; `web/src/main.tsx`,
+  `web/src/styles.css`, `desktop/main.cjs`, `server/src/imap/snippet.ts`, `server/src/imap/summary.ts`,
+  `server/src/imap/pool.ts`, `server/src/push/notify.ts`, `server/test/mime.test.ts`,
+  `server/test/push.test.ts`, `server/test/integration/push.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.3): flatpak update in one command
 
 - **Desktop app, flatpak:** when an update is out, the app's first suggestion is one command that
