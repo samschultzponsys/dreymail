@@ -67,14 +67,27 @@ function downloadUrl(release, kind, arch) {
   return asset ? asset.browser_download_url : release.html_url || RELEASES_PAGE;
 }
 
-/** What to tell the user: a sentence and, on Linux, the command that upgrades this install. */
+/** Where CI puts a release's file (the same address whether or not the release lists it yet). */
+function assetUrl(version, file) {
+  return `${RELEASES_PAGE}/download/v${displayVersion(version)}/${file}`;
+}
+
+/**
+ * What to tell the user: a sentence and, on Linux, the command that upgrades this install.
+ * `fallback` is the slower way when the command can't be used: download the file, then a command.
+ */
 function upgradeInstructions(kind, version, arch) {
   const file = assetName(kind, version, arch);
   switch (kind) {
     case 'flatpak':
+      // One command that downloads and installs; downloading by hand is the fallback.
       return {
-        text: `Download ${file}, then run this command in the folder you saved it to. It replaces the installed version and keeps your settings.`,
-        command: `flatpak install --user --reinstall -y ./${file}`,
+        text: 'Run this command in a terminal. It downloads the new version and installs it over this one, keeping your settings.',
+        command: `curl -fL -o /tmp/${file} ${assetUrl(version, file)} && flatpak install --user --reinstall -y /tmp/${file}`,
+        fallback: {
+          text: `Or download ${file} and run this command in the folder you saved it to:`,
+          command: `flatpak install --user --reinstall -y ./${file}`,
+        },
       };
     case 'deb':
       return {
@@ -111,4 +124,4 @@ async function fetchLatest(fetchImpl = fetch) {
   }
 }
 
-module.exports = { RELEASES_PAGE, parseVersion, displayVersion, isNewer, detectInstall, assetName, downloadUrl, upgradeInstructions, fetchLatest };
+module.exports = { RELEASES_PAGE, parseVersion, displayVersion, isNewer, detectInstall, assetName, assetUrl, downloadUrl, upgradeInstructions, fetchLatest };

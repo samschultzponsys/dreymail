@@ -10,7 +10,7 @@ const update = createRequire(import.meta.url)('../../desktop/update.cjs') as {
   detectInstall(platform: string, execPath: string, probe: { env(n: string): string | undefined; exists(p: string): boolean; owns(t: string, p: string): boolean }): string;
   assetName(kind: string, version: string, arch: string): string | null;
   downloadUrl(release: { tag_name: string; html_url: string; assets: { name: string; browser_download_url: string }[] }, kind: string, arch: string): string;
-  upgradeInstructions(kind: string, version: string, arch: string): { text: string; command: string | null };
+  upgradeInstructions(kind: string, version: string, arch: string): { text: string; command: string | null; fallback?: { text: string; command: string } };
   fetchLatest(f: typeof fetch): Promise<unknown>;
 };
 
@@ -44,7 +44,12 @@ describe('desktop app updates', () => {
     expect(update.assetName('deb', 'v1.8', 'x64')).toBe('DreyMail-1.8-amd64.deb');
     expect(update.assetName('flatpak', 'v1.8', 'x64')).toBe('DreyMail-1.8-x86_64.flatpak');
     expect(update.assetName('windows', 'v1.8', 'x64')).toBe('DreyMail-Setup-1.8-x64.exe');
-    expect(update.upgradeInstructions('flatpak', 'v1.8', 'x64').command).toBe('flatpak install --user --reinstall -y ./DreyMail-1.8-x86_64.flatpak');
+    // Flatpak: one command downloads and installs; downloading by hand is the fallback.
+    const flatpak = update.upgradeInstructions('flatpak', 'v1.8', 'x64');
+    expect(flatpak.command).toBe(
+      'curl -fL -o /tmp/DreyMail-1.8-x86_64.flatpak https://github.com/samschultzponsys/dreymail/releases/download/v1.8/DreyMail-1.8-x86_64.flatpak && flatpak install --user --reinstall -y /tmp/DreyMail-1.8-x86_64.flatpak',
+    );
+    expect(flatpak.fallback?.command).toBe('flatpak install --user --reinstall -y ./DreyMail-1.8-x86_64.flatpak');
     expect(update.upgradeInstructions('deb', 'v1.8', 'x64').command).toBe('sudo apt install ./DreyMail-1.8-amd64.deb');
     expect(update.upgradeInstructions('rpm', 'v1.8', 'x64').command).toBe('sudo dnf install ./DreyMail-1.8-x86_64.rpm');
     expect(update.upgradeInstructions('windows', 'v1.8', 'x64').command).toBeNull();

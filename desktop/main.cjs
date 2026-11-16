@@ -233,7 +233,13 @@ async function checkForUpdates(manual) {
   }
   const how = update.upgradeInstructions(installKind, latest.tag_name, process.arch);
   const url = update.downloadUrl(latest, installKind, process.arch);
-  const detail = [`You have ${current} (${installKind}).`, '', how.text, ...(how.command ? ['', how.command] : [])].join('\n');
+  const detail = [
+    `You have ${current} (${installKind}).`,
+    '',
+    how.text,
+    ...(how.command ? ['', how.command] : []),
+    ...(how.fallback ? ['', how.fallback.text, '', how.fallback.command] : []),
+  ].join('\n');
 
   if (installKind === 'windows') {
     const { response } = await dialog.showMessageBox(win, {
@@ -246,6 +252,26 @@ async function checkForUpdates(manual) {
     });
     if (response === 0) await installWindowsUpdate(url, update.assetName('windows', latest.tag_name, process.arch));
     if (response === 1) openExternal(latest.html_url || update.RELEASES_PAGE);
+    return;
+  }
+
+  // Flatpak: one command does it all (copied), or download by hand and copy the shorter command.
+  if (how.fallback) {
+    const buttons = ['Copy command', 'Download instead', 'Release notes', 'Later'];
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info',
+      message: `DreyMail ${version} is available`,
+      detail: `${detail}\n\n"Copy command" puts the first command on your clipboard; paste it into a terminal. "Download instead" opens the download and copies the second one.`,
+      buttons,
+      defaultId: 0,
+      cancelId: 3,
+    });
+    if (response === 0) clipboard.writeText(how.command);
+    if (response === 1) {
+      clipboard.writeText(how.fallback.command);
+      openExternal(url);
+    }
+    if (response === 2) openExternal(latest.html_url || update.RELEASES_PAGE);
     return;
   }
 

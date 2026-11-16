@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.3): flatpak update in one command
+
+- **Desktop app, flatpak:** when an update is out, the app's first suggestion is one command that
+  downloads the new flatpak with curl and installs it (`curl -fL -o /tmp/… <release file> &&
+  flatpak install --user --reinstall -y /tmp/…`); "Copy command" puts it on the clipboard. The
+  fallback, "Download instead", opens the download and copies the install command for the saved
+  file, as before. deb, rpm and Windows are unchanged.
+- **Files:** `desktop/update.cjs`, `desktop/main.cjs`, `web/test/desktopUpdate.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.2): dialogs stay open on a click outside; minimize to the tray
 
 - **Dialogs:** Accounts (adding or editing a mailbox), Settings, the AI assistant and the calendar

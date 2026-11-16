@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Flatpak updates: one command that downloads and installs, with downloading by hand as the
+      fallback (6.3).
 - [x] Desktop app: minimize to the tray, and the tray icon shows and hides the window (6.2).
 - [x] Dialogs with forms (Accounts, Settings, AI assistant, Calendar) no longer close on a click
       outside them (6.2).
