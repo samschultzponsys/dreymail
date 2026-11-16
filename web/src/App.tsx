@@ -25,11 +25,12 @@
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name to edit it.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-16: desktop notifications for every mailbox, always, with the mailbox's name.
+// Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { AccountView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
+import type { AccountView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
 import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
@@ -621,6 +622,31 @@ export function App() {
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
         onResize={(w, done) => setSideWidth(w, done)}
+        onReorder={
+          me.data?.permissions.includes('mail.accounts')
+            ? (order) => {
+                // Shown in the new order right away; saved in the background.
+                const pos = new Map(order.accounts.map((a, i) => [a.id, i]));
+                qc.setQueryData<AccountView[]>(['accounts'], (list) =>
+                  list
+                    ?.map((a) => ({ ...a, groupId: order.accounts.find((x) => x.id === a.id)?.groupId ?? null }))
+                    .sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0)),
+                );
+                qc.setQueryData<MailboxGroupView[]>(['groups'], (list) => list && order.groups.map((id) => list.find((g) => g.id === id)!).filter(Boolean));
+                void api.sidebarOrder(order).then(
+                  (saved) => {
+                    qc.setQueryData(['groups'], saved.groups);
+                    qc.setQueryData(['accounts'], saved.accounts);
+                  },
+                  (e: Error) => {
+                    push(`Couldn't save the new order: ${e.message}`, true);
+                    void qc.invalidateQueries({ queryKey: ['accounts'] });
+                    void qc.invalidateQueries({ queryKey: ['groups'] });
+                  },
+                );
+              }
+            : undefined
+        }
         onPin={(accountId, folders) => {
           // Shown right away; saved in the background.
           qc.setQueryData<AccountView[]>(['accounts'], (list) => list?.map((a) => (a.id === accountId ? { ...a, pinnedFolders: folders } : a)));

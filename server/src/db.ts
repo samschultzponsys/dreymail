@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-16: threaded or single view per mailbox.
 // Modified by samschultzponsys, 2026-11-16: pinned folders.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
+// Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -969,6 +970,36 @@ export class Store {
   deleteGroup(userId: string, id: string): boolean {
     this.db.prepare('UPDATE accounts SET group_id = NULL WHERE user_id = ? AND group_id = ?').run(userId, id);
     return Number(this.db.prepare('DELETE FROM mailbox_groups WHERE id = ? AND user_id = ?').run(id, userId).changes) > 0;
+  }
+
+  /**
+   * The sidebar's order, as dragged there: groups in order, and every mailbox in order with the
+   * group it is in now (null: not in a group). Ids that aren't the user's are ignored. A mailbox
+   * dragged into a group that sets its members' color and icon takes them on.
+   */
+  reorderSidebar(userId: string, groups: string[], accounts: { id: string; groupId: string | null }[]) {
+    const myGroups = new Map(this.listGroups(userId).map((g) => [g.id, g]));
+    const myAccounts = new Map(this.listAccounts(userId).map((a) => [a.id, a]));
+    this.db.exec('BEGIN');
+    try {
+      let gi = 0;
+      for (const id of groups) if (myGroups.has(id)) this.db.prepare('UPDATE mailbox_groups SET position = ? WHERE id = ? AND user_id = ?').run(gi++, id, userId);
+      let ai = 0;
+      for (const a of accounts) {
+        const before = myAccounts.get(a.id);
+        if (!before) continue;
+        const groupId = a.groupId && myGroups.has(a.groupId) ? a.groupId : null;
+        this.db.prepare('UPDATE accounts SET position = ?, group_id = ? WHERE id = ? AND user_id = ?').run(ai++, groupId, a.id, userId);
+        const g = groupId ? myGroups.get(groupId) : undefined;
+        if (g?.follow && (before.groupId ?? null) !== groupId) {
+          this.db.prepare("UPDATE accounts SET color = ?, icon = CASE WHEN ? = '' THEN icon ELSE ? END WHERE id = ? AND user_id = ?").run(g.color, g.icon, g.icon, a.id, userId);
+        }
+      }
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /** Folders pinned in the sidebar for this mailbox (empty: all are shown). */

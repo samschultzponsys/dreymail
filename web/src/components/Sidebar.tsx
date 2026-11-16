@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-16: mailbox groups as sections that expand and collapse.
 // Modified by samschultzponsys, 2026-11-16: pinned folders, the rest behind "show all".
 // Modified by samschultzponsys, 2026-11-16: the folder bar can be dragged wider or narrower.
+// Modified by samschultzponsys, 2026-11-16: groups and mailboxes rearranged by dragging.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
 
 import { useQuery } from '@tanstack/react-query';
@@ -53,6 +54,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
 import { PaneResizer } from './PaneResizer';
 import { ContextMenu, type MenuItem } from './MailboxMenu';
+import { applyDrop, currentOrder, type DropTarget, type Dragged, type SidebarOrder } from '../sidebarOrder';
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -124,9 +126,11 @@ interface Props {
   onAssistant?: (accountId: string) => void;
   /** Open a mailbox's settings (right-click its name); absent when the user may not edit mailboxes. */
   onEditAccount?: (accountId: string) => void;
+  /** Groups and mailboxes rearranged by dragging; absent when the user may not change mailboxes. */
+  onReorder?: (order: SidebarOrder) => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -134,6 +138,54 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
+  // Dragging groups and mailboxes into another order (not in the narrow icon-only bar).
+  const [drag, setDrag] = useState<Dragged | null>(null);
+  const [over, setOver] = useState<{ key: string; where: 'before' | 'after' | 'into' } | null>(null);
+  const canDrag = !!onReorder && !rail;
+  const half = (e: React.DragEvent) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientY - r.top < r.height / 2 ? ('before' as const) : ('after' as const);
+  };
+  const dragProps = (item: Dragged) =>
+    canDrag
+      ? {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.id);
+            setDrag(item);
+          },
+          onDragEnd: () => {
+            setDrag(null);
+            setOver(null);
+          },
+        }
+      : {};
+  /** `target` says what a drop here means (null: not here, for what is being dragged). */
+  const dropProps = (key: string, target: (e: React.DragEvent) => DropTarget | null) =>
+    canDrag
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            if (!drag) return;
+            const t = target(e);
+            if (!t) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const where = t.type === 'ungrouped' ? 'into' : t.where;
+            if (over?.key !== key || over.where !== where) setOver({ key, where });
+          },
+          onDrop: (e: React.DragEvent) => {
+            const t = drag && target(e);
+            e.preventDefault();
+            const next = drag && t ? applyDrop(currentOrder(groups, accounts), drag, t) : null;
+            setDrag(null);
+            setOver(null);
+            if (next) onReorder?.(next);
+          },
+        }
+      : {};
+  const dropClass = (key: string) => (over?.key === key ? `drop-${over.where}` : '');
+
   /** The right-click menu on a mailbox's name. */
   const [menu, setMenu] = useState<{ acc: AccountView; x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -161,8 +213,12 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           const af = folders?.find((f) => f.accountId === acc.id);
           const isCollapsed = !rail && collapsed[acc.id];
           return (
-            <div className="nav-section" key={acc.id}>
-              <div className="nav-heading-row">
+            <div className={`nav-section ${drag?.kind === 'account' && drag.id === acc.id ? 'dragging' : ''}`} key={acc.id}>
+              <div
+                className={`nav-heading-row ${dropClass(`a:${acc.id}`)}`}
+                {...dragProps({ kind: 'account', id: acc.id })}
+                {...dropProps(`a:${acc.id}`, (e) => (drag?.kind === 'account' ? { type: 'account', id: acc.id, where: half(e) } : null))}
+              >
                 <button
                   className="nav-heading"
                   onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
@@ -334,13 +390,21 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
         )}
         {groups.map((g) => {
           const members = accounts.filter((a) => a.groupId === g.id);
-          if (!members.length) return null;
+          // An empty group shows only while a mailbox is being dragged, to drop it in.
+          if (!members.length && drag?.kind !== 'account') return null;
           const key = `g:${g.id}`;
           const open = rail || !collapsed[key];
           const unread = members.reduce((n, a) => n + (folders?.find((f) => f.accountId === a.id)?.folders.find((f) => f.specialUse === 'inbox')?.unread ?? 0), 0);
           return (
-            <div className="nav-group" key={g.id} style={{ ['--group' as string]: g.color }}>
-              <button className={`nav-group-head ${unread ? 'unread' : ''}`} onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))} title={g.name} aria-expanded={open}>
+            <div className={`nav-group ${drag?.kind === 'group' && drag.id === g.id ? 'dragging' : ''}`} key={g.id} style={{ ['--group' as string]: g.color }}>
+              <button
+                className={`nav-group-head ${unread ? 'unread' : ''} ${dropClass(`g:${g.id}`)}`}
+                onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))}
+                title={canDrag ? `${g.name} (drag to move)` : g.name}
+                aria-expanded={open}
+                {...dragProps({ kind: 'group', id: g.id })}
+                {...dropProps(`g:${g.id}`, (e) => (drag?.kind === 'account' ? { type: 'group', id: g.id, where: 'into' } : drag?.kind === 'group' ? { type: 'group', id: g.id, where: half(e) } : null))}
+              >
                 {!rail && (open ? <ChevronDown size={13} /> : <ChevronRight size={13} />)}
                 <MailboxIcon icon={g.icon} color={g.color} size={15} />
                 <span className="name">{g.name}</span>
@@ -352,6 +416,11 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           );
         })}
         {accounts.filter((a) => !a.groupId || !groups.some((g) => g.id === a.groupId)).map(renderAccount)}
+        {drag?.kind === 'account' && groups.length > 0 && (
+          <div className={`nav-drop-ungrouped ${dropClass('ungrouped')}`} {...dropProps('ungrouped', () => ({ type: 'ungrouped' }))}>
+            Not in a group
+          </div>
+        )}
       </nav>
       <div className="sidebar-footer">
         <button className={`footer-me shows-${footerIdentity}`} title={`${userFullName}: profile and settings`} onClick={onSettings}>

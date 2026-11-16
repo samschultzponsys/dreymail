@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-16: provider icon from a list or any website.
 // Modified by samschultzponsys, 2026-11-16: signatures up to 1.5 MB, pictures included.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
+// Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -532,6 +533,19 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   app.get('/api/groups', async (req) => store.listGroups(uid(req)));
+
+  // The sidebar's order (groups, mailboxes and which group each is in), as dragged there.
+  const orderSchema = z.object({
+    groups: z.array(z.string().max(64)).max(200),
+    accounts: z.array(z.object({ id: z.string().max(64), groupId: z.string().max(64).nullable() })).max(200),
+  });
+  app.put('/api/sidebar-order', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    const body = orderSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid order' });
+    store.reorderSidebar(uid(req), body.data.groups, body.data.accounts);
+    return { groups: store.listGroups(uid(req)), accounts: store.listAccounts(uid(req)) };
+  });
 
   app.post('/api/groups', async (req, reply) => {
     if (!access.require(req, reply, 'mail.accounts')) return reply;

@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.0): drag to rearrange the sidebar
+
+- **Sidebar:** groups and mailboxes can be dragged into another order. A line shows where it will
+  land; dropping a mailbox on a group's name puts it in that group (an empty group shows while
+  dragging), and "Not in a group" at the bottom takes it out. Kept for the account (all devices);
+  a mailbox moved into a group that sets its members' color and icon takes them on. For roles
+  that may change mailboxes; not in the narrow icon-only bar.
+- **Server:** `PUT /api/sidebar-order` saves the order of groups and mailboxes and each mailbox's
+  group (the existing `position` columns; no migration).
+- **Files:** new `web/src/sidebarOrder.ts`, `web/test/sidebarOrder.test.ts`;
+  `web/src/components/Sidebar.tsx`, `web/src/App.tsx`, `web/src/api.ts`, `web/src/styles.css`,
+  `server/src/db.ts`, `server/src/routes/api.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v6.9): desktop notifications for every mailbox; provider icons that work
 
 - **Desktop app notifications:** new mail became a notification only while the window wasn't in
