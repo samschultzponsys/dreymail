@@ -48,6 +48,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Groups get every icon a mailbox can have (picture, provider or website icon); right-click
       a group's name to edit it (7.2).
 - [x] Flatpak update command restarts DreyMail on the new version (7.1).
+- [x] Right-click the folder bar's empty space for New group… (7.4).
 - [x] Flatpak notifications also while the window is in the background or the tray (KDE Plasma);
       mailbox pictures and provider icons in notifications in any format (7.3).
 - [x] Drag to rearrange groups and mailboxes in the sidebar, into and out of groups (7.0).

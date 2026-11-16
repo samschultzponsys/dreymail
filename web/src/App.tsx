@@ -27,6 +27,7 @@
 // Modified by samschultzponsys, 2026-11-16: desktop notifications for every mailbox, always, with the mailbox's name.
 // Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
+// Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -682,6 +683,15 @@ export function App() {
             ? (id) => {
                 setEditAccountId(null);
                 setEditGroupId(id);
+                openOverlay('accounts');
+              }
+            : undefined
+        }
+        onNewGroup={
+          me.data?.permissions.includes('mail.accounts')
+            ? () => {
+                setEditAccountId(null);
+                setEditGroupId('new');
                 openOverlay('accounts');
               }
             : undefined

@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-16: groups and mailboxes rearranged by dragging.
 // Modified by samschultzponsys, 2026-11-16: right-click a group's name; group pictures.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
+// Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -48,6 +49,7 @@ import {
   Search,
   Sparkles,
   Pencil,
+  FolderPlus,
   TriangleAlert,
   X,
 } from 'lucide-react';
@@ -131,9 +133,11 @@ interface Props {
   onReorder?: (order: SidebarOrder) => void;
   /** Open a group's settings (right-click its name); absent when the user may not change mailboxes. */
   onEditGroup?: (groupId: string) => void;
+  /** Opens the new-group form (right-click on the folder bar's empty space). */
+  onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -195,6 +199,13 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   /** The right-click menu on a group's name. */
   const [groupMenu, setGroupMenu] = useState<{ group: MailboxGroupView; x: number; y: number } | null>(null);
   const closeGroupMenu = useCallback(() => setGroupMenu(null), []);
+  /** The right-click menu on the folder bar's empty space. */
+  const [blankMenu, setBlankMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeBlankMenu = useCallback(() => setBlankMenu(null), []);
+  const blankMenuItems: MenuItem[] = [
+    ...(onNewGroup ? [{ label: 'New group…', icon: <FolderPlus size={15} />, onClick: onNewGroup }] : []),
+    { label: 'Mail accounts…', icon: <UserCog size={15} />, onClick: onAccounts },
+  ];
   const groupMenuItems = (g: MailboxGroupView): MenuItem[] => {
     const key = `g:${g.id}`;
     const items: MenuItem[] = [];
@@ -356,7 +367,15 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
       <button className="btn primary compose-btn" onClick={onCompose} disabled={accounts.length === 0} title="Compose">
         <PenSquare size={16} /> <span className="name">Compose</span>
       </button>
-      <nav className="nav">
+      <nav
+        className="nav"
+        onContextMenu={(e) => {
+          // Only the empty space (below the last mailbox, between sections): names have their own menus.
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          setBlankMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
         {showUnified && accounts.length > 1 && (
           <button
             className={`nav-item ${sel.accountId === null && !activeSearch ? 'active' : ''} ${totalUnread ? 'unread' : ''}`}
@@ -455,6 +474,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           </button>
         )}
         {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
+        {blankMenu && <ContextMenu x={blankMenu.x} y={blankMenu.y} items={blankMenuItems} onClose={closeBlankMenu} />}
         {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
         {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}
         <button className="icon-btn" title="Accounts" onClick={onAccounts}>

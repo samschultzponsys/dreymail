@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **7.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -112,7 +112,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   unread count. Optionally its mailboxes take the group's color and icon, and one switch turns
   new-mail notifications off for the whole group.
   A group's icon can be any a mailbox can have: a built-in icon, your own picture, or a provider's
-  or website's icon. Right-click a group's name to edit it.
+  or website's icon. Right-click a group's name to edit it, or the empty space at the bottom of the folder bar
+  for *New group…*.
 - **Profile pictures.** Upload a picture and place it in the circle (drag and zoom; it's resized in
   the browser). Without one, DreyMail shows your Gravatar (fetched by the server, so Gravatar never
   sees your browser), or your initials in a circle filled with the app's current color. The User role may change its own picture; a role flag

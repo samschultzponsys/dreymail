@@ -13,6 +13,14 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.4): new group from the folder bar
+
+- **Folder bar:** right-click its empty space (below the last mailbox, or between sections) for
+  *New group…*, which opens the new-group form directly (Save or Cancel returns to the mail), and
+  *Mail accounts…*. Only for roles that may change mailboxes; names keep their own menus.
+- **Files:** `web/src/components/Sidebar.tsx`, `web/src/components/AccountsDialog.tsx`,
+  `web/src/App.tsx`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v7.3): flatpak notifications in the background; mailbox icons in notifications
 
 - **Desktop app, flatpak:** on KDE Plasma, new mail only became a notification while DreyMail was
