@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.7): grips on the pane edges; resizable folder bar
+
+- **Grips:** the draggable edges of the message list and of the folder bar show a small dotted grip
+  (cyan on hover), so it's clear they can be dragged.
+- **Folder bar width:** on PCs it can be dragged wider or narrower too (180–440 px), kept per device
+  like the list's width; double-click resets. Collapsed (icons only) it stays narrow.
+- **Files:** new `web/src/components/PaneResizer.tsx`; `web/src/listWidth.ts`,
+  `web/src/components/MessageList.tsx`, `web/src/components/Sidebar.tsx`, `web/src/App.tsx`,
+  `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.6): fixes; first release with 5.3–5.5
 
 5.3, 5.4 and 5.5 were never released: the release checks (integration tests against a real mail

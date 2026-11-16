@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-16: mailbox groups as sections that expand and collapse.
 // Modified by samschultzponsys, 2026-11-16: pinned folders, the rest behind "show all".
+// Modified by samschultzponsys, 2026-11-16: the folder bar can be dragged wider or narrower.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -48,6 +49,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
+import { PaneResizer } from './PaneResizer';
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -81,6 +83,8 @@ function depth(f: FolderView): number {
 }
 
 interface Props {
+  /** PCs: dragging the right edge sets the folder bar's width (null: back to the default). */
+  onResize?: (width: number | null, done: boolean) => void;
   /** Pin or unpin folders of a mailbox (the new list of pinned paths). */
   onPin?: (accountId: string, folders: string[]) => void;
   /** Mailbox groups: sidebar sections that expand and collapse. */
@@ -117,7 +121,7 @@ interface Props {
   onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -235,6 +239,7 @@ export function Sidebar({ onPin, groups = [], accounts, showUnified, userFullNam
 
   return (
     <aside className={`pane sidebar ${rail ? 'rail' : ''}`}>
+      {onResize && !rail && <PaneResizer label="Resize the folder bar" min={180} max={(room) => Math.min(440, room - 600)} onResize={onResize} />}
       <div className="brand">
         <img className="brand-mark day" src="/brand-day.svg" alt="" />
         <img className="brand-mark night" src="/brand-night.svg" alt="" />
