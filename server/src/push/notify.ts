@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 
 import type { Address, NotificationContent } from '../../../shared/types.js';
 
@@ -13,6 +14,8 @@ export interface NewMail {
   subject: string;
   /** Used to tell real new mail from snoozed mail coming back. */
   messageId?: string | null;
+  /** The start of the message's text, fetched only when notifications show it. */
+  snippet?: string;
 }
 
 /** A snoozed message that is back in INBOX. Its new UID is null if the server didn't report it. */
@@ -63,7 +66,8 @@ function senderName(a: Address | null): string {
 }
 
 /**
- * One notification per account and batch of new mail. With `minimal` content the notification
+ * One notification per account and batch of new mail. `preview` adds the start of a single
+ * message's text under its subject. With `minimal` content the notification
  * only says that mail arrived (and in which account), never who sent it or what it is about: the
  * payload is end-to-end encrypted, but passes through Apple's/Google's push service.
  */
@@ -79,9 +83,11 @@ export function buildNotification(
 
   if (count === 1) {
     const m = newest[0]!;
+    const subject = clip(m.subject) || '(no subject)';
+    const snippet = content === 'preview' && m.snippet ? clip(m.snippet, 300) : '';
     return {
-      title: content === 'full' ? senderName(m.from) : 'New message',
-      body: content === 'full' ? clip(m.subject) || '(no subject)' : accountName,
+      title: content === 'minimal' ? 'New message' : senderName(m.from),
+      body: content === 'minimal' ? accountName : snippet ? `${subject}\n${snippet}` : subject,
       tag: `${account.id}:${m.uid}`,
       url: `/?open=${encodeURIComponent(account.id)}.${m.uidValidity}.${m.uid}`,
     };
@@ -90,8 +96,8 @@ export function buildNotification(
   const lines = newest.slice(0, MAX_LINES).map((m) => `${senderName(m.from)}: ${clip(m.subject, 100) || '(no subject)'}`);
   if (count > MAX_LINES) lines.push(`and ${count - MAX_LINES} more`);
   return {
-    title: content === 'full' ? `${count} new messages in ${accountName}` : `${count} new messages`,
-    body: content === 'full' ? lines.join('\n') : accountName,
+    title: content === 'minimal' ? `${count} new messages` : `${count} new messages in ${accountName}`,
+    body: content === 'minimal' ? accountName : lines.join('\n'),
     tag: `${account.id}:batch`,
     url: '/',
   };
@@ -116,7 +122,7 @@ export function buildSnoozeNotification(
     const known = m.uid !== null && m.uidValidity !== null;
     return {
       title: 'Back from snooze',
-      body: content === 'full' ? `${senderName(m.from)}: ${clip(m.subject, 150) || '(no subject)'}` : accountName,
+      body: content !== 'minimal' ? `${senderName(m.from)}: ${clip(m.subject, 150) || '(no subject)'}` : accountName,
       tag: known ? `${account.id}:${m.uid}` : `${account.id}:snooze`,
       url: known ? `/?open=${encodeURIComponent(account.id)}.${m.uidValidity}.${m.uid}` : '/',
     };
@@ -126,7 +132,7 @@ export function buildSnoozeNotification(
   if (count > MAX_LINES) lines.push(`and ${count - MAX_LINES} more`);
   return {
     title: `${count} snoozed messages are back`,
-    body: content === 'full' ? lines.join('\n') : accountName,
+    body: content !== 'minimal' ? lines.join('\n') : accountName,
     tag: `${account.id}:snooze`,
     url: '/',
   };

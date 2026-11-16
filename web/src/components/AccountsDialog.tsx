@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-16: your own picture as the icon while adding a mailbox.
 // Modified by samschultzponsys, 2026-11-16: mailbox groups.
 // Modified by samschultzponsys, 2026-11-16: conversations or single messages, per mailbox.
+// Modified by samschultzponsys, 2026-11-16: opens straight into a mailbox's settings from the folder bar.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -348,6 +349,7 @@ export function AccountsDialog({
   onClose,
   startWithNew,
   canEdit = true,
+  editAccountId,
 }: {
   accounts: AccountView[];
   defaults: AccountDefaults;
@@ -355,12 +357,17 @@ export function AccountsDialog({
   startWithNew?: boolean;
   /** The user's role allows adding, editing and removing mailboxes. */
   canEdit?: boolean;
+  /** Open straight into this mailbox's settings (right-click on its name in the folder bar). */
+  editAccountId?: string | null;
 }) {
+  const startEditing = canEdit ? accounts.find((a) => a.id === editAccountId) : undefined;
   const qc = useQueryClient();
-  const [editing, setEditing] = useState<{ id?: string; input: AccountInput } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; input: AccountInput } | null>(() =>
+    startEditing && startEditing.auth === 'password' ? { id: startEditing.id, input: fromView(startEditing) } : null,
+  );
   // "Add account" first asks what kind: Outlook (Microsoft sign-in) or any other IMAP account.
   const [choosing, setChoosing] = useState(!!startWithNew && canEdit);
-  const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(null);
+  const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(() => (startEditing && startEditing.auth !== 'password' ? startEditing : null));
   const groups = useQuery({ queryKey: ['groups'], queryFn: api.groups });
   const [editingGroup, setEditingGroup] = useState<MailboxGroupView | 'new' | null>(null);
   const microsoft = useQuery({ queryKey: ['microsoftAvailable'], queryFn: api.microsoftAvailable, staleTime: 60_000 });
@@ -419,10 +426,11 @@ export function AccountsDialog({
             onReconnect={() => void signIn(editingMicrosoft.auth === 'google' ? 'google' : 'microsoft', editingMicrosoft.color)}
             error={msError}
             onPicture={refresh}
-            onCancel={() => setEditingMicrosoft(null)}
+            onCancel={() => (startEditing ? onClose() : setEditingMicrosoft(null))}
             onDone={() => {
               refresh();
-              setEditingMicrosoft(null);
+              if (startEditing) onClose();
+              else setEditingMicrosoft(null);
             }}
           />
         ) : choosing && !editing ? (
@@ -523,10 +531,12 @@ export function AccountsDialog({
             image={accounts.find((a) => a.id === editing.id)?.iconImage ?? null}
             onPicture={refresh}
             defaults={defaults}
-            onCancel={() => (accounts.length ? setEditing(null) : onClose())}
+            onCancel={() => (accounts.length && !(startEditing && editing.id === startEditing.id) ? setEditing(null) : onClose())}
             onDone={() => {
               refresh();
-              setEditing(null);
+              // Opened from the folder bar's right-click menu: done means back to the mail.
+              if (startEditing && editing.id === startEditing.id) onClose();
+              else setEditing(null);
             }}
           />
         ) : (

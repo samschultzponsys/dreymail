@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **5.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -126,6 +126,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Pinned folders:** hover a folder in the sidebar and click the pin. Once a mailbox has pinned
   folders, it shows just those; the line with the ⌄ under them shows all its folders (with the
   unread count of the hidden ones), and ⌃ folds them away again.
+- **Right-click a mailbox's name** in the folder bar (web and desktop app) to edit the mailbox
+  (name, color, icon, conversations…), collapse or expand it, show all its folders, or open its AI
+  assistant.
 - Per mailbox (Accounts → edit): **Conversations** or **Single messages**, where every message is its
   own row, replies included.
 - Conversations, Gmail-style: a message and its replies are one row ("Ada, me 3") and are read
@@ -639,8 +642,9 @@ What you get:
   arrive together are summarised in one). Tapping it opens the message.
 - Nothing while the app is open and focused on any of your devices, since the list updates live
   anyway.
-- Users choose whether notifications show **sender and subject** or only "New message" and the
-  account name (Settings → This device, in the browser and the Android app). The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
+- Users choose whether notifications show **sender and subject**, **sender, subject and the start
+  of the message** (the first lines of its text, fetched when it arrives), or only "New message"
+  and the account name (Settings → This device, in the browser and the Android app). The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
   through Apple's, Google's or Mozilla's push service.
 - Notifications close themselves on all your devices once their messages are read or moved out of
   the inbox, in DreyMail or in any other mail client (within the 24 hours a notification is

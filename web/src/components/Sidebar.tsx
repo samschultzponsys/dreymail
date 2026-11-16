@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-16: mailbox groups as sections that expand and collapse.
 // Modified by samschultzponsys, 2026-11-16: pinned folders, the rest behind "show all".
 // Modified by samschultzponsys, 2026-11-16: the folder bar can be dragged wider or narrower.
+// Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -44,12 +45,14 @@ import {
   Layers,
   Search,
   Sparkles,
+  Pencil,
   TriangleAlert,
   X,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
 import { PaneResizer } from './PaneResizer';
+import { ContextMenu, type MenuItem } from './MailboxMenu';
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -119,9 +122,11 @@ interface Props {
   onCalendar?: () => void;
   /** Open the AI assistant for a mailbox (only when the user may use it). */
   onAssistant?: (accountId: string) => void;
+  /** Open a mailbox's settings (right-click its name); absent when the user may not edit mailboxes. */
+  onEditAccount?: (accountId: string) => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -129,6 +134,26 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
+  /** The right-click menu on a mailbox's name. */
+  const [menu, setMenu] = useState<{ acc: AccountView; x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const menuItems = (acc: AccountView): MenuItem[] => {
+    const isCollapsed = !!collapsed[acc.id];
+    const items: MenuItem[] = [];
+    if (onEditAccount) items.push({ label: 'Edit mailbox…', icon: <Pencil size={15} />, onClick: () => onEditAccount(acc.id) });
+    if (!rail) items.push({ label: isCollapsed ? 'Expand' : 'Collapse', icon: isCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />, onClick: () => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] })) });
+    if (!rail && (acc.pinnedFolders ?? []).length > 0)
+      items.push({
+        label: showAll[acc.id] ? 'Show pinned folders only' : 'Show all folders',
+        icon: <Folder size={15} />,
+        onClick: () => {
+          setCollapsed((c) => ({ ...c, [acc.id]: false }));
+          setShowAll((s) => ({ ...s, [acc.id]: !s[acc.id] }));
+        },
+      });
+    if (onAssistant) items.push({ label: 'AI assistant', icon: <Sparkles size={15} />, onClick: () => onAssistant(acc.id) });
+    return items;
+  };
   useEffect(() => localStorage.setItem('navRail', rail ? '1' : '0'), [rail]);
   const totalUnread = (folders ?? []).reduce((sum, a) => sum + (a.folders.find((f) => f.specialUse === 'inbox')?.unread ?? 0), 0);
 
@@ -141,7 +166,11 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                 <button
                   className="nav-heading"
                   onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
-                  title={acc.name}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({ acc, x: e.clientX, y: e.clientY });
+                  }}
+                  title={onEditAccount ? `${acc.name} (right-click for options)` : acc.name}
                 >
                   {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                   <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
@@ -339,6 +368,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
             {version.data.update && <span className="update-dot" aria-label="Update available" />}
           </button>
         )}
+        {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
         {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}
         <button className="icon-btn" title="Accounts" onClick={onAccounts}>
           <UserCog size={17} />

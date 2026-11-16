@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-16: notifications that show the start of the message.
 
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
@@ -38,15 +39,15 @@ function imapClient(user: string) {
   return c;
 }
 
-async function deliver(subject: string, flags: string[] = []) {
+async function deliver(subject: string, flags: string[] = [], body = 'hello') {
   const c = imapClient(CAROL);
   await c.connect();
-  const raw = `From: Bob <${BOB}>\r\nTo: ${CAROL}\r\nSubject: ${subject}\r\nDate: ${new Date().toUTCString()}\r\nMessage-ID: <${crypto.randomUUID()}@example.com>\r\n\r\nhello\r\n`;
+  const raw = `From: Bob <${BOB}>\r\nTo: ${CAROL}\r\nSubject: ${subject}\r\nDate: ${new Date().toUTCString()}\r\nMessage-ID: <${crypto.randomUUID()}@example.com>\r\n\r\n${body}\r\n`;
   await c.append('INBOX', Buffer.from(raw), flags);
   await c.logout();
 }
 
-async function api<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown): Promise<{ status: number; json: T }> {
+async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<{ status: number; json: T }> {
   const res = await ctx.app.inject({
     method,
     url,
@@ -166,6 +167,16 @@ describe('phone notifications for new mail', () => {
     expect(res.status).toBe(200);
     expect(await until(() => sent.length > 0)).toBe(true);
     expect(sent[0]!.payload).toMatchObject({ type: 'clear', tags: [shown.tag] });
+  });
+
+  it('shows the start of the message when the user chose previews', async () => {
+    const me = (await api<Me>('GET', '/api/me')).json;
+    expect((await api('PUT', '/api/preferences', { ...me.preferences, notificationContent: 'preview' })).status).toBe(200);
+    sent.length = 0;
+    await deliver('Weekend plans', [], 'Are you free on Saturday?\r\n> an older quoted line');
+    expect(await until(() => sent.some((r) => (r.payload as NotificationPayload).title === 'Bob'))).toBe(true);
+    expect((sent[0]!.payload as NotificationPayload).body).toBe('Weekend plans\nAre you free on Saturday?');
+    await api('PUT', '/api/preferences', { ...me.preferences, notificationContent: 'full' });
   });
 
   it('sends a test notification to the device', async () => {

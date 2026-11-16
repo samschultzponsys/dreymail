@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -110,7 +111,7 @@ export const prefsSchema = z.object({
   markReadOnOpen: z.boolean(),
   swipeLeft: swipe,
   swipeRight: swipe,
-  notificationContent: z.enum(['full', 'minimal']).default('full'),
+  notificationContent: z.enum(['full', 'preview', 'minimal']).default('full'),
   screenTransitions: z.enum(['off', 'fast', 'medium', 'slow']).default('fast'),
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),

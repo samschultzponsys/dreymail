@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
+// Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 
 // Types shared between the server API and the web client.
 
@@ -314,7 +315,7 @@ export interface DraftResult {
 }
 
 /** full: sender and subject in phone notifications; minimal: only "New message" and the account. */
-export type NotificationContent = 'full' | 'minimal';
+export type NotificationContent = 'full' | 'preview' | 'minimal';
 
 /** Phone screen transitions (the running squirrel): off, or how quickly it runs. */
 export type TransitionSpeed = 'off' | 'fast' | 'medium' | 'slow';

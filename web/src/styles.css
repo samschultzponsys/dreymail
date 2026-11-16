@@ -24,7 +24,8 @@
    Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
    Modified by samschultzponsys, 2026-11-15: send later and undo send.
    Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
-   Modified by samschultzponsys, 2026-11-15: calendar; calendar sync and invitations. */
+   Modified by samschultzponsys, 2026-11-15: calendar; calendar sync and invitations.
+   Modified by samschultzponsys, 2026-11-16: right-click menu on a mailbox's name. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1029,3 +1030,7 @@ body.resizing iframe { pointer-events: none; }
   .sidebar .pane-resizer { display: none; }
 }
 @media (max-width: 640px) { .pane-resizer { display: none; } }
+
+/* ---- right-click menu on a mailbox's name ---------------------------------------------- */
+.menu.context-menu { position: fixed; right: auto; z-index: 50; min-width: 210px; max-width: 280px; }
+.menu.context-menu .menu-label { text-transform: none; letter-spacing: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

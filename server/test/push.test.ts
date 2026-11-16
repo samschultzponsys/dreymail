@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: notification previews.
+
 import crypto from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountInput, PushSubscriptionInput } from '../../shared/types.js';
@@ -61,6 +65,15 @@ describe('notification text', () => {
     expect(lines).toHaveLength(6);
     expect(lines[0]).toBe('Sender8: Subject 8');
     expect(lines[5]).toBe('and 3 more');
+  });
+
+  it('adds the start of the message under the subject when the user chose previews', () => {
+    const m = { ...mail(7, 'Alice', 'Lunch tomorrow?'), snippet: 'Are you free at noon?   We could try the new place.' };
+    expect(buildNotification(account, [m], 'preview')).toMatchObject({ title: 'Alice', body: 'Lunch tomorrow?\nAre you free at noon? We could try the new place.' });
+    // Without a snippet (it couldn't be fetched) it is just sender and subject.
+    expect(buildNotification(account, [mail(7, 'Alice', 'Lunch tomorrow?')], 'preview')).toMatchObject({ body: 'Lunch tomorrow?' });
+    // Several at once: one line each, as with sender and subject.
+    expect(buildNotification(account, [m, mail(8, 'Bob', 'Hi')], 'preview')!.body).toBe('Bob: Hi\nAlice: Lunch tomorrow?');
   });
 
   it('never reveals sender or subject when the user chose minimal notifications', () => {

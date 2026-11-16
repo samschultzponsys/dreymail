@@ -3,12 +3,14 @@
 // Modified by samschultzponsys, 2026-11-13: new mail is also reported for open desktop-app sessions.
 // Modified by samschultzponsys, 2026-11-15: inboxes also watched for the AI assistant.
 // Modified by samschultzponsys, 2026-11-16: who is being followed (for keeping folder lists current).
+// Modified by samschultzponsys, 2026-11-16: start of new messages fetched for notification previews.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
 import type { AccountSecret, Store } from '../db.js';
 import type { NewMail } from '../push/notify.js';
 import { connectImap, MailServerError } from './connect.js';
+import { fetchSnippets } from './summary.js';
 
 export interface PoolOptions {
   idleTimeoutMs: number;
@@ -424,7 +426,18 @@ export class ImapPool {
             messageId: m.envelope?.messageId ?? null,
           };
         });
-      if (unread.length > 0) this.onNewMail(userId, accountId, unread);
+      if (unread.length === 0) return;
+      // Notifications that show the start of the message: fetch it for the one that is shown alone.
+      if (unread.length === 1 && this.store.getUser(userId)?.preferences.notificationContent === 'preview') {
+        try {
+          const withParts = await client.fetchAll(String(unread[0]!.uid), { uid: true, bodyStructure: true }, { uid: true });
+          const snippet = (await fetchSnippets(client, withParts)).get(unread[0]!.uid);
+          if (snippet) unread[0]!.snippet = snippet;
+        } catch (err) {
+          this.opts.log?.('notification preview failed', { accountId, error: (err as Error).message });
+        }
+      }
+      this.onNewMail(userId, accountId, unread);
     }).catch((err: unknown) => {
       this.opts.log?.('new mail check failed', { accountId, error: (err as Error).message });
     });

@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-15: connect single sign-on in Profile.
 // Modified by samschultzponsys, 2026-11-16: automatic image rules; sidebar entries to show.
 // Modified by samschultzponsys, 2026-11-16: "Show in notifications" in the Android app too.
+// Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -554,6 +555,7 @@ function NotificationContentSelect({ prefs, save }: { prefs: Preferences; save: 
         onChange={(e) => void save({ ...prefs, notificationContent: e.target.value as NotificationContent })}
       >
         <option value="full">Sender and subject</option>
+        <option value="preview">Sender, subject and the start of the message</option>
         <option value="minimal">Only “New message” and the account</option>
       </select>
     </div>

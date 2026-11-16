@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on waits after signing out; /login.
 // Modified by samschultzponsys, 2026-11-15: message after connecting single sign-on.
+// Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name to edit it.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -175,6 +176,8 @@ export function App() {
   const [showScheduled, setShowScheduled] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
+  /** Mailbox to open straight into when Accounts opens (right-click on its name). */
+  const [editAccountId, setEditAccountId] = useState<string | null>(null);
   // A learning period ended: the first time DreyMail opens afterwards, show its review.
   const reviews = useQuery({ queryKey: ['ai', 'reviews'], queryFn: api.assistantReviewsDue, enabled: loggedIn && !!assistantStatus.data?.allowed, staleTime: 300_000 });
   const reviewShown = useRef(false);
@@ -635,7 +638,18 @@ export function App() {
           else go(r);
         }}
         onCompose={compose}
-        onAccounts={() => openOverlay('accounts')}
+        onAccounts={() => {
+          setEditAccountId(null);
+          openOverlay('accounts');
+        }}
+        onEditAccount={
+          me.data?.permissions.includes('mail.accounts')
+            ? (id) => {
+                setEditAccountId(id);
+                openOverlay('accounts');
+              }
+            : undefined
+        }
         onSettings={() => openOverlay('settings')}
         onLogout={() => void logout()}
         userLabel={userLabel(me.data!, me.data!.preferences.showFullName)}
@@ -778,7 +792,7 @@ export function App() {
           }}
         />
       )}
-      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} onClose={() => closeOverlay('accounts')} />}
+      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} editAccountId={editAccountId} onClose={() => closeOverlay('accounts')} />}
       {showCalendar && <CalendarDialog accounts={accounts} onClose={() => setShowCalendar(false)} />}
       {showScheduled && <ScheduledDialog accounts={accountMap} onClose={() => setShowScheduled(false)} />}
       {assistantFor && accountMap.get(assistantFor.id) && (

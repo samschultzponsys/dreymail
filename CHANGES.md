@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.0): notification previews; right-click a mailbox's name
+
+- **Notification previews:** "Show in notifications" has a third choice, "Sender, subject and the
+  start of the message". For a single new message the server fetches the first bytes of its text
+  (quoted lines left out) and shows them under the subject; several at once stay one line each.
+  If the text can't be fetched, the notification still goes out with sender and subject.
+- **Right-click a mailbox's name** in the folder bar: edit the mailbox (opens its settings
+  directly; Save or Cancel returns to the mail), collapse/expand, show all or only pinned folders,
+  AI assistant. Edit only shows for roles that may change mailboxes.
+- **Files:** new `web/src/components/MailboxMenu.tsx`; `shared/types.ts`, `server/src/push/notify.ts`,
+  `server/src/imap/pool.ts`, `server/src/routes/api.ts`, `web/src/components/Sidebar.tsx`,
+  `web/src/components/AccountsDialog.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/App.tsx`, `web/src/styles.css`, `server/test/push.test.ts`,
+  `server/test/integration/push.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.9): notification content setting in the Android app
 
 - **Android:** "Show in notifications" (sender and subject, or only "New message" and the account)
