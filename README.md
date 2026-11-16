@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **7.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -519,7 +519,9 @@ server…*) and then shows DreyMail in its own window:
   notifications keep coming; *Quit* from the tray or menu stops it. New mail for **every mailbox**
   becomes a notification, also while the window is in front, with the mailbox's name in its title
   and its icon in its color (Settings → This device → "Send a test notification for each
-  mailbox" shows them). **Minimize to the tray** (on
+  mailbox" shows them). Uploaded pictures and provider icons show in any format. In the flatpak,
+  notifications go straight to the desktop's notification service, so they also show while the
+  window is behind others or in the tray (KDE Plasma dropped them otherwise). **Minimize to the tray** (on
   by default; Settings → This device, the tray menu or the DreyMail menu) makes minimizing hide the
   window from the taskbar too. A click on the tray icon brings the window back and the next click
   sends it away again (on Linux desktops where a click opens the tray menu, use *Show / hide

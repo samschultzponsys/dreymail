@@ -13,7 +13,7 @@ export interface DesktopNotification {
   tag: string;
   /** App path to open when the notification is clicked. */
   url: string;
-  /** PNG data URL: the envelope in the account's colour. */
+  /** PNG data URL: the mailbox's icon or picture in its colour. */
   icon: string;
 }
 
@@ -42,6 +42,31 @@ const iconCache = new Map<string, string>();
 /** Uploaded mailbox pictures as data: URLs, by picture URL (fetched ahead, so notifying stays instant). */
 const pictures = new Map<string, string>();
 
+/**
+ * A picture (any format the browser shows: PNG, JPEG, WebP, ICO, SVG) as a 128px PNG data: URL.
+ * The desktop app can only use PNG (or JPEG) for a notification icon, and uploaded pictures and
+ * provider icons are often in other formats.
+ */
+async function pictureAsPng(blob: Blob): Promise<string | null> {
+  const src = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const w = img.naturalWidth || 128;
+    const h = img.naturalHeight || 128;
+    const scale = 128 / Math.max(w, h);
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    c.getContext('2d')!.drawImage(img, (128 - w * scale) / 2, (128 - h * scale) / 2, w * scale, h * scale);
+    return c.toDataURL('image/png');
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
 /** Fetches a mailbox picture once and keeps it as a data: URL; null if it can't be loaded. */
 export async function loadMailboxPicture(url: string): Promise<string | null> {
   const known = pictures.get(url);
@@ -49,13 +74,8 @@ export async function loadMailboxPicture(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const blob = await res.blob();
-    const data = await new Promise<string>((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(blob);
-    });
+    const data = await pictureAsPng(await res.blob());
+    if (!data) return null;
     pictures.set(url, data);
     return data;
   } catch {

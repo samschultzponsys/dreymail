@@ -13,6 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.3): flatpak notifications in the background; mailbox icons in notifications
+
+- **Desktop app, flatpak:** on KDE Plasma, new mail only became a notification while DreyMail was
+  the window in front; behind other windows or in the tray it never reached Plasma (not even its
+  history), although the app had sent it. The flatpak now sends notifications straight to the
+  desktop's notification service with `gdbus` (as a test from inside the sandbox showed works in
+  the background), with the icon as a file the desktop can read, and hears clicks through
+  `gdbus monitor`. If gdbus fails it falls back to Electron's notifications. deb, rpm and Windows
+  are unchanged. `DREYMAIL_NOTIFY_LOG` now also records how each notification went out and whether
+  the window was focused.
+- **Notification icons:** mailboxes with an uploaded picture or a provider/website icon got the
+  plain DreyMail icon, because only PNG was used and those pictures are often JPEG, WebP, ICO or
+  SVG. Pictures are now turned into a 128px PNG first.
+- **Files:** new `desktop/notify.cjs`, `web/test/desktopNotify.test.ts`; `desktop/main.cjs`,
+  `desktop/electron-builder.yml`, `web/src/desktop.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v7.2): group icons like mailbox icons; right-click a group
 
 - **Group icons:** a group's icon can now be anything a mailbox's can: a built-in icon, your own

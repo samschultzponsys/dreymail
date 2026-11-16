@@ -7,11 +7,13 @@
 'use strict';
 
 const { app, BrowserWindow, Menu, Notification, Tray, clipboard, dialog, ipcMain, nativeImage, session, shell } = require('electron');
-const { spawn, spawnSync } = require('node:child_process');
+const { execFile, spawn, spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const update = require('./update.cjs');
+const notify = require('./notify.cjs');
 
 const APP_ID = 'io.github.samschultzponsys.dreymail';
 const SOURCE_URL = 'https://github.com/samschultzponsys/dreymail';
@@ -202,23 +204,69 @@ ipcMain.on('dreymail:minimize-to-tray', (e, on) => {
   if (isServerPage(e.senderFrame.url)) setMinimizeToTray(on);
 });
 
+// Flatpak: straight to the desktop's notification service. Electron's own notifications only
+// showed there while the window was in front (KDE Plasma dropped the rest).
+const directNotifier =
+  installKind === 'flatpak'
+    ? notify.createNotifier({ execFile, spawn, appName: 'DreyMail', desktopEntry: APP_ID, log: (m) => notifyLog({ error: m }) })
+    : null;
+
+function notifyLog(entry) {
+  // Troubleshooting: DREYMAIL_NOTIFY_LOG=/path/file records each notification (title, body, colour icon or not, how it was shown).
+  if (process.env.DREYMAIL_NOTIFY_LOG) {
+    try {
+      fs.appendFileSync(process.env.DREYMAIL_NOTIFY_LOG, JSON.stringify(entry) + '\n');
+    } catch {
+      /* troubleshooting only */
+    }
+  }
+}
+
+/** The icon as a PNG file the desktop can read (the flatpak's own files and /tmp are invisible to it). */
+function iconFile(image) {
+  try {
+    const png = image.toPNG();
+    const dir = path.join(app.getPath('userData'), 'notification-icons');
+    const file = path.join(dir, `${crypto.createHash('sha256').update(png).digest('hex').slice(0, 32)}.png`);
+    if (!fs.existsSync(file)) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, png);
+    }
+    return file;
+  } catch {
+    return '';
+  }
+}
+
 ipcMain.on('dreymail:notify', (e, n) => {
   if (!isServerPage(e.senderFrame.url)) return;
-  // Troubleshooting: DREYMAIL_NOTIFY_LOG=/path/file records each notification (title, body, colour icon or not).
-  if (process.env.DREYMAIL_NOTIFY_LOG) {
-    fs.appendFileSync(process.env.DREYMAIL_NOTIFY_LOG, JSON.stringify({ title: n.title, body: n.body, tag: n.tag, url: n.url, colourIcon: n.icon.startsWith('data:image/png') }) + '\n');
-  }
-  if (!Notification.isSupported()) return;
-  shownNotifications.get(n.tag)?.close();
-  const icon = n.icon.startsWith('data:image/png;base64,') ? nativeImage.createFromDataURL(n.icon) : nativeImage.createFromPath(ICON);
-  const note = new Notification({ title: n.title || 'DreyMail', body: n.body, icon });
-  note.on('click', () => {
+  const colourIcon = /^data:image\/(png|jpeg);base64,/.test(n.icon);
+  const icon = colourIcon ? nativeImage.createFromDataURL(n.icon) : nativeImage.createFromPath(ICON);
+  const open = () => {
     focusWindow();
     win?.webContents.send('dreymail:open', n.url);
-  });
-  note.on('close', () => shownNotifications.delete(n.tag));
-  shownNotifications.set(n.tag, note);
-  note.show();
+  };
+  const viaElectron = () => {
+    if (!Notification.isSupported()) return;
+    shownNotifications.get(n.tag)?.close();
+    const note = new Notification({ title: n.title || 'DreyMail', body: n.body, icon });
+    note.on('click', open);
+    note.on('close', () => shownNotifications.delete(n.tag));
+    shownNotifications.set(n.tag, note);
+    note.show();
+  };
+  const entry = { title: n.title, body: n.body, tag: n.tag, url: n.url, colourIcon, focused: !!win?.isFocused(), visible: !!win?.isVisible() };
+  if (!directNotifier) {
+    notifyLog({ ...entry, via: 'electron' });
+    viaElectron();
+    return;
+  }
+  void directNotifier
+    .show({ tag: n.tag, title: n.title || 'DreyMail', body: n.body, iconPath: iconFile(icon.isEmpty() ? nativeImage.createFromPath(ICON) : icon), onClick: open })
+    .then((shown) => {
+      notifyLog({ ...entry, via: shown ? 'gdbus' : 'electron (gdbus failed)' });
+      if (!shown) viaElectron();
+    });
 });
 
 ipcMain.on('dreymail:change-server', (e) => {
@@ -394,6 +442,7 @@ function refreshTrayMenu() {
 app.on('second-instance', focusWindow);
 app.on('before-quit', () => {
   quitting = true;
+  directNotifier?.stop();
 });
 app.on('window-all-closed', () => {
   if (!tray) app.quit();

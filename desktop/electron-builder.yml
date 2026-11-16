@@ -15,6 +15,7 @@ files:
   - main.cjs
   - preload.cjs
   - update.cjs
+  - notify.cjs
   - setup.html
   - build/icon.png
 extraResources:
