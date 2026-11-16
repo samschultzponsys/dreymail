@@ -27,7 +27,7 @@ describe('renewal reminder for the Outlook client secret', () => {
     await register('ann');
     await register('bob');
     const users = Object.fromEntries(store.listUsers().map((u) => [u.username, u.id]));
-    store.db.prepare("UPDATE users SET role_id = 'superadmin' WHERE id = ?").run(users.ann);
+    store.db.prepare("UPDATE users SET role_id = 'superadmin' WHERE id = ?").run(users.ann!);
 
     const save = (secretExpires: string) =>
       ctx!.app.inject({ method: 'PUT', url: '/api/admin/microsoft', headers: { cookie: sam, 'x-dreymail': '1' }, payload: { clientId: 'cid', clientSecret: 's3cret', tenant: 'common', secretExpires } });
