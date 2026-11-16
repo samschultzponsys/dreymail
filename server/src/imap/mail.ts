@@ -300,31 +300,71 @@ export class MailService {
   private readonly folderMemo = new Map<string, { at: number; value: AccountFolders }>();
   private readonly folderJobs = new Map<string, Promise<AccountFolders>>();
 
-  /**
-   * A mailbox's folders with unread counts. A list fetched in the last 30 seconds is served as is;
-   * an older one comes back at once, marked `refreshing`, while a fresh one is fetched in the
-   * background, so opening DreyMail doesn't wait for the mail server to reconnect and recount.
-   */
-  async listFolders(userId: string, accountId: string): Promise<AccountFolders> {
-    const key = `${userId}\u0000${accountId}`;
-    const known = this.folderMemo.get(key);
+  /** Remembered list: in memory, else from the encrypted mail cache (which survives restarts). */
+  private knownFolders(userId: string, accountId: string, key: string) {
+    let known = this.folderMemo.get(key);
+    if (!known && this.cached) {
+      try {
+        const saved = this.cached.cache.folderList<AccountFolders>(userId, accountId);
+        if (saved) this.folderMemo.set(key, (known = { at: saved.savedAt, value: saved.value }));
+      } catch {
+        /* cache unreadable: fetch fresh */
+      }
+    }
+    return known;
+  }
+
+  /** Fetches a fresh folder list (once at a time per mailbox) and remembers it. */
+  private refreshFolderList(userId: string, accountId: string, key: string): Promise<AccountFolders> {
     let job = this.folderJobs.get(key);
     if (!job) {
-      if (known && Date.now() - known.at < 30_000) return known.value;
       job = this.listFoldersLive(userId, accountId)
         .then((r) => {
-          if (!r.error) this.folderMemo.set(key, { at: Date.now(), value: r });
-          else this.folderMemo.delete(key);
+          if (!r.error) {
+            this.folderMemo.set(key, { at: Date.now(), value: r });
+            try {
+              this.cached?.cache.putFolderList(userId, accountId, r);
+            } catch {
+              /* the cache is optional */
+            }
+          }
           return r;
         })
         .finally(() => this.folderJobs.delete(key));
       this.folderJobs.set(key, job);
     }
+    return job;
+  }
+
+  /**
+   * A mailbox's folders with unread counts. A list fetched in the last 30 seconds is served as is;
+   * an older one (also one saved before a restart) comes back at once, marked `refreshing`, while a
+   * fresh one is fetched in the background, so opening DreyMail doesn't wait for the mail server.
+   */
+  async listFolders(userId: string, accountId: string): Promise<AccountFolders> {
+    const key = `${userId}\u0000${accountId}`;
+    const known = this.knownFolders(userId, accountId, key);
+    if (known && !this.folderJobs.has(key) && Date.now() - known.at < 30_000) return known.value;
+    const job = this.refreshFolderList(userId, accountId, key);
     if (known) {
       void job.catch(() => undefined);
       return { ...known.value, refreshing: true };
     }
     return job;
+  }
+
+  /** Keeps a mailbox's remembered folder list current (the background refresh); never throws. */
+  async refreshFolders(userId: string, accountId: string): Promise<void> {
+    const key = `${userId}\u0000${accountId}`;
+    const known = this.knownFolders(userId, accountId, key);
+    if (known && Date.now() - known.at < 60_000) return;
+    await this.refreshFolderList(userId, accountId, key).catch(() => undefined);
+  }
+
+  /** New mail or other changes: the remembered unread counts are out of date. */
+  foldersChanged(userId: string, accountId: string) {
+    const known = this.folderMemo.get(`${userId}\u0000${accountId}`);
+    if (known) known.at = 0;
   }
 
   /** Forget a mailbox's remembered folder list (after it's edited or removed). */

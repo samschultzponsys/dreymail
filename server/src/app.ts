@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 // Modified by samschultzponsys, 2026-11-15: privacy page at /privacy.
+// Modified by samschultzponsys, 2026-11-16: folder lists kept current in the background.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -327,6 +328,29 @@ export async function buildApp(
   learningTimer.unref();
   app.addHook('onClose', async () => clearInterval(learningTimer));
   live = await registerWebSocket(app, config, store, sessions, pool);
+  // New mail and other changes make the remembered unread counts out of date.
+  const sendEvent = pool.onEvent;
+  pool.onEvent = (userId, event) => {
+    if (event.type === 'mailbox' || event.type === 'reset') mail.foldersChanged(userId, event.accountId);
+    sendEvent(userId, event);
+  };
+  // Folder lists of the mailboxes people are using are kept current in the background (three
+  // mail servers at a time), so the sidebar shows right away on any device.
+  let refreshingFolders = false;
+  const folderTimer = setInterval(() => {
+    if (refreshingFolders) return;
+    refreshingFolders = true;
+    const jobs = pool.watchedUserIds().flatMap((userId) => store.listAccounts(userId).map((a) => [userId, a.id] as const));
+    const next = async (): Promise<void> => {
+      const job = jobs.shift();
+      if (!job) return;
+      await mail.refreshFolders(job[0], job[1]);
+      return next();
+    };
+    void Promise.all([next(), next(), next()]).finally(() => (refreshingFolders = false));
+  }, 5 * 60_000);
+  folderTimer.unref();
+  app.addHook('onClose', async () => clearInterval(folderTimer));
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.
   if (fs.existsSync(path.join(config.webDir, 'index.html'))) {

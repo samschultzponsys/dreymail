@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.5): folder lists kept across restarts and kept current
+
+- **Folder lists** (with unread counts) are saved in the encrypted mail cache (`cache.db`), so after
+  a restart the sidebar still shows at once on any device. Every 5 minutes the server refreshes the
+  lists of mailboxes people are using (open sessions, notifications, the AI assistant), three mail
+  servers at a time; new mail marks a mailbox's list out of date so its counts catch up. One fetch
+  per mailbox at a time, and none while a list is less than 30 seconds old.
+- **Files:** `server/src/cache/store.ts` (`folder_lists`, created in place: cached mail is kept),
+  `server/src/imap/mail.ts`, `server/src/imap/pool.ts`, `server/src/app.ts`, new
+  `server/test/folderLists.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.4): resizable message list, folders at once, Settings tabs on phones
 
 - **Message list width:** on tablets and PCs, drag the right edge of the message list (the line

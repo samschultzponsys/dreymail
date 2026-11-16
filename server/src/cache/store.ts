@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
+// Modified by samschultzponsys, 2026-11-16: each mailbox's folder list, kept encrypted.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -27,6 +28,15 @@ import { matchesTerm, type LookupField, type LookupTerm } from '../imap/related.
 
 // 2 (DreyMail): summaries carry the automatic inbox tab.
 const SCHEMA_VERSION = '2';
+
+/** Each mailbox's folder list with unread counts (DreyMail), so the sidebar shows at once. */
+const FOLDER_LISTS = `CREATE TABLE IF NOT EXISTS folder_lists (
+    user_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    data BLOB NOT NULL,
+    saved_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, account_id)
+  );`;
 
 const SCHEMA = `
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -221,7 +231,10 @@ export class MailCache {
     const meta = hasMeta
       ? new Map((this.db.prepare('SELECT key, value FROM meta').all() as { key: string; value: string }[]).map((r) => [r.key, r.value]))
       : new Map<string, string>();
-    if (meta.get('schema') === SCHEMA_VERSION && meta.get('key') === this.keyCheck()) return;
+    if (meta.get('schema') === SCHEMA_VERSION && meta.get('key') === this.keyCheck()) {
+      this.db.exec(FOLDER_LISTS); // added later; created in place so cached mail is kept
+      return;
+    }
     // Another format or another secret key (nothing in here could be decrypted): start empty.
     if (hasMeta) this.log('mail cache format or key changed, starting over');
     this.recreate();
@@ -234,6 +247,7 @@ export class MailCache {
     try {
       for (const t of tables) this.db.exec(`DROP TABLE IF EXISTS "${t.name.replace(/"/g, '""')}"`);
       this.db.exec(SCHEMA);
+      this.db.exec(FOLDER_LISTS);
       this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?), (?, ?)').run('schema', SCHEMA_VERSION, 'key', this.keyCheck());
       this.db.exec('COMMIT');
     } catch (err) {
@@ -317,11 +331,35 @@ export class MailCache {
 
   dropAccount(userId: string, accountId: string) {
     this.db.prepare('DELETE FROM folders WHERE user_id = ? AND account_id = ?').run(userId, accountId);
+    this.db.prepare('DELETE FROM folder_lists WHERE user_id = ? AND account_id = ?').run(userId, accountId);
+  }
+
+  // ---- folder lists (DreyMail) -------------------------------------------------
+
+  private listAad(userId: string, accountId: string) {
+    return `${userId}\u0000${accountId}\u0000folder-list`;
+  }
+
+  /** The last folder list saved for a mailbox, or null. */
+  folderList<T>(userId: string, accountId: string): { savedAt: number; value: T } | null {
+    const r = this.db.prepare('SELECT data, saved_at FROM folder_lists WHERE user_id = ? AND account_id = ?').get(userId, accountId) as { data: Uint8Array; saved_at: number } | undefined;
+    if (!r) return null;
+    try {
+      return { savedAt: r.saved_at, value: JSON.parse(decryptBytes(this.keys.cacheKey, Buffer.from(r.data), this.listAad(userId, accountId)).toString('utf8')) as T };
+    } catch {
+      this.db.prepare('DELETE FROM folder_lists WHERE user_id = ? AND account_id = ?').run(userId, accountId);
+      return null;
+    }
+  }
+
+  putFolderList(userId: string, accountId: string, value: unknown) {
+    const data = encryptBytes(this.keys.cacheKey, Buffer.from(JSON.stringify(value)), this.listAad(userId, accountId));
+    this.db.prepare('INSERT INTO folder_lists (user_id, account_id, data, saved_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, account_id) DO UPDATE SET data = excluded.data, saved_at = excluded.saved_at').run(userId, accountId, data, Date.now());
   }
 
   /** Forget accounts that no longer exist. `keep` holds `${userId}\0${accountId}`. */
   prune(keep: Set<string>) {
-    const rows = this.db.prepare('SELECT DISTINCT user_id, account_id FROM folders').all() as { user_id: string; account_id: string }[];
+    const rows = this.db.prepare('SELECT user_id, account_id FROM folders UNION SELECT user_id, account_id FROM folder_lists').all() as { user_id: string; account_id: string }[];
     for (const r of rows) if (!keep.has(`${r.user_id}\u0000${r.account_id}`)) this.dropAccount(r.user_id, r.account_id);
   }
 

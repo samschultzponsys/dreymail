@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: new mail is also reported for open desktop-app sessions.
 // Modified by samschultzponsys, 2026-11-15: inboxes also watched for the AI assistant.
+// Modified by samschultzponsys, 2026-11-16: who is being followed (for keeping folder lists current).
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -184,6 +185,13 @@ export class ImapPool {
   }
 
   // ---- live updates --------------------------------------------------------
+
+  /** Users whose mail is being followed now: open sessions, notifications or the AI assistant (DreyMail). */
+  watchedUserIds(): string[] {
+    const ids = new Set<string>([...this.background, ...this.assistant]);
+    for (const [id, n] of this.watchRefs) if (n > 0) ids.add(id);
+    return [...ids];
+  }
 
   private watching(userId: string): boolean {
     return (this.watchRefs.get(userId) ?? 0) > 0 || this.keepsWatching(userId);
