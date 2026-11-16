@@ -207,7 +207,11 @@ export function App() {
 
   // One row per conversation, Gmail-style, including your replies found in Sent.
   const related = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.related ?? []) ?? [], [messagesQ.data]);
-  const rows = useMemo(() => groupConversations(messages, related, { group: !inDrafts }), [messages, related, inDrafts]);
+  const singleView = useMemo(() => new Set(accounts.filter((a) => a.threaded === false).map((a) => a.id)), [accounts]);
+  const rows = useMemo(
+    () => groupConversations(messages, related, { group: !inDrafts, threaded: (id) => !singleView.has(id) }),
+    [messages, related, inDrafts, singleView],
+  );
   /** Actions on a conversation apply to all of its messages in the listed folder. */
   const expand = useCallback(
     (refs: MessageRef[]) => {

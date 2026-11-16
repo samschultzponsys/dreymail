@@ -74,6 +74,7 @@ const accountSchema = z.object({
   email: z.string().trim().min(3).max(320),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   icon: z.string().max(40).optional(),
+  threaded: z.boolean().optional(),
   imap: server,
   smtp: server,
   appendSent: z.boolean(),
@@ -543,6 +544,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       await verify(input);
       const created = store.createAccount(uid(req), input);
       store.setAccountIcon(uid(req), created.id, iconOf(input.icon));
+      if (input.threaded === false) store.setAccountThreaded(uid(req), created.id, false);
       pool.accountAdded(uid(req), created.id);
       return store.listAccounts(uid(req)).find((a) => a.id === created.id) ?? created;
     } catch (err) {
@@ -557,6 +559,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const existing = store.getAccountSecret(uid(req), req.params.id);
       if (!existing) throw new NotFoundError('Account not found');
       // Outlook / Google-signed-in accounts: only the label, name and colour can change here.
+      if (input.threaded !== undefined) store.setAccountThreaded(uid(req), req.params.id, input.threaded);
       if (existing.auth !== 'password') {
         store.setAccountIcon(uid(req), req.params.id, iconOf(input.icon, req.params.id, uid(req)));
         return store.updateAccountLabels(uid(req), req.params.id, { name: input.name, displayName: input.displayName, color: input.color });

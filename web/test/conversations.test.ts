@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: single view per mailbox.
+
 import { describe, expect, it } from 'vitest';
 import { baseSubject, groupConversations, participants, rowOf } from '../../shared/threads';
 import type { MessageSummary } from '../../shared/types';
@@ -165,3 +169,22 @@ describe('conversation participants', () => {
     expect(participants(people, isMe)).toBe('Ada, Bob … Di');
   });
 });
+
+describe('single view per mailbox', () => {
+  it('lists every message of a single-view mailbox on its own, keeping order, while others group', () => {
+    const a = msg({ id: 'a', accountId: 'threads', date: '2026-10-18T10:00:00Z' });
+    const aRe = replyTo(a, { id: 'a2', accountId: 'threads', date: '2026-10-18T12:00:00Z' });
+    const b = msg({ id: 'b', accountId: 'single', date: '2026-10-18T09:00:00Z' });
+    const bRe = replyTo(b, { id: 'b2', accountId: 'single', date: '2026-10-18T11:00:00Z' });
+    const listed = [aRe, bRe, a, b]; // newest first
+    const rows = groupConversations(listed, [], { threaded: (id) => id !== 'single' });
+    expect(rows.map((r) => [r.messageId, r.thread.length])).toEqual([
+      ['<a2@example.com>', 2],
+      ['<b2@example.com>', 1],
+      ['<b@example.com>', 1],
+    ]);
+    // Everything threaded: as before.
+    expect(groupConversations(listed, [], { threaded: () => true })).toHaveLength(2);
+  });
+});
+

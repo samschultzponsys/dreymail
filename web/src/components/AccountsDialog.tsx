@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: provider list with server settings filled in, or custom.
 // Modified by samschultzponsys, 2026-11-16: your own picture as the icon while adding a mailbox.
 // Modified by samschultzponsys, 2026-11-16: mailbox groups.
+// Modified by samschultzponsys, 2026-11-16: conversations or single messages, per mailbox.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -35,7 +36,26 @@ function fromView(a: AccountView): AccountInput {
     imap: { ...a.imap, password: '' },
     smtp: { ...a.smtp, password: '' },
     appendSent: a.appendSent,
+    threaded: a.threaded ?? true,
   };
+}
+
+/** Threaded view (conversations as one row) or single view (every message on its own), per mailbox. */
+function ThreadedChoice({ value, onChange }: { value: boolean; onChange: (threaded: boolean) => void }) {
+  return (
+    <div>
+      <label className="label">Message list</label>
+      <div className="segmented">
+        <button type="button" className={value ? 'on' : ''} onClick={() => onChange(true)}>
+          Conversations
+        </button>
+        <button type="button" className={!value ? 'on' : ''} onClick={() => onChange(false)}>
+          Single messages
+        </button>
+      </div>
+      <div className="hint">{value ? 'A message and its replies are one row, read together.' : 'Every message is its own row, also replies in a chain.'}</div>
+    </div>
+  );
 }
 
 function ServerFields({
@@ -302,6 +322,7 @@ function AccountForm({
           Save a copy of sent mail to the Sent folder
           <span className="muted">(turn off if your provider already does this)</span>
         </label>
+        <ThreadedChoice value={v.threaded ?? true} onChange={(threaded) => setV({ ...v, threaded })} />
       </div>
       <div className="dialog-foot">
         <span className={`grow ${status?.ok ? '' : 'error-text'}`} style={status?.ok ? { color: 'var(--success)' } : undefined}>
@@ -615,6 +636,7 @@ function MicrosoftAccountForm({
   const [color, setColor] = useState(account.color);
   const [icon, setIcon] = useState(account.icon);
   const [image, setImage] = useState(account.iconImage);
+  const [threaded, setThreaded] = useState(account.threaded ?? true);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -661,6 +683,7 @@ function MicrosoftAccountForm({
           </div>
         </div>
         <MailboxIconPicker value={icon} color={color} onChange={setIcon} accountId={account.id} email={account.email} image={image} onAccount={(a) => { setImage(a.iconImage); onPicture?.(); }} />
+        <ThreadedChoice value={threaded} onChange={setThreaded} />
         <div className="hint">{account.auth === 'google' ? 'Gmail keeps the copy of sent mail itself.' : 'Sent mail goes through Microsoft, which keeps the copy in Sent Items.'}</div>
         {(error || status) && <div className="error-text">{error ?? status}</div>}
       </div>
@@ -675,7 +698,7 @@ function MicrosoftAccountForm({
           onClick={async () => {
             setBusy(true);
             try {
-              await api.updateAccount(account.id, { ...fromView(account), name: name.trim(), displayName, color, icon });
+              await api.updateAccount(account.id, { ...fromView(account), name: name.trim(), displayName, color, icon, threaded });
               onDone();
             } catch (err) {
               setStatus((err as Error).message);

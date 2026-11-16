@@ -25,6 +25,7 @@
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 // Modified by samschultzponsys, 2026-11-15: repair for databases that skipped the Microsoft sign-in columns.
 // Modified by samschultzponsys, 2026-11-16: mailbox groups.
+// Modified by samschultzponsys, 2026-11-16: threaded or single view per mailbox.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -427,6 +428,11 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
     if (!cols.some((c) => c.name === 'group_id')) db.exec('ALTER TABLE accounts ADD COLUMN group_id TEXT REFERENCES mailbox_groups(id) ON DELETE SET NULL');
   },
+  // DreyMail: per mailbox, show conversations as threads (1) or every message on its own (0).
+  (db) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'threaded')) db.exec('ALTER TABLE accounts ADD COLUMN threaded INTEGER NOT NULL DEFAULT 1');
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -517,6 +523,7 @@ interface AccountRow {
   icon?: string;
   icon_image_version?: number;
   group_id?: string | null;
+  threaded?: number;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -533,6 +540,7 @@ function toView(r: AccountRow): AccountView {
     icon: r.icon === 'image' && !r.icon_image_version ? '' : (r.icon ?? ''),
     iconImage: r.icon_image_version ? `/api/accounts/${r.id}/icon?v=${r.icon_image_version}` : null,
     groupId: r.group_id ?? null,
+    threaded: r.threaded !== 0,
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
@@ -935,6 +943,11 @@ export class Store {
   deleteGroup(userId: string, id: string): boolean {
     this.db.prepare('UPDATE accounts SET group_id = NULL WHERE user_id = ? AND group_id = ?').run(userId, id);
     return Number(this.db.prepare('DELETE FROM mailbox_groups WHERE id = ? AND user_id = ?').run(id, userId).changes) > 0;
+  }
+
+  /** Conversations as threads, or every message on its own, for this mailbox. */
+  setAccountThreaded(userId: string, accountId: string, threaded: boolean) {
+    this.db.prepare('UPDATE accounts SET threaded = ? WHERE user_id = ? AND id = ?').run(threaded ? 1 : 0, userId, accountId);
   }
 
   /** New-mail notifications for this mailbox: off when its group says so. */

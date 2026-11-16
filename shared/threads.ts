@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: single view per mailbox.
+
 // Conversations (Gmail-style threads): messages that belong together are shown as one row and read
 // together. Shared by the server (to find the rest of a conversation) and the web client (to group).
 
@@ -58,9 +62,22 @@ const time = (m: MessageSummary) => new Date(m.date).getTime() || 0;
  * like Gmail. Conversations never span accounts. Each conversation becomes one row in the
  * position of its newest listed message; related messages without a listed one are dropped.
  *
- * With `group: false` (drafts), every listed message is its own row.
+ * With `group: false` (drafts), every listed message is its own row; `threaded` says that per
+ * mailbox (single view).
  */
-export function groupConversations(listed: MessageSummary[], related: MessageSummary[] = [], opts: { group?: boolean } = {}): ConversationRow[] {
+export function groupConversations(
+  listed: MessageSummary[],
+  related: MessageSummary[] = [],
+  opts: { group?: boolean; /** Per mailbox: conversations (true) or single messages (false) (DreyMail). */ threaded?: (accountId: string) => boolean } = {},
+): ConversationRow[] {
+  if (opts.threaded && opts.group !== false && listed.some((m) => !opts.threaded!(m.accountId))) {
+    // Mailboxes in single view: every message its own row; the others grouped; the list's order kept.
+    const isThreaded = (m: MessageSummary) => opts.threaded!(m.accountId);
+    const grouped = groupConversations(listed.filter(isThreaded), related.filter(isThreaded));
+    const single = groupConversations(listed.filter((m) => !isThreaded(m)), [], { group: false });
+    const order = new Map(listed.map((m, i) => [key(m), i]));
+    return [...grouped, ...single].sort((x, y) => (order.get(key(x)) ?? 0) - (order.get(key(y)) ?? 0));
+  }
   const all: MessageSummary[] = [];
   const seen = new Set<string>();
   const listedKeys = new Set<string>();

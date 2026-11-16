@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **5.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **5.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -123,6 +123,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   IDLE pushed over one WebSocket per browser session.
 - Message list with sender, subject, snippet, date, unread/flagged/answered/attachment
   indicators, and an account color tag in the unified view.
+- Per mailbox (Accounts → edit): **Conversations** or **Single messages**, where every message is its
+  own row, replies included.
 - Conversations, Gmail-style: a message and its replies are one row ("Ada, me 3") and are read
   together, older messages folded. Your replies are found in the Sent folder, also when you
   sent them from another mail client. Messages belong together when they share Message-IDs

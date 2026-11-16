@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.1): conversations or single messages, per mailbox
+
+- **Accounts → edit a mailbox → Message list:** *Conversations* (a message and its replies are one
+  row, read together, as before) or *Single messages* (every message its own row). Works for every
+  kind of mailbox; in All inboxes each mailbox follows its own choice.
+- **Files:** `server/src/db.ts` (`accounts.threaded`), `server/src/routes/api.ts`, `shared/types.ts`,
+  `shared/threads.ts`, `web/src/App.tsx`, `web/src/components/AccountsDialog.tsx`,
+  `web/test/conversations.test.ts`, `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.0): your mail provider's own icon
 
 - **Mailbox icons:** "Use Gmail's icon" (or Outlook's for Outlook, Hotmail, Live and MSN addresses,

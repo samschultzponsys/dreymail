@@ -17,6 +17,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Editing whole series of repeating CalDAV events (today they are read-only in DreyMail).
 
 ### Mail
+- [ ] Folder lists load per mailbox, so one slow mailbox (e.g. the first Outlook sign-in) doesn't hold up
+      the others' folders in the sidebar.
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
       Outlook sign-in accounts already let the provider file sent mail).
@@ -45,6 +47,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Conversations or single messages, per mailbox (5.1).
 - [x] Mailbox groups: sidebar sections that expand and collapse, with a shared color, icon and
       notification switch (4.9).
 - [x] Per-account icons, 38 built in, shown in the sidebar and notifications (2.9); your own

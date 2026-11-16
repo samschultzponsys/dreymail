@@ -40,6 +40,8 @@ export interface AccountInput {
   imap: { host: string; port: number; tls: TlsMode; user: string; password?: string };
   smtp: { host: string; port: number; tls: TlsMode; user: string; password?: string };
   appendSent: boolean;
+  /** Conversations as threads (default) or every message on its own (DreyMail). */
+  threaded?: boolean;
 }
 
 /** Account as returned to the browser. Never contains passwords. */
@@ -60,6 +62,8 @@ export interface AccountView {
   auth: AccountAuth;
   /** The mailbox group it belongs to, if any (DreyMail). */
   groupId?: string | null;
+  /** Conversations shown as threads (true) or every message on its own (DreyMail). */
+  threaded?: boolean;
 }
 
 /** A group of mailboxes: a sidebar section with its own color, icon and notification switch (DreyMail). */
