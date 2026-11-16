@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-15: search filters (sender, dates, size, attachments, flags) and all-mail sources.
 // Modified by samschultzponsys, 2026-11-16: automatic image loading rules (Settings → Images).
 // Modified by samschultzponsys, 2026-11-16: folder lists served at once from the last known one.
+// Modified by samschultzponsys, 2026-11-16: time taken per step when opening a message.
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -783,10 +784,20 @@ export class MailService {
       maxBytes: number;
       imageCache?: RemoteImageCache;
       fetchImage?: InlineOptions['fetchImage'];
+      /** Filled with how long each step took, in ms (for the Server-Timing header). */
+      timing?: Record<string, number>;
     },
   ): Promise<MessageDetail> {
+    let t = performance.now();
+    const step = (name: string) => {
+      const now = performance.now();
+      if (opts.timing) opts.timing[name] = Math.round(now - t);
+      t = now;
+    };
     const { raw, flags, internalDate } = await this.fetchRaw(userId, ref, opts.maxBytes);
+    step('fetch');
     const email = await parseRaw(raw);
+    step('parse');
     const urls = email.html ? collectRemoteImageUrls(email.html) : [];
     const decision = decideRemoteImages(email, opts.allowRemote, opts.imageDomains ?? [], opts.autoImages ? { ...opts.autoImages, imageUrls: urls } : undefined);
     // Remote images are fetched here and inlined as data: URIs; the browser never fetches them.
@@ -797,6 +808,7 @@ export class MailService {
         cache: opts.imageCache,
         fetchImage: opts.fetchImage,
       });
+      step('images');
     }
     return buildMessageDetail(
       email,

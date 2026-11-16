@@ -102,6 +102,8 @@ describe('snippets from BODYSTRUCTURE', () => {
     const reply = 'Sounds good.\r\n\r\nOn Mon, Nov 16, 2026 at 9:00 AM Sam Schultz <s@example.com> wrote:\r\n> Can you check?';
     expect(snippetFromPart(Buffer.from(reply), plain, false, { length: 1000, keepLines: true })).toBe('Sounds good.');
     expect(snippetFromPart(Buffer.from('x'.repeat(5000)), plain, false, { length: 1000, keepLines: true })).toHaveLength(1000);
+    // Emoji written in two halves (Outlook for iOS) come out whole in the snippet too.
+    expect(snippetFromPart(Buffer.from('<p>Thank you &#55357;&#56842;</p>'), { part: '1', type: 'text/html', encoding: '7bit', charset: 'utf-8' })).toBe('Thank you 😊');
     // The list's snippet is unchanged: one line, short.
     expect(snippetFromPart(Buffer.from(body), plain)).toMatch(/^Hi Sam, The RMA/);
   });

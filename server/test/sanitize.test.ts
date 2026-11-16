@@ -1,7 +1,12 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: emoji written as two halves.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { collectRemoteImageUrls, sanitizeEmailHtml, type SanitizeOptions } from '../src/mail/sanitize.js';
+import { joinSurrogateReferences } from '../src/mail/sanitize.js';
 import { sanitizeInlineStyle, sanitizeStylesheet } from '../src/mail/css.js';
 import { buildSrcdoc } from '../../shared/srcdoc.js';
 
@@ -232,5 +237,13 @@ describe('iframe document', () => {
             palette: { ...palette, background: 'red;} body{background:url(https://evil.example.com/x)' },
     });
     expect(doc).not.toContain('evil.example.com');
+  });
+});
+
+describe('emoji written in two halves', () => {
+  it('become the one character they mean (Outlook for iOS writes them so)', () => {
+    expect(joinSurrogateReferences('Thank you &#55357;&#56842;')).toBe('Thank you &#128522;');
+    expect(joinSurrogateReferences('&#xD83D;&#xDE0A;')).toBe('&#128522;');
+    expect(joinSurrogateReferences('&#65;&#66; &#128522;')).toBe('&#65;&#66; &#128522;');
   });
 });

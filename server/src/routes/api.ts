@@ -730,7 +730,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       // absent: the server decides from the user's sender-domain allowlist.
       const q = refSchema.extend({ remote: z.enum(['0', '1']).optional() }).parse(req.query);
       requireAccount(uid(req), q.accountId);
+      const timing: Record<string, number> = {};
+      const started = performance.now();
       const detail = await mail.getMessage(uid(req), q, {
+        timing,
         allowRemote: q.remote === undefined ? undefined : q.remote === '1',
         imageDomains: q.remote === undefined ? store.listImageDomains(uid(req)) : [],
         autoImages: q.remote === undefined ? autoImagesFor(uid(req)) : undefined,
@@ -740,6 +743,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       });
       const until = snoozedUntil(uid(req))(q);
       if (until) detail.snoozedUntil = until;
+      // Where the time went (mail server, parsing, pictures): visible in the browser's developer
+      // tools, and logged when a message took long.
+      const total = Math.round(performance.now() - started);
+      reply.header('server-timing', [...Object.entries(timing).map(([k, v]) => `${k};dur=${v}`), `total;dur=${total}`].join(', '));
+      if (total > 3000) req.log.warn({ ...timing, total, folder: q.folder }, 'slow message');
       reply.header('cache-control', 'private, no-store');
       return detail;
     } catch (err) {

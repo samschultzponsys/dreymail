@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: a slow picture server never holds a message back.
+
 import { describe, expect, it, vi } from 'vitest';
 import { buildMessageDetail } from '../src/mail/parse.js';
 import { collectRemoteImageUrls } from '../src/mail/sanitize.js';
@@ -82,6 +86,28 @@ describe('inlineRemoteImages', () => {
     expect(fetchImage).toHaveBeenCalledTimes(2);
     await inlineRemoteImages(urls, { userId: 'u2', fetchImage, cache });
     expect(fetchImage).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe('a slow picture server', () => {
+  it('never holds the message back past the deadline; the picture lands in the cache for next time', async () => {
+    const cache = new RemoteImageCache();
+    let finish!: () => void;
+    const fetchImage = vi.fn(async (u: string) => {
+      if (u.includes('slow')) await new Promise<void>((r) => (finish = r));
+      return png(5);
+    });
+    const urls = ['https://img.example.com/fast.png', 'https://slow.example.com/logo.png'];
+    const started = Date.now();
+    const out = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 150 });
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(out.get(urls[0]!)).toMatch(/^data:image\/png/);
+    expect(out.get(urls[1]!)).toBeNull();
+    finish();
+    await new Promise((r) => setTimeout(r, 10));
+    const again = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 150 });
+    expect(again.get(urls[1]!)).toMatch(/^data:image\/png/);
+    expect(fetchImage).toHaveBeenCalledTimes(2);
   });
 });
 

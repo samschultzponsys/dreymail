@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: emoji written as two halves (Outlook for iOS) show as one.
+
 import { Parser } from 'htmlparser2';
 import sanitizeHtml from 'sanitize-html';
 import type { HtmlStyle } from '../../../shared/types.js';
@@ -116,7 +120,22 @@ function extractStylesheets(html: string): string[] {
   return sheets;
 }
 
-export function sanitizeEmailHtml(input: string, opts: SanitizeOptions): SanitizedHtml {
+/**
+ * Emoji written as two character references, one per UTF-16 half (`&#55357;&#56842;`, as Outlook
+ * for iOS does): each half alone is shown as "�", so the pair becomes the one character it means.
+ */
+export function joinSurrogateReferences(html: string): string {
+  const ref = '&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));';
+  return html.replace(new RegExp(`${ref}${ref}`, 'g'), (whole, h1?: string, d1?: string, h2?: string, d2?: string) => {
+    const hi = h1 ? Number.parseInt(h1, 16) : Number(d1);
+    const lo = h2 ? Number.parseInt(h2, 16) : Number(d2);
+    if (hi < 0xd800 || hi > 0xdbff || lo < 0xdc00 || lo > 0xdfff) return whole;
+    return `&#${0x10000 + ((hi - 0xd800) << 10) + (lo - 0xdc00)};`;
+  });
+}
+
+export function sanitizeEmailHtml(rawInput: string, opts: SanitizeOptions): SanitizedHtml {
+  const input = joinSurrogateReferences(rawInput);
   let remoteBlocked = 0;
   let designSignals = 0;
   let images = 0;

@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Conversations scroll as one page (each message as tall as it is); faster opening (folder
+      lists on their own connection, pictures wait at most 5 s); emoji from Outlook for iOS (6.7).
 - [x] Flatpak fallback update command finds the file in the Downloads folder (6.6).
 - [x] Signatures made for Outlook: import from its .zip or .htm and pictures, table layout kept,
       up to 1.5 MB; pictures in messages sent as inline attachments (6.5).

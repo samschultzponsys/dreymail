@@ -4,6 +4,7 @@
 
 import type { MessageStructureObject } from 'imapflow';
 import { convert } from 'html-to-text';
+import { joinSurrogateReferences } from '../mail/sanitize.js';
 
 export interface TextPart {
   part: string;
@@ -105,7 +106,7 @@ export function snippetFromPart(raw: Buffer, part: TextPart, alreadyDecoded = fa
   if (part.type === 'text/html') {
     // Strip any trailing partial tag before converting.
     text = text.replace(/<[^>]*$/, '');
-    text = convert(text, {
+    text = convert(joinSurrogateReferences(text), {
       wordwrap: false,
       selectors: [
         { selector: 'a', options: { ignoreHref: true } },

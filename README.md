@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -824,9 +824,11 @@ Every message is assumed to be hostile.
   behaviors, and anything hidden behind CSS escapes. Links are limited to
   `http`/`https`/`mailto`/`tel` and open in a new tab with `noopener noreferrer`. `mailto:` links
   are pointed at the app's own composer (`/?mailto=…`) just before display.
-- The result is rendered in an `<iframe sandbox>` **without** `allow-scripts` and
-  `allow-same-origin`. That gives it an opaque origin, so it can't reach the app, its cookies or
-  storage. A strict Content-Security-Policy inside the frame (`default-src 'none'; img-src data:`)
+- The result is rendered in an `<iframe sandbox>` **without** `allow-scripts`, so nothing in a
+  message can run. (Since 6.7 the frame has `allow-same-origin`, which lets the app measure the
+  message and make the frame as tall as it, so a conversation scrolls as one page; with scripts
+  off, the message itself still can't reach the app, its cookies or storage.) A strict
+  Content-Security-Policy inside the frame (`default-src 'none'; img-src data:`)
   blocks scripts, forms, frames and **every** network request: the rendered message never
   contacts any server, which also means it works behind cookie-based auth proxies.
 - **Remote content is blocked by default.** "Load images" makes the server download the images

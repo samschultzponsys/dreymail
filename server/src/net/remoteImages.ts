@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-16: a message waits at most 5 s for its pictures.
 
 import http from 'node:http';
 import https from 'node:https';
@@ -156,7 +157,9 @@ export interface InlineOptions {
   fetchImage?: (url: string) => Promise<RemoteImage>;
 }
 
-export const INLINE_DEFAULTS = { concurrency: 6, totalBytes: 15 * 1024 * 1024, maxImages: 100, deadlineMs: 20_000 };
+// A message shows after at most deadlineMs; pictures still on their way keep downloading into the
+// cache and show the next time it opens (DreyMail: it used to wait up to 20 s, plus stragglers).
+export const INLINE_DEFAULTS = { concurrency: 6, totalBytes: 15 * 1024 * 1024, maxImages: 100, deadlineMs: 5_000 };
 
 const toDataUri = (img: RemoteImage) => `data:${img.contentType};base64,${img.body.toString('base64')}`;
 
@@ -204,7 +207,19 @@ export async function inlineRemoteImages(urls: string[], opts: InlineOptions): P
       accept(url, img);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(o.concurrency, queue.length) }, worker));
+  const all = Promise.all(Array.from({ length: Math.min(o.concurrency, queue.length) }, worker));
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<'late'>((resolve) => {
+    timer = setTimeout(() => resolve('late'), Math.max(0, deadline - Date.now()));
+    timer.unref?.();
+  });
+  if ((await Promise.race([all.then(() => 'done' as const), late])) === 'late') {
+    // Don't wait for slow servers: what hasn't arrived is left out this time.
+    const done = new Map(out);
+    for (const u of unique) if (!done.has(u)) done.set(u, null);
+    return done;
+  }
+  clearTimeout(timer);
   return out;
 }
 

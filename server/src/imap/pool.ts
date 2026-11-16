@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-15: inboxes also watched for the AI assistant.
 // Modified by samschultzponsys, 2026-11-16: who is being followed (for keeping folder lists current).
 // Modified by samschultzponsys, 2026-11-16: start of new messages fetched for notification previews.
+// Modified by samschultzponsys, 2026-11-16: folder lists on their own connection, so opening a message never waits behind them.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -26,7 +27,6 @@ interface CommandConnection {
   connecting: Promise<ImapFlow> | null;
   lastUsed: number;
   inFlight: number;
-  folders: { at: number; list: ListResponse[] } | null;
 }
 
 interface Watcher {
@@ -58,6 +58,8 @@ export class ImapPool {
   private readonly conns = new Map<string, CommandConnection>();
   private readonly watchers = new Map<string, Map<string, Watcher>>();
   private readonly watchRefs = new Map<string, number>();
+  /** The last folder list per account, for a minute (kept apart from connections, which come and go). */
+  private readonly folderLists = new Map<string, { at: number; list: ListResponse[] }>();
   private readonly background = new Set<string>();
   /** Users with the AI assistant on for some mailbox: their inboxes are watched for new mail too (DreyMail). */
   private readonly assistant = new Set<string>();
@@ -91,11 +93,16 @@ export class ImapPool {
     return acc;
   }
 
-  private async client(userId: string, accountId: string): Promise<{ conn: CommandConnection; client: ImapFlow }> {
-    const key = this.key(userId, accountId);
+  /**
+   * The account's command connection, or (`lane` 'folders') a second one that only lists folders:
+   * listing every folder with its counts can take seconds on a big account, and opening a message
+   * must never wait behind it (DreyMail).
+   */
+  private async client(userId: string, accountId: string, lane: 'main' | 'folders' = 'main'): Promise<{ conn: CommandConnection; client: ImapFlow }> {
+    const key = lane === 'main' ? this.key(userId, accountId) : `${this.key(userId, accountId)}#folders`;
     let conn = this.conns.get(key);
     if (!conn) {
-      conn = { client: null, connecting: null, lastUsed: Date.now(), inFlight: 0, folders: null };
+      conn = { client: null, connecting: null, lastUsed: Date.now(), inFlight: 0 };
       this.conns.set(key, conn);
     }
     conn.lastUsed = Date.now();
@@ -119,8 +126,8 @@ export class ImapPool {
   }
 
   /** Run `fn` with a connection, without selecting a mailbox. */
-  async withClient<T>(userId: string, accountId: string, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
-    const { conn, client } = await this.client(userId, accountId);
+  async withClient<T>(userId: string, accountId: string, fn: (client: ImapFlow) => Promise<T>, lane: 'main' | 'folders' = 'main'): Promise<T> {
+    const { conn, client } = await this.client(userId, accountId, lane);
     conn.inFlight++;
     try {
       return await fn(client);
@@ -155,21 +162,23 @@ export class ImapPool {
 
   /** Folder list with a short cache (special-use lookups happen on most actions). */
   async folders(userId: string, accountId: string, fresh = false): Promise<ListResponse[]> {
-    const { conn } = await this.client(userId, accountId);
-    if (!fresh && conn.folders && Date.now() - conn.folders.at < FOLDER_CACHE_MS) return conn.folders.list;
-    const list = await this.withClient(userId, accountId, (c) =>
-      c.list({ statusQuery: { unseen: true, messages: true } }),
-    );
-    conn.folders = { at: Date.now(), list };
+    const key = this.key(userId, accountId);
+    const known = this.folderLists.get(key);
+    if (!fresh && known && Date.now() - known.at < FOLDER_CACHE_MS) return known.list;
+    const list = await this.withClient(userId, accountId, (c) => c.list({ statusQuery: { unseen: true, messages: true } }), 'folders');
+    this.folderLists.set(key, { at: Date.now(), list });
     return list;
   }
 
   /** Close and forget every connection for an account (after edit or delete). */
   invalidate(userId: string, accountId: string) {
     const key = this.key(userId, accountId);
-    const conn = this.conns.get(key);
-    this.conns.delete(key);
-    conn?.client?.logout().catch(() => conn.client?.close());
+    this.folderLists.delete(key);
+    for (const k of [key, `${key}#folders`]) {
+      const conn = this.conns.get(k);
+      this.conns.delete(k);
+      conn?.client?.logout().catch(() => conn.client?.close());
+    }
     const w = this.watchers.get(userId)?.get(accountId);
     if (w) {
       this.stopWatcher(w);

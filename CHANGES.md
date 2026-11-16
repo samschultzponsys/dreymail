@@ -13,6 +13,26 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.7): conversations scroll as one page; faster opening
+
+- **Conversations:** each message's frame is as tall as the message, so a conversation scrolls as
+  one page instead of a scroll box per message. Measuring the message needs `allow-same-origin` on
+  the frame; scripts stay off (no `allow-scripts`) and the CSP inside still blocks every request
+  (README "Security model" updated).
+- **Faster opening:** listing folders (with every folder's counts, slow on big accounts) now has
+  its own connection, so opening a message never waits behind it. The folder list's one-minute
+  memory is kept apart from connections. A message waits at most 5 s for its pictures (it was up
+  to 20 s, plus any still loading); the rest keep downloading and show next time.
+- **Timing:** opening a message reports where the time went (`Server-Timing`: mail server,
+  parsing, pictures) and logs a warning when it took over 3 s.
+- **Emoji:** emoji written as two halves (`&#55357;&#56842;`, as Outlook for iOS does) showed as
+  "��"; they show as the emoji now, in the message and its preview.
+- **Files:** `web/src/components/MessageFrame.tsx`, `web/src/styles.css`, `server/src/imap/pool.ts`,
+  `server/src/imap/mail.ts`, `server/src/imap/snippet.ts`, `server/src/net/remoteImages.ts`,
+  `server/src/mail/sanitize.ts`, `server/src/routes/api.ts`, `server/test/remoteImages.test.ts`,
+  `server/test/sanitize.test.ts`, `server/test/mime.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.6): flatpak fallback command works from any folder
 
 - **Desktop app, flatpak:** the fallback update command ("Download instead") pointed at the file in
