@@ -13,6 +13,15 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.1): flatpak update restarts DreyMail
+
+- **Desktop app, flatpak:** after the update command installed the new version, the DreyMail that
+  was open kept running the old one. Both update commands (curl and install, or install from
+  Downloads) now end by closing DreyMail (`flatpak kill`) and starting the new version in its own
+  session (`setsid -f flatpak run`), so closing the terminal doesn't close it.
+- **Files:** `desktop/update.cjs`, `web/test/desktopUpdate.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v7.0): drag to rearrange the sidebar
 
 - **Sidebar:** groups and mailboxes can be dragged into another order. A line shows where it will

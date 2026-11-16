@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **7.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -503,7 +503,7 @@ Every release has desktop apps attached, with the version in the file name:
 
 | File | For | Install |
 | --- | --- | --- |
-| `DreyMail-1.7-x86_64.flatpak` | any Linux with Flatpak | `flatpak install --user ./DreyMail-1.7-x86_64.flatpak` (updates: the app gives you one command that downloads and installs) |
+| `DreyMail-1.7-x86_64.flatpak` | any Linux with Flatpak | `flatpak install --user ./DreyMail-1.7-x86_64.flatpak` (updates: the app gives you one command that downloads, installs and restarts DreyMail) |
 | `DreyMail-1.7-amd64.deb` | Debian, Ubuntu, Mint | `sudo apt install ./DreyMail-1.7-amd64.deb` |
 | `DreyMail-1.7-x86_64.rpm` | Fedora, openSUSE | `sudo dnf install ./DreyMail-1.7-x86_64.rpm` |
 | `DreyMail-Setup-1.7-x64.exe` | Windows 10/11 | run it (it isn't code-signed yet, so Windows SmartScreen asks: *More info → Run anyway*) |

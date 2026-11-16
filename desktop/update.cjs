@@ -67,6 +67,14 @@ function downloadUrl(release, kind, arch) {
   return asset ? asset.browser_download_url : release.html_url || RELEASES_PAGE;
 }
 
+/** The flatpak's id (desktop/electron-builder.yml appId). */
+const FLATPAK_ID = 'io.github.samschultzponsys.dreymail';
+/**
+ * After a flatpak install the running app is still the old version: close it and start the new
+ * one (in its own session, so closing the terminal doesn't close DreyMail).
+ */
+const FLATPAK_RESTART = ` && { flatpak kill ${FLATPAK_ID} 2>/dev/null; sleep 1; setsid -f flatpak run ${FLATPAK_ID} >/dev/null 2>&1; }`;
+
 /** Where CI puts a release's file (the same address whether or not the release lists it yet). */
 function assetUrl(version, file) {
   return `${RELEASES_PAGE}/download/v${displayVersion(version)}/${file}`;
@@ -82,13 +90,13 @@ function upgradeInstructions(kind, version, arch) {
     case 'flatpak':
       // One command that downloads and installs; downloading by hand is the fallback.
       return {
-        text: 'Run this command in a terminal. It downloads the new version and installs it over this one, keeping your settings.',
-        command: `curl -fL -o /tmp/${file} ${assetUrl(version, file)} && flatpak install --user --reinstall -y /tmp/${file}`,
+        text: 'Run this command in a terminal. It downloads the new version, installs it over this one (keeping your settings) and restarts DreyMail.',
+        command: `curl -fL -o /tmp/${file} ${assetUrl(version, file)} && flatpak install --user --reinstall -y /tmp/${file}${FLATPAK_RESTART}`,
         fallback: {
           // Saved by the browser into the Downloads folder (wherever the desktop has it), so the
           // command works from any folder.
           text: `Or download ${file} into your Downloads folder and run:`,
-          command: `flatpak install --user --reinstall -y "$(xdg-user-dir DOWNLOAD 2>/dev/null || echo ~/Downloads)/${file}"`,
+          command: `flatpak install --user --reinstall -y "$(xdg-user-dir DOWNLOAD 2>/dev/null || echo ~/Downloads)/${file}"${FLATPAK_RESTART}`,
         },
       };
     case 'deb':
