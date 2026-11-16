@@ -261,6 +261,7 @@ function AccountForm({
           image={image}
           pending={pendingImage}
           onPending={id ? undefined : setPendingImage}
+          email={v.email}
           onAccount={(a) => {
             setImage(a.iconImage);
             onPicture?.();
@@ -659,7 +660,7 @@ function MicrosoftAccountForm({
             </label>
           </div>
         </div>
-        <MailboxIconPicker value={icon} color={color} onChange={setIcon} accountId={account.id} image={image} onAccount={(a) => { setImage(a.iconImage); onPicture?.(); }} />
+        <MailboxIconPicker value={icon} color={color} onChange={setIcon} accountId={account.id} email={account.email} image={image} onAccount={(a) => { setImage(a.iconImage); onPicture?.(); }} />
         <div className="hint">{account.auth === 'google' ? 'Gmail keeps the copy of sent mail itself.' : 'Sent mail goes through Microsoft, which keeps the copy in Sent Items.'}</div>
         {(error || status) && <div className="error-text">{error ?? status}</div>}
       </div>

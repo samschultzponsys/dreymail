@@ -22,6 +22,7 @@ import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
 import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
+import { providerIcon, providerSite } from '../net/siteIcon.js';
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -471,6 +472,16 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       config.blockPrivateMailHosts,
     );
   };
+
+  /** A mail provider's own icon for the mailbox icon picker ("Use Gmail's icon"). */
+  app.get<{ Querystring: { email?: string } }>('/api/provider-icon', async (req, reply) => {
+    const email = (req.query.email ?? '').slice(0, 320);
+    const found = await providerIcon(email);
+    if (!found) return reply.code(404).send({ error: "Couldn't find this provider's icon. Upload a picture instead." });
+    return reply.header('content-type', found.image.contentType).header('x-provider-name', encodeURIComponent(found.name)).header('cache-control', 'private, max-age=86400').send(found.image.body);
+  });
+
+  app.get<{ Querystring: { email?: string } }>('/api/provider-icon/name', async (req) => ({ name: providerSite(req.query.email ?? '')?.name ?? null }));
 
   // ---- mailbox groups (DreyMail) ----------------------------------------------------------
 

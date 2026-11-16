@@ -4,11 +4,12 @@
 // A mailbox's icon (shared/mailboxIcons.ts) in its colour, or a picture the user uploaded, and the
 // picker and picture editor for it.
 
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Download, ImagePlus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { MAILBOX_ICONS } from '../../../shared/mailboxIcons';
 import type { AccountView } from '../../../shared/types';
-import { api } from '../api';
+import { api, fetchJson } from '../api';
 
 /** The mailbox icon in its colour, its uploaded picture, or the coloured dot for a mailbox without one. */
 export function MailboxIcon({ icon, color, size = 14, image }: { icon: string; color: string; size?: number; image?: string | null }) {
@@ -29,7 +30,7 @@ const OUT = 256;
  * Upload a picture as a mailbox icon: zoom (smaller or larger), drag it into place, and put it on a
  * transparent, white or black background. The browser makes the final 256px image.
  */
-export function MailboxImageEditor({ onSave, onCancel, busy }: { onSave: (dataUrl: string) => void; onCancel: () => void; busy?: boolean }) {
+export function MailboxImageEditor({ onSave, onCancel, busy, initialSrc }: { onSave: (dataUrl: string) => void; onCancel: () => void; busy?: boolean; /** Start with this picture instead of asking for a file. */ initialSrc?: string | null }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -39,7 +40,13 @@ export function MailboxImageEditor({ onSave, onCancel, busy }: { onSave: (dataUr
   const file = useRef<HTMLInputElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
-  useEffect(() => file.current?.click(), []);
+  useEffect(() => {
+    if (!initialSrc) return file.current?.click();
+    const i = new Image();
+    i.onload = () => setImg(i);
+    i.onerror = () => setError("That picture can't be opened");
+    i.src = initialSrc;
+  }, [initialSrc]);
 
   useEffect(() => {
     const c = canvas.current;
@@ -156,6 +163,7 @@ export function MailboxIconPicker({
   onAccount,
   pending = null,
   onPending,
+  email = '',
 }: {
   value: string;
   color: string;
@@ -167,12 +175,36 @@ export function MailboxIconPicker({
   /** Adding a mailbox: the picture chosen so far (a data URL), and changing it. */
   pending?: string | null;
   onPending?: (dataUrl: string | null) => void;
+  /** The mailbox's address: offers its provider's own icon ("Use Gmail's icon"). */
+  email?: string;
 }) {
   const [open, setOpen] = useState(!!value);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const image = accountId ? savedImage : pending;
+  const canPicture = !!accountId || !!onPending;
+  const provider = useQuery({
+    queryKey: ['provider-name', email.split('@')[1] ?? ''],
+    queryFn: () => fetchJson<{ name: string | null }>('GET', `/api/provider-icon/name?email=${encodeURIComponent(email)}`),
+    enabled: canPicture && email.includes('@'),
+    staleTime: Infinity,
+  });
+  const [providerSrc, setProviderSrc] = useState<string | null>(null);
+  const useProviderIcon = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/provider-icon?email=${encodeURIComponent(email)}`, { headers: { 'x-dreymail': '1' } });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't get the provider's icon");
+      setProviderSrc(URL.createObjectURL(await res.blob()));
+      setEditing(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const run = async (fn: () => Promise<AccountView | undefined>) => {
     setBusy(true);
@@ -219,7 +251,20 @@ export function MailboxIconPicker({
         <div className="row-buttons" style={{ marginTop: 8 }}>
           {accountId || onPending ? (
             <>
-              <button type="button" className="btn" disabled={busy} onClick={() => setEditing(true)}>
+              {provider.data?.name && (
+                <button type="button" className="btn" disabled={busy} onClick={() => void useProviderIcon()}>
+                  <Download size={15} /> Use {provider.data.name}&apos;s icon
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => {
+                  setProviderSrc(null);
+                  setEditing(true);
+                }}
+              >
                 <ImagePlus size={15} /> {image ? 'Upload another picture' : 'Upload a picture'}
               </button>
               {image && (
@@ -245,6 +290,7 @@ export function MailboxIconPicker({
       {editing && (accountId || onPending) && (
         <MailboxImageEditor
           busy={busy}
+          initialSrc={providerSrc}
           onCancel={() => setEditing(false)}
           onSave={(d) => {
             if (accountId) void run(() => api.setAccountIcon(accountId, d));

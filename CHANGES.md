@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.0): your mail provider's own icon
+
+- **Mailbox icons:** "Use Gmail's icon" (or Outlook's for Outlook, Hotmail, Live and MSN addresses,
+  Yahoo Mail's, AOL's, iCloud's, Proton Mail's, Fastmail's, Zoho's, GMX's, Yandex's, or any other
+  domain's own, e.g. Purelymail) fetches the provider's icon from its website and opens it in the
+  picture editor to size and place. The server reads the icons the provider's page lists (largest
+  first, no SVG), then /apple-touch-icon.png and /favicon.ico, with the same protections as remote
+  images (public addresses only, size limits). No logos are bundled: they are their owners'
+  trademarks.
+- **Files:** new `server/src/net/siteIcon.ts`, `server/test/siteIcon.test.ts`;
+  `server/src/routes/api.ts`, `web/src/components/MailboxIcon.tsx`,
+  `web/src/components/AccountsDialog.tsx`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v4.9): mailbox groups
 
 - **Mailbox groups** (Accounts → Groups → New group): a name, a color, an icon, the mailboxes in it,

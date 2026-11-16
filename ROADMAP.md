@@ -49,7 +49,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       notification switch (4.9).
 - [x] Per-account icons, 38 built in, shown in the sidebar and notifications (2.9); your own
       uploaded picture as an icon, with size, position and background (3.0), also while adding a
-      mailbox (4.7).
+      mailbox (4.7); the mail provider's own icon in one click (5.0).
 - [x] Signatures per account or shared across accounts (1.3).
 - [x] Interface size per device; tablet and foldable two-pane layout (2.0).
 - [x] Your name and profile picture (initials in the app color without one) at the bottom left,
