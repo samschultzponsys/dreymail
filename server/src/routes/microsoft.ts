@@ -6,12 +6,16 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { addDays, setAdminReminder } from '../calendar/adminReminders.js';
 import type { MicrosoftSettingsView } from '../../../shared/types.js';
 import type { Sessions } from '../auth/session.js';
 import type { Config } from '../config.js';
 import type { Store } from '../db.js';
 import { MicrosoftError, type MicrosoftAuth, type MicrosoftConfig } from '../oauth/microsoft.js';
 import type { Access } from '../access.js';
+
+/** Instance setting: when the Microsoft client secret expires (YYYY-MM-DD). */
+const SECRET_EXPIRES = 'microsoft.secretExpires';
 
 export function registerMicrosoftRoutes(
   app: FastifyInstance,
@@ -63,6 +67,7 @@ export function registerMicrosoftRoutes(
       hasClientSecret: !!c.clientSecret,
       tenant: c.tenant,
       redirectUri: microsoft.redirectUri,
+      secretExpires: store.getSetting<string>(SECRET_EXPIRES) ?? null,
       locked: {
         ...(env.clientId ? { clientId: 'DREYMAIL_MICROSOFT_CLIENT_ID' } : {}),
         ...(env.clientSecret ? { clientSecret: 'DREYMAIL_MICROSOFT_CLIENT_SECRET' } : {}),
@@ -75,7 +80,15 @@ export function registerMicrosoftRoutes(
 
   app.put('/api/admin/microsoft', async (req, reply) => {
     if (!access.require(req, reply, 'providers.manage')) return reply;
-    const body = z.object({ clientId: z.string().max(200), clientSecret: z.string().max(500), tenant: z.string().max(100) }).safeParse(req.body);
+    const body = z
+      .object({
+        clientId: z.string().max(200),
+        clientSecret: z.string().max(500),
+        tenant: z.string().max(100),
+        /** When the client secret expires (YYYY-MM-DD); a reminder goes in every Superadmin's calendar. */
+        secretExpires: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      })
+      .safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
     try {
       microsoftConfig.save(body.data);
@@ -83,6 +96,24 @@ export function registerMicrosoftRoutes(
       if (err instanceof MicrosoftError) return reply.code(400).send({ error: err.message });
       throw err;
     }
+    const expires = body.data.secretExpires;
+    if (expires && expires !== store.getSetting<string>(SECRET_EXPIRES)) {
+      store.setSetting(SECRET_EXPIRES, expires);
+      const admins = store.listUsers().filter((u) => access.superadmin(u)).map((u) => u.id);
+      // Two weeks ahead (or today, if that's already past).
+      const today = new Date().toISOString().slice(0, 10);
+      const day = addDays(expires, -14) < today ? today : addDays(expires, -14);
+      setAdminReminder(store, admins, {
+        key: 'microsoft-secret',
+        title: "Renew DreyMail's Outlook client secret",
+        notes: [
+          `The Outlook (Microsoft) client secret DreyMail uses expires on ${expires}. After that, Outlook and Microsoft 365 mailboxes stop syncing until a new one is saved.`,
+          '',
+          'To renew: entra.microsoft.com → Applications → App registrations → DreyMail → Certificates & secrets → New client secret (24 months). Copy its Value into DreyMail → Settings → Outlook, set the new expiry date, and save. Then delete the old secret there.',
+        ].join('\n'),
+        day,
+      });
+    } else if (body.data.secretExpires === null) store.setSetting(SECRET_EXPIRES, null);
     return view();
   });
 }

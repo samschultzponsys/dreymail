@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **4.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **4.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -277,7 +277,9 @@ own domain under *Authorized domains* and leave the logo empty. For the calendar
 
 **Outlook one-time setup** (administrator, about 5 minutes, free): Settings → **Outlook** walks you
 through registering DreyMail in Microsoft's Entra admin center and pasting two values (people
-allow mail and calendar access themselves when they sign in). Or set them
+allow mail and calendar access themselves when they sign in). Choose a 24-month client secret and
+enter its expiry date: DreyMail puts a reminder to renew it in every Superadmin's calendar, two
+weeks before it expires. Or set them
 in the compose file, which then wins over the UI: `DREYMAIL_MICROSOFT_CLIENT_ID`,
 `DREYMAIL_MICROSOFT_CLIENT_SECRET` and optionally `DREYMAIL_MICROSOFT_TENANT` (`common` by
 default).

@@ -405,6 +405,8 @@ export interface MicrosoftSettingsView {
   tenant: string;
   /** Redirect URI to enter in the app registration. */
   redirectUri: string;
+  /** When the client secret expires (YYYY-MM-DD), as entered; Superadmins get a calendar reminder (DreyMail). */
+  secretExpires: string | null;
   locked: Partial<Record<'clientId' | 'clientSecret' | 'tenant', string>>;
 }
 

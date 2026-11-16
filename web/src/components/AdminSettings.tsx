@@ -669,21 +669,35 @@ export function OutlookAdmin() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState('');
   const [tenant, setTenant] = useState<string | null>(null);
+  const [expires, setExpires] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!settings.data) return <div className="hint">{settings.error ? (settings.error as Error).message : 'Loading…'}</div>;
   const s = settings.data;
   const v = { clientId: clientId ?? s.clientId, tenant: tenant ?? s.tenant };
+  // A newly pasted secret made "for 24 months" expires two years from today, unless set otherwise.
+  const inTwoYears = () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 2);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const expiry = expires ?? (clientSecret ? inTwoYears() : (s.secretExpires ?? ''));
 
   const save = async () => {
     setBusy(true);
     setStatus(null);
     try {
-      qc.setQueryData(['admin', 'microsoft'], await api.adminSaveMicrosoft({ clientId: v.clientId, clientSecret, tenant: v.tenant }));
+      const remind = !!expiry && expiry !== s.secretExpires;
+      qc.setQueryData(['admin', 'microsoft'], await api.adminSaveMicrosoft({ clientId: v.clientId, clientSecret, tenant: v.tenant, secretExpires: expiry || null }));
       await qc.invalidateQueries({ queryKey: ['microsoftAvailable'] });
+      if (remind) void qc.invalidateQueries({ queryKey: ['events'] });
       setClientSecret('');
-      setStatus({ ok: true, text: 'Saved. "Add account → Outlook / Microsoft 365" now works for everyone on this DreyMail.' });
+      setExpires(null);
+      setStatus({
+        ok: true,
+        text: `Saved. "Add account → Outlook / Microsoft 365" now works for everyone on this DreyMail.${remind ? ' A reminder to renew the secret is in every Superadmin\'s calendar, two weeks before it expires.' : ''}`,
+      });
     } catch (err) {
       setStatus({ ok: false, text: (err as Error).message });
     } finally {
@@ -716,7 +730,8 @@ export function OutlookAdmin() {
             Copy the <strong>Application (client) ID</strong> from the overview page into the field below.
           </li>
           <li>
-            <em>Certificates &amp; secrets → New client secret</em> (pick the longest expiry), then copy its <strong>Value</strong> (not the ID) below.
+            <em>Certificates &amp; secrets → New client secret</em>. Expires: choose <strong>24 months</strong> (the longest), so it lasts two years. Copy its{' '}
+            <strong>Value</strong> (not the Secret ID) below; Microsoft shows it only once.
           </li>
           <li>
             Nothing else: people grant the mail and calendar permissions themselves when they sign in. (In some work tenants an admin must approve the app once.)
@@ -753,7 +768,13 @@ export function OutlookAdmin() {
           <input id="ms-tenant-id" className="input" value={v.tenant} onChange={(e) => setTenant(e.target.value)} placeholder="contoso.onmicrosoft.com or tenant GUID" />
         </Field>
       )}
-      <div className="hint">The client secret is stored encrypted. Microsoft secrets expire (up to 2 years): put a reminder in your calendar to renew it.</div>
+      <Field label="Client secret expires on" htmlFor="ms-expires">
+        <input id="ms-expires" className="input" type="date" value={expiry} onChange={(e) => setExpires(e.target.value)} style={{ maxWidth: 200 }} />
+      </Field>
+      <div className="hint">
+        The client secret is stored encrypted. When you save a new expiry date, DreyMail puts a reminder to renew the secret in every Superadmin&apos;s calendar,
+        two weeks before it expires (saving a new date moves it). Pasting a new secret fills in two years from today; change it if you chose a shorter expiry.
+      </div>
       {status && <div className={status.ok ? 'success-text' : 'error-text'}>{status.text}</div>}
       <div className="row-buttons">
         <span className="grow" />

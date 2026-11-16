@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v4.8): reminder to renew the Outlook client secret
+
+- **Settings → Outlook:** the guide says to choose a **24-month** client secret, and a new
+  **Client secret expires on** field fills in two years from today when a secret is pasted. Saving a
+  new date puts an all-day "Renew DreyMail's Outlook client secret" event, with the steps, two weeks
+  before it expires in every Superadmin's own DreyMail calendar (a "Personal" one is made if they
+  have none). Saving another date moves it.
+- **Files:** new `server/src/calendar/adminReminders.ts`, `server/test/adminReminders.test.ts`;
+  `server/src/routes/microsoft.ts`, `shared/types.ts`, `web/src/api.ts`,
+  `web/src/components/AdminSettings.tsx`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v4.7): your own picture while adding a mailbox
 
 - **Add account:** the icon picker's "Upload a picture" works right away; the picture is kept in the

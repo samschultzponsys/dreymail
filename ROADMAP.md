@@ -98,6 +98,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] User management in the app (1.4); roles with permission flags (Superadmin, User and custom
       roles) and per-flag checks on every administrative action (2.5).
 - [x] Outlook, Google and Android (Firebase) setup in the UI with walkthroughs (2.0–2.3).
+- [x] Reminder in every Superadmin's calendar to renew the Outlook client secret (4.8).
 - [x] Privacy page at `/privacy` for the Google and Microsoft app registrations (4.1).
 
 ### License compliance
