@@ -458,6 +458,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   footerIdentity: 'both',
   undoSendSeconds: 10,
   inboxTabs: true,
+  imagesOwnDomains: true,
+  imagesContacts: true,
+  imagesSenderHosted: false,
+  sidebarCalendar: true,
+  sidebarScheduled: true,
+  sidebarSearches: true,
 };
 
 export interface User {
@@ -1279,6 +1285,11 @@ export class Store {
   }
 
   // ---- recent recipients (address autocomplete) ----------------------------
+
+  /** Addresses the user has written to (lowercase), for "load images from people you write to". */
+  recipientAddresses(userId: string): Set<string> {
+    return new Set((this.db.prepare('SELECT address FROM recent_recipients WHERE user_id = ?').all(userId) as { address: string }[]).map((r) => r.address.trim().toLowerCase()));
+  }
 
   rememberRecipients(userId: string, recipients: { name: string; address: string }[]) {
     const stmt = this.db.prepare(

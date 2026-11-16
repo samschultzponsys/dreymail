@@ -340,6 +340,16 @@ export interface Preferences {
   undoSendSeconds: number;
   /** Inbox split into Personal / Updates / Newsletters tabs (DreyMail). */
   inboxTabs: boolean;
+  /** Load images by themselves in mail from your own mailboxes' domains (DreyMail). */
+  imagesOwnDomains: boolean;
+  /** … from people you have written to (DreyMail). */
+  imagesContacts: boolean;
+  /** … when every image is on the sender's own domain (DreyMail; they can see you opened it). */
+  imagesSenderHosted: boolean;
+  /** Sidebar entries shown: Calendar, Scheduled, Saved searches (DreyMail). */
+  sidebarCalendar: boolean;
+  sidebarScheduled: boolean;
+  sidebarSearches: boolean;
 }
 
 /**

@@ -111,6 +111,12 @@ export const prefsSchema = z.object({
   showFullName: z.boolean().default(false),
   footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
   inboxTabs: z.boolean().default(true),
+  imagesOwnDomains: z.boolean().default(true),
+  imagesContacts: z.boolean().default(true),
+  imagesSenderHosted: z.boolean().default(false),
+  sidebarCalendar: z.boolean().default(true),
+  sidebarScheduled: z.boolean().default(true),
+  sidebarSearches: z.boolean().default(true),
   undoSendSeconds: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(20), z.literal(30)]).default(10),
 });
 
@@ -626,8 +632,9 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
 
   // ---- folders ----------------------------------------------------------------
 
-  app.get('/api/folders', async (req) => {
-    const accounts = store.listAccounts(uid(req));
+  // ?accountId=: one mailbox's folders (the app asks per mailbox, so a slow one holds up no other).
+  app.get<{ Querystring: { accountId?: string } }>('/api/folders', async (req) => {
+    const accounts = store.listAccounts(uid(req)).filter((a) => !req.query.accountId || a.id === req.query.accountId);
     return Promise.all(accounts.map((a) => mail.listFolders(uid(req), a.id)));
   });
 
@@ -682,6 +689,16 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
 
   // ---- single message -----------------------------------------------------------
 
+  /** Settings → Images: automatic loading beyond the "always load from" list. */
+  const autoImagesFor = (userId: string) => {
+    const prefs = store.getUser(userId)?.preferences;
+    return {
+      ownDomains: prefs?.imagesOwnDomains === false ? [] : [...new Set(store.listAccounts(userId).map((a) => normaliseDomain(a.email)).filter((d): d is string => !!d))],
+      contacts: prefs?.imagesContacts === false ? new Set<string>() : store.recipientAddresses(userId),
+      senderHosted: prefs?.imagesSenderHosted === true,
+    };
+  };
+
   app.get('/api/message', async (req, reply) => {
     try {
       // remote=1: the user asked to load images; remote=0: keep them blocked (e.g. for quoting);
@@ -691,6 +708,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const detail = await mail.getMessage(uid(req), q, {
         allowRemote: q.remote === undefined ? undefined : q.remote === '1',
         imageDomains: q.remote === undefined ? store.listImageDomains(uid(req)) : [],
+        autoImages: q.remote === undefined ? autoImagesFor(uid(req)) : undefined,
         imageCache,
         fetchImage,
         maxBytes: config.maxMessageBytes,

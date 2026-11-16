@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.3): images from people you know, faster sidebar, sidebar choices
+
+- **Settings → Images → Load images by themselves:** in mail from your own domains (the domains of
+  your mailboxes) and from people you have written to, both on by default; and, off by default,
+  when every image is on the sender's own domain (they can then see that you opened it). The
+  "always load from" list works as before; mail that fails DMARC never loads images by itself.
+- **Sidebar:** each mailbox's folders are fetched on their own, so one slow mailbox (like a first
+  Outlook sign-in) no longer holds up the others'. Settings → General → **Sidebar shows**: Calendar,
+  Scheduled and Saved searches can be hidden.
+- **Files:** `server/src/mail/imageAllowlist.ts`, `server/src/imap/mail.ts`,
+  `server/src/routes/api.ts`, `server/src/db.ts`, `shared/types.ts`, `web/src/api.ts`,
+  `web/src/hooks.ts`, `web/src/App.tsx`, `web/src/components/SettingsDialog.tsx`, new
+  `server/test/autoImages.test.ts`, `server/test/imageAllowlist.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.2): pinned folders
 
 - **Sidebar:** a pin button on each folder (on hover). A mailbox with pinned folders shows its name

@@ -78,7 +78,7 @@ export function App() {
   const groupsQ = useQuery({ queryKey: ['groups'], queryFn: api.groups, enabled: loggedIn });
   const accounts = useMemo(() => (loggedIn ? (accountsQ.data ?? []) : []), [accountsQ.data, loggedIn]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
-  const folders = useFolders(loggedIn && accounts.length > 0);
+  const folders = useFolders(useMemo(() => accounts.map((a) => a.id), [accounts]), loggedIn && accounts.length > 0);
   const { toasts, push, dismiss } = useToasts();
 
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -637,7 +637,7 @@ export function App() {
         userAvatar={me.data!.avatar}
         footerIdentity={me.data!.preferences.footerIdentity}
         onCloseNav={() => closeOverlay('nav')}
-        searches={savedSearches.data ?? []}
+        searches={me.data?.preferences.sidebarSearches === false ? [] : (savedSearches.data ?? [])}
         activeSearch={activeSearch}
         onSearch={(s) => {
           setChecked(new Set());
@@ -645,9 +645,9 @@ export function App() {
           if (overlay === 'nav') navigate(r, { replace: true });
           else go(r);
         }}
-        scheduledCount={scheduledQ.data?.filter((m) => Date.parse(m.sendAt) > Date.now() + 60_000 || m.status === 'failed').length ?? 0}
+        scheduledCount={me.data?.preferences.sidebarScheduled === false ? 0 : scheduledQ.data?.filter((m) => Date.parse(m.sendAt) > Date.now() + 60_000 || m.status === 'failed').length ?? 0}
         onScheduled={() => setShowScheduled(true)}
-        onCalendar={() => {
+        onCalendar={me.data?.preferences.sidebarCalendar === false ? undefined : () => {
           setShowCalendar(true);
           closeOverlay('nav');
         }}

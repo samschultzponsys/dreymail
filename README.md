@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **5.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **5.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -137,7 +137,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   images are blocked by default; "Load images" has the server fetch them and embed them in the
   message, so the sender never sees your IP address. "Always load from example.com" adds the
   sender's domain (and its subdomains) to a per-user list whose mail loads images automatically;
-  manage the list in Settings.
+  manage the list in Settings. Settings → Images also loads images by themselves in mail from your own
+  domains and from people you have written to (both on by default), and, if you switch it on, when
+  every image is on the sender's own domain. Mail that fails the sender check (DMARC) never does.
 - Contact pictures instead of initials, from Gravatar, Libravatar (including a domain's own
   federated server) or, for senders at a company rather than a free mail provider, the icon of
   their website. Like remote images, the server fetches them, so these services never see your

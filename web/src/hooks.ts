@@ -5,10 +5,11 @@
 // Modified by samschultzponsys, 2026-11-13: useAccounts can wait for sign-in.
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-16: folders asked for per mailbox.
 
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ClientEvent, MessageAction, MessageRef, MessageSummary, Preferences, ServerEvent } from '../../shared/types';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AccountFolders, ClientEvent, MessageAction, MessageRef, MessageSummary, Preferences, ServerEvent } from '../../shared/types';
 import { api, type MailboxSel } from './api';
 import { desktopBridge } from './desktop';
 import { actionsPending, fetchMessageList, runMessageAction, updateMessageLists, type ActionOutcome } from './messageActions';
@@ -18,8 +19,26 @@ import { applyThemeColor } from './themeColor';
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: api.me, retry: false, staleTime: Infinity });
 export const useAccounts = (enabled = true) => useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: 60_000, enabled });
 export const useSignatures = (enabled = true) => useQuery({ queryKey: ['signatures'], queryFn: api.signatures, staleTime: 60_000, enabled });
-export const useFolders = (enabled: boolean) =>
-  useQuery({ queryKey: ['folders'], queryFn: api.folders, enabled, staleTime: 30_000, refetchInterval: 120_000 });
+/**
+ * Every mailbox's folders, each asked for on its own, so one slow mailbox doesn't hold up the others'
+ * folders in the sidebar. `data` holds the mailboxes loaded so far (in mailbox order).
+ */
+export function useFolders(accountIds: string[], enabled: boolean): { data: AccountFolders[] | undefined } {
+  const results = useQueries({
+    queries: accountIds.map((id) => ({
+      queryKey: ['folders', id],
+      queryFn: async () => (await api.folders(id))[0] ?? null,
+      enabled,
+      staleTime: 30_000,
+      refetchInterval: 120_000,
+    })),
+  });
+  const loaded = results.map((r) => r.data).filter((d): d is AccountFolders => !!d);
+  const key = results.map((r) => `${r.dataUpdatedAt}`).join('|');
+  // Same array while nothing changed, so effects that depend on it don't rerun every render.
+  const data = useMemo(() => (accountIds.length && results.some((r) => r.data) ? loaded : undefined), [key, accountIds.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data };
+}
 
 /** Saved searches (the sidebar's smart folders). */
 export function useSavedSearches(enabled: boolean) {

@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: connect single sign-on in Profile.
+// Modified by samschultzponsys, 2026-11-16: automatic image rules; sidebar entries to show.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -223,6 +224,24 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
             </>
           )}
           {tab === 'general' && (
+            <div>
+              <label className="label">Sidebar shows</label>
+              <div className="check-list">
+                <label className="check">
+                  <input type="checkbox" checked={v.sidebarCalendar ?? true} onChange={(e) => void save({ ...v, sidebarCalendar: e.target.checked })} /> Calendar
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={v.sidebarScheduled ?? true} onChange={(e) => void save({ ...v, sidebarScheduled: e.target.checked })} /> Scheduled
+                  (when mail is waiting to be sent)
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={v.sidebarSearches ?? true} onChange={(e) => void save({ ...v, sidebarSearches: e.target.checked })} /> Saved searches
+                </label>
+              </div>
+              <div className="hint">Folders can be pinned in the sidebar itself (the pin next to each folder).</div>
+            </div>
+          )}
+          {tab === 'general' && (
             <label className="check">
               <input type="checkbox" checked={v.inboxTabs ?? true} onChange={(e) => void save({ ...v, inboxTabs: e.target.checked })} />
               Split the inbox into Personal, Updates and Newsletters tabs
@@ -245,6 +264,29 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}
           {tab === 'signatures' && <SignaturesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
+          {tab === 'privacy' && (
+            <div>
+              <label className="label">Load images by themselves</label>
+              <div className="check-list">
+                <label className="check">
+                  <input type="checkbox" checked={v.imagesOwnDomains ?? true} onChange={(e) => void save({ ...v, imagesOwnDomains: e.target.checked })} />
+                  In mail from your own domains <span className="muted">(the domains of your mailboxes)</span>
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={v.imagesContacts ?? true} onChange={(e) => void save({ ...v, imagesContacts: e.target.checked })} />
+                  In mail from people you have written to
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={v.imagesSenderHosted ?? false} onChange={(e) => void save({ ...v, imagesSenderHosted: e.target.checked })} />
+                  When all images are on the sender&apos;s own domain
+                </label>
+              </div>
+              <div className="hint">
+                DreyMail fetches images itself, so senders never see your address, but loading them does let a sender see that you opened the mail (the reason
+                the last option is off by default). Mail that fails the sender check (DMARC) never loads images by itself.
+              </div>
+            </div>
+          )}
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
           {tab === 'users' && <UsersAdmin me={me} />}

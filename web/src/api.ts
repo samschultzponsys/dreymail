@@ -184,7 +184,7 @@ export const api = {
   updateSignature: (id: string, s: SignatureInput) => request<Signature>('PUT', `/api/signatures/${encodeURIComponent(id)}`, s),
   deleteSignature: (id: string) => request<{ ok: true }>('DELETE', `/api/signatures/${encodeURIComponent(id)}`),
 
-  folders: () => request<AccountFolders[]>('GET', '/api/folders'),
+  folders: (accountId?: string) => request<AccountFolders[]>('GET', accountId ? `/api/folders?accountId=${encodeURIComponent(accountId)}` : '/api/folders'),
 
   /** The user asked to refresh: the next message lists must not come from a cache that may be behind. */
   requestFresh: () => {

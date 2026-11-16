@@ -1,5 +1,11 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-16: automatic image loading for your own domains, people you
+// write to, and images on the sender's own domain.
+
 import { domainToASCII, domainToUnicode } from 'node:url';
 import type { DomainName } from '../../../shared/types.js';
+import { organisationDomain } from '../net/avatars.js';
 import { flattenAddresses, type ParsedEmail } from './parse.js';
 
 /**
@@ -87,17 +93,53 @@ export interface RemoteDecision {
   allowedBy: string | null;
   /** The sender is allowlisted but the message failed DMARC, so nothing loaded automatically. */
   skipped: 'dmarc-fail' | null;
+  /** Why images loaded by themselves (DreyMail): the list, your own domain, someone you wrote to, or the sender's own server. */
+  reason?: 'list' | 'own' | 'contact' | 'sender' | null;
 }
+
+/** Automatic loading beyond the "always load from" list (Settings → Images). */
+export interface AutoImages {
+  /** Domains of the user's own mailboxes ("your own domains"); empty when switched off. */
+  ownDomains: readonly string[];
+  /** Addresses the user has written to; empty when switched off. */
+  contacts: ReadonlySet<string>;
+  /** Load when every remote image is on the sender's own domain. */
+  senderHosted: boolean;
+  /** The message's remote image URLs (for senderHosted). */
+  imageUrls: readonly string[];
+}
+
+const hostOf = (u: string) => {
+  try {
+    return normaliseDomain(new URL(u).hostname);
+  } catch {
+    return null;
+  }
+};
 
 /**
  * `explicit`: true = the user clicked "Load images", false = the client wants the blocked
  * version (e.g. for quoting), undefined = let the allowlist decide.
  */
-export function decideRemoteImages(email: ParsedEmail, explicit: boolean | undefined, allowlist: readonly string[]): RemoteDecision {
+export function decideRemoteImages(email: ParsedEmail, explicit: boolean | undefined, allowlist: readonly string[], auto?: AutoImages): RemoteDecision {
   const domain = senderDomain(email);
   if (explicit !== undefined) return { load: explicit, senderDomain: domain, allowedBy: null, skipped: null };
-  const allowed = domain ? findAllowedDomain(domain, allowlist) : null;
-  if (!domain || !allowed) return { load: false, senderDomain: domain, allowedBy: null, skipped: null };
+  if (!domain) return { load: false, senderDomain: domain, allowedBy: null, skipped: null };
+  const listed = findAllowedDomain(domain, allowlist);
+  let reason: RemoteDecision['reason'] = listed ? 'list' : null;
+  let allowedBy = listed;
+  if (!reason && auto) {
+    const own = auto.ownDomains.find((d) => domainMatches(domain, d));
+    const from = flattenAddresses(email.from)[0]?.address?.trim().toLowerCase() ?? '';
+    if (own) [reason, allowedBy] = ['own', own];
+    else if (from && auto.contacts.has(from)) [reason, allowedBy] = ['contact', domain];
+    else if (auto.senderHosted && auto.imageUrls.length > 0) {
+      const org = organisationDomain(domain);
+      if (auto.imageUrls.every((u) => { const h = hostOf(u); return !!h && domainMatches(h, org); })) [reason, allowedBy] = ['sender', org];
+    }
+  }
+  if (!reason) return { load: false, senderDomain: domain, allowedBy: null, skipped: null };
+  // A forged sender (failed DMARC) never gets images loaded by itself.
   if (dmarcFailed(email, domain)) return { load: false, senderDomain: domain, allowedBy: null, skipped: 'dmarc-fail' };
-  return { load: true, senderDomain: domain, allowedBy: allowed, skipped: null };
+  return { load: true, senderDomain: domain, allowedBy, skipped: null, reason };
 }

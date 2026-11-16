@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: search filters (sender, dates, size, attachments, flags) and all-mail sources.
+// Modified by samschultzponsys, 2026-11-16: automatic image loading rules (Settings → Images).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -21,7 +22,7 @@ import { dateRange, filterCount, type SearchFilters } from '../../../shared/sear
 import type { ThreadHeaders } from '../../../shared/threads.js';
 import { CacheCorruptError, imapFlags, type CachedFolder, type MailCache } from '../cache/store.js';
 import type { CacheSync } from '../cache/sync.js';
-import { decideRemoteImages, displayDomain } from '../mail/imageAllowlist.js';
+import { decideRemoteImages, displayDomain, type AutoImages } from '../mail/imageAllowlist.js';
 import { attachmentBytes, buildMessageDetail, parseRaw, type ParsedEmail } from '../mail/parse.js';
 import { collectRemoteImageUrls } from '../mail/sanitize.js';
 import { inlineRemoteImages, type InlineOptions, type RemoteImageCache } from '../net/remoteImages.js';
@@ -690,6 +691,8 @@ export class MailService {
       /** true = load remote images, false = keep them blocked, undefined = per the sender-domain allowlist. */
       allowRemote: boolean | undefined;
       imageDomains?: readonly string[];
+      /** Automatic loading for your own domains, people you wrote to, the sender's own images (DreyMail). */
+      autoImages?: Omit<AutoImages, 'imageUrls'>;
       maxBytes: number;
       imageCache?: RemoteImageCache;
       fetchImage?: InlineOptions['fetchImage'];
@@ -697,11 +700,12 @@ export class MailService {
   ): Promise<MessageDetail> {
     const { raw, flags, internalDate } = await this.fetchRaw(userId, ref, opts.maxBytes);
     const email = await parseRaw(raw);
-    const decision = decideRemoteImages(email, opts.allowRemote, opts.imageDomains ?? []);
+    const urls = email.html ? collectRemoteImageUrls(email.html) : [];
+    const decision = decideRemoteImages(email, opts.allowRemote, opts.imageDomains ?? [], opts.autoImages ? { ...opts.autoImages, imageUrls: urls } : undefined);
     // Remote images are fetched here and inlined as data: URIs; the browser never fetches them.
     let inlined = new Map<string, string | null>();
     if (decision.load && email.html) {
-      inlined = await inlineRemoteImages(collectRemoteImageUrls(email.html), {
+      inlined = await inlineRemoteImages(urls, {
         userId,
         cache: opts.imageCache,
         fetchImage: opts.fetchImage,
