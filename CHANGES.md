@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.8): phone layout fix
+
+- **Phones and tablets:** 5.7's resizable folder bar left an empty block above the message list on
+  phones (the hidden folder drawer took up space) and stopped the folder drawer sliding over the list
+  on tablets. The positioning the grips need now applies only where they show.
+- **Files:** `web/src/styles.css`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.7): grips on the pane edges; resizable folder bar
 
 - **Grips:** the draggable edges of the message list and of the folder bar show a small dotted grip
