@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.2): pinned folders
+
+- **Sidebar:** a pin button on each folder (on hover). A mailbox with pinned folders shows its name
+  and just those; a "──── ⌄ ────" line under them (with the unread count of the hidden folders)
+  shows all of them, and "──── ⌃ ────" folds them away again. Without pins, everything shows as
+  before. Saved per mailbox, on every device.
+- **Files:** `server/src/db.ts` (`accounts.pinned_folders`), `server/src/routes/api.ts`,
+  `shared/types.ts`, `web/src/api.ts`, `web/src/App.tsx`, `web/src/components/Sidebar.tsx`,
+  `web/src/styles.css`, `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v5.1): conversations or single messages, per mailbox
 
 - **Accounts → edit a mailbox → Message list:** *Conversations* (a message and its replies are one

@@ -108,6 +108,7 @@ export const api = {
 
   accounts: () => request<AccountView[]>('GET', '/api/accounts'),
   groups: () => request<MailboxGroupView[]>('GET', '/api/groups'),
+  setPinnedFolders: (accountId: string, folders: string[]) => request<{ ok: boolean }>('PUT', `/api/accounts/${encodeURIComponent(accountId)}/pinned`, { folders }),
   saveGroup: (g: MailboxGroupInput, id?: string) => request<MailboxGroupView[]>(id ? 'PUT' : 'POST', id ? `/api/groups/${encodeURIComponent(id)}` : '/api/groups', g),
   deleteGroup: (id: string) => request<MailboxGroupView[]>('DELETE', `/api/groups/${encodeURIComponent(id)}`),
   testAccount: (account: AccountInput, id?: string) => request<{ ok: true }>('POST', '/api/accounts/test', { account, id }),

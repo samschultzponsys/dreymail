@@ -64,6 +64,8 @@ export interface AccountView {
   groupId?: string | null;
   /** Conversations shown as threads (true) or every message on its own (DreyMail). */
   threaded?: boolean;
+  /** Folders pinned in the sidebar; the rest hide behind "show all" (empty: all shown) (DreyMail). */
+  pinnedFolders?: string[];
 }
 
 /** A group of mailboxes: a sidebar section with its own color, icon and notification switch (DreyMail). */

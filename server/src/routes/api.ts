@@ -474,6 +474,14 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     );
   };
 
+  /** Folders pinned in the sidebar (a view preference: no mailbox permission needed). */
+  app.put<{ Params: { id: string } }>('/api/accounts/:id/pinned', async (req, reply) => {
+    const body = z.object({ folders: z.array(z.string().max(1000)).max(200) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
+    if (!store.setPinnedFolders(uid(req), req.params.id, body.data.folders)) return reply.code(404).send({ error: 'Account not found' });
+    return { ok: true };
+  });
+
   /** A mail provider's own icon for the mailbox icon picker ("Use Gmail's icon"). */
   app.get<{ Querystring: { email?: string } }>('/api/provider-icon', async (req, reply) => {
     const email = (req.query.email ?? '').slice(0, 320);

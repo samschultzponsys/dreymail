@@ -26,7 +26,7 @@
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
+import type { AccountView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
 import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
@@ -607,6 +607,14 @@ export function App() {
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
+        onPin={(accountId, folders) => {
+          // Shown right away; saved in the background.
+          qc.setQueryData<AccountView[]>(['accounts'], (list) => list?.map((a) => (a.id === accountId ? { ...a, pinnedFolders: folders } : a)));
+          void api.setPinnedFolders(accountId, folders).catch((e: Error) => {
+            push(`Couldn't save pinned folders: ${e.message}`);
+            void qc.invalidateQueries({ queryKey: ['accounts'] });
+          });
+        }}
         groups={groupsQ.data}
         accounts={accounts}
         showUnified={unifiedInbox}

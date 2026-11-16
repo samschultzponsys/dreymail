@@ -14,10 +14,14 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: calendar.
 // Modified by samschultzponsys, 2026-11-16: mailbox groups as sections that expand and collapse.
+// Modified by samschultzponsys, 2026-11-16: pinned folders, the rest behind "show all".
 
 import { useQuery } from '@tanstack/react-query';
 import {
   AlarmClock,
+  ChevronUp,
+  Pin,
+  PinOff,
   BellOff,
   CalendarDays,
   Archive,
@@ -77,6 +81,8 @@ function depth(f: FolderView): number {
 }
 
 interface Props {
+  /** Pin or unpin folders of a mailbox (the new list of pinned paths). */
+  onPin?: (accountId: string, folders: string[]) => void;
   /** Mailbox groups: sidebar sections that expand and collapse. */
   groups?: MailboxGroupView[];
   /** Show the "All inboxes" entry (Settings → All inboxes). */
@@ -111,11 +117,13 @@ interface Props {
   onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
   useEffect(() => localStorage.setItem('navRail', rail ? '1' : '0'), [rail]);
   const totalUnread = (folders ?? []).reduce((sum, a) => sum + (a.folders.find((f) => f.specialUse === 'inbox')?.unread ?? 0), 0);
@@ -162,24 +170,63 @@ export function Sidebar({ groups = [], accounts, showUnified, userFullName, user
                     </div>
                   )}
                   {af &&
-                    sortFolders(af.folders).map((f) => {
-                      const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
-                      const showCount = f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed';
+                    (() => {
+                      const pinned = acc.pinnedFolders ?? [];
+                      const all = sortFolders(af.folders);
+                      // With folders pinned, only those show until "show all" is opened.
+                      const limited = pinned.length > 0 && !showAll[acc.id];
+                      const shown = limited ? all.filter((f) => pinned.includes(f.path)) : all;
+                      const countOf = (f: FolderView) => (f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed' ? f.unread : 0);
+                      const hiddenUnread = limited ? all.filter((f) => !pinned.includes(f.path)).reduce((n, f) => n + countOf(f), 0) : 0;
                       return (
-                        <button
-                          key={f.path}
-                          className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
-                          disabled={!f.selectable}
-                          style={{ paddingLeft: rail ? undefined : 8 + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
-                          onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
-                          title={f.path}
-                        >
-                          {f.specialUse ? SPECIAL_ICON[f.specialUse] : <Folder size={16} />}
-                          <span className="name">{f.specialUse === 'inbox' ? 'Inbox' : f.name}</span>
-                          {showCount ? <span className="count">{f.unread}</span> : null}
-                        </button>
+                        <>
+                          {shown.map((f) => {
+                            const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
+                            const showCount = countOf(f);
+                            const isPinned = pinned.includes(f.path);
+                            return (
+                              <div key={f.path} className={`nav-folder ${isPinned ? 'pinned' : ''}`}>
+                                <button
+                                  className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
+                                  disabled={!f.selectable}
+                                  style={{ paddingLeft: rail ? undefined : 8 + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
+                                  onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
+                                  title={f.path}
+                                >
+                                  {f.specialUse ? SPECIAL_ICON[f.specialUse] : <Folder size={16} />}
+                                  <span className="name">{f.specialUse === 'inbox' ? 'Inbox' : f.name}</span>
+                                  {showCount ? <span className="count">{showCount}</span> : null}
+                                </button>
+                                {!rail && onPin && (
+                                  <button
+                                    className="pin-btn name"
+                                    title={isPinned ? `Unpin ${f.name}` : `Pin ${f.name}: always shown`}
+                                    aria-label={isPinned ? `Unpin ${f.name}` : `Pin ${f.name}`}
+                                    aria-pressed={isPinned}
+                                    onClick={() => onPin(acc.id, isPinned ? pinned.filter((p) => p !== f.path) : [...pinned, f.path])}
+                                  >
+                                    {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {pinned.length > 0 && !rail && (
+                            <button
+                              className="nav-more"
+                              onClick={() => setShowAll((m) => ({ ...m, [acc.id]: !m[acc.id] }))}
+                              title={limited ? `Show all folders of ${acc.name}` : 'Show pinned folders only'}
+                              aria-expanded={!limited}
+                            >
+                              <span className="nav-more-line" />
+                              {limited ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                              {hiddenUnread > 0 && <span className="count">{hiddenUnread}</span>}
+                              <span className="nav-more-line" />
+                            </button>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                 </>
               )}
             </div>
