@@ -2,16 +2,23 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 import { describe, expect, it } from 'vitest';
-import { iconLinks, providerIcon, providerSite } from '../src/net/siteIcon.js';
+import { iconLinks, PROVIDER_CHOICES, providerByKey, providerIcon, providerSite } from '../src/net/siteIcon.js';
 
 describe("a mail provider's own icon", () => {
   it('knows the big providers, and uses the domain itself otherwise', () => {
     expect(providerSite('a@gmail.com')).toEqual({ name: 'Gmail', pages: ['https://www.google.com/gmail/about/'] });
-    expect(providerSite('a@hotmail.com')?.name).toBe('Outlook');
-    expect(providerSite('a@msn.com')?.name).toBe('Outlook');
+    expect(providerSite('a@hotmail.com')?.name).toBe('Outlook / Hotmail');
+    expect(providerSite('a@msn.com')?.name).toBe('MSN');
     expect(providerSite('a@purelymail.com')).toEqual({ name: 'Purelymail', pages: ['https://purelymail.com/', 'https://www.purelymail.com/'] });
     expect(providerSite('not an address')).toBeNull();
     expect(providerSite('a@localhost')).toBeNull();
+  });
+
+  it('offers a list of providers to pick from, whatever the address', () => {
+    expect(PROVIDER_CHOICES.map((p) => p.name)).toEqual(expect.arrayContaining(['Gmail', 'Outlook / Hotmail', 'MSN', 'Yahoo Mail', 'AOL', 'Purelymail', 'Microsoft 365']));
+    expect(new Set(PROVIDER_CHOICES.map((p) => p.key)).size).toBe(PROVIDER_CHOICES.length);
+    expect(providerByKey('purelymail')).toEqual({ name: 'Purelymail', pages: ['https://purelymail.com/'] });
+    expect(providerByKey('nope')).toBeNull();
   });
 
   it('picks the biggest icon a page lists, never SVG or mask icons', () => {

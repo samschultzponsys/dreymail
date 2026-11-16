@@ -25,7 +25,8 @@
    Modified by samschultzponsys, 2026-11-15: send later and undo send.
    Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
    Modified by samschultzponsys, 2026-11-15: calendar; calendar sync and invitations.
-   Modified by samschultzponsys, 2026-11-16: right-click menu on a mailbox's name. */
+   Modified by samschultzponsys, 2026-11-16: right-click menu on a mailbox's name.
+   Modified by samschultzponsys, 2026-11-16: provider icon list in the icon picker. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1034,3 +1035,7 @@ body.resizing iframe { pointer-events: none; }
 /* ---- right-click menu on a mailbox's name ---------------------------------------------- */
 .menu.context-menu { position: fixed; right: auto; z-index: 50; min-width: 210px; max-width: 280px; }
 .menu.context-menu .menu-label { text-transform: none; letter-spacing: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Icon picker: a provider's icon from a list, or any website's. */
+.icon-provider-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex-basis: 100%; }
+.icon-provider-pick .select { width: auto; flex: 1 1 200px; max-width: 280px; }
+.icon-provider-pick .input { flex: 1 1 160px; max-width: 220px; }

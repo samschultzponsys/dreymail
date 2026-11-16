@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.1): mailbox icon from any provider or website
+
+- **Icon picker:** besides "Use <provider>'s icon" for the mailbox's own address, a list ("Icon of
+  a provider…": Gmail, Google Workspace, Outlook / Hotmail, MSN, Microsoft 365, Yahoo, AOL, iCloud,
+  Proton, Tuta, Purelymail, Fastmail and more) and "Another website…" fetch an icon whatever the
+  address is. Same fetching rules as before (public addresses only, size limits), into the same
+  editor.
+- **Files:** `server/src/net/siteIcon.ts`, `server/src/routes/api.ts`,
+  `web/src/components/MailboxIcon.tsx`, `web/src/styles.css`, `server/test/siteIcon.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.0): notification previews; right-click a mailbox's name
 
 - **Notification previews:** "Show in notifications" has a third choice, "Sender, subject and the

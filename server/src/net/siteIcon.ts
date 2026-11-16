@@ -5,6 +5,8 @@
 // (providers' logos are their trademarks): the server reads the icons the provider's own web page
 // lists (rel="icon" / "apple-touch-icon"), largest first, then the usual /apple-touch-icon.png and
 // /favicon.ico. Like remote images, only public addresses are fetched, with size limits.
+// The icon picker can also name a provider from a list, or any website, when the address doesn't
+// say which provider the mailbox is with.
 
 import http from 'node:http';
 import https from 'node:https';
@@ -16,19 +18,45 @@ import { fetchRemoteImage, type RemoteImage } from './remoteImages.js';
 const MAX_PAGE = 512 * 1024;
 const MAX_ICON = 512 * 1024;
 
-/** Where each provider's own icon is: the page whose icons show its mail product. */
-const PROVIDER_PAGES: { domains: string[]; name: string; page: string }[] = [
-  { domains: ['gmail.com', 'googlemail.com'], name: 'Gmail', page: 'https://www.google.com/gmail/about/' },
-  { domains: ['outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'outlook.de', 'hotmail.co.uk', 'live.co.uk'], name: 'Outlook', page: 'https://outlook.live.com/' },
-  { domains: ['yahoo.com', 'ymail.com', 'rocketmail.com', 'yahoo.co.uk', 'yahoo.ca', 'yahoo.de', 'yahoo.fr'], name: 'Yahoo Mail', page: 'https://mail.yahoo.com/' },
-  { domains: ['aol.com'], name: 'AOL', page: 'https://mail.aol.com/' },
-  { domains: ['icloud.com', 'me.com', 'mac.com'], name: 'iCloud', page: 'https://www.icloud.com/mail' },
-  { domains: ['proton.me', 'protonmail.com', 'pm.me'], name: 'Proton Mail', page: 'https://proton.me/mail' },
-  { domains: ['fastmail.com', 'fastmail.fm'], name: 'Fastmail', page: 'https://www.fastmail.com/' },
-  { domains: ['zoho.com', 'zohomail.com', 'zohomail.eu'], name: 'Zoho Mail', page: 'https://www.zoho.com/mail/' },
-  { domains: ['gmx.com', 'gmx.us', 'gmx.net', 'gmx.de', 'gmx.at', 'gmx.ch'], name: 'GMX', page: 'https://www.gmx.com/' },
-  { domains: ['yandex.com', 'yandex.ru', 'ya.ru'], name: 'Yandex Mail', page: 'https://mail.yandex.com/' },
+/** Where each provider's own icon is: the page whose icons show its mail product. The ones with
+ * domains are also picked by themselves for addresses at those domains. */
+const PROVIDER_PAGES: { key: string; domains: string[]; name: string; page: string }[] = [
+  { key: 'gmail', domains: ['gmail.com', 'googlemail.com'], name: 'Gmail', page: 'https://www.google.com/gmail/about/' },
+  { key: 'google-workspace', domains: [], name: 'Google Workspace', page: 'https://workspace.google.com/' },
+  { key: 'outlook', domains: ['outlook.com', 'hotmail.com', 'live.com', 'outlook.de', 'hotmail.co.uk', 'live.co.uk'], name: 'Outlook / Hotmail', page: 'https://outlook.live.com/' },
+  { key: 'msn', domains: ['msn.com'], name: 'MSN', page: 'https://www.msn.com/' },
+  { key: 'microsoft-365', domains: [], name: 'Microsoft 365', page: 'https://www.microsoft365.com/' },
+  { key: 'yahoo', domains: ['yahoo.com', 'ymail.com', 'rocketmail.com', 'yahoo.co.uk', 'yahoo.ca', 'yahoo.de', 'yahoo.fr'], name: 'Yahoo Mail', page: 'https://mail.yahoo.com/' },
+  { key: 'aol', domains: ['aol.com'], name: 'AOL', page: 'https://mail.aol.com/' },
+  { key: 'icloud', domains: ['icloud.com', 'me.com', 'mac.com'], name: 'iCloud', page: 'https://www.icloud.com/mail' },
+  { key: 'proton', domains: ['proton.me', 'protonmail.com', 'pm.me'], name: 'Proton Mail', page: 'https://proton.me/mail' },
+  { key: 'tuta', domains: ['tuta.com', 'tutanota.com', 'tuta.io'], name: 'Tuta', page: 'https://tuta.com/' },
+  { key: 'purelymail', domains: [], name: 'Purelymail', page: 'https://purelymail.com/' },
+  { key: 'fastmail', domains: ['fastmail.com', 'fastmail.fm'], name: 'Fastmail', page: 'https://www.fastmail.com/' },
+  { key: 'zoho', domains: ['zoho.com', 'zohomail.com', 'zohomail.eu'], name: 'Zoho Mail', page: 'https://www.zoho.com/mail/' },
+  { key: 'gmx', domains: ['gmx.com', 'gmx.us', 'gmx.net', 'gmx.de', 'gmx.at', 'gmx.ch'], name: 'GMX', page: 'https://www.gmx.com/' },
+  { key: 'webde', domains: [], name: 'WEB.DE', page: 'https://web.de/' },
+  { key: 'mailcom', domains: [], name: 'mail.com', page: 'https://www.mail.com/' },
+  { key: 'yandex', domains: ['yandex.com', 'yandex.ru', 'ya.ru'], name: 'Yandex Mail', page: 'https://mail.yandex.com/' },
+  { key: 'hey', domains: ['hey.com'], name: 'HEY', page: 'https://www.hey.com/' },
+  { key: 'mailbox-org', domains: [], name: 'mailbox.org', page: 'https://mailbox.org/' },
+  { key: 'posteo', domains: [], name: 'Posteo', page: 'https://posteo.de/' },
+  { key: 'migadu', domains: [], name: 'Migadu', page: 'https://www.migadu.com/' },
+  { key: 'runbox', domains: [], name: 'Runbox', page: 'https://runbox.com/' },
+  { key: 'xfinity', domains: ['comcast.net'], name: 'Xfinity / Comcast', page: 'https://www.xfinity.com/' },
+  { key: 'att', domains: ['att.net', 'sbcglobal.net', 'bellsouth.net'], name: 'AT&T', page: 'https://www.att.com/' },
+  { key: 'namecheap', domains: [], name: 'Namecheap', page: 'https://www.namecheap.com/' },
+  { key: 'ionos', domains: [], name: 'IONOS', page: 'https://www.ionos.com/' },
 ];
+
+/** The providers offered in the icon picker's list. */
+export const PROVIDER_CHOICES = PROVIDER_PAGES.map(({ key, name }) => ({ key, name }));
+
+/** A provider from the list, by key. */
+export function providerByKey(key: string): { name: string; pages: string[] } | null {
+  const p = PROVIDER_PAGES.find((x) => x.key === key);
+  return p ? { name: p.name, pages: [p.page] } : null;
+}
 
 /** The provider for an address: a known one, or the domain's own website. */
 export function providerSite(email: string): { name: string; pages: string[] } | null {
@@ -113,8 +141,11 @@ export function iconLinks(html: string, base: string): string[] {
 }
 
 /** The provider's icon for this address, or null if none could be fetched. */
-export async function providerIcon(email: string, deps: { getPage?: GetPage; fetchImage?: (url: string) => Promise<RemoteImage> } = {}): Promise<{ name: string; image: RemoteImage } | null> {
-  const site = providerSite(email);
+export async function providerIcon(
+  email: string,
+  deps: { getPage?: GetPage; fetchImage?: (url: string) => Promise<RemoteImage> } = {},
+  site: { name: string; pages: string[] } | null = providerSite(email),
+): Promise<{ name: string; image: RemoteImage } | null> {
   if (!site) return null;
   const page = deps.getPage ?? getPage;
   const fetchImage = deps.fetchImage ?? ((url: string) => fetchRemoteImage(url, { maxBytes: MAX_ICON }));

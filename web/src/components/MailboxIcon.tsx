@@ -190,12 +190,21 @@ export function MailboxIconPicker({
     enabled: canPicture && email.includes('@'),
     staleTime: Infinity,
   });
+  // Any provider from a list (or any website), for when the address doesn't say which one it is.
+  const providers = useQuery({
+    queryKey: ['provider-list'],
+    queryFn: () => fetchJson<{ key: string; name: string }[]>('GET', '/api/provider-icon/providers'),
+    enabled: canPicture && open,
+    staleTime: Infinity,
+  });
+  const [pick, setPick] = useState('');
+  const [site, setSite] = useState('');
   const [providerSrc, setProviderSrc] = useState<string | null>(null);
-  const useProviderIcon = async () => {
+  const useProviderIcon = async (query = `email=${encodeURIComponent(email)}`) => {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/provider-icon?email=${encodeURIComponent(email)}`, { headers: { 'x-dreymail': '1' } });
+      const res = await fetch(`/api/provider-icon?${query}`, { headers: { 'x-dreymail': '1' } });
       if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't get the provider's icon");
       setProviderSrc(URL.createObjectURL(await res.blob()));
       setEditing(true);
@@ -267,6 +276,28 @@ export function MailboxIconPicker({
               >
                 <ImagePlus size={15} /> {image ? 'Upload another picture' : 'Upload a picture'}
               </button>
+              <div className="icon-provider-pick">
+                <select className="select" aria-label="Get the icon of a provider" value={pick} disabled={busy} onChange={(e) => setPick(e.target.value)}>
+                  <option value="">Icon of a provider…</option>
+                  {(providers.data ?? []).map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.name}
+                    </option>
+                  ))}
+                  <option value="site">Another website…</option>
+                </select>
+                {pick === 'site' && (
+                  <input className="input" placeholder="example.com" value={site} onChange={(e) => setSite(e.target.value)} aria-label="Website" />
+                )}
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy || !pick || (pick === 'site' && !site.trim())}
+                  onClick={() => void useProviderIcon(pick === 'site' ? `site=${encodeURIComponent(site.trim())}` : `provider=${encodeURIComponent(pick)}`)}
+                >
+                  <Download size={15} /> Get icon
+                </button>
+              </div>
               {image && (
                 <button
                   type="button"

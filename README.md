@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -101,8 +101,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   notifications in the desktop app, the Android app (status-bar and large icon) and browsers. Or
   upload your own picture, also right while adding the mailbox: size it, drag it into place, and put it
   on a transparent, white or black background. **Use Gmail's icon** (or Outlook's, Yahoo's, your
-  provider's…) fetches the provider's own icon from its website into the same editor; DreyMail
-  doesn't ship other companies' logos.
+  provider's…) fetches the provider's own icon from its website into the same editor. When the
+  address doesn't say which provider it is (your own domain, say), pick one from **Icon of a
+  provider…** (Gmail, Outlook / Hotmail, MSN, Yahoo, AOL, Purelymail and more) or choose **Another
+  website…** and type its address. DreyMail doesn't ship other companies' logos.
 - **Mailbox groups** (Accounts → Groups): put mailboxes in groups such as Work and Personal. Each
   group is a section in the sidebar that expands and collapses, with its own icon, color and total
   unread count. Optionally its mailboxes take the group's color and icon, and one switch turns

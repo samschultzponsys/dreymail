@@ -18,12 +18,13 @@
 // Modified by samschultzponsys, 2026-11-15: AI assistant learning mode.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
+// Modified by samschultzponsys, 2026-11-16: provider icon from a list or any website.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
 import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
-import { providerIcon, providerSite } from '../net/siteIcon.js';
+import { PROVIDER_CHOICES, providerByKey, providerIcon, providerSite } from '../net/siteIcon.js';
 import { isFreemail } from '../net/avatars.js';
 import { MAIL_PROVIDERS, MICROSOFT_DOMAINS } from '../../../shared/mailProviders.js';
 
@@ -496,14 +497,23 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   /** A mail provider's own icon for the mailbox icon picker ("Use Gmail's icon"). */
-  app.get<{ Querystring: { email?: string } }>('/api/provider-icon', async (req, reply) => {
+  // The icon of the provider for an address, of one picked from the list (provider=key), or of any
+  // website (site=domain).
+  app.get<{ Querystring: { email?: string; provider?: string; site?: string } }>('/api/provider-icon', async (req, reply) => {
     const email = (req.query.email ?? '').slice(0, 320);
-    const found = await providerIcon(email);
+    const site = req.query.provider
+      ? providerByKey(req.query.provider.slice(0, 40))
+      : req.query.site
+        ? providerSite(`x@${req.query.site.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]!.slice(0, 253)}`)
+        : providerSite(email);
+    if ((req.query.provider || req.query.site) && !site) return reply.code(400).send({ error: req.query.site ? 'Type a website, like example.com' : 'Unknown provider' });
+    const found = await providerIcon(email, {}, site);
     if (!found) return reply.code(404).send({ error: "Couldn't find this provider's icon. Upload a picture instead." });
     return reply.header('content-type', found.image.contentType).header('x-provider-name', encodeURIComponent(found.name)).header('cache-control', 'private, max-age=86400').send(found.image.body);
   });
 
   app.get<{ Querystring: { email?: string } }>('/api/provider-icon/name', async (req) => ({ name: providerSite(req.query.email ?? '')?.name ?? null }));
+  app.get('/api/provider-icon/providers', async () => PROVIDER_CHOICES);
 
   // ---- mailbox groups (DreyMail) ----------------------------------------------------------
 
