@@ -10,18 +10,20 @@
 // Modified by samschultzponsys, 2026-11-15: Gmail's two ways side by side, with what each gives and costs.
 // Modified by samschultzponsys, 2026-11-15: provider list with server settings filled in, or custom.
 // Modified by samschultzponsys, 2026-11-16: your own picture as the icon while adding a mailbox.
+// Modified by samschultzponsys, 2026-11-16: mailbox groups.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { DEFAULT_PORTS } from '../../../shared/mailPorts';
-import type { AccountDefaults, AccountInput, AccountView, TlsMode } from '../../../shared/types';
+import type { AccountDefaults, AccountInput, AccountView, MailboxGroupView, TlsMode } from '../../../shared/types';
 import { gmailAppPasswordInput, newAccountInput, usesDefaultPassword } from '../accountForm';
 import { MAIL_PROVIDERS, isMicrosoftAddress, providerForEmail, providerForServers, type MailProvider } from '../../../shared/mailProviders';
 import { api } from '../api';
 import { ACCOUNT_COLORS } from '../util';
 import { labelOn } from '../accountTheme';
 import { MailboxIcon, MailboxIconPicker } from './MailboxIcon';
+import { GroupEditor } from './GroupEditor';
 
 function fromView(a: AccountView): AccountInput {
   return {
@@ -337,6 +339,8 @@ export function AccountsDialog({
   // "Add account" first asks what kind: Outlook (Microsoft sign-in) or any other IMAP account.
   const [choosing, setChoosing] = useState(!!startWithNew && canEdit);
   const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(null);
+  const groups = useQuery({ queryKey: ['groups'], queryFn: api.groups });
+  const [editingGroup, setEditingGroup] = useState<MailboxGroupView | 'new' | null>(null);
   const microsoft = useQuery({ queryKey: ['microsoftAvailable'], queryFn: api.microsoftAvailable, staleTime: 60_000 });
   const google = useQuery({ queryKey: ['googleAvailable'], queryFn: api.googleAvailable, staleTime: 60_000 });
   const [msError, setMsError] = useState<string | null>(null);
@@ -359,12 +363,35 @@ export function AccountsDialog({
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="dialog" role="dialog" aria-modal="true">
         <div className="dialog-head">
-          <h2>{editing || editingMicrosoft ? (editing?.id || editingMicrosoft ? 'Edit account' : 'Add account') : choosing ? 'Add account' : 'Mail accounts'}</h2>
+          <h2>
+            {editingGroup
+              ? editingGroup === 'new'
+                ? 'New group'
+                : 'Edit group'
+              : editing || editingMicrosoft
+                ? editing?.id || editingMicrosoft
+                  ? 'Edit account'
+                  : 'Add account'
+                : choosing
+                  ? 'Add account'
+                  : 'Mail accounts'}
+          </h2>
           <button className="icon-btn" onClick={onClose} title="Close">
             <X size={17} />
           </button>
         </div>
-        {editingMicrosoft ? (
+        {editingGroup ? (
+          <GroupEditor
+            group={editingGroup === 'new' ? null : editingGroup}
+            accounts={accounts}
+            onCancel={() => setEditingGroup(null)}
+            onDone={(list) => {
+              qc.setQueryData(['groups'], list);
+              refresh();
+              setEditingGroup(null);
+            }}
+          />
+        ) : editingMicrosoft ? (
           <MicrosoftAccountForm
             account={editingMicrosoft}
             onReconnect={() => void signIn(editingMicrosoft.auth === 'google' ? 'google' : 'microsoft', editingMicrosoft.color)}
@@ -524,6 +551,32 @@ export function AccountsDialog({
                   )}
                 </div>
               ))}
+              {canEdit && accounts.length > 0 && (
+                <div className="groups-section">
+                  <div className="groups-head">
+                    <strong>Groups</strong>
+                    <span className="muted">Mailboxes grouped in the sidebar, with a shared color, icon and notifications.</span>
+                  </div>
+                  {(groups.data ?? []).map((g) => (
+                    <button key={g.id} className="group-card" onClick={() => setEditingGroup(g)}>
+                      <span className="account-mark" style={{ background: g.color }}>
+                        {g.icon && <MailboxIcon icon={g.icon} color={labelOn(g.color)} size={16} />}
+                      </span>
+                      <span className="grow">
+                        <strong>{g.name}</strong>
+                        <span className="sub">
+                          {g.accountIds.length} {g.accountIds.length === 1 ? 'mailbox' : 'mailboxes'}
+                          {g.notify ? '' : ' · notifications off'}
+                        </span>
+                      </span>
+                      <Pencil size={15} />
+                    </button>
+                  ))}
+                  <button className="btn" onClick={() => setEditingGroup('new')}>
+                    <Plus size={14} /> New group
+                  </button>
+                </div>
+              )}
             </div>
             <div className="dialog-foot">
               <span className="grow muted">Passwords are stored encrypted and never sent back to the browser.</span>

@@ -36,7 +36,7 @@ export interface RolesView {
   roles: Role[];
   defaultRole: string;
 }
-import type { AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, ScheduledSend, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
+import type { MailboxGroupInput, MailboxGroupView, AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, ScheduledSend, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -107,6 +107,9 @@ export const api = {
   changePassword: (current: string, next: string) => request<{ ok: true }>('PUT', '/api/password', { current, next }),
 
   accounts: () => request<AccountView[]>('GET', '/api/accounts'),
+  groups: () => request<MailboxGroupView[]>('GET', '/api/groups'),
+  saveGroup: (g: MailboxGroupInput, id?: string) => request<MailboxGroupView[]>(id ? 'PUT' : 'POST', id ? `/api/groups/${encodeURIComponent(id)}` : '/api/groups', g),
+  deleteGroup: (id: string) => request<MailboxGroupView[]>('DELETE', `/api/groups/${encodeURIComponent(id)}`),
   testAccount: (account: AccountInput, id?: string) => request<{ ok: true }>('POST', '/api/accounts/test', { account, id }),
   createAccount: (a: AccountInput) => request<AccountView>('POST', '/api/accounts', a),
   updateAccount: (id: string, a: AccountInput) => request<AccountView>('PUT', `/api/accounts/${encodeURIComponent(id)}`, a),

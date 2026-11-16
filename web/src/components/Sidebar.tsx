@@ -13,10 +13,12 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: calendar.
+// Modified by samschultzponsys, 2026-11-16: mailbox groups as sections that expand and collapse.
 
 import { useQuery } from '@tanstack/react-query';
 import {
   AlarmClock,
+  BellOff,
   CalendarDays,
   Archive,
   ChevronDown,
@@ -42,7 +44,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
-import type { AccountFolders, AccountView, FolderView, SpecialUse } from '../../../shared/types';
+import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
 import { UserAvatar } from './UserPicture';
@@ -75,6 +77,8 @@ function depth(f: FolderView): number {
 }
 
 interface Props {
+  /** Mailbox groups: sidebar sections that expand and collapse. */
+  groups?: MailboxGroupView[];
   /** Show the "All inboxes" entry (Settings → All inboxes). */
   showUnified: boolean;
   /** Full name, for the tooltip when only the first name is shown. */
@@ -107,7 +111,7 @@ interface Props {
   onAssistant?: (accountId: string) => void;
 }
 
-export function Sidebar({ accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -115,6 +119,72 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
   useEffect(() => localStorage.setItem('navRail', rail ? '1' : '0'), [rail]);
   const totalUnread = (folders ?? []).reduce((sum, a) => sum + (a.folders.find((f) => f.specialUse === 'inbox')?.unread ?? 0), 0);
+
+  const renderAccount = (acc: AccountView) => {
+          const af = folders?.find((f) => f.accountId === acc.id);
+          const isCollapsed = !rail && collapsed[acc.id];
+          return (
+            <div className="nav-section" key={acc.id}>
+              <div className="nav-heading-row">
+                <button
+                  className="nav-heading"
+                  onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
+                  title={acc.name}
+                >
+                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                  <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
+                  <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
+                  {af?.error && (
+                    <span className="health-alert" title={`This mailbox has a problem: ${af.error}`} aria-label="Mailbox problem">
+                      <TriangleAlert size={13} />
+                    </span>
+                  )}
+                </button>
+                {onAssistant && (
+                  <button className="nav-assistant name" title={`AI assistant for ${acc.name}`} aria-label={`AI assistant for ${acc.name}`} onClick={() => onAssistant(acc.id)}>
+                    <Sparkles size={13} />
+                  </button>
+                )}
+              </div>
+              {!isCollapsed && (
+                <>
+                  {!af && (
+                    <div className="nav-loading" role="status" aria-label="Loading folders" title="Loading folders">
+                      <div className="spinner" />
+                    </div>
+                  )}
+                  {af?.error && (
+                    <div className="nav-error">
+                      {af.error}{' '}
+                      <button className="link-btn" onClick={onAccounts}>
+                        Fix in Accounts
+                      </button>
+                    </div>
+                  )}
+                  {af &&
+                    sortFolders(af.folders).map((f) => {
+                      const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
+                      const showCount = f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed';
+                      return (
+                        <button
+                          key={f.path}
+                          className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
+                          disabled={!f.selectable}
+                          style={{ paddingLeft: rail ? undefined : 8 + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
+                          onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
+                          title={f.path}
+                        >
+                          {f.specialUse ? SPECIAL_ICON[f.specialUse] : <Folder size={16} />}
+                          <span className="name">{f.specialUse === 'inbox' ? 'Inbox' : f.name}</span>
+                          {showCount ? <span className="count">{f.unread}</span> : null}
+                        </button>
+                      );
+                    })}
+                </>
+              )}
+            </div>
+          );
+  };
 
   return (
     <aside className={`pane sidebar ${rail ? 'rail' : ''}`}>
@@ -181,71 +251,26 @@ export function Sidebar({ accounts, showUnified, userFullName, userAvatar, foote
               ))}
           </div>
         )}
-        {accounts.map((acc) => {
-          const af = folders?.find((f) => f.accountId === acc.id);
-          const isCollapsed = !rail && collapsed[acc.id];
+        {groups.map((g) => {
+          const members = accounts.filter((a) => a.groupId === g.id);
+          if (!members.length) return null;
+          const key = `g:${g.id}`;
+          const open = rail || !collapsed[key];
+          const unread = members.reduce((n, a) => n + (folders?.find((f) => f.accountId === a.id)?.folders.find((f) => f.specialUse === 'inbox')?.unread ?? 0), 0);
           return (
-            <div className="nav-section" key={acc.id}>
-              <div className="nav-heading-row">
-                <button
-                  className="nav-heading"
-                  onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: !c[acc.id] }))}
-                  title={acc.name}
-                >
-                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                  <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={14} />
-                  <span className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
-                  {af?.error && (
-                    <span className="health-alert" title={`This mailbox has a problem: ${af.error}`} aria-label="Mailbox problem">
-                      <TriangleAlert size={13} />
-                    </span>
-                  )}
-                </button>
-                {onAssistant && (
-                  <button className="nav-assistant name" title={`AI assistant for ${acc.name}`} aria-label={`AI assistant for ${acc.name}`} onClick={() => onAssistant(acc.id)}>
-                    <Sparkles size={13} />
-                  </button>
-                )}
-              </div>
-              {!isCollapsed && (
-                <>
-                  {!af && (
-                    <div className="nav-loading" role="status" aria-label="Loading folders" title="Loading folders">
-                      <div className="spinner" />
-                    </div>
-                  )}
-                  {af?.error && (
-                    <div className="nav-error">
-                      {af.error}{' '}
-                      <button className="link-btn" onClick={onAccounts}>
-                        Fix in Accounts
-                      </button>
-                    </div>
-                  )}
-                  {af &&
-                    sortFolders(af.folders).map((f) => {
-                      const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
-                      const showCount = f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed';
-                      return (
-                        <button
-                          key={f.path}
-                          className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
-                          disabled={!f.selectable}
-                          style={{ paddingLeft: rail ? undefined : 8 + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
-                          onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
-                          title={f.path}
-                        >
-                          {f.specialUse ? SPECIAL_ICON[f.specialUse] : <Folder size={16} />}
-                          <span className="name">{f.specialUse === 'inbox' ? 'Inbox' : f.name}</span>
-                          {showCount ? <span className="count">{f.unread}</span> : null}
-                        </button>
-                      );
-                    })}
-                </>
-              )}
+            <div className="nav-group" key={g.id} style={{ ['--group' as string]: g.color }}>
+              <button className={`nav-group-head ${unread ? 'unread' : ''}`} onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))} title={g.name} aria-expanded={open}>
+                {!rail && (open ? <ChevronDown size={13} /> : <ChevronRight size={13} />)}
+                <MailboxIcon icon={g.icon} color={g.color} size={15} />
+                <span className="name">{g.name}</span>
+                {!g.notify && <BellOff size={12} className="name muted" aria-label="Notifications off" />}
+                {unread > 0 && <span className="count">{unread}</span>}
+              </button>
+              {open && <div className="nav-group-body">{members.map(renderAccount)}</div>}
             </div>
           );
         })}
+        {accounts.filter((a) => !a.groupId || !groups.some((g) => g.id === a.groupId)).map(renderAccount)}
       </nav>
       <div className="sidebar-footer">
         <button className={`footer-me shows-${footerIdentity}`} title={`${userFullName}: profile and settings`} onClick={onSettings}>

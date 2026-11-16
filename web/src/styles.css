@@ -957,3 +957,18 @@ img.account-mark { object-fit: cover; }
 .sso-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
 .sso-row .grow { min-width: 200px; }
 a.btn { text-decoration: none; }
+
+/* ---- mailbox groups --------------------------------------------------------------------- */
+.nav-group { margin-top: 6px; }
+.nav-group-head { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; cursor: pointer; padding: 6px 8px; border-radius: var(--radius-sm); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; text-align: left; }
+.nav-group-head:hover { background: var(--hover); }
+.nav-group-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-group-head svg.muted { flex: 0 0 auto; color: var(--muted); }
+.nav-group-body { border-left: 2px solid color-mix(in srgb, var(--group) 45%, transparent); margin-left: 12px; padding-left: 4px; }
+.groups-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.groups-head { display: flex; flex-direction: column; gap: 2px; }
+.groups-head .muted { font-size: 12.5px; }
+.group-card { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.group-card:hover { background: var(--surface-2); }
+.group-card .sub { display: block; font-size: 12.5px; color: var(--muted); }
+.groups-section > .btn { align-self: flex-start; }

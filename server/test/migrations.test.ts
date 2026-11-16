@@ -18,7 +18,7 @@ import { MIGRATIONS, Store } from '../src/db.js';
 const ORDER = [
   'users', 'image_domains', 'push_subscriptions', 'snoozes', 'password_hash', 'username', 'signatures', 'is_admin', 'fcm_tokens',
   'auth', 'display_name', 'saved_searches', 'roles', 'icon', 'icon_image', 'ai_connections', 'learning_from', 'blocked_senders',
-  'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth',
+  'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth', 'mailbox_groups',
 ];
 
 const marker = (m: (typeof MIGRATIONS)[number]) => {

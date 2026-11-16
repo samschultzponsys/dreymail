@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v4.9): mailbox groups
+
+- **Mailbox groups** (Accounts → Groups → New group): a name, a color, an icon, the mailboxes in it,
+  "Mailboxes use the group's color and icon" (applied to every member when saved; one mailbox can
+  still be changed afterwards) and "Notify me about new mail in these mailboxes" (off: no new-mail
+  notifications for any of them, on any device). In the sidebar each group is a section header
+  with its icon, color and total unread count that expands and collapses; its mailboxes sit under
+  it. A mailbox is in one group at a time; deleting a group keeps its mailboxes.
+- **Files:** new `web/src/components/GroupEditor.tsx`, `server/test/groups.test.ts`;
+  `server/src/db.ts` (`mailbox_groups`, `accounts.group_id`), `server/src/routes/api.ts`,
+  `server/src/app.ts` (notifications), `shared/types.ts`, `web/src/api.ts`, `web/src/App.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/AccountsDialog.tsx`, `web/src/styles.css`,
+  `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v4.8): reminder to renew the Outlook client secret
 
 - **Settings → Outlook:** the guide says to choose a **24-month** client secret, and a new

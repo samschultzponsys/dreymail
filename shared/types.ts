@@ -58,7 +58,25 @@ export interface AccountView {
   appendSent: boolean;
   /** How DreyMail signs in (DreyMail): a password, or Microsoft / Google sign-in (OAuth). */
   auth: AccountAuth;
+  /** The mailbox group it belongs to, if any (DreyMail). */
+  groupId?: string | null;
 }
+
+/** A group of mailboxes: a sidebar section with its own color, icon and notification switch (DreyMail). */
+export interface MailboxGroupView {
+  id: string;
+  name: string;
+  color: string;
+  /** Icon key (shared/mailboxIcons.ts), or '' for none. */
+  icon: string;
+  /** New-mail notifications for its mailboxes. */
+  notify: boolean;
+  /** Its mailboxes take the group's color and icon. */
+  follow: boolean;
+  accountIds: string[];
+}
+
+export type MailboxGroupInput = Omit<MailboxGroupView, 'id'>;
 
 export type AccountAuth = 'password' | 'microsoft' | 'google';
 

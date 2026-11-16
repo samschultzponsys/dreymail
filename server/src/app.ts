@@ -246,6 +246,7 @@ export async function buildApp(
       void assistant.learnArrivals(userId, accountId, fresh.map((m) => m.uid)).catch(() => undefined);
       if (fresh.length === 0 || !pool.notifiesNewMail(userId)) return;
       liveNotify(userId, accountId, (account, content) => buildNotification(account, fresh, content));
+      if (!store.notifiesFor(userId, accountId)) return; // its group's notifications are off
       await push.notifyNewMail(userId, accountId, fresh);
     })();
   };

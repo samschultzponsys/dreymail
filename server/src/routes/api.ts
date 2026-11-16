@@ -472,6 +472,41 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     );
   };
 
+  // ---- mailbox groups (DreyMail) ----------------------------------------------------------
+
+  const groupSchema = z.object({
+    name: z.string().trim().min(1).max(60),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    icon: z.string().max(40).refine((v) => v === '' || isMailboxIcon(v), 'Unknown icon'),
+    notify: z.boolean(),
+    follow: z.boolean(),
+    accountIds: z.array(z.string().max(64)).max(200),
+  });
+
+  app.get('/api/groups', async (req) => store.listGroups(uid(req)));
+
+  app.post('/api/groups', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    const body = groupSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? 'Give the group a name' });
+    store.saveGroup(uid(req), body.data);
+    return store.listGroups(uid(req));
+  });
+
+  app.put<{ Params: { id: string } }>('/api/groups/:id', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    const body = groupSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? 'Give the group a name' });
+    if (!store.saveGroup(uid(req), body.data, req.params.id)) return reply.code(404).send({ error: 'Group not found' });
+    return store.listGroups(uid(req));
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/groups/:id', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    if (!store.deleteGroup(uid(req), req.params.id)) return reply.code(404).send({ error: 'Group not found' });
+    return store.listGroups(uid(req));
+  });
+
   app.post('/api/accounts/test', async (req, reply) => {
     if (!access.require(req, reply, 'mail.accounts')) return reply;
     try {

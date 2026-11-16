@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 // Modified by samschultzponsys, 2026-11-15: repair for databases that skipped the Microsoft sign-in columns.
+// Modified by samschultzponsys, 2026-11-16: mailbox groups.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -31,7 +32,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { ALL_PERMISSIONS, isPermission, SUPERADMIN, USER_DEFAULTS, USER_ROLE, type Permission, type Role } from '../../shared/permissions.js';
 import { normalizeFilters, type SavedSearch, type SearchFilters } from '../../shared/search.js';
-import type { AccountInput, AccountView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
+import type { AccountInput, AccountView, MailboxGroupInput, MailboxGroupView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
 import { decrypt, encrypt } from './crypto.js';
 
 // Snoozed messages: where each one waits (IMAP folder, UIDVALIDITY, UID) and when it returns to
@@ -409,6 +410,23 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!cols.some((c) => c.name === 'auth')) db.exec("ALTER TABLE accounts ADD COLUMN auth TEXT NOT NULL DEFAULT 'password';");
     if (!cols.some((c) => c.name === 'oauth_token')) db.exec("ALTER TABLE accounts ADD COLUMN oauth_token TEXT NOT NULL DEFAULT '';");
   },
+  // DreyMail: mailbox groups (sidebar sections with a shared color, icon and notification switch).
+  (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS mailbox_groups (
+               id TEXT PRIMARY KEY,
+               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+               name TEXT NOT NULL,
+               color TEXT NOT NULL,
+               icon TEXT NOT NULL DEFAULT '',
+               notify INTEGER NOT NULL DEFAULT 1,
+               follow INTEGER NOT NULL DEFAULT 1,
+               position INTEGER NOT NULL DEFAULT 0,
+               created_at INTEGER NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS mailbox_groups_user ON mailbox_groups(user_id);`);
+    const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'group_id')) db.exec('ALTER TABLE accounts ADD COLUMN group_id TEXT REFERENCES mailbox_groups(id) ON DELETE SET NULL');
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -498,6 +516,7 @@ interface AccountRow {
   oauth_token?: string;
   icon?: string;
   icon_image_version?: number;
+  group_id?: string | null;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -513,6 +532,7 @@ function toView(r: AccountRow): AccountView {
     color: r.color,
     icon: r.icon === 'image' && !r.icon_image_version ? '' : (r.icon ?? ''),
     iconImage: r.icon_image_version ? `/api/accounts/${r.id}/icon?v=${r.icon_image_version}` : null,
+    groupId: r.group_id ?? null,
     imap: { host: r.imap_host, port: r.imap_port, tls: r.imap_tls as TlsMode, user: r.imap_user },
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
@@ -872,6 +892,56 @@ export class Store {
   }
 
   // ---- accounts ------------------------------------------------------------
+
+  // ---- mailbox groups (DreyMail) ---------------------------------------------------------
+
+  listGroups(userId: string): MailboxGroupView[] {
+    const rows = this.db.prepare('SELECT * FROM mailbox_groups WHERE user_id = ? ORDER BY position, created_at').all(userId) as {
+      id: string;
+      name: string;
+      color: string;
+      icon: string;
+      notify: number;
+      follow: number;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      color: r.color,
+      icon: r.icon,
+      notify: r.notify === 1,
+      follow: r.follow === 1,
+      accountIds: (this.db.prepare('SELECT id FROM accounts WHERE user_id = ? AND group_id = ? ORDER BY position, created_at').all(userId, r.id) as { id: string }[]).map((a) => a.id),
+    }));
+  }
+
+  /** Creates or updates a group and sets which of the user's mailboxes are in it. */
+  saveGroup(userId: string, g: MailboxGroupInput, id?: string): string | null {
+    if (id && !this.db.prepare('SELECT 1 FROM mailbox_groups WHERE id = ? AND user_id = ?').get(id, userId)) return null;
+    const gid = id ?? crypto.randomUUID();
+    if (id) this.db.prepare('UPDATE mailbox_groups SET name = ?, color = ?, icon = ?, notify = ?, follow = ? WHERE id = ?').run(g.name, g.color, g.icon, g.notify ? 1 : 0, g.follow ? 1 : 0, gid);
+    else {
+      const pos = (this.db.prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM mailbox_groups WHERE user_id = ?').get(userId) as { p: number }).p;
+      this.db.prepare('INSERT INTO mailbox_groups (id, user_id, name, color, icon, notify, follow, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(gid, userId, g.name, g.color, g.icon, g.notify ? 1 : 0, g.follow ? 1 : 0, pos, Date.now());
+    }
+    const mine = new Set(this.listAccounts(userId).map((a) => a.id));
+    this.db.prepare('UPDATE accounts SET group_id = NULL WHERE user_id = ? AND group_id = ?').run(userId, gid);
+    for (const accountId of g.accountIds) if (mine.has(accountId)) this.db.prepare('UPDATE accounts SET group_id = ? WHERE user_id = ? AND id = ?').run(gid, userId, accountId);
+    // "Mailboxes use the group's color and icon": applied to every member now.
+    if (g.follow) this.db.prepare("UPDATE accounts SET color = ?, icon = CASE WHEN ? = '' THEN icon ELSE ? END WHERE user_id = ? AND group_id = ?").run(g.color, g.icon, g.icon, userId, gid);
+    return gid;
+  }
+
+  deleteGroup(userId: string, id: string): boolean {
+    this.db.prepare('UPDATE accounts SET group_id = NULL WHERE user_id = ? AND group_id = ?').run(userId, id);
+    return Number(this.db.prepare('DELETE FROM mailbox_groups WHERE id = ? AND user_id = ?').run(id, userId).changes) > 0;
+  }
+
+  /** New-mail notifications for this mailbox: off when its group says so. */
+  notifiesFor(userId: string, accountId: string): boolean {
+    const r = this.db.prepare('SELECT g.notify FROM accounts a JOIN mailbox_groups g ON g.id = a.group_id WHERE a.user_id = ? AND a.id = ?').get(userId, accountId) as { notify: number } | undefined;
+    return !r || r.notify === 1;
+  }
 
   listAccounts(userId: string): AccountView[] {
     const rows = this.db

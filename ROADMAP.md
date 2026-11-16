@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Mailbox groups: sidebar sections that expand and collapse, with a shared color, icon and
+      notification switch (4.9).
 - [x] Per-account icons, 38 built in, shown in the sidebar and notifications (2.9); your own
       uploaded picture as an icon, with size, position and background (3.0), also while adding a
       mailbox (4.7).

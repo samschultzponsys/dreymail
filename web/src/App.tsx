@@ -75,6 +75,7 @@ export function App() {
   const theme = useTheme(me.data?.preferences.theme);
   // Only once signed in: asked earlier it fails with 401 and wouldn't be asked again after login.
   const accountsQ = useAccounts(loggedIn);
+  const groupsQ = useQuery({ queryKey: ['groups'], queryFn: api.groups, enabled: loggedIn });
   const accounts = useMemo(() => (loggedIn ? (accountsQ.data ?? []) : []), [accountsQ.data, loggedIn]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const folders = useFolders(loggedIn && accounts.length > 0);
@@ -602,6 +603,7 @@ export function App() {
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
+        groups={groupsQ.data}
         accounts={accounts}
         showUnified={unifiedInbox}
         folders={folders.data}
