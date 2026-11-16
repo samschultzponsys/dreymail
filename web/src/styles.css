@@ -31,7 +31,8 @@
    Modified by samschultzponsys, 2026-11-16: signature import button.
    Modified by samschultzponsys, 2026-11-16: message frames as tall as their message.
    Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
-   Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging. */
+   Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
+   Modified by samschultzponsys, 2026-11-16: collapsed folder bar: groups as tinted panels, no overflow. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -220,7 +221,7 @@ svg { flex-shrink: 0; }
   width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
 }
 .sidebar.rail .nav-heading { justify-content: center; padding: 4px 0; }
-.sidebar.rail .nav-heading svg { display: none; }
+.sidebar.rail .nav-heading svg:not(.mailbox-icon) { display: none; }
 .sidebar.rail .sidebar-footer { flex-direction: column; gap: 6px; padding: 8px 4px; }
 .sidebar.rail .sidebar-footer .who { display: none; }
 .rail-toggle svg { transition: transform 0.15s; }
@@ -972,6 +973,22 @@ a.btn { text-decoration: none; }
 .nav-group-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-group-head svg.muted { flex: 0 0 auto; color: var(--muted); }
 .nav-group-body { border-left: 2px solid color-mix(in srgb, var(--group) 45%, transparent); margin-left: 12px; padding-left: 4px; }
+/* Collapsed bar: no room for the indent and the count. A group is a tinted panel in its color, and
+   unread mail is a dot, as on folders. Nothing may stick out sideways. */
+@media (min-width: 1025px) {
+  .sidebar.rail .nav { overflow-x: hidden; }
+  .sidebar.rail .nav-group-head { justify-content: center; padding: 6px 0; position: relative; }
+  .sidebar.rail .nav-group-head .count { display: none; }
+  .sidebar.rail .nav-group-head.unread::after {
+    content: ''; position: absolute; top: 4px; right: 10px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+  .sidebar.rail .nav-group-body {
+    border-left: 0; margin-left: 0; padding: 2px 0 4px;
+    background: color-mix(in srgb, var(--group) 12%, transparent); border-radius: var(--radius-sm);
+  }
+  .sidebar.rail .nav-group-body .nav-section:first-child { margin-top: 4px; }
+}
 .groups-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 .groups-head { display: flex; flex-direction: column; gap: 2px; }
 .groups-head .muted { font-size: 12.5px; }

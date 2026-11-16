@@ -13,6 +13,15 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.5): tidier collapsed folder bar
+
+- **Collapsed folder bar** (wide screens): a group's unread count stuck out of the bar, and its
+  mailboxes were indented with a side line that pushed the bar sideways (a scrollbar appeared).
+  Now a group shows its icon with an unread dot, its mailboxes sit in a panel tinted in the
+  group's color, and nothing sticks out. Mailboxes with a built-in icon also show it there (it
+  was hidden along with the arrow). Phones and tablets are unchanged.
+- **Files:** `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v7.4): new group from the folder bar
 
 - **Folder bar:** right-click its empty space (below the last mailbox, or between sections) for
