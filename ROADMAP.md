@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Signatures made for Outlook: import from its .zip or .htm and pictures, table layout kept,
+      up to 1.5 MB; pictures in messages sent as inline attachments (6.5).
 - [x] Links in DreyMail's own pages (a signature, a hint) open outside the app, never in place of
       it; the desktop app has Back and Back to DreyMail (6.4).
 - [x] Notification previews up to about 1,000 characters with their paragraphs, for expanded

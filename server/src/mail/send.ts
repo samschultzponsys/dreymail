@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: answers to calendar invitations (iTIP REPLY).
+// Modified by samschultzponsys, 2026-11-16: sent mail carries its pictures as inline attachments.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -75,7 +76,7 @@ export class ComposeService {
     // Graph takes the recipients from the headers, so Outlook messages keep Bcc (Exchange strips it
     // from what recipients get); SMTP gets them in the envelope instead.
     const viaGraph = account.auth === 'microsoft';
-    const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: viaGraph });
+    const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: viaGraph, inlineImages: true });
     await this.deliver(userId, account, raw, envelope);
 
     // From here on the message is sent; failures are reported as warnings, not errors.

@@ -13,6 +13,27 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.5): signatures made for Outlook; pictures sent as inline attachments
+
+- **Import from Outlook files** (Settings → Signatures → a signature): choose the .zip a signature
+  tool gives you, or its .htm file and its pictures. The pictures are put into the signature, the
+  HTML is cleaned (nothing in it can run), and it shows in the editor to check before saving.
+  The .zip is read in the browser (no new dependency).
+- **Bigger signatures:** up to 1.5 MB, pictures included (it was 100,000 characters, too small for
+  an animated logo, so such a signature couldn't be saved).
+- **Table layout kept:** the cleaner now keeps `cellpadding`, `cellspacing`, `border`, `width`,
+  `height`, `valign` and `bgcolor` on tables and cells, and `border` on pictures, which signatures
+  made for Outlook rely on.
+- **Pictures in sent mail:** pictures inside a message (pasted, or a signature's) were sent as
+  data: URLs, which Gmail and Outlook on the web don't show; the option meant to turn them into
+  attachments only works with nodemailer's transport, not the composer DreyMail uses. They are now
+  sent as inline (cid:) attachments, the same picture once. Drafts keep them inside the HTML, so
+  they open again in the editor.
+- **Files:** new `web/src/signatureImport.ts`, `web/test/signatureImport.test.ts`;
+  `web/src/components/SignaturesSettings.tsx`, `web/src/styles.css`, `server/src/mail/compose.ts`,
+  `server/src/mail/send.ts`, `server/src/routes/api.ts`, `server/test/mime.test.ts`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.4): longer notification previews; links never replace the app
 
 - **Notification previews:** "Sender, subject and the start of the message" now shows up to about

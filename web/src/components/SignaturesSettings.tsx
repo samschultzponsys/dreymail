@@ -2,11 +2,15 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Bold, Italic, Link as LinkIcon, Plus, Trash2 } from 'lucide-react';
+import { Bold, FileUp, Italic, Link as LinkIcon, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AccountView, Signature, SignatureInput } from '../../../shared/types';
 import { api } from '../api';
 import { useAccounts, useSignatures } from '../hooks';
+import { importSignature } from '../signatureImport';
+
+/** Most a signature can be, pictures included (the server's limit). */
+const MAX_SIGNATURE = 1_500_000;
 
 /**
  * Settings → Signatures. Each signature has a name, rich text and checkboxes for the accounts that
@@ -118,6 +122,21 @@ function SignatureEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const body = useRef<HTMLDivElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
+  const [imported, setImported] = useState<string | null>(null);
+
+  const importFiles = async (files: File[]) => {
+    setError(null);
+    setImported(null);
+    try {
+      const html = await importSignature(files);
+      if (html.length > MAX_SIGNATURE) throw new Error('This signature’s pictures are too big (1.5 MB at most). Make them smaller and try again.');
+      if (body.current) body.current.innerHTML = html;
+      setImported(`Imported ${files.length === 1 ? files[0]!.name : `${files.length} files`}. Check it below, then save.`);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
 
   useEffect(() => {
     if (body.current) body.current.innerHTML = initial.html;
@@ -163,6 +182,22 @@ function SignatureEditor({
             <button type="button" className="icon-btn" title="Link" onMouseDown={(e) => e.preventDefault()} onClick={() => format('link')}>
               <LinkIcon size={15} />
             </button>
+            <span className="grow" />
+            <button type="button" className="btn sig-import" title="Import a signature made for Outlook: its .zip, or its .htm file and pictures" onClick={() => importInput.current?.click()}>
+              <FileUp size={15} /> Import from Outlook files
+            </button>
+            <input
+              ref={importInput}
+              type="file"
+              hidden
+              multiple
+              accept=".zip,.htm,.html,image/*"
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = '';
+                if (files.length) void importFiles(files);
+              }}
+            />
           </div>
           <div ref={body} className="sig-content" contentEditable suppressContentEditableWarning aria-label="Signature text" />
         </div>
@@ -192,6 +227,7 @@ function SignatureEditor({
         <input type="checkbox" checked={onReplies} onChange={(e) => setOnReplies(e.target.checked)} />
         Also add to replies and forwards
       </label>
+      {imported && <div className="hint">{imported}</div>}
       {error && <div className="error-text">{error}</div>}
       <div className="row-buttons">
         {onDelete && (
@@ -206,7 +242,13 @@ function SignatureEditor({
         <button
           className="btn primary"
           disabled={busy || !name.trim()}
-          onClick={() => void run(() => onSave({ name: name.trim(), html: body.current?.innerHTML ?? '', accountIds, onReplies }))}
+          onClick={() =>
+            void run(async () => {
+              const html = body.current?.innerHTML ?? '';
+              if (html.length > MAX_SIGNATURE) throw new Error('This signature is too big to save (1.5 MB at most, pictures included). Use smaller pictures.');
+              await onSave({ name: name.trim(), html, accountIds, onReplies });
+            })
+          }
         >
           Save
         </button>

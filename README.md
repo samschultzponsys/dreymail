@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -160,7 +160,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   for the accounts that use it. Tick one account for a per-inbox signature, or several to share
   one. Optionally also added to replies and forwards. The composer puts it in below where you
   type (above any quoted message), swaps it when you change the From account, and takes on the
-  From account's color.
+  From account's color. **Import from Outlook files** takes a signature made for Outlook (the .zip
+  a signature tool gives you, or its .htm file and pictures) with its table layout and pictures,
+  animated GIFs included (up to 1.5 MB). Pictures in a message, a signature's included, are sent as
+  inline attachments, which every mail app shows.
 - Compose, reply, reply-all, and forward (with the original attachments). Includes a light
   rich-text editor, an automatic plain-text alternative, attachments, drafts (saved to the
   account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used

@@ -27,7 +27,8 @@
    Modified by samschultzponsys, 2026-11-15: calendar; calendar sync and invitations.
    Modified by samschultzponsys, 2026-11-16: right-click menu on a mailbox's name.
    Modified by samschultzponsys, 2026-11-16: provider icon list in the icon picker.
-   Modified by samschultzponsys, 2026-11-16: signature preview links don't open. */
+   Modified by samschultzponsys, 2026-11-16: signature preview links don't open.
+   Modified by samschultzponsys, 2026-11-16: signature import button. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1042,3 +1043,7 @@ body.resizing iframe { pointer-events: none; }
 .icon-provider-pick .input { flex: 1 1 160px; max-width: 220px; }
 /* A signature's preview opens the signature for editing; its links don't open from there. */
 .sig-preview a { pointer-events: none; }
+/* Signature editor: "Import from Outlook files" at the right of the toolbar. */
+.sig-toolbar { align-items: center; }
+.sig-toolbar .grow { flex: 1; }
+.sig-toolbar .sig-import { min-height: 28px; padding: 0 10px; font-size: 13px; }

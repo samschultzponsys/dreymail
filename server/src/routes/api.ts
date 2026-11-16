@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 // Modified by samschultzponsys, 2026-11-16: provider icon from a list or any website.
+// Modified by samschultzponsys, 2026-11-16: signatures up to 1.5 MB, pictures included.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -136,7 +137,8 @@ export function capitalizeName(input: string): string {
 
 export const signatureSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  html: z.string().max(100_000),
+  // Pictures are kept inside the signature (data: URLs), e.g. an animated logo: room for them.
+  html: z.string().max(1_500_000, 'This signature is too big to save (1.5 MB at most, pictures included). Use smaller pictures.'),
   accountIds: z.array(z.string().max(100)).max(100),
   onReplies: z.boolean().default(true),
 });

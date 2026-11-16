@@ -108,6 +108,15 @@ describe('snippets from BODYSTRUCTURE', () => {
 });
 
 describe('composing', () => {
+  it('keeps the table layout of signatures made for Outlook', () => {
+    const sig = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr><td width="67" height="67" valign="top"><img src="data:image/gif;base64,R0lGOD" width="67" height="67" border="0" onerror="x()"></td></tr></table>';
+    const out = sanitizeOutgoingHtml(sig);
+    expect(out).toContain('cellpadding="0" cellspacing="0" border="0"');
+    expect(out).toContain('<td width="67" height="67" valign="top">');
+    expect(out).toContain('src="data:image/gif;base64,R0lGOD" width="67" height="67" border="0"');
+    expect(out).not.toContain('onerror');
+  });
+
   it('parses recipient lists', () => {
     expect(parseAddressList('"Doe, Jane" <jane@example.com>, bob@example.com')).toEqual([
       { name: 'Doe, Jane', address: 'jane@example.com' },
@@ -147,6 +156,32 @@ describe('composing', () => {
     expect(parsed.messageId).toBe(messageId);
     expect(parsed.bcc ?? []).toEqual([]);
     expect(parsed.attachments.map((a) => a.filename)).toEqual(['notes.txt']);
+  });
+
+  it('sends pictures inside the HTML (a signature logo) as inline attachments; drafts keep them inside', async () => {
+    const gif = Buffer.from('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64');
+    const msg = {
+      from: { name: '', address: 'user@example.com' },
+      to: [{ name: '', address: 'jane@example.com' }],
+      cc: [],
+      bcc: [],
+      subject: 'sig',
+      html: `<p>Hi</p><img src="data:image/gif;base64,${gif.toString('base64')}" width="67"><img src="data:image/gif;base64,${gif.toString('base64')}">`,
+      inReplyTo: null,
+      references: [],
+      attachments: [],
+    };
+    const sent = await parseRaw((await buildRawMessage(msg, { keepBcc: false, inlineImages: true })).raw);
+    expect(sent.html).not.toContain('data:');
+    const cids = [...String(sent.html).matchAll(/src="cid:([^"]+)"/g)].map((m) => m[1]);
+    expect(cids).toHaveLength(2);
+    expect(new Set(cids).size).toBe(1); // the same picture is attached once
+    const inline = sent.attachments.filter((a) => a.contentId);
+    expect(inline).toHaveLength(1);
+    expect(inline[0]!.mimeType).toBe('image/gif');
+    expect(Buffer.compare(Buffer.from(inline[0]!.content as ArrayBuffer), gif)).toBe(0);
+    const draft = await parseRaw((await buildRawMessage(msg, { keepBcc: true })).raw);
+    expect(draft.html).toContain('data:image/gif;base64,');
   });
 
   it('keeps Bcc in drafts', async () => {
