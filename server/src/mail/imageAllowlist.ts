@@ -99,7 +99,7 @@ export interface RemoteDecision {
 
 /** Automatic loading beyond the "always load from" list (Settings → Images). */
 export interface AutoImages {
-  /** Domains of the user's own mailboxes ("your own domains"); empty when switched off. */
+  /** Domains of the user's own mailboxes ("your own domains"), without public ones like gmail.com; empty when switched off. */
   ownDomains: readonly string[];
   /** Addresses the user has written to; empty when switched off. */
   contacts: ReadonlySet<string>;
@@ -129,7 +129,8 @@ export function decideRemoteImages(email: ParsedEmail, explicit: boolean | undef
   let reason: RemoteDecision['reason'] = listed ? 'list' : null;
   let allowedBy = listed;
   if (!reason && auto) {
-    const own = auto.ownDomains.find((d) => domainMatches(domain, d));
+    // Exactly your own domain (a newsletter subdomain of it doesn't count).
+    const own = auto.ownDomains.find((d) => d === domain);
     const from = flattenAddresses(email.from)[0]?.address?.trim().toLowerCase() ?? '';
     if (own) [reason, allowedBy] = ['own', own];
     else if (from && auto.contacts.has(from)) [reason, allowedBy] = ['contact', domain];

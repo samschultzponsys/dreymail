@@ -11,7 +11,8 @@ const auto = (over: Partial<AutoImages> = {}): AutoImages => ({ ownDomains: [], 
 describe('loading images by themselves', () => {
   it('for your own domains and people you have written to', async () => {
     expect(decideRemoteImages(await mail('Me <me@spazcat.test>'), undefined, [], auto({ ownDomains: ['spazcat.test'] }))).toMatchObject({ load: true, reason: 'own' });
-    expect(decideRemoteImages(await mail('Work <it@corp.spazcat.test>'), undefined, [], auto({ ownDomains: ['spazcat.test'] }))).toMatchObject({ load: true, reason: 'own' });
+    // Exactly your domain: a subdomain (e.g. a newsletter's) doesn't count.
+    expect(decideRemoteImages(await mail('News <n@news.spazcat.test>'), undefined, [], auto({ ownDomains: ['spazcat.test'] })).load).toBe(false);
     expect(decideRemoteImages(await mail('Ada <Ada@Example.org>'), undefined, [], auto({ contacts: new Set(['ada@example.org']) }))).toMatchObject({ load: true, reason: 'contact' });
     expect(decideRemoteImages(await mail('Stranger <x@example.net>'), undefined, [], auto({ ownDomains: ['spazcat.test'], contacts: new Set(['ada@example.org']) }))).toMatchObject({ load: false });
   });

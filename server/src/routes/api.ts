@@ -23,6 +23,12 @@ import type { ScheduledSends } from '../mail/scheduled.js';
 import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
 import { providerIcon, providerSite } from '../net/siteIcon.js';
+import { isFreemail } from '../net/avatars.js';
+import { MAIL_PROVIDERS, MICROSOFT_DOMAINS } from '../../../shared/mailProviders.js';
+
+const PUBLIC_MAIL_DOMAINS = new Set([...MAIL_PROVIDERS.flatMap((p) => p.domains), ...MICROSOFT_DOMAINS]);
+/** gmail.com, outlook.com, yahoo.com…: shared by everyone. */
+const isPublicMailDomain = (d: string) => PUBLIC_MAIL_DOMAINS.has(d) || isFreemail(d);
 import { decodeFilters, normalizeFilters } from '../../../shared/search.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -695,7 +701,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   const autoImagesFor = (userId: string) => {
     const prefs = store.getUser(userId)?.preferences;
     return {
-      ownDomains: prefs?.imagesOwnDomains === false ? [] : [...new Set(store.listAccounts(userId).map((a) => normaliseDomain(a.email)).filter((d): d is string => !!d))],
+      // Public mail domains (gmail.com, outlook.com…) are everyone's, not "your own".
+      ownDomains:
+        prefs?.imagesOwnDomains === false
+          ? []
+          : [...new Set(store.listAccounts(userId).map((a) => normaliseDomain(a.email)).filter((d): d is string => !!d && !isPublicMailDomain(d)))],
       contacts: prefs?.imagesContacts === false ? new Set<string>() : store.recipientAddresses(userId),
       senderHosted: prefs?.imagesSenderHosted === true,
     };

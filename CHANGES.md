@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.6): fixes; first release with 5.3–5.5
+
+5.3, 5.4 and 5.5 were never released: the release checks (integration tests against a real mail
+server) failed on the two problems below. 5.6 brings all of their changes.
+
+- **Fix: folder lists right after a change.** Marking mail read or unread, moving, archiving (which
+  can create the Archive folder), sending and the like now mark the mailbox's remembered folder list
+  as changed, and the next request waits for the real counts instead of showing the remembered ones
+  for up to 30 seconds. A fetch overtaken by a change no longer overwrites the newer list.
+- **Fix: "your own domains" for images** now means exactly the domains of your mailboxes: not their
+  subdomains (a newsletter from news.yourdomain.com doesn't count), and never public mail domains
+  (gmail.com, outlook.com, yahoo.com…), which would have loaded images for every Gmail sender.
+- **Files:** `server/src/imap/mail.ts`, `server/src/mail/imageAllowlist.ts`,
+  `server/src/routes/api.ts`, `server/test/autoImages.test.ts`, `README.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-16 (v5.5): folder lists kept across restarts and kept current
 
 - **Folder lists** (with unread counts) are saved in the encrypted mail cache (`cache.db`), so after

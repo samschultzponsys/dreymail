@@ -272,17 +272,20 @@ export class MailService {
 
   /** Something changed in a folder: if it is cached, sync it soon. */
   folderChanged(userId: string, accountId: string, folder: string) {
+    this.foldersChanged(userId, accountId);
     this.fromCache(userId, accountId, folder, undefined, ({ sync }) => sync.syncSoon(userId, accountId, folder));
   }
 
   /** Apply a change we just made on the IMAP server to the cached copy of the folder, if there is one. */
   private updateCache(userId: string, accountId: string, folder: string, uidValidity: string, fn: (cache: MailCache, f: CachedFolder) => void) {
+    this.foldersChanged(userId, accountId);
     const f = this.cachedFolder(userId, accountId, folder, uidValidity);
     if (f) this.fromCache(userId, accountId, folder, undefined, ({ cache }) => fn(cache, f));
   }
 
   /** Forget everything cached for an account (deleted, or now pointing at another mailbox). */
   forgetAccount(userId: string, accountId: string) {
+    this.forgetFolders(userId, accountId);
     this.fromCache(userId, accountId, 'INBOX', undefined, ({ cache }) => cache.dropAccount(userId, accountId));
   }
 
@@ -297,7 +300,7 @@ export class MailService {
   }
 
   /** The last folder list of each mailbox, served at once while a fresh one is fetched (DreyMail). */
-  private readonly folderMemo = new Map<string, { at: number; value: AccountFolders }>();
+  private readonly folderMemo = new Map<string, { at: number; value: AccountFolders; dirty?: boolean }>();
   private readonly folderJobs = new Map<string, Promise<AccountFolders>>();
 
   /** Remembered list: in memory, else from the encrypted mail cache (which survives restarts). */
@@ -318,9 +321,10 @@ export class MailService {
   private refreshFolderList(userId: string, accountId: string, key: string): Promise<AccountFolders> {
     let job = this.folderJobs.get(key);
     if (!job) {
-      job = this.listFoldersLive(userId, accountId)
+      const current = this.listFoldersLive(userId, accountId)
         .then((r) => {
-          if (!r.error) {
+          // Only the latest fetch counts: one overtaken by a change brings back old counts.
+          if (!r.error && this.folderJobs.get(key) === current) {
             this.folderMemo.set(key, { at: Date.now(), value: r });
             try {
               this.cached?.cache.putFolderList(userId, accountId, r);
@@ -330,8 +334,11 @@ export class MailService {
           }
           return r;
         })
-        .finally(() => this.folderJobs.delete(key));
-      this.folderJobs.set(key, job);
+        .finally(() => {
+          if (this.folderJobs.get(key) === current) this.folderJobs.delete(key);
+        });
+      job = current;
+      this.folderJobs.set(key, current);
     }
     return job;
   }
@@ -344,9 +351,10 @@ export class MailService {
   async listFolders(userId: string, accountId: string): Promise<AccountFolders> {
     const key = `${userId}\u0000${accountId}`;
     const known = this.knownFolders(userId, accountId, key);
-    if (known && !this.folderJobs.has(key) && Date.now() - known.at < 30_000) return known.value;
+    if (known && !known.dirty && !this.folderJobs.has(key) && Date.now() - known.at < 30_000) return known.value;
     const job = this.refreshFolderList(userId, accountId, key);
-    if (known) {
+    // Changed by an action (read, moved, a folder made…): wait for the real counts, never show old ones.
+    if (known && !known.dirty) {
       void job.catch(() => undefined);
       return { ...known.value, refreshing: true };
     }
@@ -357,14 +365,16 @@ export class MailService {
   async refreshFolders(userId: string, accountId: string): Promise<void> {
     const key = `${userId}\u0000${accountId}`;
     const known = this.knownFolders(userId, accountId, key);
-    if (known && Date.now() - known.at < 60_000) return;
+    if (known && !known.dirty && Date.now() - known.at < 60_000) return;
     await this.refreshFolderList(userId, accountId, key).catch(() => undefined);
   }
 
   /** New mail or other changes: the remembered unread counts are out of date. */
   foldersChanged(userId: string, accountId: string) {
     const known = this.folderMemo.get(`${userId}\u0000${accountId}`);
-    if (known) known.at = 0;
+    if (known) known.dirty = true;
+    // A fetch that started before the change could bring back the old counts: let the next one decide.
+    this.folderJobs.delete(`${userId}\u0000${accountId}`);
   }
 
   /** Forget a mailbox's remembered folder list (after it's edited or removed). */
@@ -837,6 +847,7 @@ export class MailService {
         return created;
       });
       await this.pool.folders(userId, accountId, true);
+      this.foldersChanged(userId, accountId);
       return { path: res.path, created: true };
     } catch (err) {
       const e = err as { responseText?: string; message?: string };
