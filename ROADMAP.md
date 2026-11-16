@@ -45,6 +45,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Groups get every icon a mailbox can have (picture, provider or website icon); right-click
+      a group's name to edit it (7.2).
 - [x] Flatpak update command restarts DreyMail on the new version (7.1).
 - [x] Drag to rearrange groups and mailboxes in the sidebar, into and out of groups (7.0).
 - [x] Desktop notifications for every mailbox, always, with the mailbox's name, icon and color, and a

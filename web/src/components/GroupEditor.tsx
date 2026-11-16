@@ -14,6 +14,8 @@ export function GroupEditor({ group, accounts, onDone, onCancel }: { group: Mail
   const [v, setV] = useState<MailboxGroupInput>(
     group ? { name: group.name, color: group.color, icon: group.icon, notify: group.notify, follow: group.follow, accountIds: group.accountIds } : { name: '', color: ACCOUNT_COLORS[2]!, icon: '', notify: true, follow: true, accountIds: [] },
   );
+  // The group's own picture: its saved URL, or a new one (a data URL) until the group is saved.
+  const [picture, setPicture] = useState<string | null>(group?.iconImage ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toggle = (id: string) => setV((cur) => ({ ...cur, accountIds: cur.accountIds.includes(id) ? cur.accountIds.filter((x) => x !== id) : [...cur.accountIds, id] }));
@@ -27,6 +29,17 @@ export function GroupEditor({ group, accounts, onDone, onCancel }: { group: Mail
       setError((err as Error).message);
       setBusy(false);
     }
+  };
+
+  // Saves the group, then its picture (a new one is uploaded; a removed one deleted).
+  const save = async () => {
+    const icon = v.icon === 'image' && !picture ? '' : v.icon;
+    const before = group ? null : new Set((await api.groups()).map((g) => g.id));
+    let groups = await api.saveGroup({ ...v, icon, name: v.name.trim() }, group?.id);
+    const id = group?.id ?? groups.find((g) => !before!.has(g.id))?.id;
+    if (id && picture?.startsWith('data:')) groups = await api.setGroupIcon(id, picture);
+    else if (id && !picture && group?.iconImage) groups = await api.deleteGroupIcon(id);
+    return groups;
   };
 
   return (
@@ -51,7 +64,8 @@ export function GroupEditor({ group, accounts, onDone, onCancel }: { group: Mail
             </div>
           </div>
         </div>
-        <MailboxIconPicker value={v.icon} color={v.color} onChange={(icon) => setV((cur) => ({ ...cur, icon: icon === 'image' ? '' : icon }))} />
+        {/* The same icons as a mailbox's: built-in ones, a picture, a provider's or any website's icon. */}
+        <MailboxIconPicker value={v.icon} color={v.color} onChange={(icon) => setV((cur) => ({ ...cur, icon }))} pending={picture} onPending={setPicture} hint="Shown on the group's heading in the sidebar." />
         <div>
           <label className="label">Mailboxes in this group</label>
           {accounts.length === 0 && <div className="muted">No mailboxes yet.</div>}
@@ -91,7 +105,7 @@ export function GroupEditor({ group, accounts, onDone, onCancel }: { group: Mail
         <button className="btn ghost" onClick={onCancel}>
           Cancel
         </button>
-        <button className="btn primary" disabled={busy || !v.name.trim()} onClick={() => void run(() => api.saveGroup({ ...v, name: v.name.trim() }, group?.id))}>
+        <button className="btn primary" disabled={busy || !v.name.trim()} onClick={() => void run(save)}>
           Save
         </button>
       </div>

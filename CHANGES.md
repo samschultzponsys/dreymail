@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v7.2): group icons like mailbox icons; right-click a group
+
+- **Group icons:** a group's icon can now be anything a mailbox's can: a built-in icon, your own
+  picture (upload, size and background in the same editor), or a provider's or any website's
+  icon. Stored like mailbox pictures (new columns on `mailbox_groups`, migration appended at the
+  end); `GET/PUT/DELETE /api/groups/:id/icon`. "Mailboxes use the group's color and icon" leaves
+  members' icons alone when the group's icon is its own picture.
+- **Right-click a group's name** in the folder bar: Edit group… (opens its settings directly;
+  Save or Cancel returns to the mail), Collapse/Expand.
+- **Files:** `server/src/db.ts`, `server/src/routes/api.ts`, `shared/types.ts`,
+  `server/test/migrations.test.ts`, `web/src/components/GroupEditor.tsx`,
+  `web/src/components/MailboxIcon.tsx`, `web/src/components/AccountsDialog.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/App.tsx`, `web/src/api.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v7.1): flatpak update restarts DreyMail
 
 - **Desktop app, flatpak:** after the update command installed the new version, the DreyMail that

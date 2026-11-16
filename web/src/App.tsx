@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-16: desktop notifications for every mailbox, always, with the mailbox's name.
 // Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -181,6 +182,8 @@ export function App() {
   const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
   /** Mailbox to open straight into when Accounts opens (right-click on its name). */
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
+  /** Group to open straight into when Accounts opens (right-click on its name). */
+  const [editGroupId, setEditGroupId] = useState<string | null>(null);
   // A learning period ended: the first time DreyMail opens afterwards, show its review.
   const reviews = useQuery({ queryKey: ['ai', 'reviews'], queryFn: api.assistantReviewsDue, enabled: loggedIn && !!assistantStatus.data?.allowed, staleTime: 300_000 });
   const reviewShown = useRef(false);
@@ -671,11 +674,22 @@ export function App() {
         onCompose={compose}
         onAccounts={() => {
           setEditAccountId(null);
+          setEditGroupId(null);
           openOverlay('accounts');
         }}
+        onEditGroup={
+          me.data?.permissions.includes('mail.accounts')
+            ? (id) => {
+                setEditAccountId(null);
+                setEditGroupId(id);
+                openOverlay('accounts');
+              }
+            : undefined
+        }
         onEditAccount={
           me.data?.permissions.includes('mail.accounts')
             ? (id) => {
+                setEditGroupId(null);
                 setEditAccountId(id);
                 openOverlay('accounts');
               }
@@ -824,7 +838,7 @@ export function App() {
           }}
         />
       )}
-      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} editAccountId={editAccountId} onClose={() => closeOverlay('accounts')} />}
+      {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} editAccountId={editAccountId} editGroupId={editGroupId} onClose={() => closeOverlay('accounts')} />}
       {showCalendar && <CalendarDialog accounts={accounts} onClose={() => setShowCalendar(false)} />}
       {showScheduled && <ScheduledDialog accounts={accountMap} onClose={() => setShowScheduled(false)} />}
       {assistantFor && accountMap.get(assistantFor.id) && (

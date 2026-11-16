@@ -29,6 +29,7 @@
 // Modified by samschultzponsys, 2026-11-16: pinned folders.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -441,6 +442,14 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
   (db) => {
     const cols = db.prepare("SELECT name FROM pragma_table_info('accounts')").all() as { name: string }[];
     if (!cols.some((c) => c.name === 'pinned_folders')) db.exec("ALTER TABLE accounts ADD COLUMN pinned_folders TEXT NOT NULL DEFAULT '[]'");
+  },
+  // A group's own picture as its icon, like a mailbox's (DreyMail 7.2).
+  (db: DatabaseSync) => {
+    const cols = db.prepare("SELECT name FROM pragma_table_info('mailbox_groups')").all() as { name: string }[];
+    const has = (n: string) => cols.some((c) => c.name === n);
+    if (!has('icon_image')) db.exec('ALTER TABLE mailbox_groups ADD COLUMN icon_image BLOB');
+    if (!has('icon_image_type')) db.exec("ALTER TABLE mailbox_groups ADD COLUMN icon_image_type TEXT NOT NULL DEFAULT ''");
+    if (!has('icon_image_version')) db.exec('ALTER TABLE mailbox_groups ADD COLUMN icon_image_version INTEGER NOT NULL DEFAULT 0');
   },
 ];
 
@@ -938,12 +947,14 @@ export class Store {
       icon: string;
       notify: number;
       follow: number;
+      icon_image_version?: number;
     }[];
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
       color: r.color,
-      icon: r.icon,
+      icon: r.icon === 'image' && !r.icon_image_version ? '' : r.icon,
+      iconImage: r.icon_image_version ? `/api/groups/${r.id}/icon?v=${r.icon_image_version}` : null,
       notify: r.notify === 1,
       follow: r.follow === 1,
       accountIds: (this.db.prepare('SELECT id FROM accounts WHERE user_id = ? AND group_id = ? ORDER BY position, created_at').all(userId, r.id) as { id: string }[]).map((a) => a.id),
@@ -962,9 +973,27 @@ export class Store {
     const mine = new Set(this.listAccounts(userId).map((a) => a.id));
     this.db.prepare('UPDATE accounts SET group_id = NULL WHERE user_id = ? AND group_id = ?').run(userId, gid);
     for (const accountId of g.accountIds) if (mine.has(accountId)) this.db.prepare('UPDATE accounts SET group_id = ? WHERE user_id = ? AND id = ?').run(gid, userId, accountId);
-    // "Mailboxes use the group's color and icon": applied to every member now.
-    if (g.follow) this.db.prepare("UPDATE accounts SET color = ?, icon = CASE WHEN ? = '' THEN icon ELSE ? END WHERE user_id = ? AND group_id = ?").run(g.color, g.icon, g.icon, userId, gid);
+    // "Mailboxes use the group's color and icon": applied to every member now (a group's own
+    // picture stays the group's: members keep their icons then).
+    const memberIcon = g.icon === 'image' ? '' : g.icon;
+    if (g.follow) this.db.prepare("UPDATE accounts SET color = ?, icon = CASE WHEN ? = '' THEN icon ELSE ? END WHERE user_id = ? AND group_id = ?").run(g.color, memberIcon, memberIcon, userId, gid);
     return gid;
+  }
+
+  /** A group's own picture as its icon (null: removed). */
+  setGroupIconImage(userId: string, groupId: string, picture: { type: string; body: Buffer } | null): boolean {
+    const n = this.db
+      .prepare('UPDATE mailbox_groups SET icon_image = ?, icon_image_type = ?, icon_image_version = ? WHERE user_id = ? AND id = ?')
+      .run(picture?.body ?? null, picture?.type ?? '', picture ? Date.now() : 0, userId, groupId).changes;
+    if (n) this.db.prepare(`UPDATE mailbox_groups SET icon = ? WHERE user_id = ? AND id = ? AND (icon = 'image' OR ?)`).run(picture ? 'image' : '', userId, groupId, picture ? 1 : 0);
+    return n > 0;
+  }
+
+  getGroupIconImage(userId: string, groupId: string): { type: string; body: Buffer } | null {
+    const r = this.db.prepare('SELECT icon_image, icon_image_type FROM mailbox_groups WHERE user_id = ? AND id = ?').get(userId, groupId) as
+      | { icon_image: Uint8Array | null; icon_image_type: string }
+      | undefined;
+    return r?.icon_image ? { type: r.icon_image_type, body: Buffer.from(r.icon_image) } : null;
   }
 
   deleteGroup(userId: string, id: string): boolean {

@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-16: pinned folders, the rest behind "show all".
 // Modified by samschultzponsys, 2026-11-16: the folder bar can be dragged wider or narrower.
 // Modified by samschultzponsys, 2026-11-16: groups and mailboxes rearranged by dragging.
+// Modified by samschultzponsys, 2026-11-16: right-click a group's name; group pictures.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
 
 import { useQuery } from '@tanstack/react-query';
@@ -128,9 +129,11 @@ interface Props {
   onEditAccount?: (accountId: string) => void;
   /** Groups and mailboxes rearranged by dragging; absent when the user may not change mailboxes. */
   onReorder?: (order: SidebarOrder) => void;
+  /** Open a group's settings (right-click its name); absent when the user may not change mailboxes. */
+  onEditGroup?: (groupId: string) => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, scheduledCount = 0, onScheduled, onCalendar }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -189,6 +192,16 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   /** The right-click menu on a mailbox's name. */
   const [menu, setMenu] = useState<{ acc: AccountView; x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  /** The right-click menu on a group's name. */
+  const [groupMenu, setGroupMenu] = useState<{ group: MailboxGroupView; x: number; y: number } | null>(null);
+  const closeGroupMenu = useCallback(() => setGroupMenu(null), []);
+  const groupMenuItems = (g: MailboxGroupView): MenuItem[] => {
+    const key = `g:${g.id}`;
+    const items: MenuItem[] = [];
+    if (onEditGroup) items.push({ label: 'Edit group…', icon: <Pencil size={15} />, onClick: () => onEditGroup(g.id) });
+    if (!rail) items.push({ label: collapsed[key] ? 'Expand' : 'Collapse', icon: collapsed[key] ? <ChevronDown size={15} /> : <ChevronUp size={15} />, onClick: () => setCollapsed((c) => ({ ...c, [key]: !c[key] })) });
+    return items;
+  };
   const menuItems = (acc: AccountView): MenuItem[] => {
     const isCollapsed = !!collapsed[acc.id];
     const items: MenuItem[] = [];
@@ -400,13 +413,17 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
               <button
                 className={`nav-group-head ${unread ? 'unread' : ''} ${dropClass(`g:${g.id}`)}`}
                 onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))}
-                title={canDrag ? `${g.name} (drag to move)` : g.name}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setGroupMenu({ group: g, x: e.clientX, y: e.clientY });
+                }}
+                title={canDrag ? `${g.name} (drag to move, right-click for options)` : onEditGroup ? `${g.name} (right-click for options)` : g.name}
                 aria-expanded={open}
                 {...dragProps({ kind: 'group', id: g.id })}
                 {...dropProps(`g:${g.id}`, (e) => (drag?.kind === 'account' ? { type: 'group', id: g.id, where: 'into' } : drag?.kind === 'group' ? { type: 'group', id: g.id, where: half(e) } : null))}
               >
                 {!rail && (open ? <ChevronDown size={13} /> : <ChevronRight size={13} />)}
-                <MailboxIcon icon={g.icon} color={g.color} size={15} />
+                <MailboxIcon icon={g.icon} image={g.iconImage} color={g.color} size={15} />
                 <span className="name">{g.name}</span>
                 {!g.notify && <BellOff size={12} className="name muted" aria-label="Notifications off" />}
                 {unread > 0 && <span className="count">{unread}</span>}
@@ -438,6 +455,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           </button>
         )}
         {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
+        {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
         {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}
         <button className="icon-btn" title="Accounts" onClick={onAccounts}>
           <UserCog size={17} />

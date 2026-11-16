@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-16: signatures up to 1.5 MB, pictures included.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -526,13 +527,41 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   const groupSchema = z.object({
     name: z.string().trim().min(1).max(60),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-    icon: z.string().max(40).refine((v) => v === '' || isMailboxIcon(v), 'Unknown icon'),
+    icon: z.string().max(40).refine((v) => v === '' || v === 'image' || isMailboxIcon(v), 'Unknown icon'),
     notify: z.boolean(),
     follow: z.boolean(),
     accountIds: z.array(z.string().max(64)).max(200),
   });
 
   app.get('/api/groups', async (req) => store.listGroups(uid(req)));
+
+  // A group's own picture as its icon, like a mailbox's.
+  app.get<{ Params: { id: string } }>('/api/groups/:id/icon', async (req, reply) => {
+    const img = store.getGroupIconImage(uid(req), req.params.id);
+    if (!img) return reply.code(404).send({ error: 'No picture' });
+    return reply
+      .header('content-type', img.type)
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .send(img.body);
+  });
+  app.put<{ Params: { id: string } }>('/api/groups/:id/icon', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    const body = z.object({ image: z.string().max(500_000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid picture' });
+    try {
+      if (!store.setGroupIconImage(uid(req), req.params.id, parsePicture(body.data.image))) return reply.code(404).send({ error: 'Group not found' });
+    } catch (err) {
+      if (err instanceof PictureError) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+    return store.listGroups(uid(req));
+  });
+  app.delete<{ Params: { id: string } }>('/api/groups/:id/icon', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    if (!store.setGroupIconImage(uid(req), req.params.id, null)) return reply.code(404).send({ error: 'Group not found' });
+    return store.listGroups(uid(req));
+  });
 
   // The sidebar's order (groups, mailboxes and which group each is in), as dragged there.
   const orderSchema = z.object({

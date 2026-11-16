@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 // Types shared between the server API and the web client.
 
@@ -82,9 +83,11 @@ export interface MailboxGroupView {
   /** Its mailboxes take the group's color and icon. */
   follow: boolean;
   accountIds: string[];
+  /** URL of the group's own picture, when that is its icon (icon 'image') (DreyMail 7.2). */
+  iconImage?: string | null;
 }
 
-export type MailboxGroupInput = Omit<MailboxGroupView, 'id'>;
+export type MailboxGroupInput = Omit<MailboxGroupView, 'id' | 'iconImage'>;
 
 export type AccountAuth = 'password' | 'microsoft' | 'google';
 

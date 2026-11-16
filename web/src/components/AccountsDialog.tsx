@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-16: conversations or single messages, per mailbox.
 // Modified by samschultzponsys, 2026-11-16: opens straight into a mailbox's settings from the folder bar.
 // Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -351,6 +352,7 @@ export function AccountsDialog({
   startWithNew,
   canEdit = true,
   editAccountId,
+  editGroupId,
 }: {
   accounts: AccountView[];
   defaults: AccountDefaults;
@@ -360,6 +362,8 @@ export function AccountsDialog({
   canEdit?: boolean;
   /** Open straight into this mailbox's settings (right-click on its name in the folder bar). */
   editAccountId?: string | null;
+  /** Open straight into this group's settings (right-click on its name in the folder bar). */
+  editGroupId?: string | null;
 }) {
   const startEditing = canEdit ? accounts.find((a) => a.id === editAccountId) : undefined;
   const qc = useQueryClient();
@@ -370,7 +374,8 @@ export function AccountsDialog({
   const [choosing, setChoosing] = useState(!!startWithNew && canEdit);
   const [editingMicrosoft, setEditingMicrosoft] = useState<AccountView | null>(() => (startEditing && startEditing.auth !== 'password' ? startEditing : null));
   const groups = useQuery({ queryKey: ['groups'], queryFn: api.groups });
-  const [editingGroup, setEditingGroup] = useState<MailboxGroupView | 'new' | null>(null);
+  const startGroup = canEdit && editGroupId ? (qc.getQueryData<MailboxGroupView[]>(['groups']) ?? []).find((g) => g.id === editGroupId) : undefined;
+  const [editingGroup, setEditingGroup] = useState<MailboxGroupView | 'new' | null>(startGroup ?? null);
   const microsoft = useQuery({ queryKey: ['microsoftAvailable'], queryFn: api.microsoftAvailable, staleTime: 60_000 });
   const google = useQuery({ queryKey: ['googleAvailable'], queryFn: api.googleAvailable, staleTime: 60_000 });
   const [msError, setMsError] = useState<string | null>(null);
@@ -415,11 +420,13 @@ export function AccountsDialog({
           <GroupEditor
             group={editingGroup === 'new' ? null : editingGroup}
             accounts={accounts}
-            onCancel={() => setEditingGroup(null)}
+            onCancel={() => (startGroup && editingGroup !== 'new' && editingGroup?.id === startGroup.id ? onClose() : setEditingGroup(null))}
             onDone={(list) => {
               qc.setQueryData(['groups'], list);
               refresh();
-              setEditingGroup(null);
+              // Opened from the folder bar's right-click menu: done means back to the mail.
+              if (startGroup && editingGroup !== 'new' && editingGroup?.id === startGroup.id) onClose();
+              else setEditingGroup(null);
             }}
           />
         ) : editingMicrosoft ? (
@@ -594,7 +601,7 @@ export function AccountsDialog({
                   {(groups.data ?? []).map((g) => (
                     <button key={g.id} className="group-card" onClick={() => setEditingGroup(g)}>
                       <span className="account-mark" style={{ background: g.color }}>
-                        {g.icon && <MailboxIcon icon={g.icon} color={labelOn(g.color)} size={16} />}
+                        {g.icon && <MailboxIcon icon={g.icon} image={g.iconImage} color={labelOn(g.color)} size={16} />}
                       </span>
                       <span className="grow">
                         <strong>{g.name}</strong>

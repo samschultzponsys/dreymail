@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-16: sidebar order.
+// Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -114,6 +115,8 @@ export const api = {
   setPinnedFolders: (accountId: string, folders: string[]) => request<{ ok: boolean }>('PUT', `/api/accounts/${encodeURIComponent(accountId)}/pinned`, { folders }),
   saveGroup: (g: MailboxGroupInput, id?: string) => request<MailboxGroupView[]>(id ? 'PUT' : 'POST', id ? `/api/groups/${encodeURIComponent(id)}` : '/api/groups', g),
   deleteGroup: (id: string) => request<MailboxGroupView[]>('DELETE', `/api/groups/${encodeURIComponent(id)}`),
+  setGroupIcon: (id: string, image: string) => request<MailboxGroupView[]>('PUT', `/api/groups/${encodeURIComponent(id)}/icon`, { image }),
+  deleteGroupIcon: (id: string) => request<MailboxGroupView[]>('DELETE', `/api/groups/${encodeURIComponent(id)}/icon`),
   testAccount: (account: AccountInput, id?: string) => request<{ ok: true }>('POST', '/api/accounts/test', { account, id }),
   createAccount: (a: AccountInput) => request<AccountView>('POST', '/api/accounts', a),
   updateAccount: (id: string, a: AccountInput) => request<AccountView>('PUT', `/api/accounts/${encodeURIComponent(id)}`, a),

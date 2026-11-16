@@ -164,6 +164,7 @@ export function MailboxIconPicker({
   pending = null,
   onPending,
   email = '',
+  hint,
 }: {
   value: string;
   color: string;
@@ -177,6 +178,8 @@ export function MailboxIconPicker({
   onPending?: (dataUrl: string | null) => void;
   /** The mailbox's address: offers its provider's own icon ("Use Gmail's icon"). */
   email?: string;
+  /** Where the icon shows (a group's differs from a mailbox's). */
+  hint?: string;
 }) {
   const [open, setOpen] = useState(!!value);
   const [editing, setEditing] = useState(false);
@@ -334,7 +337,7 @@ export function MailboxIconPicker({
         />
       )}
       {error && <div className="error-text">{error}</div>}
-      <div className="hint">Shown in the sidebar and on this mailbox's notifications (desktop app, Android app and browsers that can draw it).</div>
+      <div className="hint">{hint ?? "Shown in the sidebar and on this mailbox's notifications (desktop app, Android app and browsers that can draw it)."}</div>
     </div>
   );
 }
