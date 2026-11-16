@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-15: connect single sign-on in Profile.
 // Modified by samschultzponsys, 2026-11-16: automatic image rules; sidebar entries to show.
+// Modified by samschultzponsys, 2026-11-16: "Show in notifications" in the Android app too.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -528,26 +529,33 @@ function Notifications({ prefs, save }: { prefs: Preferences; save: (p: Preferen
           )}
         </div>
       )}
-      <div style={{ marginTop: 10 }}>
-        <label className="label" htmlFor="notify-content">
-          Show in notifications
-        </label>
-        <select
-          id="notify-content"
-          className="select"
-          value={prefs.notificationContent}
-          onChange={(e) => void save({ ...prefs, notificationContent: e.target.value as NotificationContent })}
-        >
-          <option value="full">Sender and subject</option>
-          <option value="minimal">Only “New message” and the account</option>
-        </select>
-      </div>
+      <NotificationContentSelect prefs={prefs} save={save} />
       <div className="hint">
         You get a notification for new unread mail in your inboxes while DreyMail isn’t open in front of you. Notifications pass through
         Apple’s or Google’s push service, encrypted so that only your device can read them.
       </div>
       {info && <div className="hint">{info}</div>}
       {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/** What a notification shows (account-wide: the server builds the notification for every device). */
+function NotificationContentSelect({ prefs, save }: { prefs: Preferences; save: (p: Preferences) => Promise<void> }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <label className="label" htmlFor="notify-content">
+        Show in notifications
+      </label>
+      <select
+        id="notify-content"
+        className="select"
+        value={prefs.notificationContent}
+        onChange={(e) => void save({ ...prefs, notificationContent: e.target.value as NotificationContent })}
+      >
+        <option value="full">Sender and subject</option>
+        <option value="minimal">Only “New message” and the account</option>
+      </select>
     </div>
   );
 }
@@ -802,7 +810,11 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
         {desktop ? (
           <div className="hint">On. The desktop app shows new mail as notifications in each account’s color while it runs, also from the tray.</div>
         ) : android ? (
-          <AndroidNotifications />
+          <>
+            <AndroidNotifications />
+            <NotificationContentSelect prefs={prefs} save={save} />
+            <div className="hint">Applies on all your devices. Your phone may still hide what a notification says while it’s locked; that’s in Android’s lock screen settings.</div>
+          </>
         ) : (
           <Notifications prefs={prefs} save={save} />
         )}

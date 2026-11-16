@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v5.9): notification content setting in the Android app
+
+- **Android:** "Show in notifications" (sender and subject, or only "New message" and the account)
+  was only in the browser's Settings → This device; the Android app shows it there too now, with a
+  note that the phone's lock screen settings may still hide the content.
+- **Files:** `web/src/components/SettingsDialog.tsx`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v5.8): phone layout fix
 
 - **Phones and tablets:** 5.7's resizable folder bar left an empty block above the message list on

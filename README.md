@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **5.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **5.9**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -640,7 +640,7 @@ What you get:
 - Nothing while the app is open and focused on any of your devices, since the list updates live
   anyway.
 - Users choose whether notifications show **sender and subject** or only "New message" and the
-  account name. The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
+  account name (Settings → This device, in the browser and the Android app). The payload is end-to-end encrypted to the device (RFC 8291), but it does pass
   through Apple's, Google's or Mozilla's push service.
 - Notifications close themselves on all your devices once their messages are read or moved out of
   the inbox, in DreyMail or in any other mail client (within the 24 hours a notification is
