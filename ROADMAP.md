@@ -45,6 +45,9 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).
+- [x] Desktop app: minimize to the tray, and the tray icon shows and hides the window (6.2).
+- [x] Dialogs with forms (Accounts, Settings, AI assistant, Calendar) no longer close on a click
+      outside them (6.2).
 - [x] Mailbox icon from any provider in a list, or any website, whatever the address (6.1).
 - [x] Right-click a mailbox's name to edit it, collapse it or show all its folders (6.0).
 - [x] Notifications can show the start of the message too; that setting is in the Android app (5.9, 6.0).

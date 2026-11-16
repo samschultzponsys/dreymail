@@ -25,6 +25,8 @@
 // Modified by samschultzponsys, 2026-11-16: automatic image rules; sidebar entries to show.
 // Modified by samschultzponsys, 2026-11-16: "Show in notifications" in the Android app too.
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
+// Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
+// Modified by samschultzponsys, 2026-11-16: desktop app: minimize to the tray.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -113,7 +115,8 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
   };
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
+      {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
       <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(640px, 100%)', height: 'min(720px, calc(100dvh - 32px))' }}>
         <div className="dialog-head">
           <h2>Settings</h2>
@@ -587,6 +590,33 @@ function DesktopApp() {
   );
 }
 
+/** Desktop app: minimizing sends the window to the tray; a click on the tray icon brings it back. */
+function TrayOption() {
+  const desktop = desktopBridge();
+  const [on, setOn] = useState(!!desktop?.minimizeToTray);
+  if (!desktop?.setMinimizeToTray) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <label className="label">Window</label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            desktop.setMinimizeToTray?.(e.target.checked);
+          }}
+        />
+        Minimize to the tray
+      </label>
+      <div className="hint">
+        Minimizing hides DreyMail from the taskbar; click the tray icon to bring it back, and click it again to send it away. Closing the window
+        always keeps DreyMail running in the tray (Quit is in the tray menu).
+      </div>
+    </div>
+  );
+}
+
 /** Settings → Notifications in the Android app: Android's own per-account settings (sound, vibration). */
 function AndroidNotifications() {
   const accounts = useAccounts();
@@ -810,7 +840,10 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
       <div>
         {(desktop || android) && <label className="label">Notifications on this device</label>}
         {desktop ? (
-          <div className="hint">On. The desktop app shows new mail as notifications in each account’s color while it runs, also from the tray.</div>
+          <>
+            <div className="hint">On. The desktop app shows new mail as notifications in each account’s color while it runs, also from the tray.</div>
+            <TrayOption />
+          </>
         ) : android ? (
           <>
             <AndroidNotifications />

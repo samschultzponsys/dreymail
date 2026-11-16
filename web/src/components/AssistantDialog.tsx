@@ -843,7 +843,8 @@ export function AssistantDialog({ account, folders, onClose, initialTab = 'setup
   };
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
+      {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
       <div className="dialog" role="dialog" aria-modal="true" aria-label={`AI assistant for ${account.name}`} style={{ width: 'min(720px, 100%)', height: 'min(780px, calc(100dvh - 32px))' }}>
         <div className="dialog-head">
           <h2 className="assistant-title">

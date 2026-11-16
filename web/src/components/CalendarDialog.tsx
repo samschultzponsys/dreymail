@@ -341,7 +341,8 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
   }
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
+      {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
       <div className="dialog cal-dialog" role="dialog" aria-modal="true" aria-label="Calendar">
         <div className="dialog-head cal-head">
           <button className="icon-btn cal-list-toggle" title="Calendars" onClick={() => setShowList((s) => !s)}>

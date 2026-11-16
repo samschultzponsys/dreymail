@@ -42,7 +42,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **6.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **6.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -502,7 +502,11 @@ server…*) and then shows DreyMail in its own window:
 - **Notifications in each account's color.** New mail pops up as a native notification whose
   icon is the envelope in that account's color, so you see at a glance which inbox it's for.
   Click it to open the message. Closing the window keeps DreyMail running in the tray, so
-  notifications keep coming; *Quit* from the tray or menu stops it.
+  notifications keep coming; *Quit* from the tray or menu stops it. **Minimize to the tray** (on
+  by default; Settings → This device, the tray menu or the DreyMail menu) makes minimizing hide the
+  window from the taskbar too. A click on the tray icon brings the window back and the next click
+  sends it away again (on Linux desktops where a click opens the tray menu, use *Show / hide
+  DreyMail* there).
 - **Updates.** The app checks for a newer release every time it starts, and on demand (*DreyMail →
   Check for updates…*, the tray menu, or Settings → This device). It knows how it was installed and
   shows the exact upgrade for that: the flatpak, apt or dnf command (copied to your clipboard,

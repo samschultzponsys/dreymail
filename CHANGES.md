@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-16 (v6.2): dialogs stay open on a click outside; minimize to the tray
+
+- **Dialogs:** Accounts (adding or editing a mailbox), Settings, the AI assistant and the calendar
+  no longer close when you click outside them, which lost what you had typed. Close them with ×
+  or Cancel. What's new and Scheduled still close on a click outside.
+- **Desktop app (Linux and Windows):** "Minimize to the tray" (on by default; Settings → This
+  device, the tray menu or the DreyMail menu): minimizing hides the window to the tray. A click on
+  the tray icon now shows or hides the window (it only showed it before); the tray menu has
+  "Show / hide DreyMail" for Linux desktops where a click opens the menu.
+- **Files:** `desktop/main.cjs`, `desktop/preload.cjs`, `web/src/desktop.ts`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/components/AccountsDialog.tsx`,
+  `web/src/components/AssistantDialog.tsx`, `web/src/components/CalendarDialog.tsx`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v6.1): mailbox icon from any provider or website
 
 - **Icon picker:** besides "Use <provider>'s icon" for the mailbox's own address, a list ("Icon of

@@ -29,6 +29,9 @@ export interface DesktopBridge {
   checkForUpdates(): void;
   /** Asks for a different DreyMail server address. */
   changeServer(): void;
+  /** Minimizing hides the window to the tray (desktop app 6.2 and later). */
+  minimizeToTray?: boolean;
+  setMinimizeToTray?(on: boolean): void;
 }
 
 export function desktopBridge(): DesktopBridge | undefined {

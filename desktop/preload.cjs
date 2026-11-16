@@ -26,5 +26,8 @@ contextBridge.exposeInMainWorld('dreymailDesktop', {
     ipcRenderer.on('dreymail:open', (_e, url) => cb(String(url)));
   },
   checkForUpdates: () => ipcRenderer.send('dreymail:check-updates'),
+  /** Minimizing hides the window to the tray (as it was when the page loaded; kept by the app). */
+  minimizeToTray: !!info.minimizeToTray,
+  setMinimizeToTray: (on) => ipcRenderer.send('dreymail:minimize-to-tray', !!on),
   changeServer: () => ipcRenderer.send('dreymail:change-server'),
 });

@@ -67,6 +67,16 @@ const installKind = update.detectInstall(process.platform, process.execPath, {
 let win = null;
 let tray = null;
 let quitting = false;
+/** When the window last lost focus: clicking the tray icon takes focus away first (Windows). */
+let lastBlur = 0;
+
+/** Minimize to the tray: minimizing hides the window (and its taskbar button) until the tray brings it back. */
+const minimizeToTray = () => readConfig().minimizeToTray !== false;
+function setMinimizeToTray(on) {
+  writeConfig({ ...readConfig(), minimizeToTray: !!on });
+  refreshTrayMenu();
+  Menu.setApplicationMenu(buildMenu());
+}
 
 function showSetup() {
   const icon = nativeImage.createFromPath(ICON).resize({ width: 128 }).toDataURL();
@@ -133,6 +143,12 @@ function createWindow() {
       .then(({ response }) => (response === 0 ? showServer() : showSetup()));
   });
 
+  win.on('blur', () => {
+    lastBlur = Date.now();
+  });
+  win.on('minimize', () => {
+    if (tray && minimizeToTray()) win.hide();
+  });
   win.on('close', (e) => {
     // With a tray icon, closing keeps DreyMail running so notifications keep coming.
     if (tray && !quitting) {
@@ -154,12 +170,24 @@ function focusWindow() {
   win.focus();
 }
 
+/** The tray icon flips the window: in front → to the tray; hidden, minimized or behind others → in front. */
+function toggleWindow() {
+  if (!win) return;
+  const inFront = win.isVisible() && !win.isMinimized() && (win.isFocused() || Date.now() - lastBlur < 400);
+  if (inFront) win.hide();
+  else focusWindow();
+}
+
 // ---- notifications ------------------------------------------------------------------------------
 
 const shownNotifications = new Map();
 
 ipcMain.on('dreymail:info', (e) => {
-  e.returnValue = { version: update.displayVersion(app.getVersion()), installKind };
+  e.returnValue = { version: update.displayVersion(app.getVersion()), installKind, minimizeToTray: minimizeToTray() };
+});
+
+ipcMain.on('dreymail:minimize-to-tray', (e, on) => {
+  if (isServerPage(e.senderFrame.url)) setMinimizeToTray(on);
 });
 
 ipcMain.on('dreymail:notify', (e, n) => {
@@ -261,6 +289,7 @@ function buildMenu() {
       submenu: [
         { label: 'Change server…', click: () => { focusWindow(); showSetup(); } },
         { label: 'Check for updates…', click: () => void checkForUpdates(true) },
+        { label: 'Minimize to the tray', type: 'checkbox', checked: minimizeToTray(), click: (item) => setMinimizeToTray(item.checked) },
         { type: 'separator' },
         { role: 'reload' },
         { type: 'separator' },
@@ -299,15 +328,23 @@ function createTray() {
     return;
   }
   tray.setToolTip('DreyMail');
+  refreshTrayMenu();
+  // A click on the icon shows or hides the window. Some Linux desktops only open the menu on a
+  // click, so the menu has "Show / hide DreyMail" too.
+  tray.on('click', toggleWindow);
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Open DreyMail', click: focusWindow },
+      { label: 'Show / hide DreyMail', click: toggleWindow },
+      { label: 'Minimize to the tray', type: 'checkbox', checked: minimizeToTray(), click: (item) => setMinimizeToTray(item.checked) },
       { label: 'Check for updates…', click: () => void checkForUpdates(true) },
       { type: 'separator' },
       { label: 'Quit', click: () => { quitting = true; app.quit(); } },
     ]),
   );
-  tray.on('click', focusWindow);
 }
 
 // ---- start ----------------------------------------------------------------------------------------

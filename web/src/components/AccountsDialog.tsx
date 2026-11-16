@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-16: mailbox groups.
 // Modified by samschultzponsys, 2026-11-16: conversations or single messages, per mailbox.
 // Modified by samschultzponsys, 2026-11-16: opens straight into a mailbox's settings from the folder bar.
+// Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -389,7 +390,8 @@ export function AccountsDialog({
   };
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
+      {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
       <div className="dialog" role="dialog" aria-modal="true">
         <div className="dialog-head">
           <h2>
