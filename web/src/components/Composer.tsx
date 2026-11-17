@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: puts the signature in and swaps it when the From account changes.
 // Modified by samschultzponsys, 2026-11-13: takes on the From account's colour.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
+// Modified by samschultzponsys, 2026-11-17: Schedule button with more quick times; longer send delays.
 
 import {
   Bold,
@@ -28,7 +29,8 @@ import { accountPalette } from '../accountTheme';
 import { api } from '../api';
 import { useSignatures } from '../hooks';
 import { applySignature, signatureFor } from '../signature';
-import { formatAddress, formatSize } from '../util';
+import { toLocalInput } from '../snooze';
+import { formatAddress, formatDelay, formatSize } from '../util';
 
 export interface ComposerInit {
   accountId: string;
@@ -249,7 +251,7 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
         const back = snapshot();
         const undo = { label: 'Undo', run: () => void api.cancelScheduled(id).then(() => (onScheduled?.(), onReopen?.(back)), (e: Error) => onToast(e.message, true)) };
         if (at) onToast(`Scheduled for ${at.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`, false, undo);
-        else onToast('Sending…', false, undo, undoSeconds * 1000);
+        else onToast(undoSeconds >= 60 ? `Sending in ${formatDelay(undoSeconds)}…` : 'Sending…', false, undo, undoSeconds * 1000);
         onScheduled?.();
         if (!at) window.setTimeout(onSent, undoSeconds * 1000 + 3000);
       } else {
@@ -270,6 +272,13 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
     if (weekday !== undefined) d.setDate(d.getDate() + ((weekday + 7 - d.getDay()) % 7 || 7));
     else d.setDate(d.getDate() + days);
     d.setHours(hour, 0, 0, 0);
+    return d;
+  };
+
+  /** Now plus some minutes, rounded up to the next 5 minutes. */
+  const inMinutes = (minutes: number) => {
+    const d = new Date(Date.now() + minutes * 60_000);
+    d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
     return d;
   };
 
@@ -431,13 +440,16 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
           <Send size={15} /> {busy === 'send' ? 'Sending…' : 'Send'}
         </button>
         <span className="send-later">
-          <button className="icon-btn" title="Send later" aria-expanded={laterOpen} onClick={() => setLaterOpen((o) => !o)} disabled={busy !== null}>
-            <Clock size={16} />
+          <button className="btn" title="Send at a later time" aria-expanded={laterOpen} onClick={() => setLaterOpen((o) => !o)} disabled={busy !== null}>
+            <Clock size={15} /> Schedule
           </button>
           {laterOpen && (
             <div className="send-later-menu" role="menu">
               {(
                 [
+                  ['In 1 hour', inMinutes(60)],
+                  ['In 3 hours', inMinutes(180)],
+                  ...(new Date().getHours() < 17 ? [['This evening', at(0, 18)] as const] : []),
                   ['Tomorrow morning', at(1, 8)],
                   ['Tomorrow afternoon', at(1, 13)],
                   ['Monday morning', at(0, 8, 1)],
@@ -459,7 +471,7 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
                   }
                 }}
               >
-                <input className="input" type="datetime-local" value={laterCustom} onChange={(e) => setLaterCustom(e.target.value)} aria-label="Send at" />
+                <input className="input" type="datetime-local" value={laterCustom} onChange={(e) => setLaterCustom(e.target.value)} aria-label="Send at" min={toLocalInput(new Date())} />
                 <button className="btn" disabled={!laterCustom}>
                   Schedule
                 </button>

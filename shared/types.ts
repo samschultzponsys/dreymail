@@ -349,7 +349,7 @@ export interface Preferences {
   showFullName: boolean;
   /** Bottom left (DreyMail): photo and name, name only, or photo only. */
   footerIdentity: FooterIdentity;
-  /** Seconds a sent message waits so it can be undone (0 = send at once) (DreyMail). */
+  /** Seconds a sent message waits so it can be undone (0 = send at once, at most 600) (DreyMail). */
   undoSendSeconds: number;
   /** Inbox split into Personal / Updates / Newsletters tabs (DreyMail). */
   inboxTabs: boolean;

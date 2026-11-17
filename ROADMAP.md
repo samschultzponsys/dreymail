@@ -107,7 +107,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 - [x] Copy verification codes; unsubscribe button; block sender (address or domain); mailbox health
       warnings (3.4).
-- [x] Send later and undo send, sent by the server (3.5).
+- [x] Send later and undo send, sent by the server (3.5); Schedule button with more quick times,
+      send delay presets up to 5 minutes and a custom delay up to 10 (7.7).
 - [x] Calendar: DreyMail's own calendars with colors and show/hide checkboxes, grouped by mailbox,
       shared with other users (view or edit), repeating events, month/week/day/agenda views (3.8).
 - [x] Google, Outlook and CalDAV calendars next to DreyMail's own, read and written live; answering

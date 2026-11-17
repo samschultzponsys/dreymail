@@ -131,7 +131,8 @@ export const prefsSchema = z.object({
   sidebarScheduled: z.boolean().default(true),
   sidebarSearches: z.boolean().default(true),
   messageButtons: z.array(z.enum(MESSAGE_BUTTONS as [MessageButton, ...MessageButton[]])).max(MESSAGE_BUTTONS.length).default([...DEFAULT_MESSAGE_BUTTONS]),
-  undoSendSeconds: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(20), z.literal(30)]).default(10),
+  // Up to 10 minutes: longer than that is what Send later is for.
+  undoSendSeconds: z.number().int().min(0).max(600).default(10),
 });
 
 /** Collapses spaces and, for all-lowercase input, capitalises each word. Mixed case is kept (McDonald). */

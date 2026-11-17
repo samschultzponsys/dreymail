@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
 // Modified by samschultzponsys, 2026-11-16: desktop app: minimize to the tray.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
+// Modified by samschultzponsys, 2026-11-17: send delay presets up to 5 minutes and a custom delay up to 10.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -48,6 +49,7 @@ import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
 import { currentEnvironment, currentSubscription, disablePush, enablePush, pushAvailability, type PushAvailability } from '../push';
+import { formatDelay } from '../util';
 
 const TRANSITION_OPTIONS: [TransitionSpeed, string][] = [
   ['off', 'Off'],
@@ -285,17 +287,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
             </label>
           )}
           {tab === 'general' && (
-            <div>
-              <label className="label">Undo send</label>
-              <div className="segmented">
-                {[0, 5, 10, 20, 30].map((n) => (
-                  <button key={n} className={(v.undoSendSeconds ?? 10) === n ? 'on' : ''} onClick={() => void save({ ...v, undoSendSeconds: n })} style={{ padding: '6px 12px' }}>
-                    {n === 0 ? 'Off' : `${n} s`}
-                  </button>
-                ))}
-              </div>
-              <div className="hint">After you press Send, the message waits this long so you can take it back with Undo. Your server sends it even if you close DreyMail.</div>
-            </div>
+            <SendDelay value={v.undoSendSeconds ?? 10} onChange={(n) => void save({ ...v, undoSendSeconds: n })} />
           )}
           {tab === 'general' && <BlockedSenders accounts={myAccounts.data ?? []} />}
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}
@@ -334,6 +326,57 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'android' && <AndroidAdmin />}
           {error && <div className="error-text">{error}</div>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const SEND_DELAYS = [0, 10, 30, 60, 120, 300];
+const MAX_SEND_DELAY = 600;
+
+/** Settings → General → Send delay: presets, or any custom delay up to 10 minutes. */
+function SendDelay({ value, onChange }: { value: number; onChange: (seconds: number) => void }) {
+  const preset = SEND_DELAYS.includes(value);
+  const [custom, setCustom] = useState(!preset);
+  const [minutes, setMinutes] = useState(String(Math.floor(value / 60)));
+  const [seconds, setSeconds] = useState(String(value % 60));
+  const apply = (m: string, s: string) => {
+    const total = Math.min(MAX_SEND_DELAY, Math.max(0, (parseInt(m, 10) || 0) * 60 + (parseInt(s, 10) || 0)));
+    if (total !== value) onChange(total);
+  };
+  return (
+    <div>
+      <label className="label">Send delay (undo send)</label>
+      <div className="segmented" style={{ flexWrap: 'wrap' }}>
+        {SEND_DELAYS.map((n) => (
+          <button
+            key={n}
+            className={!custom && value === n ? 'on' : ''}
+            onClick={() => {
+              setCustom(false);
+              onChange(n);
+            }}
+            style={{ padding: '6px 12px' }}
+          >
+            {n === 0 ? 'Off' : formatDelay(n)}
+          </button>
+        ))}
+        <button className={custom ? 'on' : ''} onClick={() => setCustom(true)} style={{ padding: '6px 12px' }}>
+          Custom
+        </button>
+      </div>
+      {custom && (
+        <div className="send-delay-custom">
+          <input className="input" type="number" min={0} max={10} value={minutes} aria-label="Minutes" onChange={(e) => setMinutes(e.target.value)} onBlur={() => apply(minutes, seconds)} />
+          <span>min</span>
+          <input className="input" type="number" min={0} max={59} value={seconds} aria-label="Seconds" onChange={(e) => setSeconds(e.target.value)} onBlur={() => apply(minutes, seconds)} />
+          <span>s</span>
+          <span className="muted">up to 10 minutes{value ? ` · now ${formatDelay(value)}` : ''}</span>
+        </div>
+      )}
+      <div className="hint">
+        After you press Send, the message waits this long so you can take it back with Undo (it's listed under Scheduled meanwhile). Your server sends it
+        even if you close DreyMail. To send at a later time, use Schedule next to Send.
       </div>
     </div>
   );

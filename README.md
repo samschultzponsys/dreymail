@@ -31,7 +31,8 @@
      Modified by samschultzponsys, 2026-11-15: Gmail's two ways compared.
      Modified by samschultzponsys, 2026-11-15: provider list.
      Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an account.
-     Modified by samschultzponsys, 2026-11-17: connecting single sign-on replaces the password. -->
+     Modified by samschultzponsys, 2026-11-17: connecting single sign-on replaces the password.
+     Modified by samschultzponsys, 2026-11-17: Schedule button; longer send delays. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -43,7 +44,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **7.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -209,8 +210,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender
   supports it). **Block sender** sends an address or a whole domain to Junk, now and in future;
   manage blocked senders in Settings → General.
-- **Send later** (tomorrow morning, Monday, or any time) and **undo send**: Send waits a few
-  seconds, 10 by default (adjustable in Settings → General), with an Undo button. Your server
+- **Schedule** (next to Send): in 1 or 3 hours, this evening, tomorrow morning or afternoon,
+  Monday morning, or any date and time. **Send delay (undo send)**: Send waits 10 seconds by
+  default, with an Undo button; Settings → General offers Off, 10 s, 30 s, 1, 2 or 5 minutes, or a
+  custom delay up to 10 minutes. Your server
   sends both, even if you close DreyMail. Waiting messages are listed under **Scheduled** in the
   sidebar.
 - **Calendar** (in the sidebar): month, week, day and agenda views, with every calendar in one list

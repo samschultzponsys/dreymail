@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v7.7): Schedule button and longer send delays
+
+- **Composer:** the clock icon is now a labeled **Schedule** button, with more quick times (in 1
+  hour, in 3 hours, this evening) besides tomorrow morning/afternoon, Monday morning and a custom
+  date and time (no longer one in the past).
+- **Settings → General → Send delay (undo send):** presets Off, 10 s, 30 s, 1 min, 2 min, 5 min,
+  and *Custom* (minutes and seconds, up to 10 minutes). The server accepts any delay from 0 to
+  600 seconds. Delays of a minute or more say "Sending in …" with Undo.
+- **Files:** `web/src/components/Composer.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/util.ts`, `web/src/styles.css`, `server/src/routes/api.ts`, `shared/types.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v7.6): single sign-on replaces the password
 
 - **Settings → Profile → Single sign-on:** connecting your provider now removes the account's
