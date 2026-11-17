@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: pictures fetched for the image viewer.
+
 import { ApiError } from './api';
 
 /** How far along an attachment download is: shown on its chip while it runs. */
@@ -36,7 +40,7 @@ export function downloadLabel(s: DownloadState): string | null {
 /** Hands the finished file to the browser's downloads (default: a click on a blob link). */
 export type SaveFile = (blob: Blob, filename: string) => void;
 
-const saveWithLink: SaveFile = (blob, filename) => {
+export const saveWithLink: SaveFile = (blob, filename) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -99,4 +103,31 @@ export async function downloadFile(
     }
     onState({ status: 'error', message: (err as Error).message || 'Download failed' });
   }
+}
+
+/**
+ * Picture types shown in DreyMail's image viewer (DreyMail). SVG is left out on purpose: it can
+ * carry scripts, so it is only ever downloaded.
+ */
+const VIEWABLE = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/avif', 'image/bmp']);
+
+export function isViewableImage(mimeType: string): boolean {
+  return VIEWABLE.has(mimeType.toLowerCase().split(';')[0]!.trim());
+}
+
+/** Fetch an attachment as a Blob of its own type (the server always sends octet-stream), with progress. */
+export function fetchAttachmentBlob(url: string, mimeType: string, onState: (s: DownloadState) => void, opts: { fetch?: typeof fetch; signal?: AbortSignal } = {}): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    let blob: Blob | null = null;
+    void downloadFile(
+      url,
+      '',
+      (s) => {
+        onState(s);
+        if (s.status === 'done') resolve(blob);
+        if (s.status === 'error' || (s.status === 'idle' && opts.signal?.aborted)) resolve(null);
+      },
+      { ...opts, save: (b) => (blob = new Blob([b], { type: mimeType })) },
+    );
+  });
 }

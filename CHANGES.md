@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.3): image viewer for attached pictures
+
+- **Image viewer:** a click on an attached picture (PNG, JPEG, GIF, WebP, AVIF, BMP) opens it full
+  size over the app: the arrows or ← → move between the message's pictures, Download saves the
+  one shown, Esc or a click beside it closes. Pictures are fetched once and shown from memory (a
+  `blob:` URL of their own type); the server still sends attachments only as downloads. SVG stays
+  download-only, as it can carry scripts.
+- **Download arrow:** picture chips have a download arrow at their end (with the same progress
+  as before); other attachments download with a click, as before.
+- **Files:** `web/src/components/ImageViewer.tsx` (new), `web/src/components/Reader.tsx`,
+  `web/src/download.ts`, `web/src/styles.css`, `web/test/download.test.ts`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.2): the receiving mailbox as a colored bubble
 
 - **Mailbox bubble:** with several mailboxes, the name of the mailbox a message came to (next to

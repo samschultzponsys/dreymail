@@ -40,7 +40,8 @@
    Modified by samschultzponsys, 2026-11-17: calendar page and its sidebar button.
    Modified by samschultzponsys, 2026-11-17: readable dropdown lists in dark mode.
    Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer.
-   Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble. */
+   Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
+   Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -410,6 +411,27 @@ svg { flex-shrink: 0; }
 .attachment.downloading { cursor: progress; border-color: var(--accent); }
 .attachment.saved { border-color: var(--success); }
 .attachment.failed { border-color: var(--danger); }
+/* Attached pictures (DreyMail): the chip opens the image viewer; the arrow at its end downloads. */
+.attachment.image-att { padding: 0; gap: 0; }
+.image-att .att-open { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 4px 6px 10px; border: 0; background: none; color: inherit; font: inherit; cursor: zoom-in; position: relative; }
+.image-att .att-dl { display: inline-flex; align-items: center; justify-content: center; align-self: stretch; padding: 0 9px; border-left: 1px solid var(--border); color: inherit; position: relative; }
+.image-att .att-dl:hover { background: var(--hover); }
+.image-viewer { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: rgba(8, 10, 18, 0.95); backdrop-filter: blur(6px); color: #f4f5f7; }
+.iv-bar { display: flex; align-items: center; gap: 6px; padding: 10px 12px 10px 16px; }
+.iv-name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-meta { font-size: 12px; font-weight: 400; opacity: 0.7; }
+.iv-btn, .iv-nav { display: inline-flex; align-items: center; justify-content: center; border: 0; background: rgba(255, 255, 255, 0.1); color: inherit; border-radius: 50%; cursor: pointer; }
+.iv-btn { width: 38px; height: 38px; }
+.iv-btn:hover, .iv-nav:hover { background: rgba(255, 255, 255, 0.2); }
+.iv-btn:disabled { opacity: 0.4; cursor: default; }
+.iv-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 56px 24px; }
+.iv-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5); background: #fff; }
+.iv-status { display: flex; align-items: center; gap: 10px; font-size: 14px; opacity: 0.85; }
+.iv-status .spin { animation: spin 0.8s linear infinite; }
+.iv-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; }
+.iv-nav.prev { left: 10px; }
+.iv-nav.next { right: 10px; }
+@media (max-width: 640px) { .iv-stage { padding: 0 8px 16px; } .iv-nav { top: auto; bottom: 18px; transform: none; } }
 .attachment .attachment-progress {
   position: absolute; inset: 0 auto 0 0; background: var(--accent); opacity: 0.15; transition: width 0.15s linear;
 }

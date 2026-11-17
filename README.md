@@ -47,7 +47,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.9 (the calendar as a page of its own).
      Modified by samschultzponsys, 2026-11-17: v9.0 (readable dropdown lists in dark mode).
      Modified by samschultzponsys, 2026-11-17: v9.1 (server and client versions side by side).
-     Modified by samschultzponsys, 2026-11-17: v9.2 (the receiving mailbox as a colored bubble). -->
+     Modified by samschultzponsys, 2026-11-17: v9.2 (the receiving mailbox as a colored bubble).
+     Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -59,7 +60,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -201,6 +202,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   a signature tool gives you, or its .htm file and pictures) with its table layout and pictures,
   animated GIFs included (up to 1.5 MB). Pictures in a message, a signature's included, are sent as
   inline attachments, which every mail app shows.
+- **Attached pictures** (PNG, JPEG, GIF, WebP, AVIF, BMP) open with a click in an image viewer:
+  arrows or ← → between the pictures of a message, Download, Esc to close. The arrow at the end of
+  their chip downloads straight away. Other files, and SVG pictures (which can carry scripts),
+  download with a click as before.
 - Compose, reply, reply-all, and forward (with the original attachments). Includes a light
   rich-text editor, an automatic plain-text alternative, attachments, drafts (saved to the
   account's Drafts folder), and a copy in Sent. Addresses turn into bubbles as soon as they are

@@ -1,9 +1,13 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: pictures for the image viewer.
+
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { AttachmentView } from '../../shared/types';
 import { AttachmentChip } from '../src/components/Reader';
-import { downloadFile, downloadLabel, type DownloadState } from '../src/download';
+import { downloadFile, downloadLabel, fetchAttachmentBlob, isViewableImage, type DownloadState } from '../src/download';
 
 /** A response whose body arrives in the given chunks. */
 function streamed(chunks: string[], headers: Record<string, string> = {}): Response {
@@ -107,5 +111,26 @@ describe('the attachment chip', () => {
     const html = chip({ status: 'error', message: 'Mail server unavailable' });
     expect(html).toContain('failed');
     expect(html).toContain('Couldn&#x27;t download report.pdf: Mail server unavailable');
+  });
+});
+
+describe('attached pictures (image viewer)', () => {
+  it('shows raster pictures, never SVG (it can carry scripts)', () => {
+    for (const t of ['image/png', 'image/jpeg', 'IMAGE/JPEG', 'image/gif', 'image/webp', 'image/png; name=a.png']) expect(isViewableImage(t)).toBe(true);
+    for (const t of ['image/svg+xml', 'application/pdf', 'text/html', 'application/octet-stream']) expect(isViewableImage(t)).toBe(false);
+  });
+
+  it('fetches the picture as a Blob of its own type (the server sends octet-stream)', async () => {
+    const fetchStub = (async () => new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'application/octet-stream' } })) as typeof fetch;
+    const states: string[] = [];
+    const blob = await fetchAttachmentBlob('/api/attachment?x', 'image/png', (s) => states.push(s.status), { fetch: fetchStub });
+    expect(blob?.type).toBe('image/png');
+    expect(blob?.size).toBe(4);
+    expect(states.at(-1)).toBe('done');
+  });
+
+  it('gives null when the download fails', async () => {
+    const fetchStub = (async () => new Response(JSON.stringify({ error: 'Message gone' }), { status: 404 })) as typeof fetch;
+    expect(await fetchAttachmentBlob('/x', 'image/png', () => {}, { fetch: fetchStub })).toBeNull();
   });
 });

@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-17: pinned buttons on every opened message, not only in conversations.
 // Modified by samschultzponsys, 2026-11-17: Not spam button in Junk; Spam button elsewhere.
 // Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a bubble in its color.
+// Modified by samschultzponsys, 2026-11-17: attached pictures open in an image viewer; a download arrow on their chip.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -28,6 +29,7 @@ import {
   Mail,
   MailOpen,
   Paperclip,
+  Image as ImageIcon,
   PenSquare,
   Reply,
   ShieldAlert,
@@ -52,7 +54,8 @@ import { buttonFill, labelOn } from '../accountTheme';
 import { SnoozeMenu } from './SnoozeMenu';
 import { formatSnoozeTime } from '../snooze';
 import { linkify } from '../mailto';
-import { downloadFile, downloadLabel, downloadPercent, type DownloadState } from '../download';
+import { downloadFile, downloadLabel, downloadPercent, isViewableImage, type DownloadState } from '../download';
+import { ImageViewer } from './ImageViewer';
 
 /**
  * Plain-text body: React escapes everything; only http(s) URLs, mailto: links and email addresses
@@ -359,7 +362,18 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
  * An attachment to download. The server first fetches the whole message from the mail server, so
  * the chip shows that it's working, then the progress, then that the file was saved (or why not).
  */
-export function AttachmentChip({ url, attachment: a, initialState = { status: 'idle' } }: { url: string; attachment: AttachmentView; initialState?: DownloadState }) {
+export function AttachmentChip({
+  url,
+  attachment: a,
+  initialState = { status: 'idle' },
+  onOpen,
+}: {
+  url: string;
+  attachment: AttachmentView;
+  initialState?: DownloadState;
+  /** A picture (DreyMail): a click opens it in the image viewer; the arrow downloads it. */
+  onOpen?: () => void;
+}) {
   const [state, setState] = useState<DownloadState>(initialState);
   const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(resetTimer.current), []);
@@ -376,6 +390,42 @@ export function AttachmentChip({ url, attachment: a, initialState = { status: 'i
     });
   };
   const title = state.status === 'error' ? `Couldn't download ${a.filename}: ${state.message}` : active ? `Downloading ${a.filename}…` : `${a.filename} (${a.mimeType})`;
+  const stateIcon = active ? (
+    <LoaderCircle size={14} className="spin" />
+  ) : state.status === 'done' ? (
+    <Check size={14} className="ok" />
+  ) : state.status === 'error' ? (
+    <CircleAlert size={14} className="err" />
+  ) : (
+    <Download size={14} className="muted" />
+  );
+  if (onOpen) {
+    return (
+      <span className={`attachment image-att ${active ? 'downloading' : ''} ${state.status === 'done' ? 'saved' : ''} ${state.status === 'error' ? 'failed' : ''}`} aria-busy={active}>
+        {pct !== null && <span className="attachment-progress" style={{ width: `${pct}%` }} />}
+        <button type="button" className="att-open" title={`Open ${a.filename}`} onClick={onOpen}>
+          <ImageIcon size={14} />
+          <span className="fname">{a.filename}</span>
+          <span className="fsize" aria-live="polite">
+            {label ?? formatSize(a.size)}
+          </span>
+        </button>
+        <a
+          className="att-dl"
+          href={url}
+          download={a.filename}
+          title={state.status === 'error' ? title : `Download ${a.filename}`}
+          onClick={(e) => {
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            start();
+          }}
+        >
+          {stateIcon}
+        </a>
+      </span>
+    );
+  }
   return (
     <a
       className={`attachment ${active ? 'downloading' : ''} ${state.status === 'done' ? 'saved' : ''} ${state.status === 'error' ? 'failed' : ''}`}
@@ -453,6 +503,8 @@ function MessageCard({
   const [modeOverride, setModeOverride] = useState<'dark' | 'paper' | null>(null);
   const [showText, setShowText] = useState(false);
   const [headOpen, setHeadOpen] = useState(false);
+  /** The attached picture open in the image viewer (DreyMail). */
+  const [viewing, setViewing] = useState<number | null>(null);
   const [tool, setTool] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const qcCard = useQueryClient();
@@ -696,10 +748,19 @@ function MessageCard({
 
           {d.attachments.length > 0 && (
             <div className="attachments">
-              {d.attachments.map((a) => (
-                <AttachmentChip key={a.index} url={api.attachmentUrl(msgRef, a.index)} attachment={a} />
-              ))}
+              {d.attachments.map((a) => {
+                const pictures = d.attachments.filter((x) => isViewableImage(x.mimeType));
+                const at = pictures.indexOf(a);
+                return <AttachmentChip key={a.index} url={api.attachmentUrl(msgRef, a.index)} attachment={a} onOpen={at >= 0 ? () => setViewing(at) : undefined} />;
+              })}
             </div>
+          )}
+          {viewing !== null && (
+            <ImageViewer
+              images={d.attachments.filter((x) => isViewableImage(x.mimeType)).map((x) => ({ url: api.attachmentUrl(msgRef, x.index), attachment: x }))}
+              start={viewing}
+              onClose={() => setViewing(null)}
+            />
           )}
 
           {d.html && !showText ? (

@@ -89,6 +89,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Subfolders fold away in the sidebar, the same on every device (8.8).
 - [x] The calendar as a page of its own (`/calendar`) with a clear button under Compose (8.9).
 - [x] Server and client versions side by side at the bottom, with a warning that says what to update (9.1).
+- [x] Attached pictures open in an image viewer; a download arrow on their chip (9.3).
 - [x] Conversations or single messages, per mailbox (5.1).
 - [x] Mailbox groups: sidebar sections that expand and collapse, with a shared color, icon and
       notification switch (4.9).
