@@ -145,6 +145,10 @@ export const prefsSchema = z.object({
       accounts: z.record(z.string().max(64), z.object({ cc: z.boolean().optional(), bcc: z.boolean().optional() })),
     })
     .default(DEFAULT_ADDRESS_LINES),
+  collapsedFolders: z
+    .record(z.string().max(64), z.array(z.string().max(1000)).max(500))
+    .refine((r) => Object.keys(r).length <= 200)
+    .default({}),
   messageButtons: z.array(z.enum(MESSAGE_BUTTONS as [MessageButton, ...MessageButton[]])).max(MESSAGE_BUTTONS.length).default([...DEFAULT_MESSAGE_BUTTONS]),
   // Up to 10 minutes: longer than that is what Send later is for.
   undoSendSeconds: z.number().int().min(0).max(600).default(10),
@@ -384,6 +388,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     try {
       const prefs = prefsSchema.parse(req.body);
       store.setPreferences(uid(req), prefs);
+      // The user's other devices (browser tabs, desktop and Android apps) pick the change up now.
+      pool.onEvent(uid(req), { type: 'preferences' });
       return prefs;
     } catch (err) {
       return sendError(reply, err);

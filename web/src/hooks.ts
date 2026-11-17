@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-16: folders asked for per mailbox.
+// Modified by samschultzponsys, 2026-11-17: preferences changed on another device are fetched again.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -129,6 +130,7 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
         if (ev.type === 'reset') void qc.resetQueries({ queryKey: ['messages'] });
         else if (ev.type === 'mailbox') refresh();
         else if (ev.type === 'snoozeEnded') snoozeEnded.current?.(ev);
+        else if (ev.type === 'preferences') void qc.invalidateQueries({ queryKey: ['me'] });
         else if (ev.type === 'notify') notify.current?.(ev);
       };
       ws.onclose = (e) => {

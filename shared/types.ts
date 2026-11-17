@@ -384,6 +384,8 @@ export interface Preferences {
   suggestAccounts: string[];
   /** Whether the composer shows the Cc and Bcc lines by itself: for all, per group, per mailbox (DreyMail). */
   addressLines: AddressLines;
+  /** Folders whose subfolders are folded away in the sidebar, per mailbox (DreyMail; follows the user to every device). */
+  collapsedFolders: Record<string, string[]>;
 }
 
 /**
@@ -617,7 +619,9 @@ export type ServerEvent =
    * native notification in the account's colour. Browsers use Web Push instead and ignore this.
    */
   | { type: 'notify'; accountId: string; title: string; body: string; tag: string; url: string }
-  | { type: 'hello' };
+  | { type: 'hello' }
+  /** The user's preferences changed on some device: fetch them again (DreyMail). */
+  | { type: 'preferences' };
 
 /**
  * Sent by the browser over the WebSocket: whether the app is in front of the user right now

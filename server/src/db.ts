@@ -531,6 +531,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   suggestScope: 'all',
   suggestAccounts: [],
   addressLines: DEFAULT_ADDRESS_LINES,
+  collapsedFolders: {},
 };
 
 export interface User {

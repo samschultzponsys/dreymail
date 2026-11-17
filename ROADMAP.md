@@ -86,6 +86,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       the sender's own domain; folder lists load per mailbox; Calendar, Scheduled and Saved searches
       can be hidden from the sidebar (5.3).
 - [x] Pinned folders in the sidebar, the rest behind a "show all" line (5.2).
+- [x] Subfolders fold away in the sidebar, the same on every device (8.8).
 - [x] Conversations or single messages, per mailbox (5.1).
 - [x] Mailbox groups: sidebar sections that expand and collapse, with a shared color, icon and
       notification switch (4.9).

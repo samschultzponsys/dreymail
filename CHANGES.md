@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.8): folding subfolders, on every device
+
+- **Folding subfolders:** folders with subfolders get an arrow in the sidebar that folds them away
+  and back; a folded folder's count includes its subfolders' unread mail. Stored in the new
+  `collapsedFolders` preference (per mailbox), so every browser and the desktop and Android apps
+  show the same.
+- **Preferences follow at once:** saving preferences tells the user's other open sessions
+  (WebSocket event `preferences`), which fetch them again: folding, Cc/Bcc pins and every other
+  setting show on the other devices without reloading.
+- **Files:** `web/src/components/Sidebar.tsx`, `web/src/App.tsx`, `web/src/hooks.ts`,
+  `web/src/styles.css`, `shared/types.ts`, `server/src/db.ts`, `server/src/routes/api.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.7): Sending list under Compose
 
 - **Sending** (right under Compose in the sidebar): mail in its send delay (undo send), with a

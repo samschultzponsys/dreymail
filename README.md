@@ -42,7 +42,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.4 (single line spacing when writing).
      Modified by samschultzponsys, 2026-11-17: v8.5 (Not spam).
      Modified by samschultzponsys, 2026-11-17: v8.6 (Spam, address suggestions and bubbles, Cc/Bcc lines).
-     Modified by samschultzponsys, 2026-11-17: v8.7 (Sending list under Compose). -->
+     Modified by samschultzponsys, 2026-11-17: v8.7 (Sending list under Compose).
+     Modified by samschultzponsys, 2026-11-17: v8.8 (folding subfolders, on every device). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -54,7 +55,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -150,6 +151,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Pinned folders:** hover a folder in the sidebar and click the pin. Once a mailbox has pinned
   folders, it shows just those; the line with the ⌄ under them shows all its folders (with the
   unread count of the hidden ones), and ⌃ folds them away again.
+- **Folding subfolders:** the arrow before a folder that has subfolders folds them away (their
+  unread mail then counts on that folder) and back. What is folded is saved with your account, so
+  every browser and the desktop and Android apps show the same, and open ones follow at once.
 - **Reading toolbar:** the arrow at its right end switches between compact icons and bigger buttons
   with their names (kept per device). Every opened message (on its own or in a conversation) also has small
   buttons of its own (Reply, Reply all, Forward and Delete by default; Settings → General picks which, from those

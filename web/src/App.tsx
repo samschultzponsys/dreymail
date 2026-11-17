@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Sending list under Compose (undo send after leaving the message).
+// Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -696,6 +697,22 @@ export function App() {
               }
             : undefined
         }
+        collapsedFolders={me.data?.preferences.collapsedFolders}
+        onToggleFolder={(accountId, path) => {
+          const prefs = me.data?.preferences;
+          if (!prefs) return;
+          const mine = prefs.collapsedFolders?.[accountId] ?? [];
+          const list = mine.includes(path) ? mine.filter((p) => p !== path) : [...mine, path];
+          const collapsedFolders = { ...(prefs.collapsedFolders ?? {}) };
+          if (list.length) collapsedFolders[accountId] = list;
+          else delete collapsedFolders[accountId];
+          const next = { ...prefs, collapsedFolders };
+          qc.setQueryData(['me'], { ...me.data, preferences: next });
+          void api.savePreferences(next).catch((err: Error) => {
+            push(err.message, true);
+            void qc.invalidateQueries({ queryKey: ['me'] });
+          });
+        }}
         onPin={(accountId, folders) => {
           // Shown right away; saved in the background.
           qc.setQueryData<AccountView[]>(['accounts'], (list) => list?.map((a) => (a.id === accountId ? { ...a, pinnedFolders: folders } : a)));

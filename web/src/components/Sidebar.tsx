@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 // Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
+// Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -117,6 +118,9 @@ interface Props {
   onCompose: () => void;
   /** Shown right under Compose (the Sending list) (DreyMail). */
   belowCompose?: ReactNode;
+  /** Folders whose subfolders are folded away, per mailbox (a preference, so every device shows the same) (DreyMail). */
+  collapsedFolders?: Record<string, string[]>;
+  onToggleFolder?: (accountId: string, path: string) => void;
   onAccounts: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -144,7 +148,7 @@ interface Props {
   onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -305,21 +309,54 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                       const all = sortFolders(af.folders);
                       // With folders pinned, only those show until "show all" is opened.
                       const limited = pinned.length > 0 && !showAll[acc.id];
-                      const shown = limited ? all.filter((f) => pinned.includes(f.path)) : all;
                       const countOf = (f: FolderView) => (f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed' ? f.unread : 0);
+                      // Subfolders folded away under a collapsed folder (DreyMail): hidden, their unread
+                      // mail counted on the folder they are folded into.
+                      const folded = new Set(collapsedFolders[acc.id] ?? []);
+                      const byPath = new Map(af.folders.map((f) => [f.path, f]));
+                      const parentOf = (f: FolderView) => (f.parentPath && byPath.has(f.parentPath) ? f.parentPath : null);
+                      const hasChildren = new Set(af.folders.map(parentOf).filter((p): p is string => !!p));
+                      const foldedInto = (f: FolderView): string | null => {
+                        let top: string | null = null;
+                        for (let p = parentOf(f); p; p = parentOf(byPath.get(p)!)) if (folded.has(p)) top = p;
+                        return top;
+                      };
+                      const hiddenUnder = new Map<string, number>();
+                      for (const f of af.folders) {
+                        const into = foldedInto(f);
+                        if (into) hiddenUnder.set(into, (hiddenUnder.get(into) ?? 0) + countOf(f));
+                      }
+                      const visible = rail ? all : all.filter((f) => !foldedInto(f));
+                      // Room for the fold arrows, in a column, when any folder has subfolders.
+                      const foldRoom = !rail && !limited && !!onToggleFolder && hasChildren.size > 0 ? 16 : 0;
+                      const shown = limited ? visible.filter((f) => pinned.includes(f.path)) : visible;
                       const hiddenUnread = limited ? all.filter((f) => !pinned.includes(f.path)).reduce((n, f) => n + countOf(f), 0) : 0;
                       return (
                         <>
                           {shown.map((f) => {
                             const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
-                            const showCount = countOf(f);
+                            const isFolded = folded.has(f.path);
+                            const showCount = countOf(f) + (isFolded ? (hiddenUnder.get(f.path) ?? 0) : 0);
                             const isPinned = pinned.includes(f.path);
+                            const canFold = !rail && !limited && !!onToggleFolder && hasChildren.has(f.path);
                             return (
-                              <div key={f.path} className={`nav-folder ${isPinned ? 'pinned' : ''}`}>
+                              <div key={f.path} className={`nav-folder ${isPinned ? 'pinned' : ''} ${canFold ? 'foldable' : ''}`}>
+                                {canFold && (
+                                  <button
+                                    className="fold-btn"
+                                    style={{ left: depth(f) * 14 + 4 }}
+                                    title={isFolded ? `Show the folders in ${f.name}` : `Fold away the folders in ${f.name}`}
+                                    aria-label={isFolded ? `Expand ${f.name}` : `Collapse ${f.name}`}
+                                    aria-expanded={!isFolded}
+                                    onClick={() => onToggleFolder(acc.id, f.path)}
+                                  >
+                                    {isFolded ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                                  </button>
+                                )}
                                 <button
                                   className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
                                   disabled={!f.selectable}
-                                  style={{ paddingLeft: rail ? undefined : 8 + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
+                                  style={{ paddingLeft: rail ? undefined : 8 + foldRoom + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
                                   onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
                                   title={f.path}
                                 >
