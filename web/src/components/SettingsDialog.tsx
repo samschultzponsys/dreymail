@@ -32,9 +32,11 @@
 // Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
 // Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
 // Modified by samschultzponsys, 2026-11-17: Install the app (This device, in a browser).
+// Modified by samschultzponsys, 2026-11-17: stay signed in and the idle lock (This device).
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
 
+import { DeviceSessionSettings } from './AppLock';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -971,6 +973,7 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
       </div>
       <DesktopApp />
       <InstallApp />
+      <DeviceSessionSettings />
       <InterfaceSize />
       <div>
         {(desktop || android) && <label className="label">Notifications on this device</label>}

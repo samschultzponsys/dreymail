@@ -32,7 +32,7 @@
 // Modified by samschultzponsys, 2026-11-17: Sending list under Compose (undo send after leaving the message).
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
-// Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications.
+// Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,6 +58,7 @@ import { AssistantDialog } from './components/AssistantDialog';
 import { ScheduledDialog, useScheduled } from './components/ScheduledDialog';
 import { CalendarDialog } from './components/CalendarDialog';
 import { ReminderWindow } from './components/ReminderWindow';
+import { AppLock } from './components/AppLock';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
 import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type ReminderEvent, type SnoozeEndedEvent } from './hooks';
@@ -652,6 +653,7 @@ export function App() {
   }
   if (me.error) {
     if (me.error instanceof ApiError && me.error.status === 401) return <Login />;
+    if (me.error instanceof ApiError && me.error.status === 423) return <AppLock enabled />;
     return <div className="center error-text">Could not reach the server: {(me.error as Error).message}</div>;
   }
 
@@ -935,6 +937,7 @@ export function App() {
       {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       <ReminderWindow enabled={loggedIn && accounts.length > 0} onOpenCalendar={() => go({ ...HOME, calendar: true })} />
+      <AppLock enabled={loggedIn} />
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.error ? 'error' : ''}`}>

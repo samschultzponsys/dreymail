@@ -5,6 +5,7 @@
 // password. Signatures and attestation are checked by SimpleWebAuthn. Passkeys are "discoverable",
 // so signing in needs no username. They are bound to DREYMAIL_BASE_URL's host and need https (or
 // localhost).
+// DreyMail 9.6: this device's session settings (trusted device, idle lock) and unlocking with a passkey.
 
 import crypto from 'node:crypto';
 import {
@@ -147,6 +148,84 @@ export function registerPasskeyRoutes(app: FastifyInstance, deps: { config: Conf
       db.prepare('UPDATE passkeys SET counter = ?, last_used = ? WHERE id = ?').run(v.authenticationInfo.newCounter, Date.now(), row.id);
       sessions.write(reply, { uid: row.user_id, via: 'passkey' });
       return { ok: true };
+    } catch {
+      failures.fail(req.ip);
+      return reply.code(401).send({ error: 'The passkey could not be verified' });
+    }
+  });
+
+  // ---- this device: trusted (sliding) session and the idle app lock (DreyMail 9.6) ----------
+
+  const LOCK_CHOICES = [0, 1, 5, 10, 15, 30, 60, 240];
+  const hasPasskey = (userId: string) => !!db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(userId);
+  const state = (req: FastifyRequest) => {
+    const full = sessions.readWithExpiry(req)!;
+    return { full, view: { trusted: !!full.data.trusted, lockAfter: full.data.lockAfter ?? 0, locked: !!full.data.locked, hasPasskey: hasPasskey(req.user!.id), expires: new Date(full.exp * 1000).toISOString() } };
+  };
+
+  app.get('/api/session', async (req) => state(req).view);
+
+  app.put('/api/session', async (req, reply) => {
+    const body = z.object({ trusted: z.boolean().optional(), lockAfter: z.number().int().refine((n) => LOCK_CHOICES.includes(n)).optional() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Invalid request' });
+    const { full } = state(req);
+    if (full.data.locked) return reply.code(423).send({ error: 'DreyMail is locked', locked: true });
+    if (body.data.lockAfter && !hasPasskey(req.user!.id)) return reply.code(400).send({ error: 'Add a passkey first (Settings → Profile): unlocking needs one.' });
+    const data = { ...full.data, ...(body.data.trusted !== undefined ? { trusted: body.data.trusted } : {}), ...(body.data.lockAfter !== undefined ? { lockAfter: body.data.lockAfter || undefined } : {}), seen: Date.now() };
+    sessions.rewrite(reply, data, full.exp);
+    return { trusted: !!data.trusted, lockAfter: data.lockAfter ?? 0, locked: false, hasPasskey: hasPasskey(req.user!.id) };
+  });
+
+  /** The user did something on this device (sent at most once a minute while they do). */
+  app.post('/api/session/active', async (req, reply) => {
+    const { full } = state(req);
+    if (full.data.locked) return reply.code(423).send({ error: 'DreyMail is locked', locked: true });
+    if (full.data.lockAfter) sessions.rewrite(reply, { ...full.data, seen: Date.now() }, full.exp);
+    return { ok: true };
+  });
+
+  /** "Lock now". */
+  app.post('/api/session/lock', async (req, reply) => {
+    const { full } = state(req);
+    if (!hasPasskey(req.user!.id)) return reply.code(400).send({ error: 'Add a passkey first (Settings → Profile): unlocking needs one.' });
+    sessions.rewrite(reply, { ...full.data, locked: true }, full.exp);
+    return { locked: true };
+  });
+
+  app.post('/api/session/unlock/options', async (req) => {
+    const creds = db.prepare('SELECT id, transports FROM passkeys WHERE user_id = ?').all(req.user!.id) as { id: string; transports: string }[];
+    const options = await generateAuthenticationOptions({ rpID, userVerification: 'required', allowCredentials: creds.map((c) => ({ id: c.id, transports: JSON.parse(c.transports) as never })) });
+    put(`unlock:${req.user!.id}`, options.challenge);
+    return { options };
+  });
+
+  app.post('/api/session/unlock', async (req, reply) => {
+    const userId = req.user!.id;
+    if (failures.blocked(req.ip)) return reply.code(429).send({ error: 'Too many failed attempts. Try again in a few minutes.' });
+    const body = z.object({ response: z.object({ id: z.string().max(1000) }).passthrough() }).safeParse(req.body);
+    const challenge = body.success ? take(`unlock:${userId}`) : null;
+    if (!body.success || !challenge) return reply.code(400).send({ error: 'That took too long. Try again.' });
+    const row = db.prepare('SELECT id, public_key, counter, transports FROM passkeys WHERE id = ? AND user_id = ?').get(body.data.response.id, userId) as
+      | { id: string; public_key: Uint8Array; counter: number; transports: string }
+      | undefined;
+    if (!row) {
+      failures.fail(req.ip);
+      return reply.code(401).send({ error: 'That passkey is not one of yours' });
+    }
+    try {
+      const v = await verifyAuthenticationResponse({
+        response: body.data.response as unknown as AuthenticationResponseJSON,
+        expectedChallenge: challenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        requireUserVerification: true,
+        credential: { id: row.id, publicKey: new Uint8Array(row.public_key), counter: row.counter, transports: JSON.parse(row.transports) as never },
+      });
+      if (!v.verified) throw new Error('not verified');
+      db.prepare('UPDATE passkeys SET counter = ?, last_used = ? WHERE id = ?').run(v.authenticationInfo.newCounter, Date.now(), row.id);
+      const { full } = state(req);
+      sessions.rewrite(reply, { ...full.data, locked: false, seen: Date.now() }, full.exp);
+      return { locked: false };
     } catch {
       failures.fail(req.ip);
       return reply.code(401).send({ error: 'The passkey could not be verified' });

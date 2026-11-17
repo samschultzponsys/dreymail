@@ -21,13 +21,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Mail
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
-- [ ] Per-account "save copy to Sent" default by provider (the per-account setting exists; Gmail and
-      Outlook sign-in accounts already let the provider file sent mail).
 - [ ] Gmail specifics: multi-label view and archive vs. delete semantics over IMAP.
-
-### Security and sessions
-- [ ] App lock with a passkey after being idle (passkey sign-in itself is done).
-- [ ] Sliding sessions on trusted devices (today a session lasts 14 days from sign-in).
 
 ### Configuration
 - [ ] Remaining settings in the UI (account defaults, cache, push), stored in the database, with
@@ -164,6 +158,10 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       ends (3.3).
 
 ### Administration and security
+- [x] Stay signed in on trusted devices (sliding sessions) and the idle app lock unlocked with a
+      passkey, kept by the server (9.6).
+- [x] One copy of sent mail in Sent: providers that file it themselves aren't given a second one
+      (9.6; per-provider defaults since 4.3).
 - [x] Settings → Storage: space used per user (mail cache per mailbox, own data by kind) and the
       database files' sizes (8.2); clearing a user's mail cache, per mailbox or all (8.3).
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).

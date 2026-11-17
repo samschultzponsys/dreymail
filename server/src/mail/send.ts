@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-17: tells who a message was sent to (address suggestions).
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: sends calendar invitations, updates and cancellations (iTIP REQUEST/CANCEL).
+// Modified by samschultzponsys, 2026-11-17: no second copy in Sent when the server filed one itself.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -92,7 +93,9 @@ export class ComposeService {
       try {
         const sent = await this.mail.specialFolder(userId, account.id, 'sent');
         if (sent) {
-          await this.mail.append(userId, account.id, sent, raw, ['\\Seen']);
+          // Some servers file what they send in Sent themselves (Gmail, Microsoft 365, …): no second copy.
+          const filed = messageId ? await this.mail.hasMessageId(userId, account.id, sent, messageId).catch(() => false) : false;
+          if (!filed) await this.mail.append(userId, account.id, sent, raw, ['\\Seen']);
           savedToSent = true;
         } else warnings.push('No Sent folder found; the message was not saved.');
       } catch (err) {

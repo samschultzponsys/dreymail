@@ -25,6 +25,7 @@
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: Not spam (unblocks the sender).
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
+// Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -54,7 +55,7 @@ import { AvatarService, normaliseEmail } from '../net/avatars.js';
 import { RemoteImageCache, type RemoteImage } from '../net/remoteImages.js';
 import { displayDomain, MAX_ALLOWED_DOMAINS, normaliseDomain } from '../mail/imageAllowlist.js';
 import { FailureLimiter, hashPassword, passwordSchema, verifyPassword } from '../auth/password.js';
-import type { Sessions } from '../auth/session.js';
+import { TRUSTED_TTL, type Sessions } from '../auth/session.js';
 import { ComposeError, type ComposeService } from '../mail/send.js';
 import { sanitizeOutgoingHtml } from '../mail/compose.js';
 import type { Access } from '../access.js';
@@ -243,10 +244,21 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   // Authentication + CSRF protection for the whole /api namespace.
   app.addHook('preHandler', async (req, reply) => {
     if (!req.url.startsWith('/api/')) return;
-    const session = sessions.read(req);
-    const user = session ? store.getUser(session.uid) : null;
-    if (!user) return reply.code(401).send({ error: 'Not logged in' });
+    const full = sessions.readWithExpiry(req);
+    const user = full ? store.getUser(full.data.uid) : null;
+    if (!full || !user) return reply.code(401).send({ error: 'Not logged in' });
     req.user = user;
+    // DreyMail: the idle app lock and trusted devices (sliding sessions).
+    let s = full.data;
+    let changed = false;
+    const now = Date.now();
+    if (s.lockAfter && !s.locked && s.seen && now - s.seen > s.lockAfter * 60_000) {
+      s = { ...s, locked: true };
+      changed = true;
+    }
+    if (s.trusted && full.exp - now / 1000 < TRUSTED_TTL - 86_400) changed = true;
+    if (changed) sessions.rewrite(reply, s, full.exp);
+    if (s.locked && !req.url.startsWith('/api/session')) return reply.code(423).send({ error: 'DreyMail is locked', locked: true });
     // State-changing requests must carry a custom header. Browsers only allow that from our own
     // origin (it would require a CORS preflight, which we never grant).
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-dreymail'] !== '1') {

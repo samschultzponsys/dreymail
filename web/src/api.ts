@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-16: sidebar order.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
+// Modified by samschultzponsys, 2026-11-17: a locked device (423) shows the lock screen.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -71,6 +72,8 @@ export async function request<T>(method: string, url: string, body?: unknown): P
     } catch {
       /* not JSON */
     }
+    // DreyMail: this device is locked (idle lock): the lock screen takes over.
+    if (res.status === 423) window.dispatchEvent(new Event('dreymail:locked'));
     throw new ApiError(msg, res.status, stale);
   }
   return (await res.json()) as T;

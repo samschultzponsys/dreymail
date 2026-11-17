@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-17: other cached folders checked with the server before listing; Drafts never threaded.
 // Modified by samschultzponsys, 2026-11-17: Not spam (back to the inbox, marked $NotJunk).
 // Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
+// Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -1064,6 +1065,14 @@ export class MailService {
     } catch {
       /* not critical */
     }
+  }
+
+  /** Whether a message with this Message-ID is in the folder (DreyMail: a provider that filed sent mail itself). */
+  async hasMessageId(userId: string, accountId: string, folder: string, messageId: string): Promise<boolean> {
+    return this.pool.withMailbox(userId, accountId, folder, async (client) => {
+      const found = await client.search({ header: { 'message-id': messageId } }, { uid: true });
+      return Array.isArray(found) && found.length > 0;
+    });
   }
 
   async append(userId: string, accountId: string, folder: string, raw: Buffer, flags: string[]) {

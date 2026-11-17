@@ -50,7 +50,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.2 (the receiving mailbox as a colored bubble).
      Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures).
      Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree).
-     Modified by samschultzponsys, 2026-11-17: v9.5 (calendar: full repeats, guests and invitations, Teams and Meet, reminders). -->
+     Modified by samschultzponsys, 2026-11-17: v9.5 (calendar: full repeats, guests and invitations, Teams and Meet, reminders).
+     Modified by samschultzponsys, 2026-11-17: v9.6 (stay signed in, the app lock, one copy in Sent). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -62,7 +63,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.5**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.6**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -98,6 +99,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   `DREYMAIL_BASE_URL`. They work in current browsers. In the desktop and Android apps, support
   depends on the system (Windows Hello works; Linux and Android WebView vary), and passwords or
   OIDC keep working there.
+- **Stay signed in and the app lock** (Settings → This device): *Stay signed in on this device*
+  keeps the sign-in for as long as DreyMail is used there at least once a month (up to a year;
+  otherwise a sign-in lasts 14 days). *Lock DreyMail* after 1 minute to 4 hours without use (or
+  *Lock now*): the lock screen covers everything until you unlock with one of your passkeys. The
+  server keeps the lock, so reloading or reopening the app doesn't get past it; only your own
+  keys, clicks and touches count as use, not the app refreshing in the background.
 - **Administration in the app, with roles.** Every user has a role made of permission flags:
   - **Superadmin** has every right, including ones added in later versions. The first user is
     Superadmin, and so is anyone named in `DREYMAIL_ADMIN_USERS`.
@@ -824,7 +831,8 @@ Two login methods are available, alone or together:
 
 Password users and OIDC users are separate accounts, even if they share an email address.
 
-Sessions are encrypted cookies valid for 14 days. They can't be revoked one by one: changing a
+Sessions are encrypted cookies valid for 14 days, or on devices set to stay signed in, 30 days from
+the last use (at most a year from signing in). The idle lock is kept in the same cookie. They can't be revoked one by one: changing a
 password doesn't sign out other devices. Changing `DREYMAIL_SECRET_KEY` signs everyone out (and
 makes stored mail passwords unreadable).
 

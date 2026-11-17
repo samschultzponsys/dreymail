@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own key-derivation salt (old data is upgraded by upgrade.ts).
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-17: sealed values can be read with their expiry (sliding sessions).
 
 import crypto from 'node:crypto';
 
@@ -88,11 +89,16 @@ export function sealJson(key: Buffer, value: unknown, ttlSeconds: number, purpos
 }
 
 export function openJson<T>(key: Buffer, sealed: string | undefined, purpose: string): T | null {
+  return openJsonWithExpiry<T>(key, sealed, purpose)?.value ?? null;
+}
+
+/** Like openJson, with the expiry (Unix seconds) it was sealed with (DreyMail). */
+export function openJsonWithExpiry<T>(key: Buffer, sealed: string | undefined, purpose: string): { value: T; exp: number } | null {
   if (!sealed) return null;
   try {
     const { exp, v } = JSON.parse(decrypt(key, sealed, purpose)) as { exp: number; v: T };
     if (typeof exp !== 'number' || exp < Math.floor(Date.now() / 1000)) return null;
-    return v;
+    return { value: v, exp };
   } catch {
     return null;
   }

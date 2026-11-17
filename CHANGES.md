@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.6): stay signed in, the app lock, one copy in Sent
+
+- **Stay signed in** (Settings → This device): a trusted device's session slides, 30 days from the
+  last use, at most a year from signing in (`trusted`, `since` in the session cookie;
+  `Sessions.rewrite`; `openJsonWithExpiry` in `crypto.ts`).
+- **App lock:** lock after 1 minute to 4 hours without use, or Lock now. Activity is reported by the
+  app (`POST /api/session/active`, at most once a minute, only for keys, clicks, touches and
+  scrolling); once idle too long the server marks the session locked and answers 423 to everything
+  but `/api/session/*` until `POST /api/session/unlock` verifies one of the user's passkeys (user
+  verification required). The app shows a lock screen on 423, also when opened locked.
+- **Sent copies:** before saving a copy in Sent, DreyMail looks for the message's Message-ID there,
+  so servers that file sent mail themselves (Gmail, Microsoft 365 and others) don't get a second one.
+- **Files:** `server/src/auth/session.ts`, `server/src/auth/passkeys.ts`, `server/src/crypto.ts`,
+  `server/src/routes/api.ts`, `server/src/mail/send.ts`, `server/src/imap/mail.ts`,
+  `web/src/components/AppLock.tsx` (new), `web/src/components/SettingsDialog.tsx`, `web/src/api.ts`,
+  `web/src/App.tsx`, `web/src/styles.css`, `server/test/deviceSession.test.ts` (new),
+  `server/test/sentCopy.test.ts` (new), `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-17 (v9.5): calendar repeats, guests, Teams and Meet, reminders
 
 - **Repeats:** DreyMail's own events repeat every N days, weeks, months or years; weekly on chosen
