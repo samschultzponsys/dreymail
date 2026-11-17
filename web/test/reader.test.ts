@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: account tag markup.
+// Modified by samschultzponsys, 2026-11-17: the account tag as a colored bubble.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
@@ -89,10 +90,11 @@ describe('message header', () => {
     expect(html).toMatch(/class="msg-to "/);
   });
 
-  it('shows a dot in the account colour next to the recipient when the user has several accounts', () => {
+  it('shows the account as a bubble in its colour next to the recipient when the user has several accounts', () => {
     const html = render(detail(), { multipleAccounts: true });
     expect(html).toMatch(/class="msg-to has-account"/);
-    expect(html).toMatch(/<span class="acct-tag" title="Work"><span class="acct-dot" style="background:#3b82f6"><\/span><span class="acct-name">Work<\/span>/);
+    // Filled with the account colour (a readable label on it); the dot stays for folded phone headers.
+    expect(html).toMatch(/<span class="acct-tag filled" title="Work" style="--acct-fill:#[0-9a-f]{6};--acct-label:#[0-9a-f]{6}"><span class="acct-dot" style="background:#3b82f6"><\/span><span class="acct-name">Work<\/span>/);
   });
 });
 

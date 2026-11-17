@@ -19,8 +19,8 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   "to …" in the message header) is a bubble filled with that mailbox's color, with a navy or white
   label, whichever reads better, instead of a gray outline with a dot. On phones, with the header
   folded, it stays a colored dot.
-- **Files:** `web/src/components/Reader.tsx`, `web/src/styles.css`, `README.md`, `package.json`,
-  `package-lock.json`.
+- **Files:** `web/src/components/Reader.tsx`, `web/src/styles.css`, `web/test/reader.test.ts`,
+  `README.md`, `package.json`, `package-lock.json`.
 
 ## 2026-11-17 (v9.1): server and client versions side by side
 
