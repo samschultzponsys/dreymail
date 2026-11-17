@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-17: pinned buttons on every opened message, not only in conversations.
 // Modified by samschultzponsys, 2026-11-17: Not spam button in Junk; Spam button elsewhere.
+// Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a bubble in its color.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -47,6 +48,7 @@ import { displayName, formatFullDate, formatListDate, formatSize, refKey, toRef 
 import { Avatar } from './Avatar';
 import { MessageFrame } from './MessageFrame';
 import { MoveMenu } from './MoveMenu';
+import { buttonFill, labelOn } from '../accountTheme';
 import { SnoozeMenu } from './SnoozeMenu';
 import { formatSnoozeTime } from '../snooze';
 import { linkify } from '../mailto';
@@ -544,7 +546,11 @@ function MessageCard({
                 to {d.to.map(displayName).join(', ') || '(undisclosed)'}
                 {d.cc.length > 0 && <span className="cc"> · cc {d.cc.map(displayName).join(', ')}</span>}
                 {multipleAccounts && account && (
-                  <span className="acct-tag" title={account.name}>
+                  <span
+                    className="acct-tag filled"
+                    title={account.name}
+                    style={{ ['--acct-fill' as string]: buttonFill(account.color), ['--acct-label' as string]: labelOn(buttonFill(account.color)) } as React.CSSProperties}
+                  >
                     <span className="acct-dot" style={{ background: account.color }} />
                     <span className="acct-name">{account.name}</span>
                   </span>
