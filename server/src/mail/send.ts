@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-16: sent mail carries its pictures as inline attachments.
 // Modified by samschultzponsys, 2026-11-17: tells who a message was sent to (address suggestions).
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
+// Modified by samschultzponsys, 2026-11-17: sends calendar invitations, updates and cancellations (iTIP REQUEST/CANCEL).
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -159,22 +160,28 @@ export class ComposeService {
 
   /** Answers a calendar invitation: a short note with the iTIP REPLY the organizer's calendar reads. */
   async sendInvitationReply(userId: string, accountId: string, r: { to: string; subject: string; text: string; ics: string }): Promise<void> {
+    await this.sendInvitation(userId, accountId, { ...r, to: [r.to], method: 'REPLY' });
+  }
+
+  /** An iCalendar message (an invitation, an update, a cancellation or an answer) from a mailbox. */
+  async sendInvitation(userId: string, accountId: string, r: { to: string[]; subject: string; text: string; ics: string; method: 'REQUEST' | 'CANCEL' | 'REPLY' }): Promise<void> {
     const account = this.store.getAccountSecret(userId, accountId);
     if (!account) throw new ComposeError('Unknown sender account');
-    if (!isValidAddress(r.to)) throw new ComposeError(`Invalid address: ${r.to}`);
+    const to = [...new Set(r.to.map((x) => x.trim()).filter(Boolean))];
+    if (!to.length) return;
+    for (const a of to) if (!isValidAddress(a)) throw new ComposeError(`Invalid address: ${a}`);
     const composer = new MailComposer({
       from: { name: account.displayName, address: account.email },
-      to: r.to,
+      to,
       subject: r.subject,
       text: r.text,
-      icalEvent: { method: 'REPLY', content: r.ics },
+      icalEvent: { method: r.method, content: r.ics },
       disableFileAccess: true,
       disableUrlAccess: true,
       xMailer: 'DreyMail',
     });
-    const mail = composer.compile();
-    const raw = await mail.build();
-    await this.deliver(userId, account, raw, { from: account.email, to: [r.to] });
+    const raw = await composer.compile().build();
+    await this.deliver(userId, account, raw, { from: account.email, to });
   }
 
   async saveDraft(userId: string, p: ComposePayload, uploads: OutgoingAttachment[]): Promise<DraftResult> {

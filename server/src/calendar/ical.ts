@@ -7,7 +7,10 @@
 // occurrences), and writing events and invitation answers (iTIP REPLY).
 
 import crypto from 'node:crypto';
-import type { Recurrence } from '../../../shared/calendar.js';
+import { ruleOf, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields } from '../../../shared/calendar.js';
+import { DAY, daysIn, expandRule, icalDate, icalDateTime, nthWeekday, parseRule, parseWall, untilMs, utcToWall, validTimeZone, WEEKDAYS, wallToUtc, type IcalTime } from '../../../shared/rrule.js';
+
+export { expandRule, icalDate, icalDateTime, parseRule, parseWall, utcToWall, validTimeZone, wallToUtc, type IcalTime };
 
 export interface IcalProp {
   name: string;
@@ -22,8 +25,6 @@ export interface IcalComponent {
   props: IcalProp[];
   children: IcalComponent[];
 }
-
-const DAY = 86_400_000;
 
 // ---- parsing --------------------------------------------------------------------------------
 
@@ -151,38 +152,6 @@ const WINDOWS_ZONES: Record<string, string> = {
   'New Zealand Standard Time': 'Pacific/Auckland',
 };
 
-const formatters = new Map<string, Intl.DateTimeFormat | null>();
-function formatter(tz: string): Intl.DateTimeFormat | null {
-  if (!formatters.has(tz)) {
-    try {
-      formatters.set(tz, new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }));
-    } catch {
-      formatters.set(tz, null);
-    }
-  }
-  return formatters.get(tz)!;
-}
-
-export const validTimeZone = (tz: string | undefined | null): tz is string => !!tz && formatter(tz) !== null;
-
-/** The wall-clock time in `tz` at UTC `ms`, as a "wall" timestamp (its UTC fields are the local fields). */
-export function utcToWall(ms: number, tz: string): number {
-  const f = formatter(tz);
-  if (!f) return ms;
-  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map((x) => [x.type, Number(x.value)])) as Record<string, number>;
-  return Date.UTC(p.year!, p.month! - 1, p.day!, p.hour! % 24, p.minute!, p.second!) + (ms % 1000);
-}
-
-/** UTC time of a wall-clock time in `tz` (the earlier one when a fall-back hour repeats). */
-export function wallToUtc(wall: number, tz: string): number {
-  if (!formatter(tz)) return wall;
-  const off1 = utcToWall(wall, tz) - wall;
-  let t = wall - off1;
-  const off2 = utcToWall(t, tz) - t;
-  if (off2 !== off1) t = wall - off2;
-  return t;
-}
-
 /** A time zone resolver for one file: IANA, Windows names, then the file's own VTIMEZONEs. */
 export function zoneResolver(cal: IcalComponent | undefined): (tzid: string | undefined) => ((wall: number) => number) | null {
   const vtz = new Map<string, IcalComponent>();
@@ -231,21 +200,6 @@ function yearlyOnset(rrule: string, start: number, year: number): number[] {
   return [Date.UTC(year, month - 1, s.getUTCDate()) + time];
 }
 
-/** "20261116T090000" / "20261116" as a wall timestamp; null if malformed. */
-export function parseWall(v: string): number | null {
-  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?/.exec(v.trim());
-  return m ? Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0)) : null;
-}
-
-export interface IcalTime {
-  /** UTC; for all-day values, midnight UTC of that date. */
-  ms: number;
-  allDay: boolean;
-  /** The wall time the value was written in, and how to turn wall times into UTC (for repeats). */
-  wall: number;
-  toUtc: (wall: number) => number;
-}
-
 /** A DTSTART / DTEND / RECURRENCE-ID / EXDATE value. */
 export function timeOf(p: IcalProp | undefined, resolve: ReturnType<typeof zoneResolver>, value = p?.value): IcalTime | null {
   if (!p || !value) return null;
@@ -266,149 +220,6 @@ export function parseDuration(v: string | undefined): number | null {
 }
 
 // ---- repeat rules -------------------------------------------------------------------------------
-
-const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-
-interface Rule {
-  freq: string;
-  interval: number;
-  count: number | null;
-  until: string | null;
-  byday: { n: number; weekday: number }[];
-  bymonthday: number[];
-  bymonth: number[];
-  bysetpos: number[];
-}
-
-export function parseRule(rule: string): Rule {
-  const kv = Object.fromEntries(rule.replace(/^RRULE:/i, '').split(';').map((x) => x.split('=') as [string, string]).map(([k, v]) => [k?.toUpperCase(), v ?? '']));
-  const ints = (v: string | undefined) => (v ? v.split(',').map(Number).filter((n) => Number.isFinite(n) && n !== 0) : []);
-  return {
-    freq: (kv.FREQ ?? '').toUpperCase(),
-    interval: Math.max(1, Number(kv.INTERVAL) || 1),
-    count: kv.COUNT ? Math.max(0, Number(kv.COUNT) || 0) : null,
-    until: kv.UNTIL || null,
-    byday: (kv.BYDAY ?? '')
-      .split(',')
-      .map((d) => /^([+-]?\d{1,2})?(SU|MO|TU|WE|TH|FR|SA)$/i.exec(d.trim()))
-      .filter((m): m is RegExpExecArray => !!m)
-      .map((m) => ({ n: Number(m[1] ?? 0), weekday: WEEKDAYS.indexOf(m[2]!.toUpperCase()) })),
-    bymonthday: ints(kv.BYMONTHDAY),
-    bymonth: ints(kv.BYMONTH),
-    bysetpos: ints(kv.BYSETPOS),
-  };
-}
-
-/** The n-th (1-based; negative from the end) weekday of a month, as a UTC midnight; null if none. */
-function nthWeekday(year: number, month: number, weekday: number, n: number): number | null {
-  if (n > 0) {
-    const first = new Date(Date.UTC(year, month, 1)).getUTCDay();
-    const day = 1 + ((weekday - first + 7) % 7) + (n - 1) * 7;
-    return day <= daysIn(year, month) ? Date.UTC(year, month, day) : null;
-  }
-  const last = daysIn(year, month);
-  const lastDay = new Date(Date.UTC(year, month, last)).getUTCDay();
-  const day = last - ((lastDay - weekday + 7) % 7) + (n + 1) * 7;
-  return day >= 1 ? Date.UTC(year, month, day) : null;
-}
-const daysIn = (year: number, month: number) => new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-
-/** Candidate days (UTC midnights) of one month for MONTHLY/YEARLY rules. */
-function monthDays(r: Rule, year: number, month: number, startDay: number): number[] {
-  const out: number[] = [];
-  if (r.bymonthday.length) {
-    for (const d of r.bymonthday) {
-      const day = d > 0 ? d : daysIn(year, month) + d + 1;
-      if (day >= 1 && day <= daysIn(year, month)) out.push(Date.UTC(year, month, day));
-    }
-  } else if (r.byday.length) {
-    for (const b of r.byday) {
-      if (b.n) {
-        const d = nthWeekday(year, month, b.weekday, b.n);
-        if (d !== null) out.push(d);
-      } else for (let d = nthWeekday(year, month, b.weekday, 1); d !== null && new Date(d).getUTCMonth() === month; d += 7 * DAY) out.push(d);
-    }
-  } else if (startDay <= daysIn(year, month)) out.push(Date.UTC(year, month, startDay));
-  return out;
-}
-
-/**
- * Start times (UTC) of a repeating event's occurrences that overlap [from, to), at most `max`.
- * Works in the event's wall-clock time, so 9:00 stays 9:00 across daylight-saving changes.
- */
-export function expandRule(rule: string, start: IcalTime, durationMs: number, from: number, to: number, exdates: Set<number>, max = 1000): number[] {
-  const r = parseRule(rule);
-  if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(r.freq)) return start.ms + durationMs > from && start.ms < to ? [start.ms] : [];
-  const until = r.until ? untilMs(r.until, start) : Infinity;
-  const s = new Date(start.wall);
-  const timeOfDay = start.wall - Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate());
-  const out: number[] = [];
-  let counted = 0;
-  const weekStart = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()) - ((s.getUTCDay() + 6) % 7) * DAY; // Monday
-  for (let k = 0; k < 10_000; k++) {
-    let days: number[] = [];
-    const step = k * r.interval;
-    if (r.freq === 'DAILY') {
-      const d = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() + step);
-      days = [d];
-      const dd = new Date(d);
-      if (r.byday.length && !r.byday.some((b) => b.weekday === dd.getUTCDay())) days = [];
-      if (r.bymonthday.length && !r.bymonthday.includes(dd.getUTCDate())) days = [];
-    } else if (r.freq === 'WEEKLY') {
-      const w = weekStart + step * 7 * DAY;
-      const wd = r.byday.length ? r.byday.map((b) => b.weekday) : [s.getUTCDay()];
-      days = wd.map((x) => w + ((x + 6) % 7) * DAY);
-    } else if (r.freq === 'MONTHLY') {
-      const m = s.getUTCMonth() + step;
-      days = monthDays(r, s.getUTCFullYear() + Math.floor(m / 12), ((m % 12) + 12) % 12, s.getUTCDate());
-    } else {
-      const y = s.getUTCFullYear() + step;
-      const months = r.bymonth.length ? r.bymonth.map((m) => m - 1) : [s.getUTCMonth()];
-      days = months.flatMap((m) => (r.bymonthday.length || r.byday.length ? monthDays(r, y, m, s.getUTCDate()) : s.getUTCDate() <= daysIn(y, m) ? [Date.UTC(y, m, s.getUTCDate())] : []));
-    }
-    if (r.bymonth.length && r.freq !== 'YEARLY') days = days.filter((d) => r.bymonth.includes(new Date(d).getUTCMonth() + 1));
-    days.sort((a, b) => a - b);
-    if (r.bysetpos.length) days = r.bysetpos.map((p) => days[p > 0 ? p - 1 : days.length + p]).filter((d): d is number => d !== undefined);
-    let periodStart = Infinity;
-    for (const day of days) {
-      const wall = day + timeOfDay;
-      periodStart = Math.min(periodStart, wall);
-      if (wall < start.wall) continue;
-      const utc = start.toUtc(wall);
-      if (utc > until) return out;
-      counted++;
-      if (r.count !== null && counted > r.count) return out;
-      if (utc >= to) return out;
-      if (utc + durationMs > from && !exdates.has(utc)) {
-        out.push(utc);
-        if (out.length >= max) return out;
-      }
-    }
-    if (days.length === 0 && r.freq !== 'DAILY' && k > 2000) break;
-    if (Number.isFinite(periodStart) && start.toUtc(periodStart) > to + 400 * DAY) break;
-  }
-  return out;
-}
-
-function untilMs(v: string, start: IcalTime): number {
-  const wall = parseWall(v);
-  if (wall === null) return Infinity;
-  if (/^\d{8}$/.test(v.trim())) return start.allDay ? wall : start.toUtc(wall + DAY - 1);
-  return /Z$/i.test(v.trim()) ? wall : start.toUtc(wall);
-}
-
-/** The simple repeat DreyMail's own calendars can hold, or null if the rule is more than that. */
-export function simpleRecurrence(rule: string, start: IcalTime): { recurrence: Recurrence; until: string | null } | null {
-  const r = parseRule(rule);
-  const freq = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', YEARLY: 'yearly' }[r.freq] as Recurrence | undefined;
-  if (!freq || r.interval !== 1 || r.count !== null || r.bymonthday.length || r.bysetpos.length || r.bymonth.length) return null;
-  const sd = new Date(start.wall).getUTCDay();
-  if (r.byday.length && !(freq === 'weekly' && r.byday.length === 1 && r.byday[0]!.weekday === sd && !r.byday[0]!.n)) return null;
-  const until = r.until ? new Date(start.allDay ? untilMs(r.until, start) : utcToWallLocal(untilMs(r.until, start), start)).toISOString().slice(0, 10) : null;
-  return { recurrence: freq, until };
-}
-/** The wall date of a UTC time for this event's zone (approximation through its start offset). */
-const utcToWallLocal = (utc: number, start: IcalTime) => utc + (start.wall - start.ms);
 
 /** "Repeats every week on Mon, Wed until Dec 1, 2026" for an invitation card. */
 export function describeRule(rule: string): string {
@@ -435,6 +246,7 @@ export interface IcalPerson {
   email: string;
   name: string;
   status: string;
+  role?: string;
 }
 
 export interface IcalEvent {
@@ -459,6 +271,7 @@ const personOf = (p: IcalProp): IcalPerson => ({
   email: p.value.replace(/^mailto:/i, '').trim().toLowerCase(),
   name: p.params.CN ?? '',
   status: (p.params.PARTSTAT ?? 'NEEDS-ACTION').toUpperCase(),
+  ...(p.params.ROLE ? { role: p.params.ROLE.toUpperCase() } : {}),
 });
 
 /** The VEVENTs of a calendar file, with times resolved to UTC. */
@@ -570,21 +383,12 @@ export function serialize(c: IcalComponent): string {
   return `${lines.join('\r\n')}\r\n`;
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-export const icalDate = (wall: number) => {
-  const d = new Date(wall);
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-};
-export const icalDateTime = (wall: number) => {
-  const d = new Date(wall);
-  return `${icalDate(wall)}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-};
 const mk = (name: string, value: string, params: Record<string, string> = {}): IcalProp => {
   const p = Object.entries(params).map(([k, v]) => `;${k}=${/[;:,]/.test(v) ? `"${v}"` : v}`).join('');
   return { name, params, value, raw: `${name}${p}:${value}` };
 };
 
-export interface EventFields {
+export interface EventFields extends RepeatFields {
   title: string;
   location: string;
   notes: string;
@@ -592,26 +396,124 @@ export interface EventFields {
   start: string;
   end: string;
   allDay: boolean;
-  recurrence: Recurrence;
-  until: string | null;
   /** IANA zone the event was made in (repeats keep their local time there). */
   timeZone?: string;
+  /** Minutes before the start (null: none; missing: leave the event's alarms as they are). */
+  reminder?: number | null;
+  /** Guests (missing: leave the guest list as it is). */
+  attendees?: Attendee[];
+  /** Who invites (written with the guests). */
+  organizer?: { email: string; name: string } | null;
+  /** Skipped occurrences of a repeating event (ISO starts). */
+  exdates?: string[];
+  /** Online meeting to make with the event (providers that offer one). */
+  meeting?: MeetingKind | null;
 }
 
-/** The RRULE for a simple repeat. */
+/** The event's start as a wall time in its zone (UTC fields = local fields). */
+export function startWallOf(f: Pick<EventFields, 'start' | 'allDay' | 'timeZone'>): number {
+  const s = Date.parse(f.start);
+  return f.allDay || !validTimeZone(f.timeZone) ? s : utcToWall(s, f.timeZone);
+}
+
+/** The RRULE for an event's repeat (UNTIL in UTC for timed events, as RFC 5545 asks). */
 export function ruleFor(f: EventFields): string | null {
   if (f.recurrence === 'none') return null;
-  let rule = `FREQ=${f.recurrence.toUpperCase()}`;
-  if (f.until) {
+  let untilValue: string | undefined;
+  if (f.until && !f.count) {
     const day = Date.parse(`${f.until}T00:00:00Z`);
-    if (f.allDay) rule += `;UNTIL=${icalDate(day)}`;
+    if (f.allDay) untilValue = icalDate(day);
     else {
       const endOfDay = day + DAY - 1000;
-      const utc = validTimeZone(f.timeZone) ? wallToUtc(endOfDay, f.timeZone) : endOfDay;
-      rule += `;UNTIL=${icalDateTime(utc)}Z`;
+      untilValue = `${icalDateTime(validTimeZone(f.timeZone) ? wallToUtc(endOfDay, f.timeZone) : endOfDay)}Z`;
     }
   }
-  return rule;
+  return ruleOf(f, startWallOf(f), untilValue);
+}
+
+/** A DreyMail repeat from an RRULE, or null when the rule is more than DreyMail's editor offers. */
+export function repeatFromRule(rule: string, start: IcalTime): RepeatFields | null {
+  const r = parseRule(rule);
+  const freq = ({ DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', YEARLY: 'yearly' } as Record<string, Exclude<Recurrence, 'none'>>)[r.freq];
+  if (!freq || r.bysetpos.length) return null;
+  const s = new Date(start.wall);
+  const out: RepeatFields = { recurrence: freq, until: null, interval: r.interval, count: r.count };
+  if (r.until && !r.count) out.until = new Date(start.allDay ? untilMs(r.until, start) : untilMs(r.until, start) + (start.wall - start.ms)).toISOString().slice(0, 10);
+  if (r.bymonth.length && !(freq === 'yearly' && r.bymonth.length === 1 && r.bymonth[0] === s.getUTCMonth() + 1)) return null;
+  if (freq === 'daily') {
+    if (r.bymonthday.length) return null;
+    if (r.byday.length) {
+      // "Every weekday" written as a daily rule: the same as weekly on those days.
+      if (r.interval !== 1 || r.byday.some((b) => b.n)) return null;
+      return { ...out, recurrence: 'weekly', byDay: r.byday.map((b) => b.weekday).sort() };
+    }
+    return out;
+  }
+  if (freq === 'weekly') {
+    if (r.bymonthday.length || r.byday.some((b) => b.n)) return null;
+    if (r.byday.length) out.byDay = [...new Set(r.byday.map((b) => b.weekday))].sort();
+    return out;
+  }
+  if (r.bymonthday.length) return r.bymonthday.length === 1 && r.bymonthday[0] === s.getUTCDate() && !r.byday.length ? { ...out, monthlyBy: 'day' } : null;
+  if (!r.byday.length) return { ...out, monthlyBy: 'day' };
+  const b = r.byday[0]!;
+  if (r.byday.length !== 1 || b.weekday !== s.getUTCDay()) return null;
+  if (b.n === -1) return { ...out, monthlyBy: 'last' };
+  if (b.n === Math.ceil(s.getUTCDate() / 7)) return { ...out, monthlyBy: 'weekday' };
+  return null;
+}
+
+/** The simple repeat DreyMail's own calendars can hold, or null if the rule is more than that (kept for older callers). */
+export function simpleRecurrence(rule: string, start: IcalTime): { recurrence: Recurrence; until: string | null } | null {
+  const r = repeatFromRule(rule, start);
+  if (!r || (r.interval ?? 1) !== 1 || r.count || r.byDay?.length || (r.monthlyBy && r.monthlyBy !== 'day')) return null;
+  return { recurrence: r.recurrence, until: r.until };
+}
+
+/** A time value written like `like` (a DTSTART): a date, a time in its zone, or UTC. */
+function timeLike(like: IcalProp | undefined, t: IcalTime | null, ms: number): IcalProp {
+  if (!like || !t) return mk('X', `${icalDateTime(ms)}Z`);
+  if (t.allDay) return mk('X', icalDate(ms), { VALUE: 'DATE' });
+  if (like.params.TZID) {
+    let wall = ms + (t.wall - t.ms);
+    for (let i = 0; i < 3 && t.toUtc(wall) !== ms; i++) wall += ms - t.toUtc(wall);
+    return mk('X', icalDateTime(wall), { TZID: like.params.TZID });
+  }
+  return mk('X', /Z$/i.test(like.value.trim()) ? `${icalDateTime(ms)}Z` : icalDateTime(ms));
+}
+const renamed = (p: IcalProp, name: string) => mk(name, p.value, p.params);
+
+const PARTSTAT: Record<AttendeeStatus, string> = { 'needs-action': 'NEEDS-ACTION', accepted: 'ACCEPTED', tentative: 'TENTATIVE', declined: 'DECLINED' };
+export const statusOfPartstat = (v: string): AttendeeStatus => (v === 'ACCEPTED' ? 'accepted' : v === 'TENTATIVE' ? 'tentative' : v === 'DECLINED' ? 'declined' : 'needs-action');
+const cn = (name: string): Record<string, string> => (name ? { CN: name.replace(/["\r\n]/g, '') } : {});
+
+/** ORGANIZER and ATTENDEE lines; `clientSchedules` asks a CalDAV server not to email them itself (RFC 6638). */
+function peopleProps(f: Pick<EventFields, 'attendees' | 'organizer'>, clientSchedules = false): IcalProp[] {
+  if (!f.attendees?.length || !f.organizer) return [];
+  const agent: Record<string, string> = clientSchedules ? { 'SCHEDULE-AGENT': 'CLIENT' } : {};
+  return [
+    mk('ORGANIZER', `mailto:${f.organizer.email}`, { ...cn(f.organizer.name), ...agent }),
+    ...f.attendees.map((a) =>
+      mk('ATTENDEE', `mailto:${a.email}`, { ...cn(a.name), ROLE: a.optional ? 'OPT-PARTICIPANT' : 'REQ-PARTICIPANT', PARTSTAT: PARTSTAT[a.status] ?? 'NEEDS-ACTION', RSVP: 'TRUE', ...agent }),
+    ),
+  ];
+}
+
+/** A display alarm `min` minutes before the start. */
+export function alarmOf(min: number): IcalComponent {
+  return { name: 'VALARM', props: [mk('ACTION', 'DISPLAY'), mk('DESCRIPTION', 'Reminder'), mk('TRIGGER', min > 0 ? `-PT${Math.round(min)}M` : 'PT0S')], children: [] };
+}
+
+/** Minutes before the start of an event's first display/audio alarm relative to the start, if any. */
+export function reminderOf(c: IcalComponent): number | null {
+  for (const a of c.children) {
+    if (a.name !== 'VALARM') continue;
+    const trig = prop(a, 'TRIGGER');
+    if (!trig || trig.params.VALUE === 'DATE-TIME' || trig.params.RELATED === 'END') continue;
+    const d = parseDuration(trig.value);
+    if (d !== null && d <= 0) return Math.round(-d / 60_000);
+  }
+  return null;
 }
 
 /** The properties DreyMail writes for an event's time and text. */
@@ -629,29 +531,209 @@ function eventProps(f: EventFields): IcalProp[] {
   if (f.location) out.push(mk('LOCATION', escapeText(f.location)));
   if (f.notes) out.push(mk('DESCRIPTION', escapeText(f.notes)));
   if (rule) out.push(mk('RRULE', rule));
+  if (rule && f.exdates?.length) {
+    const ex = f.exdates.map((x) => Date.parse(x)).filter((x) => !Number.isNaN(x));
+    if (ex.length) out.push(f.allDay ? mk('EXDATE', ex.map(icalDate).join(','), { VALUE: 'DATE' }) : mk('EXDATE', ex.map((x) => `${icalDateTime(x)}Z`).join(',')));
+  }
   return out;
 }
 
 const stamp = () => `${icalDateTime(Date.now())}Z`;
 
 /** A new calendar object for CalDAV. */
-export function newEventIcs(f: EventFields, uid = `${crypto.randomUUID()}@dreymail`): { uid: string; ics: string } {
+export function newEventIcs(f: EventFields, uid = `${crypto.randomUUID()}@dreymail`, opts: { clientSchedules?: boolean } = {}): { uid: string; ics: string } {
   const cal: IcalComponent = {
     name: 'VCALENDAR',
     props: [mk('VERSION', '2.0'), mk('PRODID', '-//DreyMail//Calendar//EN')],
-    children: [{ name: 'VEVENT', props: [mk('UID', uid), mk('DTSTAMP', stamp()), mk('CREATED', stamp()), ...eventProps(f), mk('SEQUENCE', '0')], children: [] }],
+    children: [
+      ...zonesFor(f),
+      {
+        name: 'VEVENT',
+        props: [mk('UID', uid), mk('DTSTAMP', stamp()), mk('CREATED', stamp()), ...eventProps(f), ...peopleProps(f, opts.clientSchedules), mk('SEQUENCE', '0')],
+        children: f.reminder !== null && f.reminder !== undefined ? [alarmOf(f.reminder)] : [],
+      },
+    ],
   };
   return { uid, ics: serialize(cal) };
 }
 
-/** An existing calendar object with DreyMail's fields changed; everything else (alarms, attendees…) kept. */
-export function updateEventIcs(existing: string, f: EventFields): string {
+/** VTIMEZONEs for the zone an event's times are written in (Outlook needs them for repeats). */
+function zonesFor(f: EventFields): IcalComponent[] {
+  if (f.allDay || f.recurrence === 'none' || !validTimeZone(f.timeZone) || f.timeZone === 'UTC') return [];
+  const z = vtimezone(f.timeZone, new Date(Date.parse(f.start)).getUTCFullYear());
+  return z ? [z] : [];
+}
+
+/**
+ * A VTIMEZONE for an IANA zone, worked out from its offsets in `year`: one STANDARD part, plus a
+ * DAYLIGHT part with yearly rules (the n-th or last weekday of the month) when it has summer time.
+ */
+export function vtimezone(tz: string, year: number): IcalComponent | null {
+  if (!validTimeZone(tz)) return null;
+  const off = (t: number) => utcToWall(t, tz) - t;
+  const fmtOff = (ms: number) => {
+    const m = Math.round(Math.abs(ms) / 60_000);
+    return `${ms < 0 ? '-' : '+'}${String(Math.floor(m / 60)).padStart(2, '0')}${String(m % 60).padStart(2, '0')}`;
+  };
+  // Find the moments the offset changes during the year.
+  const changes: { at: number; from: number; to: number }[] = [];
+  let t = Date.UTC(year, 0, 1);
+  let o = off(t);
+  for (let d = 1; d <= 366; d++) {
+    const n = Date.UTC(year, 0, 1 + d);
+    const on = off(n);
+    if (on !== o) {
+      let lo = n - DAY;
+      let hi = n;
+      while (hi - lo > 60_000) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (off(mid) === o) lo = mid;
+        else hi = mid;
+      }
+      // Offsets change on whole minutes: the first minute after the last old-offset moment.
+      changes.push({ at: Math.floor(lo / 60_000) * 60_000 + 60_000, from: o, to: on });
+      o = on;
+    }
+    t = n;
+  }
+  const part = (name: string, c: { at: number; from: number; to: number } | null, fixed: number): IcalComponent => {
+    if (!c) return { name, props: [mk('DTSTART', '19700101T000000'), mk('TZOFFSETFROM', fmtOff(fixed)), mk('TZOFFSETTO', fmtOff(fixed))], children: [] };
+    const wall = c.at + c.from; // the local time the change happens, in the old offset
+    const d = new Date(wall);
+    const n = d.getUTCDate() + 7 > daysIn(d.getUTCFullYear(), d.getUTCMonth()) ? -1 : Math.ceil(d.getUTCDate() / 7);
+    return {
+      name,
+      props: [
+        mk('DTSTART', `1970${icalDateTime(wall).slice(4)}`),
+        mk('TZOFFSETFROM', fmtOff(c.from)),
+        mk('TZOFFSETTO', fmtOff(c.to)),
+        mk('RRULE', `FREQ=YEARLY;BYMONTH=${d.getUTCMonth() + 1};BYDAY=${n}${WEEKDAYS[d.getUTCDay()]}`),
+      ],
+      children: [],
+    };
+  };
+  const children: IcalComponent[] = [];
+  if (changes.length >= 2) {
+    const toSummer = changes.find((c) => c.to > c.from)!;
+    const toWinter = changes.find((c) => c.to < c.from)!;
+    children.push(part('STANDARD', toWinter, 0), part('DAYLIGHT', toSummer, 0));
+  } else children.push(part('STANDARD', null, off(Date.UTC(year, 6, 1))));
+  return { name: 'VTIMEZONE', props: [mk('TZID', tz)], children };
+}
+
+/** An existing calendar object with DreyMail's fields changed; everything else (attendees, overrides…) kept. */
+export function updateEventIcs(existing: string, f: EventFields, opts: { clientSchedules?: boolean } = {}): string {
   const cal = parseIcal(existing).find((c) => c.name === 'VCALENDAR');
   const ev = cal?.children.find((c) => c.name === 'VEVENT' && !prop(c, 'RECURRENCE-ID'));
   if (!cal || !ev) throw new Error('This event could not be read');
-  const replaced = new Set(['SUMMARY', 'LOCATION', 'DESCRIPTION', 'DTSTART', 'DTEND', 'DURATION', 'RRULE', 'EXDATE', 'RDATE', 'DTSTAMP', 'LAST-MODIFIED', 'SEQUENCE']);
+  const replaced = new Set(['SUMMARY', 'LOCATION', 'DESCRIPTION', 'DTSTART', 'DTEND', 'DURATION', 'RRULE', 'RDATE', 'DTSTAMP', 'LAST-MODIFIED', 'SEQUENCE']);
+  // Skipped occurrences stay while the event repeats (they are written anew when DreyMail has them).
+  if (f.recurrence === 'none' || f.exdates) replaced.add('EXDATE');
+  if (f.attendees) replaced.add('ORGANIZER').add('ATTENDEE');
   const seq = (Number(prop(ev, 'SEQUENCE')?.value) || 0) + 1;
-  ev.props = [...ev.props.filter((p) => !replaced.has(p.name)), ...eventProps(f), mk('DTSTAMP', stamp()), mk('LAST-MODIFIED', stamp()), mk('SEQUENCE', String(seq))];
+  ev.props = [...ev.props.filter((p) => !replaced.has(p.name)), ...eventProps(f), ...(f.attendees ? peopleProps(f, opts.clientSchedules) : []), mk('DTSTAMP', stamp()), mk('LAST-MODIFIED', stamp()), mk('SEQUENCE', String(seq))];
+  if (f.reminder !== undefined) ev.children = [...ev.children.filter((c) => c.name !== 'VALARM'), ...(f.reminder !== null ? [alarmOf(f.reminder)] : [])];
+  // A new zone needs its definition.
+  const tz = f.timeZone;
+  if (tz && !cal.children.some((c) => c.name === 'VTIMEZONE' && prop(c, 'TZID')?.value === tz)) cal.children = [...zonesFor(f), ...cal.children];
+  // Overrides of occurrences that no longer exist would show up on their own: drop them when the series stops repeating.
+  if (f.recurrence === 'none') cal.children = cal.children.filter((c) => !(c.name === 'VEVENT' && prop(c, 'RECURRENCE-ID')));
+  return serialize(cal);
+}
+
+/** The master VEVENT of a calendar object and its start. */
+function masterOf(cal: IcalComponent) {
+  const ev = cal.children.find((c) => c.name === 'VEVENT' && !prop(c, 'RECURRENCE-ID'));
+  if (!ev) throw new Error('This event could not be read');
+  const resolve = zoneResolver(cal);
+  return { ev, resolve, start: timeOf(prop(ev, 'DTSTART'), resolve) };
+}
+
+/** Changes one occurrence of a repeating event (a RECURRENCE-ID override; RFC 5545 §3.8.4.4). */
+export function overrideOccurrenceIcs(existing: string, occurrenceStart: number, f: EventFields, opts: { clientSchedules?: boolean } = {}): string {
+  const cal = parseIcal(existing).find((c) => c.name === 'VCALENDAR');
+  if (!cal) throw new Error('This event could not be read');
+  const { ev, resolve, start } = masterOf(cal);
+  const rid = renamed(timeLike(prop(ev, 'DTSTART'), start, occurrenceStart), 'RECURRENCE-ID');
+  const same = (c: IcalComponent) => c.name === 'VEVENT' && timeOf(prop(c, 'RECURRENCE-ID'), resolve)?.ms === occurrenceStart;
+  const old = cal.children.find(same);
+  const seq = Math.max(Number(prop(ev, 'SEQUENCE')?.value) || 0, Number(old && prop(old, 'SEQUENCE')?.value) || 0) + 1;
+  const people = f.attendees ? peopleProps(f, opts.clientSchedules) : ev.props.filter((p) => p.name === 'ORGANIZER' || p.name === 'ATTENDEE');
+  const one: IcalComponent = {
+    name: 'VEVENT',
+    props: [mk('UID', prop(ev, 'UID')?.value ?? ''), rid, ...eventProps({ ...f, recurrence: 'none', until: null, count: null }), ...people, mk('DTSTAMP', stamp()), mk('SEQUENCE', String(seq))],
+    children: f.reminder !== undefined ? (f.reminder !== null ? [alarmOf(f.reminder)] : []) : ev.children.filter((c) => c.name === 'VALARM'),
+  };
+  cal.children = [...cal.children.filter((c) => !same(c)), one];
+  return serialize(cal);
+}
+
+/** Leaves one occurrence out of a repeating event (EXDATE), dropping its override if it had one. */
+export function excludeOccurrenceIcs(existing: string, occurrenceStart: number): string {
+  const cal = parseIcal(existing).find((c) => c.name === 'VCALENDAR');
+  if (!cal) throw new Error('This event could not be read');
+  const { ev, resolve, start } = masterOf(cal);
+  ev.props = [...ev.props.filter((p) => p.name !== 'DTSTAMP' && p.name !== 'SEQUENCE'), renamed(timeLike(prop(ev, 'DTSTART'), start, occurrenceStart), 'EXDATE'), mk('DTSTAMP', stamp()), mk('SEQUENCE', String((Number(prop(ev, 'SEQUENCE')?.value) || 0) + 1))];
+  cal.children = cal.children.filter((c) => !(c.name === 'VEVENT' && timeOf(prop(c, 'RECURRENCE-ID'), resolve)?.ms === occurrenceStart));
+  return serialize(cal);
+}
+
+/** A whole calendar object as DreyMail's editor shows it (the master's fields and repeat). */
+export function fieldsOfIcs(existing: string): (EventFields & { uid: string; editable: boolean; organizer: { email: string; name: string } | null }) | null {
+  const cal = parseIcal(existing).find((c) => c.name === 'VCALENDAR');
+  if (!cal) return null;
+  const e = eventsOf(cal).find((x) => x.recurrenceId === null);
+  if (!e) return null;
+  const rep = e.rrule ? repeatFromRule(e.rrule, e.start) : { recurrence: 'none' as const, until: null };
+  return {
+    uid: e.uid,
+    title: e.title,
+    location: e.location,
+    notes: e.description,
+    start: new Date(e.start.ms).toISOString(),
+    end: new Date(e.end).toISOString(),
+    allDay: e.allDay,
+    ...(rep ?? { recurrence: 'none', until: null }),
+    editable: !!rep,
+    timeZone: zoneNameOf(prop(e.component, 'DTSTART')),
+    reminder: reminderOf(e.component),
+    attendees: e.attendees.filter((a) => a.email !== e.organizer?.email).map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), optional: a.role === 'OPT-PARTICIPANT' || undefined })),
+    organizer: e.organizer ? { email: e.organizer.email, name: e.organizer.name } : null,
+    exdates: [...e.exdates].map((x) => new Date(x).toISOString()),
+  };
+}
+const zoneNameOf = (p: IcalProp | undefined) => {
+  const id = p?.params.TZID;
+  if (!id) return undefined;
+  const clean = id.replace(/^\/+/, '').trim();
+  return validTimeZone(clean) ? clean : windowsZone(clean);
+};
+
+/**
+ * An invitation (iTIP REQUEST), update or cancellation (CANCEL) for a DreyMail or CalDAV event
+ * with guests, as the organizer sends it by email (RFC 5546).
+ */
+export function requestIcs(uid: string, f: EventFields, method: 'REQUEST' | 'CANCEL', sequence: number, only?: string[]): string {
+  const attendees = only ? (f.attendees ?? []).filter((a) => only.includes(a.email)) : f.attendees;
+  const cal: IcalComponent = {
+    name: 'VCALENDAR',
+    props: [mk('VERSION', '2.0'), mk('PRODID', '-//DreyMail//Calendar//EN'), mk('METHOD', method)],
+    children: [
+      ...zonesFor(f),
+      {
+        name: 'VEVENT',
+        props: [
+          mk('UID', uid),
+          mk('DTSTAMP', stamp()),
+          ...eventProps(f),
+          ...peopleProps({ ...f, attendees }),
+          mk('SEQUENCE', String(sequence)),
+          mk('STATUS', method === 'CANCEL' ? 'CANCELLED' : 'CONFIRMED'),
+        ],
+        children: method === 'REQUEST' && f.reminder !== null && f.reminder !== undefined ? [alarmOf(f.reminder)] : [],
+      },
+    ],
+  };
   return serialize(cal);
 }
 
@@ -702,4 +784,37 @@ export function replyIcs(invite: IcalEvent, me: { email: string; name: string },
     children: [{ name: 'VEVENT', props, children: [] }],
   };
   return serialize(cal);
+}
+
+/**
+ * A stored calendar object (CalDAV) as an iTIP message to email the guests: METHOD added, alarms
+ * and SCHEDULE-AGENT left out; a CANCEL marks the whole event canceled.
+ */
+export function itipFromStored(stored: string, method: 'REQUEST' | 'CANCEL'): string {
+  const cal = parseIcal(stored).find((c) => c.name === 'VCALENDAR');
+  if (!cal) throw new Error('This event could not be read');
+  const clean = (c: IcalComponent): IcalComponent => ({
+    ...c,
+    props: c.props.map((p) => {
+      if ((p.name !== 'ORGANIZER' && p.name !== 'ATTENDEE') || !p.params['SCHEDULE-AGENT']) return p;
+      const { 'SCHEDULE-AGENT': _drop, ...rest } = p.params;
+      return mk(p.name, p.value, rest);
+    }),
+    children: c.children.filter((k) => k.name !== 'VALARM').map(clean),
+  });
+  const out = clean(cal);
+  out.props = [...out.props.filter((p) => p.name !== 'METHOD'), mk('METHOD', method)];
+  if (method === 'CANCEL') {
+    out.children = out.children.filter((c) => !(c.name === 'VEVENT' && prop(c, 'RECURRENCE-ID')));
+    for (const ev of out.children.filter((c) => c.name === 'VEVENT'))
+      ev.props = [...ev.props.filter((p) => p.name !== 'STATUS' && p.name !== 'SEQUENCE'), mk('STATUS', 'CANCELLED'), mk('SEQUENCE', String((Number(prop(ev, 'SEQUENCE')?.value) || 0) + 1))];
+  }
+  return serialize(out);
+}
+
+/** Guests of a stored calendar object (master), by address. */
+export function guestsOfStored(stored: string): { organizer: string | null; attendees: string[] } {
+  const cal = parseIcal(stored).find((c) => c.name === 'VCALENDAR');
+  const e = cal ? eventsOf(cal).find((x) => x.recurrenceId === null) : undefined;
+  return { organizer: e?.organizer?.email ?? null, attendees: (e?.attendees ?? []).map((a) => a.email).filter((a) => a !== e?.organizer?.email) };
 }

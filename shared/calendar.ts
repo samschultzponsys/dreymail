@@ -3,7 +3,53 @@
 
 /** DreyMail's own calendars: shareable between DreyMail users, optionally grouped under a mailbox. */
 
+import { DAY, expandRule, utcToWall, validTimeZone, wallToUtc, type IcalTime } from './rrule.js';
+
 export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+/** Monthly and yearly repeats: on the start's day of the month, its weekday ("2nd Tuesday") or the last such weekday. */
+export type MonthlyBy = 'day' | 'weekday' | 'last';
+
+/** How an event repeats (DreyMail's own events, and series at providers). */
+export interface RepeatFields {
+  recurrence: Recurrence;
+  /** Last day a repeating event happens (YYYY-MM-DD, in the event's time zone), or null for no end. */
+  until: string | null;
+  /** Every N days, weeks, months or years (default 1). */
+  interval?: number;
+  /** Weekly: the weekdays (0 = Sunday … 6 = Saturday); default the start's weekday. */
+  byDay?: number[];
+  /** Monthly and yearly (default 'day'). */
+  monthlyBy?: MonthlyBy;
+  /** Ends after this many times (null or missing: no limit). */
+  count?: number | null;
+}
+
+export type AttendeeStatus = 'needs-action' | 'accepted' | 'tentative' | 'declined';
+
+export interface Attendee {
+  email: string;
+  name: string;
+  status: AttendeeStatus;
+  /** Optional rather than required. */
+  optional?: boolean;
+}
+
+/** An online meeting made with the event: Microsoft Teams (Outlook / Microsoft 365) or Google Meet. */
+export type MeetingKind = 'teams' | 'meet';
+
+/** Reminder choices, in minutes before the start (Outlook's list). */
+export const REMINDER_CHOICES = [0, 5, 10, 15, 30, 60, 120, 240, 720, 1440, 2880, 10080] as const;
+export const DEFAULT_REMINDER = 15;
+
+export function reminderLabel(min: number | null | undefined): string {
+  if (min === null || min === undefined) return 'None';
+  if (min === 0) return 'At start time';
+  if (min % 10080 === 0) return `${min / 10080} week${min === 10080 ? '' : 's'} before`;
+  if (min % 1440 === 0) return `${min / 1440} day${min === 1440 ? '' : 's'} before`;
+  if (min % 60 === 0) return `${min / 60} hour${min === 60 ? '' : 's'} before`;
+  return `${min} minutes before`;
+}
 
 export interface CalendarView {
   id: string;
@@ -22,6 +68,8 @@ export interface CalendarView {
   source: CalendarSource;
   /** For provider calendars: the mailbox (Google, Outlook) or CalDAV connection it comes from. */
   sourceId: string | null;
+  /** Online meetings this calendar can make for its events (Teams for Outlook work accounts, Meet for Google). */
+  meetings?: MeetingKind[];
 }
 
 export type CalendarSource = 'local' | 'google' | 'microsoft' | 'caldav';
@@ -41,6 +89,20 @@ export interface CalendarSourceView {
   error: string | null;
   /** Reconnecting the mailbox (signing in again) fixes the error. */
   reconnect: boolean;
+}
+
+/** A reminder whose time has come, shown in the reminder window until dismissed. */
+export interface ReminderAlert {
+  key: string;
+  eventId: string;
+  calendarId: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  location: string;
+  joinUrl: string | null;
+  color: string;
 }
 
 /** An invitation found in an email (an iCalendar attachment). */
@@ -86,9 +148,33 @@ export interface CalendarEvent {
   recurrence: Recurrence;
   /** Last day a repeating event happens (YYYY-MM-DD), or null for no end. */
   until: string | null;
-  /** Provider calendars: one occurrence of a repeating series (edits change this occurrence only). */
+  interval?: number;
+  byDay?: number[];
+  monthlyBy?: MonthlyBy;
+  count?: number | null;
+  /** Occurrences of a repeating DreyMail event that were deleted or moved out (their ISO starts). */
+  exdates?: string[];
+  /** IANA zone the event was made in: repeats keep their local time there. */
+  timeZone?: string;
+  /** Reminder, in minutes before the start (null: none). */
+  reminder?: number | null;
+  /** People invited (the organizer not among them). */
+  attendees?: Attendee[];
+  /** Who sent the invitations (null: nobody was invited, or it is yours). */
+  organizer?: { email: string; name: string } | null;
+  /** You are the organizer (or nobody was invited): you can change the guest list. */
+  isOrganizer?: boolean;
+  /** Mailbox the invitations of a DreyMail or CalDAV event are sent from. */
+  sendFrom?: string | null;
+  /** Online meeting asked for when saving (Teams for Outlook calendars, Meet for Google ones). */
+  meeting?: MeetingKind | null;
+  /** Link to join the online meeting (Teams, Meet, Zoom… found in the event). */
+  joinUrl?: string | null;
+  /** Provider calendars: one occurrence of a repeating series. */
   instance?: boolean;
-  /** Can't be changed from DreyMail (repeating events of CalDAV calendars). */
+  /** For one occurrence of a series: the series' id (GET it to edit the whole series). */
+  seriesId?: string;
+  /** Can't be changed from DreyMail. */
   readOnly?: boolean;
 }
 
@@ -99,55 +185,117 @@ export interface EventOccurrence extends CalendarEvent {
   occurrenceEnd: string;
 }
 
-export type EventInput = Omit<CalendarEvent, 'id' | 'instance' | 'readOnly'> & {
+export type EventInput = Omit<CalendarEvent, 'id' | 'instance' | 'readOnly' | 'seriesId' | 'organizer' | 'isOrganizer' | 'joinUrl'> & {
   /** The browser's time zone, so repeats keep their local time at providers. */
   timeZone?: string;
 };
 
+/** Which part of a repeating event a change or deletion applies to. */
+export type SeriesScope = 'this' | 'following' | 'all';
+
+const WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
 /**
- * Occurrences of an event between `from` and `to` (ms), counted in local time (so a weekly 9:00
- * meeting stays at 9:00 across daylight-saving changes; the browser runs this). Monthly events on
- * the 29th–31st skip months without that day; at most 500 occurrences per call.
+ * The RRULE for an event's repeat, given its start as a wall time (UTC fields = local fields).
+ * UNTIL is written as a date (YYYYMMDD) unless `untilValue` gives the exact value to use.
  */
-export function occurrences(e: CalendarEvent, from: number, to: number): EventOccurrence[] {
+export function ruleOf(e: RepeatFields, startWall: number, untilValue?: string): string | null {
+  if (e.recurrence === 'none') return null;
+  const s = new Date(startWall);
+  const parts = [`FREQ=${e.recurrence.toUpperCase()}`];
+  const interval = Math.max(1, Math.floor(e.interval ?? 1));
+  if (interval > 1) parts.push(`INTERVAL=${interval}`);
+  if (e.recurrence === 'weekly' && e.byDay?.length) {
+    const days = [...new Set(e.byDay.filter((d) => d >= 0 && d <= 6))].sort();
+    if (days.length && !(days.length === 1 && days[0] === s.getUTCDay())) parts.push(`BYDAY=${days.map((d) => WD[d]).join(',')}`);
+  }
+  if ((e.recurrence === 'monthly' || e.recurrence === 'yearly') && e.monthlyBy && e.monthlyBy !== 'day') {
+    const n = e.monthlyBy === 'last' ? -1 : Math.ceil(s.getUTCDate() / 7);
+    if (e.recurrence === 'yearly') parts.push(`BYMONTH=${s.getUTCMonth() + 1}`);
+    parts.push(`BYDAY=${n}${WD[s.getUTCDay()]}`);
+  }
+  if (e.count && e.count > 0) parts.push(`COUNT=${Math.floor(e.count)}`);
+  else if (e.until) parts.push(`UNTIL=${untilValue ?? e.until.replace(/-/g, '')}`);
+  return parts.join(';');
+}
+
+const ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "Every 2 weeks on Monday, Wednesday until Dec 1, 2026" (the start as a wall time). */
+export function describeRepeat(e: RepeatFields, startWall: number): string {
+  if (e.recurrence === 'none') return 'Does not repeat';
+  const s = new Date(startWall);
+  const n = Math.max(1, e.interval ?? 1);
+  const unit = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[e.recurrence];
+  let text = n > 1 ? `Every ${n} ${unit}s` : `Every ${unit}`;
+  if (e.recurrence === 'weekly') {
+    const days = e.byDay?.length ? [...new Set(e.byDay)].sort() : [s.getUTCDay()];
+    text += days.join(',') === '1,2,3,4,5' ? ' on weekdays' : ` on ${days.map((d) => DAY_NAMES[d]).join(', ')}`;
+  } else if (e.recurrence === 'monthly' || e.recurrence === 'yearly') {
+    const month = e.recurrence === 'yearly' ? `${s.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })} ` : '';
+    if (e.monthlyBy === 'weekday' || e.monthlyBy === 'last') {
+      const ord = e.monthlyBy === 'last' ? 'last' : ORD[Math.ceil(s.getUTCDate() / 7)];
+      text += ` on the ${ord} ${DAY_NAMES[s.getUTCDay()]}${month ? ` of ${month.trim()}` : ''}`;
+    } else text += ` on ${month}${e.recurrence === 'yearly' ? s.getUTCDate() : `day ${s.getUTCDate()}`}`;
+  }
+  if (e.count) text += `, ${e.count} times`;
+  else if (e.until) {
+    const [y, m, d] = e.until.split('-').map(Number);
+    text += ` until ${new Date(Date.UTC(y!, m! - 1, d!)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`;
+  }
+  return text;
+}
+
+/** The zone repeats of `e` are counted in: all-day events on UTC dates, timed ones in their own zone. */
+export function zoneOf(e: Pick<CalendarEvent, 'allDay' | 'timeZone'>, fallback?: string): string {
+  if (e.allDay) return 'UTC';
+  if (validTimeZone(e.timeZone)) return e.timeZone;
+  if (validTimeZone(fallback)) return fallback;
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
+/** The event's start as an RRULE start time in its zone. */
+export function startTimeOf(e: Pick<CalendarEvent, 'start' | 'allDay' | 'timeZone'>, fallbackZone?: string): IcalTime {
+  const ms = Date.parse(e.start);
+  const zone = zoneOf(e, fallbackZone);
+  if (zone === 'UTC') return { ms, allDay: e.allDay, wall: ms, toUtc: (w) => w };
+  return { ms, allDay: false, wall: utcToWall(ms, zone), toUtc: (w) => wallToUtc(w, zone) };
+}
+
+/**
+ * Occurrences of an event between `from` and `to` (ms), counted in the event's time zone (so a
+ * weekly 9:00 meeting stays at 9:00 across daylight-saving changes; events saved without a zone use
+ * `fallbackZone`, else this computer's). Monthly events on the 29th–31st skip months without that
+ * day; at most 500 occurrences per call.
+ */
+export function occurrences(e: CalendarEvent, from: number, to: number, fallbackZone?: string): EventOccurrence[] {
   const start = Date.parse(e.start);
   const end = Date.parse(e.end);
   const dur = Math.max(0, end - start);
   if (e.recurrence === 'none') return end > from && start < to ? [{ ...e, occurrenceStart: e.start, occurrenceEnd: e.end }] : [];
-  // All-day events are stored on UTC midnights, so they repeat in UTC (no daylight-saving shift);
-  // timed events repeat in local time.
-  const utc = e.allDay;
-  const [uy, um, ud] = (e.until ?? '').split('-').map(Number);
-  const until = !e.until ? Infinity : utc ? Date.UTC(uy!, um! - 1, ud!, 23, 59, 59, 999) : new Date(uy!, um! - 1, ud!, 23, 59, 59, 999).getTime();
-  const out: EventOccurrence[] = [];
-  const s = new Date(start);
-  const day = (d: Date) => (utc ? d.getUTCDate() : d.getDate());
-  const month = (d: Date) => (utc ? d.getUTCMonth() : d.getMonth());
-  for (let i = 0; out.length < 500 && i < 20000; i++) {
-    const d = new Date(s);
-    if (e.recurrence === 'daily' || e.recurrence === 'weekly') {
-      const n = day(s) + (e.recurrence === 'daily' ? i : 7 * i);
-      if (utc) d.setUTCDate(n);
-      else d.setDate(n);
-    } else if (e.recurrence === 'monthly') {
-      if (utc) d.setUTCMonth(month(s) + i);
-      else d.setMonth(month(s) + i);
-      if (day(d) !== day(s)) continue; // e.g. the 31st in a 30-day month
-    } else {
-      if (utc) d.setUTCFullYear(s.getUTCFullYear() + i);
-      else d.setFullYear(s.getFullYear() + i);
-      if (month(d) !== month(s)) continue; // Feb 29 in a common year
-    }
-    const t = d.getTime();
-    if (t > until || t >= to) break;
-    if (t + dur > from) out.push({ ...e, occurrenceStart: new Date(t).toISOString(), occurrenceEnd: new Date(t + dur).toISOString() });
-  }
-  return out;
+  const st = startTimeOf(e, fallbackZone);
+  const rule = ruleOf(e, st.wall);
+  if (!rule) return [];
+  const skipped = new Set((e.exdates ?? []).map((x) => Date.parse(x)).filter((x) => !Number.isNaN(x)));
+  return expandRule(rule, st, dur, from, to, skipped, 500).map((t) => ({ ...e, occurrenceStart: new Date(t).toISOString(), occurrenceEnd: new Date(t + dur).toISOString() }));
 }
 
 /** Could the event happen between `from` and `to` (ms)? The server's coarse filter. */
 export function mayOccur(e: Pick<CalendarEvent, 'start' | 'end' | 'recurrence' | 'until'>, from: number, to: number): boolean {
   const start = Date.parse(e.start);
   if (e.recurrence === 'none') return Date.parse(e.end) > from && start < to;
-  return start < to && (!e.until || Date.parse(`${e.until}T23:59:59.999Z`) + 86_400_000 >= from);
+  return start < to && (!e.until || Date.parse(`${e.until}T23:59:59.999Z`) + DAY >= from);
+}
+
+/** Links to online meetings (Teams, Meet, Zoom, Webex, GoToMeeting, Whereby, Jitsi) in event text. */
+const MEETING_LINK = /https:\/\/(?:teams\.microsoft\.com\/l\/meetup-join\/|teams\.live\.com\/meet\/|meet\.google\.com\/[a-z]|[\w-]+\.zoom\.us\/[jw]\/|zoom\.us\/[jw]\/|[\w-]+\.webex\.com\/(?:meet|join|[\w-]+\/j\.php)|meet\.goto\.com\/|global\.gotomeeting\.com\/join\/|whereby\.com\/|meet\.jit\.si\/)[^\s<>"')\]]*/i;
+
+/** The first online meeting link in an event's location or notes, if any. */
+export function findJoinUrl(...texts: (string | null | undefined)[]): string | null {
+  for (const t of texts) {
+    const m = t ? MEETING_LINK.exec(t) : null;
+    if (m) return m[0].replace(/[.,;]+$/, '');
+  }
+  return null;
 }

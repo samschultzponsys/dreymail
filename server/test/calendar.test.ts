@@ -138,3 +138,59 @@ describe('calendars', () => {
     expect((await call('DELETE', `/api/events/${e.body.id}`, sam)).status).toBe(200);
   });
 });
+
+describe('repeating DreyMail events (9.5)', () => {
+  const range = '/api/events?from=2026-03-01T00:00:00.000Z&to=2026-04-01T00:00:00.000Z';
+  const starts = (list: CalendarEvent[]) =>
+    list
+      .flatMap((e) => occurrences(e, Date.parse('2026-03-01T00:00:00Z'), Date.parse('2026-04-01T00:00:00Z')))
+      .map((o) => `${o.occurrenceStart.slice(5, 16)} ${o.title}`)
+      .sort();
+
+  it('changes one occurrence, this and following, or the whole series, and deletes the same ways', async () => {
+    const { sam } = await start();
+    const calId = (await call('GET', '/api/calendars', sam)).body[0].id as string;
+    const made = await call('POST', '/api/events', sam, {
+      calendarId: calId,
+      title: 'Standup',
+      start: '2026-03-02T09:00:00.000Z',
+      end: '2026-03-02T09:15:00.000Z',
+      recurrence: 'weekly',
+      byDay: [1, 3],
+      count: 6,
+      timeZone: 'UTC',
+      reminder: 10,
+    });
+    expect(made.status).toBe(200);
+    expect(made.body).toMatchObject({ recurrence: 'weekly', byDay: [1, 3], count: 6, reminder: 10, isOrganizer: true });
+    const id = made.body.id as string;
+    expect(starts((await call('GET', range, sam)).body)).toEqual(['03-02T09:00 Standup', '03-04T09:00 Standup', '03-09T09:00 Standup', '03-11T09:00 Standup', '03-16T09:00 Standup', '03-18T09:00 Standup']);
+
+    // Only Wednesday the 4th moves to 10:00.
+    const one = await call('PUT', `/api/events/${id}`, sam, { ...made.body, title: 'Standup (moved)', start: '2026-03-04T10:00:00.000Z', end: '2026-03-04T10:15:00.000Z', scope: 'this', occurrenceStart: '2026-03-04T09:00:00.000Z' });
+    expect(one.status).toBe(200);
+    expect(one.body.recurrence).toBe('none');
+    // From the 11th on: renamed (a new series with the remaining times).
+    const rest = await call('PUT', `/api/events/${id}`, sam, { ...made.body, title: 'Sync', start: '2026-03-11T09:00:00.000Z', end: '2026-03-11T09:15:00.000Z', scope: 'following', occurrenceStart: '2026-03-11T09:00:00.000Z' });
+    expect(rest.body).toMatchObject({ title: 'Sync', count: 3 });
+    expect(starts((await call('GET', range, sam)).body)).toEqual(['03-02T09:00 Standup', '03-04T10:00 Standup (moved)', '03-09T09:00 Standup', '03-11T09:00 Sync', '03-16T09:00 Sync', '03-18T09:00 Sync']);
+
+    // Delete only the 16th, then the whole first series.
+    expect((await call('DELETE', `/api/events/${rest.body.id}?scope=this&occurrence=2026-03-16T09:00:00.000Z`, sam)).status).toBe(200);
+    expect((await call('DELETE', `/api/events/${id}?scope=all`, sam)).status).toBe(200);
+    expect(starts((await call('GET', range, sam)).body)).toEqual(['03-04T10:00 Standup (moved)', '03-11T09:00 Sync', '03-18T09:00 Sync']);
+    expect((await call('GET', `/api/events/${rest.body.id}`, sam)).body.exdates).toEqual(['2026-03-16T09:00:00.000Z']);
+  });
+
+  it('rejects guests with bad addresses and remembers good ones', async () => {
+    const { sam } = await start();
+    const calId = (await call('GET', '/api/calendars', sam)).body[0].id as string;
+    const bad = await call('POST', '/api/events', sam, { calendarId: calId, title: 'Review', start: '2026-03-02T09:00:00.000Z', end: '2026-03-02T10:00:00.000Z', attendees: [{ email: 'not an address' }] });
+    expect(bad.status).toBe(400);
+    // Without a mailbox to send from, the event is saved with its guests and nothing is sent.
+    const ok = await call('POST', '/api/events', sam, { calendarId: calId, title: 'Review', start: '2026-03-02T09:00:00.000Z', end: '2026-03-02T10:00:00.000Z', attendees: [{ email: 'Ada@Example.com', name: 'Ada' }] });
+    expect(ok.status).toBe(200);
+    expect(ok.body.attendees).toEqual([{ email: 'ada@example.com', name: 'Ada', status: 'needs-action' }]);
+    expect((await call('GET', '/api/reminders', sam)).body).toEqual([]);
+  });
+});

@@ -7,7 +7,7 @@
 // go straight to the provider. Also answers invitations found in mail.
 
 import crypto from 'node:crypto';
-import type { CalendarSourceView, InviteAnswer, InviteState } from '../../../shared/calendar.js';
+import { findJoinUrl, occurrences, type CalendarEvent, type CalendarSourceView, type EventOccurrence, type InviteAnswer, type InviteState } from '../../../shared/calendar.js';
 import type { MessageRef } from '../../../shared/types.js';
 import type { Store } from '../db.js';
 import type { MailService } from '../imap/mail.js';
@@ -15,9 +15,11 @@ import type { ComposeService } from '../mail/send.js';
 import { assertPublicHost } from '../net/ssrf.js';
 import type { GoogleAuth } from '../oauth/google.js';
 import type { MicrosoftAuth } from '../oauth/microsoft.js';
-import { describeRule, replyIcs, simpleRecurrence, storableIcs, type EventFields, type PartStat } from './ical.js';
+import { windowsZone } from './ical.js';
+import { describeRule, fieldsOfIcs, guestsOfStored, itipFromStored, repeatFromRule, replyIcs, requestIcs, statusOfPartstat, storableIcs, validTimeZone, type EventFields, type PartStat } from './ical.js';
+import { eventFromRow, LocalEvents } from './localEvents.js';
 import { findInvite, type FoundInvite } from './invites.js';
-import { CalDavCalendar, GoogleCalendar, OutlookCalendar, RemoteCalendarError, type CalendarProvider, type Http, type RemoteEvent } from './remote.js';
+import { CalDavCalendar, GoogleCalendar, OutlookCalendar, RemoteCalendarError, type CalendarProvider, type Http, type RemoteEvent, type RemoteSeries } from './remote.js';
 
 export interface CalendarRow {
   id: string;
@@ -29,9 +31,27 @@ export interface CalendarRow {
   source_id: string | null;
   remote_id: string | null;
   writable: number;
+  meetings?: string;
+}
+
+/** A sender for invitations: a mailbox of the user. */
+interface Sender {
+  id: string;
+  email: string;
+  displayName: string;
 }
 
 const SYNC_EVERY = 5 * 60_000;
+
+/** Invitations added to a calendar get Outlook's default reminder (none for all-day events). */
+const DEFAULT_INVITE_REMINDER = (allDay: boolean) => (allDay ? null : 15);
+
+/** The IANA zone an invitation's start is written in, if it names one DreyMail knows. */
+function zoneOfStart(inv: FoundInvite): string | undefined {
+  const tz = inv.event.component.props.find((p) => p.name === 'DTSTART')?.params.TZID?.replace(/^\/+/, '').trim();
+  if (!tz) return undefined;
+  return validTimeZone(tz) ? tz : windowsZone(tz);
+}
 const EVENTS_FOR = 60_000;
 
 export class CalendarService {
@@ -40,6 +60,7 @@ export class CalendarService {
   /** Per source (mailbox id or CalDAV connection id): why it can't be read right now. */
   private readonly errors = new Map<string, { message: string; reconnect: boolean }>();
   private readonly cache = new Map<string, { at: number; events: RemoteEvent[] }>();
+  readonly local: LocalEvents;
 
   constructor(
     private readonly deps: {
@@ -52,7 +73,9 @@ export class CalendarService {
       blockPrivateHosts: boolean;
       maxMessageBytes: number;
     },
-  ) {}
+  ) {
+    this.local = new LocalEvents(deps.store);
+  }
 
   private get db() {
     return this.deps.store.db;
@@ -134,12 +157,13 @@ export class CalendarService {
           for (const c of list) {
             seen.add(c.remoteId);
             const row = existing.find((e) => e.remote_id === c.remoteId);
-            if (row) this.db.prepare('UPDATE calendars SET name = ?, writable = ?, account_id = ? WHERE id = ?').run(c.name, c.writable ? 1 : 0, s.accountId, row.id);
+            const meetings = (c.meetings ?? []).join(',');
+            if (row) this.db.prepare('UPDATE calendars SET name = ?, writable = ?, account_id = ?, meetings = ? WHERE id = ?').run(c.name, c.writable ? 1 : 0, s.accountId, meetings, row.id);
             else {
               const id = crypto.randomUUID();
               this.db
-                .prepare('INSERT INTO calendars (id, owner_id, name, color, account_id, created_at, source, source_id, remote_id, writable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-                .run(id, userId, c.name, c.color, s.accountId, Date.now(), s.kind, s.id, c.remoteId, c.writable ? 1 : 0);
+                .prepare('INSERT INTO calendars (id, owner_id, name, color, account_id, created_at, source, source_id, remote_id, writable, meetings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(id, userId, c.name, c.color, s.accountId, Date.now(), s.kind, s.id, c.remoteId, c.writable ? 1 : 0, meetings);
               if (!c.visibleByDefault) this.db.prepare('INSERT OR IGNORE INTO calendar_hidden (calendar_id, user_id) VALUES (?, ?)').run(id, userId);
             }
           }
@@ -183,6 +207,11 @@ export class CalendarService {
 
   /** Events of a provider calendar in [from, to); errors are remembered for the calendar list. */
   async events(userId: string, cal: CalendarRow, from: number, to: number): Promise<RemoteEvent[]> {
+    return (await this.eventsOrNull(userId, cal, from, to)) ?? [];
+  }
+
+  /** Like events(), but null when the provider couldn't be read. */
+  async eventsOrNull(userId: string, cal: CalendarRow, from: number, to: number): Promise<RemoteEvent[] | null> {
     const key = `${cal.id}|${from}|${to}`;
     const hit = this.cache.get(key);
     if (hit && Date.now() - hit.at < EVENTS_FOR) return hit.events;
@@ -196,8 +225,135 @@ export class CalendarService {
       return events;
     } catch (err) {
       this.remember(cal.source_id!, err);
-      return [];
+      return null;
     }
+  }
+
+  /** The user's mailbox addresses (lowercase): who "you" are as an organizer. */
+  myAddresses(userId: string): Set<string> {
+    return new Set(this.deps.store.listAccounts(userId).map((a) => a.email.toLowerCase()));
+  }
+
+  /** The mailbox invitations go out from: the one asked for, the calendar's mailbox, or the first. */
+  sender(userId: string, cal: Pick<CalendarRow, 'account_id'> | null, wanted?: string | null): Sender | null {
+    const list = this.deps.store.listAccounts(userId);
+    const a = list.find((x) => x.id === wanted) ?? list.find((x) => x.id === cal?.account_id) ?? list[0];
+    return a ? { id: a.id, email: a.email.toLowerCase(), displayName: a.displayName } : null;
+  }
+
+  /** Emails an invitation, update or cancellation to `to`, from one of the user's mailboxes. */
+  async mailInvitation(userId: string, from: Sender, method: 'REQUEST' | 'CANCEL', to: string[], f: Pick<EventFields, 'title' | 'start' | 'end' | 'allDay' | 'location' | 'notes' | 'timeZone'>, ics: string, update: boolean) {
+    const list = [...new Set(to.map((x) => x.toLowerCase()))].filter((x) => x && x !== from.email);
+    if (!list.length) return;
+    const zone = validTimeZone(f.timeZone) ? f.timeZone : 'UTC';
+    const when = f.allDay
+      ? new Date(f.start).toLocaleDateString('en-US', { dateStyle: 'full', timeZone: 'UTC' })
+      : `${new Date(f.start).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short', timeZone: zone })} – ${new Date(f.end).toLocaleTimeString('en-US', { timeStyle: 'short', timeZone: zone, timeZoneName: 'short' })}`;
+    const verb = method === 'CANCEL' ? 'Canceled' : update ? 'Updated invitation' : 'Invitation';
+    const join = findJoinUrl(f.location, f.notes);
+    const text = [
+      method === 'CANCEL' ? `${from.displayName || from.email} canceled this event.` : `${from.displayName || from.email} invited you.`,
+      '',
+      f.title,
+      when,
+      f.location ? `Where: ${f.location}` : '',
+      join && join !== f.location ? `Join: ${join}` : '',
+      f.notes ? `\n${f.notes}` : '',
+    ]
+      .filter((x, i) => x || i === 1)
+      .join('\n');
+    await this.deps.compose.sendInvitation(userId, from.id, { to: list, subject: `${verb}: ${f.title} @ ${when}`, text, ics, method });
+  }
+
+  /** Invitations for a DreyMail event with guests (from its sender mailbox). */
+  async inviteLocal(userId: string, e: CalendarEvent, method: 'REQUEST' | 'CANCEL', opts: { to?: string[]; update?: boolean } = {}) {
+    if (!e.attendees?.length) return;
+    const uid = this.local.uidOf(e.id);
+    const cal = this.db.prepare('SELECT account_id FROM calendars WHERE id = ?').get(e.calendarId) as { account_id: string | null } | undefined;
+    const from = this.sender(userId, cal ?? null, e.sendFrom);
+    if (!uid || !from) return;
+    const f: EventFields = { ...e, organizer: e.organizer ?? { email: from.email, name: from.displayName } };
+    const ics = requestIcs(uid.uid, f, method, uid.sequence);
+    await this.mailInvitation(userId, from, method, opts.to ?? e.attendees.map((a) => a.email), f, ics, !!opts.update);
+  }
+
+  /** The whole event or series of a provider calendar (for editing every occurrence). */
+  async get(userId: string, cal: CalendarRow, eventId: string): Promise<RemoteSeries> {
+    const p = this.provider(userId, cal.source, cal.source_id);
+    if (!p || !cal.remote_id) throw new RemoteCalendarError('This calendar is not connected any more', 404);
+    return p.get(cal.remote_id, eventId);
+  }
+
+  /**
+   * Occurrences with a reminder in the user's visible calendars between from and to (DreyMail's own
+   * repeats expanded in each event's zone), and the calendars that couldn't be read.
+   */
+  async upcoming(userId: string, from: number, to: number): Promise<{ items: (EventOccurrence & { color: string })[]; failed: Set<string> }> {
+    const cals = this.db
+      .prepare(
+        `SELECT c.* FROM calendars c LEFT JOIN calendar_shares s ON s.calendar_id = c.id AND s.user_id = ?
+          WHERE (c.owner_id = ? OR (s.user_id IS NOT NULL AND c.source = 'local'))
+            AND NOT EXISTS (SELECT 1 FROM calendar_hidden h WHERE h.calendar_id = c.id AND h.user_id = ?)`,
+      )
+      .all(userId, userId, userId) as unknown as CalendarRow[];
+    const items: (EventOccurrence & { color: string })[] = [];
+    const failed = new Set<string>();
+    const local = cals.filter((c) => c.source === 'local');
+    if (local.length) {
+      const rows = this.db
+        .prepare(`SELECT * FROM calendar_events WHERE calendar_id IN (${local.map(() => '?').join(',')}) AND reminder IS NOT NULL AND start_at < ? AND (end_at > ? OR recurrence != 'none')`)
+        .all(...local.map((c) => c.id), to, from) as Record<string, unknown>[];
+      for (const r of rows) {
+        const e = eventFromRow(r);
+        const color = local.find((c) => c.id === e.calendarId)?.color ?? '#22d3ee';
+        for (const o of occurrences(e, from, to)) items.push({ ...o, color, joinUrl: findJoinUrl(e.location, e.notes) });
+      }
+    }
+    await Promise.all(
+      cals
+        .filter((c) => c.source !== 'local')
+        .map(async (c) => {
+          const list = await this.eventsOrNull(userId, c, from, to);
+          if (!list) return failed.add(c.id);
+          for (const e of list)
+            if (e.reminder !== null && e.reminder !== undefined)
+              items.push({
+                id: `${c.id}~${Buffer.from(e.remoteId).toString('base64url')}`,
+                calendarId: c.id,
+                title: e.title,
+                start: e.start,
+                end: e.end,
+                allDay: e.allDay,
+                location: e.location,
+                notes: '',
+                recurrence: 'none',
+                until: null,
+                reminder: e.reminder,
+                joinUrl: e.joinUrl ?? null,
+                occurrenceStart: e.start,
+                occurrenceEnd: e.end,
+                color: c.color,
+              });
+        }),
+    );
+    return { items, failed };
+  }
+
+  /** A guest answered an invitation the user sent from DreyMail: their answer goes on the event. */
+  async applyReply(userId: string, ref: MessageRef): Promise<boolean> {
+    const inv = await this.loadInvite(userId, ref);
+    if (inv.method !== 'REPLY') return false;
+    const mine = this.myAddresses(userId);
+    let changed = false;
+    for (const a of inv.event.attendees) {
+      if (mine.has(a.email)) continue;
+      const rows = this.db
+        .prepare('SELECT e.id, e.organizer FROM calendar_events e JOIN calendars c ON c.id = e.calendar_id WHERE e.ical_uid = ? AND c.owner_id = ?')
+        .all(inv.event.uid, userId) as { id: string; organizer: string | null }[];
+      if (!rows.length) continue;
+      changed = this.local.setAttendeeStatus(inv.event.uid, a.email, statusOfPartstat(a.status)) || changed;
+    }
+    return changed;
   }
 
   private forget(calId: string) {
@@ -211,17 +367,58 @@ export class CalendarService {
     return p;
   }
 
-  async create(userId: string, cal: CalendarRow, f: EventFields) {
-    await this.need(userId, cal).create(cal.remote_id!, f);
+  async create(userId: string, cal: CalendarRow, f: EventFields & { sendFrom?: string | null }) {
+    const p = this.need(userId, cal);
+    const guests = cal.source === 'caldav' && !!f.attendees?.length;
+    const from = guests ? this.sender(userId, cal, f.sendFrom) : null;
+    const id = await p.create(cal.remote_id!, from ? { ...f, organizer: { email: from.email, name: from.displayName } } : f);
     this.forget(cal.id);
+    // CalDAV: DreyMail emails the guests (Google and Outlook do it themselves).
+    if (from && p instanceof CalDavCalendar) {
+      const raw = await p.raw(id).catch(() => null);
+      if (raw) await this.mailInvitation(userId, from, 'REQUEST', f.attendees!.map((a) => a.email), f, itipFromStored(raw, 'REQUEST'), false);
+    }
   }
-  async update(userId: string, cal: CalendarRow, eventId: string, f: EventFields, instance: boolean) {
-    await this.need(userId, cal).update(cal.remote_id!, eventId, f, instance);
+  async update(userId: string, cal: CalendarRow, eventId: string, f: EventFields & { sendFrom?: string | null }, instance: boolean) {
+    const p = this.need(userId, cal);
+    if (!(p instanceof CalDavCalendar)) {
+      await p.update(cal.remote_id!, eventId, f, instance);
+      this.forget(cal.id);
+      return;
+    }
+    const before = await p.raw(eventId).catch(() => null);
+    const old = before ? guestsOfStored(before) : { organizer: null, attendees: [] };
+    const mine = this.myAddresses(userId);
+    const organizes = !old.organizer || mine.has(old.organizer);
+    // Only the organizer changes the guest list.
+    const fields: EventFields = organizes ? f : { ...f, attendees: undefined };
+    const from = organizes && (f.attendees?.length || old.attendees.length) ? this.sender(userId, cal, f.sendFrom) : null;
+    if (from && f.attendees?.length) fields.organizer = old.organizer ? { email: old.organizer, name: from.email === old.organizer ? from.displayName : '' } : { email: from.email, name: from.displayName };
+    await p.update(cal.remote_id!, eventId, fields, instance);
     this.forget(cal.id);
+    if (!from) return;
+    const after = await p.raw(eventId).catch(() => null);
+    const now = f.attendees?.map((a) => a.email) ?? old.attendees;
+    const removed = old.attendees.filter((a) => !now.includes(a));
+    if (after && now.length) await this.mailInvitation(userId, from, 'REQUEST', now, f, itipFromStored(after, 'REQUEST'), true);
+    if (before && removed.length) await this.mailInvitation(userId, from, 'CANCEL', removed, f, itipFromStored(before, 'CANCEL'), true);
   }
   async remove(userId: string, cal: CalendarRow, eventId: string) {
-    await this.need(userId, cal).remove(cal.remote_id!, eventId);
+    const p = this.need(userId, cal);
+    const before = p instanceof CalDavCalendar ? await p.raw(eventId).catch(() => null) : null;
+    await p.remove(cal.remote_id!, eventId);
     this.forget(cal.id);
+    if (!before || !(p instanceof CalDavCalendar)) return;
+    const g = guestsOfStored(before);
+    if (!g.attendees.length || (g.organizer && !this.myAddresses(userId).has(g.organizer))) return;
+    const from = this.sender(userId, cal);
+    const f = fieldsOfIcs(before);
+    if (!from || !f) return;
+    // One occurrence left out: the guests get the series without it; otherwise a cancellation.
+    if (eventId.includes('#')) {
+      const after = await p.raw(eventId).catch(() => null);
+      if (after) await this.mailInvitation(userId, from, 'REQUEST', g.attendees, f, itipFromStored(after, 'REQUEST'), true);
+    } else await this.mailInvitation(userId, from, 'CANCEL', g.attendees, f, itipFromStored(before, 'CANCEL'), true);
   }
 
   // ---- invitations ----------------------------------------------------------------------------------
@@ -321,11 +518,26 @@ export class CalendarService {
     const e = inv.event;
     if (cal.source === 'local') {
       this.db.prepare('DELETE FROM calendar_events WHERE calendar_id = ? AND ical_uid = ?').run(cal.id, e.uid);
-      const simple = e.rrule ? simpleRecurrence(e.rrule, e.start) : null;
-      const notes = [e.rrule && !simple ? describeRule(e.rrule) : '', e.organizer ? `Organizer: ${e.organizer.name || e.organizer.email}` : '', e.description].filter(Boolean).join('\n\n');
-      this.db
-        .prepare('INSERT INTO calendar_events (id, calendar_id, title, start_at, end_at, all_day, location, notes, recurrence, until_day, created_by, updated_at, ical_uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(crypto.randomUUID(), cal.id, e.title || 'Invitation', e.start.ms, e.end, e.allDay ? 1 : 0, e.location.slice(0, 500), notes.slice(0, 10_000), simple?.recurrence ?? 'none', simple?.until ?? null, userId, Date.now(), e.uid);
+      const rep = e.rrule ? repeatFromRule(e.rrule, e.start) : null;
+      const notes = [e.rrule && !rep ? describeRule(e.rrule) : '', e.organizer ? `Organizer: ${e.organizer.name || e.organizer.email}` : '', e.description].filter(Boolean).join('\n\n');
+      this.local.insert(
+        {
+          calendarId: cal.id,
+          title: e.title || 'Invitation',
+          start: new Date(e.start.ms).toISOString(),
+          end: new Date(e.end).toISOString(),
+          allDay: e.allDay,
+          location: e.location.slice(0, 500),
+          notes: notes.slice(0, 10_000),
+          ...(rep ?? { recurrence: 'none', until: null }),
+          exdates: [...e.exdates].map((x) => new Date(x).toISOString()),
+          timeZone: zoneOfStart(inv),
+          reminder: DEFAULT_INVITE_REMINDER(e.allDay),
+        },
+        userId,
+        null,
+        e.uid,
+      );
       return null;
     }
     if (cal.source === 'caldav') {
@@ -338,7 +550,7 @@ export class CalendarService {
     }
     // A Google or Outlook calendar picked for a mailbox without its own calendar.
     const p = this.need(userId, cal);
-    const simple = e.rrule ? simpleRecurrence(e.rrule, e.start) : null;
+    const rep = e.rrule ? repeatFromRule(e.rrule, e.start) : null;
     const id = await p.create(cal.remote_id!, {
       title: e.title || 'Invitation',
       location: e.location,
@@ -346,8 +558,9 @@ export class CalendarService {
       start: new Date(e.start.ms).toISOString(),
       end: new Date(e.end).toISOString(),
       allDay: e.allDay,
-      recurrence: simple?.recurrence ?? 'none',
-      until: simple?.until ?? null,
+      ...(rep ?? { recurrence: 'none', until: null }),
+      timeZone: zoneOfStart(inv),
+      reminder: DEFAULT_INVITE_REMINDER(e.allDay),
     });
     this.forget(cal.id);
     return id;

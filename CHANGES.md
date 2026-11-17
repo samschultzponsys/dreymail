@@ -13,6 +13,45 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.5): calendar repeats, guests, Teams and Meet, reminders
+
+- **Repeats:** DreyMail's own events repeat every N days, weeks, months or years; weekly on chosen
+  weekdays; monthly or yearly on the day, the n-th weekday or the last weekday; until a day or a
+  number of times; with occurrences left out. Repeats are expanded in the event's own time zone
+  (stored with the event), by the same rule engine on the server and in the browser
+  (`shared/rrule.ts`, moved out of `server/src/calendar/ical.ts`), so 9:00 stays 9:00 across
+  daylight-saving changes.
+- **Series editing:** an occurrence of a repeating event can be changed or deleted on its own, with
+  the following ones (DreyMail calendars: the series ends before it and a new one starts), or as the
+  whole series. Google and Outlook series are read from the provider (RRULE, Graph patterns) and
+  written back; CalDAV occurrences get RECURRENCE-ID overrides or EXDATEs, CalDAV series are no
+  longer read-only.
+- **Guests:** events have guests (required or optional, with their answers). Google and Outlook send
+  invitations themselves; for DreyMail and CalDAV calendars DreyMail emails iTIP REQUEST / CANCEL
+  messages from a chosen mailbox (CalDAV events are written with SCHEDULE-AGENT=CLIENT so the server
+  doesn't send them too), with a generated VTIMEZONE. Guests' REPLY messages update the event when
+  opened.
+- **Meetings:** Teams meetings for Outlook calendars that allow them (`isOnlineMeeting`,
+  `teamsForBusiness`), Google Meet for Google calendars (`conferenceData`); join links found in
+  events (Teams, Meet, Zoom, Webex, GoTo, Whereby, Jitsi) give a Join button.
+- **Reminders:** per event (none, at the start, 5 minutes to a week before; 15 minutes for new
+  events and accepted invitations). The server looks ahead in every user's visible calendars every
+  5 minutes, keeps due reminders in `calendar_alerts`, and notifies every device (Web Push, the
+  Android app, and the desktop app over the WebSocket); the app's reminder window offers Join,
+  Snooze and Dismiss, in step across devices.
+- **Database:** migration adding repeat, reminder, guest and meeting columns to `calendar_events`,
+  `meetings` to `calendars`, and the `calendar_alerts` table.
+- **Files:** `shared/rrule.ts` (new), `shared/calendar.ts`, `shared/types.ts`,
+  `server/src/calendar/localEvents.ts` (new), `server/src/calendar/reminders.ts` (new),
+  `server/src/calendar/ical.ts`, `server/src/calendar/remote.ts`, `server/src/calendar/service.ts`,
+  `server/src/routes/calendar.ts`, `server/src/mail/send.ts`, `server/src/push/service.ts`,
+  `server/src/db.ts`, `server/src/app.ts`, `web/src/components/EventEditor.tsx` (new),
+  `web/src/components/ReminderWindow.tsx` (new), `web/src/components/CalendarDialog.tsx`,
+  `web/src/components/InviteCard.tsx`, `web/src/hooks.ts`, `web/src/App.tsx`, `web/src/styles.css`,
+  `server/test/repeats.test.ts` (new), `server/test/reminders.test.ts` (new),
+  `server/test/calendar.test.ts`, `server/test/calendar-sync.test.ts`, `server/test/ical.test.ts`,
+  `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.4): the folder bar as a real tree
 
 - **Folder order:** subfolders were sorted alphabetically after the built-in mailboxes, so the

@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: Android app notifications (Firebase).
 // Modified by samschultzponsys, 2026-11-15: mailbox icons.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
+// Modified by samschultzponsys, 2026-11-17: event reminders on every device.
 
 import { MAILBOX_ICONS } from '../../../shared/mailboxIcons.js';
 import crypto from 'node:crypto';
@@ -244,6 +245,11 @@ export class PushService {
     const badge = await this.opts.unreadCount?.(userId).catch(() => null);
     const payload: ClearPayload = { type: 'clear', tags: done, ...(typeof badge === 'number' ? { badge } : {}) };
     await this.send(userId, payload, NOTIFICATION_TTL_S, { urgency: 'normal', only: canClearSilently });
+  }
+
+  /** An event reminder, on every device (also while the app is open: it is time-critical) (DreyMail). */
+  async notifyReminder(userId: string, payload: NotificationPayload): Promise<number> {
+    return this.send(userId, payload, 3600);
   }
 
   /** "Send test notification" in Settings. Returns how many devices accepted it. */

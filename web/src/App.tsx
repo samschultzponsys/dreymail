@@ -32,6 +32,7 @@
 // Modified by samschultzponsys, 2026-11-17: Sending list under Compose (undo send after leaving the message).
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
+// Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,7 +44,7 @@ import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
 import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme';
-import { desktopBridge, loadMailboxPicture, mailboxNotificationIcon } from './desktop';
+import { accountIcon, desktopBridge, loadMailboxPicture, mailboxNotificationIcon } from './desktop';
 import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
@@ -56,9 +57,10 @@ import { SettingsDialog } from './components/SettingsDialog';
 import { AssistantDialog } from './components/AssistantDialog';
 import { ScheduledDialog, useScheduled } from './components/ScheduledDialog';
 import { CalendarDialog } from './components/CalendarDialog';
+import { ReminderWindow } from './components/ReminderWindow';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
-import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type SnoozeEndedEvent } from './hooks';
+import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type ReminderEvent, type SnoozeEndedEvent } from './hooks';
 import { PENDING_MAILTO_KEY, parseMailto } from './mailto';
 import { blankComposer, composerFor, composerForMailto } from './replies';
 import { useRouter, type Location } from './router';
@@ -266,7 +268,11 @@ export function App() {
     },
     [accountMap],
   );
-  useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify);
+  // Desktop app: an event reminder as a native notification (browsers and phones get Web Push / Firebase).
+  const onReminder = useCallback((ev: ReminderEvent) => {
+    desktopBridge()?.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(BRAND_CYAN, 'bell') });
+  }, []);
+  useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify, onReminder);
   // Desktop app: have uploaded mailbox pictures ready for notifications.
   useEffect(() => {
     if (!desktopBridge()) return;
@@ -928,6 +934,7 @@ export function App() {
       )}
       {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
+      <ReminderWindow enabled={loggedIn && accounts.length > 0} onOpenCalendar={() => go({ ...HOME, calendar: true })} />
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.error ? 'error' : ''}`}>

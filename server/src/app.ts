@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox cached in the background.
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
+// Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,6 +52,7 @@ import { Access } from './access.js';
 import { registerPasskeyRoutes } from './auth/passkeys.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
+import { Reminders } from './calendar/reminders.js';
 import type { Http } from './calendar/remote.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
@@ -314,6 +316,16 @@ export async function buildApp(
     blockPrivateHosts: config.blockPrivateMailHosts,
     maxMessageBytes: config.maxMessageBytes,
   });
+  // Event reminders: notifications on every device and the reminder window, sent by the server.
+  const reminders = new Reminders({
+    store,
+    calendars,
+    push: (userId, payload) => push.notifyReminder(userId, payload),
+    emit: (userId, event) => pool.onEvent(userId, event),
+    log: (msg, extra) => app.log.warn(extra ?? {}, msg),
+  });
+  reminders.start();
+  app.addHook('onClose', async () => reminders.stop());
 
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 50, fieldSize: 6 * 1024 * 1024 } });
@@ -376,7 +388,7 @@ export async function buildApp(
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
-  registerCalendarRoutes(app, { store, calendars });
+  registerCalendarRoutes(app, { store, calendars, reminders });
   registerAutoReplyRoutes(app, { autoReplies, onChanged: (userId) => assistant.syncWatching(userId) });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();

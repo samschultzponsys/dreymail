@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-16: folders asked for per mailbox.
 // Modified by samschultzponsys, 2026-11-17: preferences changed on another device are fetched again.
+// Modified by samschultzponsys, 2026-11-17: event reminders over the WebSocket.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -90,8 +91,12 @@ export type SnoozeEndedEvent = Extract<ServerEvent, { type: 'snoozeEnded' }>;
 /** One WebSocket per browser session; reconnects with backoff. Reports presence to the server. */
 export type NotifyEvent = Extract<ServerEvent, { type: 'notify' }>;
 
-export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEndedEvent) => void, onNotify?: (ev: NotifyEvent) => void) {
+export type ReminderEvent = Extract<ServerEvent, { type: 'reminder' }>;
+
+export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEndedEvent) => void, onNotify?: (ev: NotifyEvent) => void, onReminder?: (ev: ReminderEvent) => void) {
   const qc = useQueryClient();
+  const reminder = useRef(onReminder);
+  reminder.current = onReminder;
   const timer = useRef<number | null>(null);
   const snoozeEnded = useRef(onSnoozeEnded);
   snoozeEnded.current = onSnoozeEnded;
@@ -132,6 +137,11 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
         else if (ev.type === 'snoozeEnded') snoozeEnded.current?.(ev);
         else if (ev.type === 'preferences') void qc.invalidateQueries({ queryKey: ['me'] });
         else if (ev.type === 'notify') notify.current?.(ev);
+        else if (ev.type === 'reminders') void qc.invalidateQueries({ queryKey: ['reminders'] });
+        else if (ev.type === 'reminder') {
+          void qc.invalidateQueries({ queryKey: ['reminders'] });
+          reminder.current?.(ev);
+        }
       };
       ws.onclose = (e) => {
         if (stopped || e.code === 4401) return;

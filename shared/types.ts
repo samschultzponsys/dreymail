@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-17: space used per user (Settings → Storage).
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
+// Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
 
 // Types shared between the server API and the web client.
 
@@ -621,7 +622,11 @@ export type ServerEvent =
   | { type: 'notify'; accountId: string; title: string; body: string; tag: string; url: string }
   | { type: 'hello' }
   /** The user's preferences changed on some device: fetch them again (DreyMail). */
-  | { type: 'preferences' };
+  | { type: 'preferences' }
+  /** An event reminder is due: the desktop app shows it as a notification, every app opens its reminder window (DreyMail). */
+  | { type: 'reminder'; title: string; body: string; tag: string; url: string; joinUrl: string | null }
+  /** Reminders were dismissed or snoozed on some device: fetch them again (DreyMail). */
+  | { type: 'reminders' };
 
 /**
  * Sent by the browser over the WebSocket: whether the app is in front of the user right now

@@ -13,8 +13,11 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Planned
 
 ### Calendar
-- [ ] Reminders as notifications (phone, desktop and browser), from the event's alarms.
-- [ ] Editing whole series of repeating CalDAV events (today they are read-only in DreyMail).
+- [ ] Scheduling assistant: guests' free/busy times next to each other (Outlook and Google), and room
+      booking.
+- [ ] Show as busy, free, tentative or away; proposing a new time when answering an invitation.
+- [ ] Dragging events to move them in the week and day views.
+- [ ] "This and following" for Google, Outlook and CalDAV series (today: this event or all events).
 
 ### Mail
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
@@ -132,6 +135,15 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       shared with other users (view or edit), repeating events, month/week/day/agenda views (3.8).
 - [x] Google, Outlook and CalDAV calendars next to DreyMail's own, read and written live; answering
       invitations (Yes / Maybe / No) from the message (3.9).
+- [x] Full repeats: every N, chosen weekdays, n-th or last weekday, until a day or N times; change or
+      delete this event, this and following, or all events, also for Google, Outlook and CalDAV
+      series (9.5).
+- [x] Guests and invitations: Google and Outlook send them; DreyMail emails iTIP invitations,
+      updates and cancellations for its own and CalDAV calendars, and records guests' answers (9.5).
+- [x] Teams meetings (Outlook work accounts) and Google Meet with the event; Join buttons for
+      meeting links (9.5).
+- [x] Reminders: notifications on every device from the server, and a reminder window with Join,
+      Snooze and Dismiss, in step across devices (9.5).
 - [x] Automatic inbox tabs: Personal / Updates / Newsletters, without AI (3.7). Rules with a match
       preview are part of the AI assistant (Test this rule, 3.1).
 

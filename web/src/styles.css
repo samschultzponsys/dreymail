@@ -41,7 +41,8 @@
    Modified by samschultzponsys, 2026-11-17: readable dropdown lists in dark mode.
    Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer.
    Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
-   Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips. */
+   Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
+   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1023,6 +1024,50 @@ img.account-mark { object-fit: cover; }
 .cal-when > div { flex: 1; min-width: 200px; }
 .cal-when-row { display: flex; gap: 6px; }
 .cal-when-row .input { min-width: 0; }
+.cal-when-row { align-items: center; }
+/* The event editor (DreyMail 9.5). */
+.ev-scope { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2, var(--bg)); font-size: 13px; }
+.event-dialog .dialog-head .btn.primary { margin-left: auto; text-decoration: none; }
+.event-dialog .dialog-head .btn.primary + .icon-btn { margin-left: 4px; }
+.ev-repeat { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.ev-num { width: 72px; flex: 0 0 72px; }
+.ev-weekdays { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.ev-weekdays button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); cursor: pointer; font-weight: 600; }
+.ev-weekdays button.on { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
+.ev-weekdays .ev-weekdays-preset { width: auto; border-radius: 999px; padding: 0 12px; font-weight: 500; }
+.ev-ends .label, .ev-guests .cal-when-row .label { margin: 0; white-space: nowrap; flex: none; }
+.ev-guests .cal-when-row .select { flex: 1; min-width: 0; }
+.ev-ends .select { flex: 1; min-width: 0; }
+.ev-guests { display: flex; flex-direction: column; gap: 6px; }
+.ev-guests .label { display: inline-flex; align-items: center; gap: 5px; }
+.ev-guests-field { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0 10px; position: relative; }
+.ev-guests-field .field { border: 0; padding: 0; }
+.ev-guests-field .suggestions { left: 0; right: 0; }
+.ev-guest-list { display: flex; flex-direction: column; gap: 2px; }
+.ev-guest { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13px; }
+.ev-guest-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-status { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; border: 2px solid var(--muted); }
+.ev-status.accepted { background: #16a34a; border-color: #16a34a; }
+.ev-status.tentative { background: transparent; border-color: #ca8a04; border-style: dashed; }
+.ev-status.declined { background: #dc2626; border-color: #dc2626; }
+.ev-status.organizer { background: var(--accent-fill); border-color: var(--accent-fill); }
+/* The reminder window (DreyMail 9.5): over everything, bottom right (full width on phones). */
+.reminders { position: fixed; z-index: 38; right: 16px; bottom: 16px; width: min(420px, calc(100vw - 32px)); max-height: min(70dvh, 520px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.reminders-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2, var(--bg)); }
+.reminders-head .grow { flex: 1; }
+.reminders-snooze { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.reminders-snooze .select { height: 30px; padding-top: 0; padding-bottom: 0; width: auto; }
+.reminders-list { overflow-y: auto; }
+.reminder { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-left: 4px solid var(--cal); }
+.reminder + .reminder { border-top: 1px solid var(--border); }
+.reminder-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.reminder-title { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reminder-when { font-size: 12px; color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reminder-when.due { color: var(--accent); font-weight: 600; }
+.reminder-actions { display: flex; align-items: center; gap: 4px; }
+.reminder-actions .btn.primary { text-decoration: none; }
+.reminders .error-text { padding: 6px 12px; }
+@media (max-width: 600px) { .reminders { left: 8px; right: 8px; bottom: 8px; width: auto; } }
 .cal-colors { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .cal-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
 .cal-swatch.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }

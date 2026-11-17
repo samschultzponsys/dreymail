@@ -9,13 +9,21 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { mayOccur, type CalendarEvent, type CalendarView } from '../../../shared/calendar.js';
-import { RemoteCalendarError } from '../calendar/remote.js';
+import { findJoinUrl, mayOccur, type CalendarEvent, type CalendarView, type EventInput, type MeetingKind } from '../../../shared/calendar.js';
+import { eventFromRow } from '../calendar/localEvents.js';
+import { RemoteCalendarError, type RemoteEvent } from '../calendar/remote.js';
+import type { Reminders } from '../calendar/reminders.js';
 import type { CalendarRow, CalendarService } from '../calendar/service.js';
 import type { Store } from '../db.js';
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const calendarSchema = z.object({ name: z.string().trim().min(1).max(80), color: colorSchema, accountId: z.string().max(64).nullable().default(null) });
+const attendeeSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(320),
+  name: z.string().trim().max(200).default(''),
+  status: z.enum(['needs-action', 'accepted', 'tentative', 'declined']).default('needs-action'),
+  optional: z.boolean().optional(),
+});
 const eventSchema = z
   .object({
     calendarId: z.string().max(64),
@@ -27,11 +35,25 @@ const eventSchema = z
     notes: z.string().max(10_000).default(''),
     recurrence: z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly']).default('none'),
     until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+    interval: z.number().int().min(1).max(999).optional(),
+    byDay: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+    monthlyBy: z.enum(['day', 'weekday', 'last']).optional(),
+    count: z.number().int().min(1).max(999).nullable().optional(),
     timeZone: z.string().max(64).optional(),
+    /** Minutes before the start; null: none. */
+    reminder: z.number().int().min(0).max(40_320).nullable().optional(),
+    attendees: z.array(attendeeSchema).max(200).optional(),
+    /** Mailbox the invitations of DreyMail and CalDAV events go out from. */
+    sendFrom: z.string().max(64).nullable().optional(),
+    meeting: z.enum(['teams', 'meet']).nullable().optional(),
     /** Provider events: this is one occurrence of a repeating series. */
     instance: z.boolean().optional(),
+    /** Repeating DreyMail events: change this occurrence, this and the following ones, or all. */
+    scope: z.enum(['this', 'following', 'all']).optional(),
+    occurrenceStart: z.string().datetime().optional(),
   })
-  .refine((e) => Date.parse(e.end) >= Date.parse(e.start), { message: 'The end must be after the start' });
+  .refine((e) => Date.parse(e.end) >= Date.parse(e.start), { message: 'The end must be after the start' })
+  .refine((e) => !e.scope || e.scope === 'all' || !!e.occurrenceStart, { message: 'Which occurrence?' });
 const refSchema = z.object({ accountId: z.string().max(64), folder: z.string().max(1000), uid: z.number().int().positive(), uidValidity: z.string().max(40) });
 
 type Access = 'owner' | 'edit' | 'view';
@@ -44,8 +66,8 @@ function parseRemoteId(id: string): { calendarId: string; remoteId: string } | n
   return { calendarId: id.slice(0, i), remoteId: Buffer.from(id.slice(i + 1), 'base64url').toString() };
 }
 
-export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Store; calendars: CalendarService }) {
-  const { store, calendars } = deps;
+export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Store; calendars: CalendarService; reminders?: Reminders }) {
+  const { store, calendars, reminders } = deps;
   const db = store.db;
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const fail = (reply: FastifyReply, err: unknown) => {
@@ -97,6 +119,7 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
             : [],
         source: r.source,
         sourceId: r.source_id,
+        ...(r.meetings ? { meetings: r.meetings.split(',').filter(Boolean) as MeetingKind[] } : {}),
       };
     });
   };
@@ -216,131 +239,235 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
 
   // ---- events --------------------------------------------------------------------------
 
-  const toEvent = (r: Record<string, unknown>): CalendarEvent => ({
-    id: String(r.id),
-    calendarId: String(r.calendar_id),
-    title: String(r.title),
-    start: new Date(Number(r.start_at)).toISOString(),
-    end: new Date(Number(r.end_at)).toISOString(),
-    allDay: r.all_day === 1,
-    location: String(r.location),
-    notes: String(r.notes),
-    recurrence: r.recurrence as CalendarEvent['recurrence'],
-    until: (r.until_day as string | null) ?? null,
-  });
+  /** A DreyMail event as the user sees it (whether they organize it, its meeting link). */
+  const toEvent = (userId: string, r: Record<string, unknown>): CalendarEvent => {
+    const e = eventFromRow(r);
+    const org = e.organizer?.email;
+    return { ...e, isOrganizer: !org || calendars.myAddresses(userId).has(org.toLowerCase()), joinUrl: findJoinUrl(e.location, e.notes) };
+  };
+  const localRow = (id: string) => db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+
+  /** A provider event in the app's terms. */
+  const fromRemote = (userId: string, c: CalendarRow, e: RemoteEvent & Partial<Pick<CalendarEvent, 'interval' | 'byDay' | 'monthlyBy' | 'count' | 'timeZone' | 'exdates'>>, writable: boolean): CalendarEvent => {
+    const org = e.organizer?.email;
+    return {
+      id: remoteEventId(c.id, e.remoteId),
+      calendarId: c.id,
+      title: e.title,
+      start: e.start,
+      end: e.end,
+      allDay: e.allDay,
+      location: e.location,
+      notes: e.notes,
+      recurrence: e.recurrence,
+      until: e.until,
+      ...(e.interval && e.interval > 1 ? { interval: e.interval } : {}),
+      ...(e.byDay?.length ? { byDay: e.byDay } : {}),
+      ...(e.monthlyBy ? { monthlyBy: e.monthlyBy } : {}),
+      ...(e.count ? { count: e.count } : {}),
+      ...(e.timeZone ? { timeZone: e.timeZone } : {}),
+      reminder: e.reminder ?? null,
+      ...(e.attendees?.length ? { attendees: e.attendees, organizer: e.organizer ?? null } : {}),
+      isOrganizer: c.source === 'caldav' ? !org || calendars.myAddresses(userId).has(org) : e.isOrganizer !== false,
+      joinUrl: e.joinUrl ?? null,
+      instance: e.instance || undefined,
+      ...(e.seriesId ? { seriesId: remoteEventId(c.id, e.seriesId) } : {}),
+      readOnly: e.readOnly || !writable || undefined,
+    };
+  };
 
   /** Events of the user's visible calendars that may happen between from and to (DreyMail repeats are expanded by the app). */
   app.get<{ Querystring: { from?: string; to?: string } }>('/api/events', async (req, reply) => {
+    const userId = req.user!.id;
     const from = Date.parse(req.query.from ?? '');
     const to = Date.parse(req.query.to ?? '');
     if (Number.isNaN(from) || Number.isNaN(to) || to <= from || to - from > 400 * 86_400_000) return bad(reply, 'Invalid range');
-    const visible = list(req.user!.id).filter((c) => c.visible);
+    const visible = list(userId).filter((c) => c.visible);
     const local = visible.filter((c) => c.source === 'local').map((c) => c.id);
     const out: CalendarEvent[] = [];
     if (local.length) {
       const rows = db
         .prepare(`SELECT * FROM calendar_events WHERE calendar_id IN (${local.map(() => '?').join(',')}) AND start_at < ? AND (end_at > ? OR recurrence != 'none')`)
         .all(...local, to, from) as Record<string, unknown>[];
-      out.push(...rows.map(toEvent).filter((e) => mayOccur(e, from, to)));
+      out.push(...rows.map((r) => toEvent(userId, r)).filter((e) => mayOccur(e, from, to)));
     }
     const remote = await Promise.all(
       visible
         .filter((c) => c.source !== 'local')
         .map(async (c) => {
           const r = row(c.id)!;
-          return (await calendars.events(req.user!.id, r, from, to)).map(
-            (e): CalendarEvent => ({
-              id: remoteEventId(c.id, e.remoteId),
-              calendarId: c.id,
-              title: e.title,
-              start: e.start,
-              end: e.end,
-              allDay: e.allDay,
-              location: e.location,
-              notes: e.notes,
-              recurrence: e.recurrence,
-              until: e.until,
-              instance: e.instance || undefined,
-              readOnly: e.readOnly || !r.writable || undefined,
-            }),
-          );
+          return (await calendars.events(userId, r, from, to)).map((e) => fromRemote(userId, r, e, !!r.writable));
         }),
     );
     return out.concat(...remote);
   });
 
+  /** One event, or the whole series an occurrence belongs to (provider events: read from the provider). */
+  app.get<{ Params: { id: string } }>('/api/events/:id', async (req, reply) => {
+    const userId = req.user!.id;
+    const remote = parseRemoteId(req.params.id);
+    if (remote) {
+      const cal = row(remote.calendarId);
+      if (!cal || cal.owner_id !== userId || cal.source === 'local') return bad(reply, 'Event not found', 404);
+      try {
+        const s = await calendars.get(userId, cal, remote.remoteId);
+        return fromRemote(userId, cal, { ...s, readOnly: !s.editable }, !!cal.writable);
+      } catch (err) {
+        return fail(reply, err);
+      }
+    }
+    const r = localRow(req.params.id);
+    if (!r || !access(userId, String(r.calendar_id))) return bad(reply, 'Event not found', 404);
+    return toEvent(userId, r);
+  });
+
+  /** Sends invitations in the background: a guest's address that bounces doesn't undo the save. */
+  const inviting = (p: Promise<unknown>, reply: FastifyReply) =>
+    p.catch((err: Error) => {
+      reply.log.warn({ error: err.message }, 'sending calendar invitations failed');
+      return err.message;
+    });
+
+  /** The organizer of a DreyMail event with guests: the mailbox they are invited from. */
+  const organizerFor = (userId: string, calendarId: string, e: { attendees?: unknown[]; sendFrom?: string | null }) => {
+    if (!e.attendees?.length) return null;
+    const s = calendars.sender(userId, row(calendarId) ?? null, e.sendFrom);
+    return s ? { email: s.email, name: s.displayName } : null;
+  };
+
   app.post('/api/events', async (req, reply) => {
+    const userId = req.user!.id;
     const body = eventSchema.safeParse(req.body);
     if (!body.success) return bad(reply, body.error.issues[0]?.message ?? 'Check the event');
-    if (!canEdit(req.user!.id, body.data.calendarId)) return bad(reply, "You can't add events to this calendar", 403);
-    const e = body.data;
+    if (!canEdit(userId, body.data.calendarId)) return bad(reply, "You can't add events to this calendar", 403);
+    const { scope: _s, occurrenceStart: _o, instance: _i, ...e } = body.data;
     const cal = row(e.calendarId)!;
     if (cal.source !== 'local') {
       try {
-        await calendars.create(req.user!.id, cal, e);
+        await calendars.create(userId, cal, e);
         return { ok: true };
       } catch (err) {
         return fail(reply, err);
       }
     }
-    const id = crypto.randomUUID();
-    db.prepare(
-      'INSERT INTO calendar_events (id, calendar_id, title, start_at, end_at, all_day, location, notes, recurrence, until_day, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(id, e.calendarId, e.title, Date.parse(e.start), Date.parse(e.end), e.allDay ? 1 : 0, e.location, e.notes, e.recurrence, e.until, req.user!.id, Date.now());
-    return toEvent(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id) as Record<string, unknown>);
+    const org = organizerFor(userId, e.calendarId, e);
+    const sendFrom = org ? (calendars.sender(userId, cal, e.sendFrom)?.id ?? null) : null;
+    const saved = calendars.local.insert({ ...e, sendFrom }, userId, org);
+    const warning = await inviting(calendars.inviteLocal(userId, saved, 'REQUEST'), reply);
+    return { ...toEvent(userId, localRow(saved.id)!), ...(typeof warning === 'string' ? { warning: `Saved, but the invitations were not sent: ${warning}` } : {}) };
   });
 
   app.put<{ Params: { id: string } }>('/api/events/:id', async (req, reply) => {
+    const userId = req.user!.id;
     const body = eventSchema.safeParse(req.body);
     if (!body.success) return bad(reply, body.error.issues[0]?.message ?? 'Check the event');
     const remote = parseRemoteId(req.params.id);
+    const { scope, occurrenceStart, instance, ...e } = body.data;
     if (remote) {
       const cal = row(remote.calendarId);
-      if (!cal || cal.owner_id !== req.user!.id || cal.source === 'local') return bad(reply, 'Event not found', 404);
-      if (body.data.calendarId !== cal.id) return bad(reply, 'Events from your provider stay in their calendar');
+      if (!cal || cal.owner_id !== userId || cal.source === 'local') return bad(reply, 'Event not found', 404);
+      if (e.calendarId !== cal.id) return bad(reply, 'Events from your provider stay in their calendar');
       try {
-        await calendars.update(req.user!.id, cal, remote.remoteId, body.data, !!body.data.instance);
+        await calendars.update(userId, cal, remote.remoteId, e, !!instance);
         return { ok: true };
       } catch (err) {
         return fail(reply, err);
       }
     }
-    const cur = db.prepare('SELECT calendar_id FROM calendar_events WHERE id = ?').get(req.params.id) as { calendar_id: string } | undefined;
-    if (!cur || !canEdit(req.user!.id, cur.calendar_id)) return bad(reply, 'Event not found, or you may not change it', 404);
-    if (!canEdit(req.user!.id, body.data.calendarId) || row(body.data.calendarId)?.source !== 'local') return bad(reply, "You can't move events to that calendar", 403);
-    const e = body.data;
-    db.prepare('UPDATE calendar_events SET calendar_id = ?, title = ?, start_at = ?, end_at = ?, all_day = ?, location = ?, notes = ?, recurrence = ?, until_day = ?, updated_at = ? WHERE id = ?').run(
-      e.calendarId,
-      e.title,
-      Date.parse(e.start),
-      Date.parse(e.end),
-      e.allDay ? 1 : 0,
-      e.location,
-      e.notes,
-      e.recurrence,
-      e.until,
-      Date.now(),
-      req.params.id,
-    );
-    return toEvent(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id) as Record<string, unknown>);
+    const curRow = localRow(req.params.id);
+    if (!curRow || !canEdit(userId, String(curRow.calendar_id))) return bad(reply, 'Event not found, or you may not change it', 404);
+    if (!canEdit(userId, e.calendarId) || row(e.calendarId)?.source !== 'local') return bad(reply, "You can't move events to that calendar", 403);
+    const cur = toEvent(userId, curRow);
+    // Only the organizer changes the guest list; others keep it as it is.
+    const input: EventInput = cur.isOrganizer ? e : { ...e, attendees: cur.attendees, sendFrom: cur.sendFrom };
+    const org = cur.isOrganizer ? organizerFor(userId, input.calendarId, input) : (cur.organizer ?? null);
+    const sendFrom = cur.isOrganizer && org ? (calendars.sender(userId, row(input.calendarId) ?? null, input.sendFrom)?.id ?? null) : (cur.sendFrom ?? null);
+    const which = cur.recurrence === 'none' ? 'all' : (scope ?? 'all');
+    const mails: Promise<unknown>[] = [];
+    let saved: CalendarEvent;
+    if (which === 'all') {
+      saved = calendars.local.update(cur.id, { ...input, sendFrom, exdates: input.recurrence === 'none' ? [] : cur.exdates }, org);
+      if (cur.isOrganizer) {
+        const now = new Set((saved.attendees ?? []).map((a) => a.email));
+        const removed = (cur.attendees ?? []).filter((a) => !now.has(a.email)).map((a) => a.email);
+        mails.push(calendars.inviteLocal(userId, saved, 'REQUEST', { update: true }));
+        if (removed.length) mails.push(calendars.inviteLocal(userId, { ...saved, attendees: cur.attendees }, 'CANCEL', { to: removed }));
+      }
+    } else if (which === 'this') {
+      // The occurrence leaves the series and becomes an event of its own.
+      const series = calendars.local.skip(cur.id, occurrenceStart!);
+      saved = calendars.local.insert({ ...input, recurrence: 'none', until: null, count: null, sendFrom }, userId, org);
+      if (cur.isOrganizer) mails.push(calendars.inviteLocal(userId, series, 'REQUEST', { update: true }), calendars.inviteLocal(userId, saved, 'REQUEST'));
+    } else {
+      // This and the following: the series ends before it, a new one starts with the changes.
+      const { kept, before } = calendars.local.endBefore(cur.id, occurrenceStart!);
+      saved = calendars.local.insert({ ...input, count: input.count ? Math.max(1, input.count - before) : input.count, sendFrom }, userId, org);
+      if (cur.isOrganizer) {
+        if (kept) mails.push(calendars.inviteLocal(userId, kept, 'REQUEST', { update: true }));
+        else mails.push(calendars.inviteLocal(userId, cur, 'CANCEL'));
+        mails.push(calendars.inviteLocal(userId, saved, 'REQUEST'));
+      }
+    }
+    const warning = await inviting(Promise.all(mails), reply);
+    return { ...toEvent(userId, localRow(saved.id)!), ...(typeof warning === 'string' ? { warning: `Saved, but the invitations were not sent: ${warning}` } : {}) };
   });
 
-  app.delete<{ Params: { id: string } }>('/api/events/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string }; Querystring: { scope?: string; occurrence?: string } }>('/api/events/:id', async (req, reply) => {
+    const userId = req.user!.id;
     const remote = parseRemoteId(req.params.id);
     if (remote) {
       const cal = row(remote.calendarId);
-      if (!cal || cal.owner_id !== req.user!.id || cal.source === 'local') return bad(reply, 'Event not found', 404);
+      if (!cal || cal.owner_id !== userId || cal.source === 'local') return bad(reply, 'Event not found', 404);
       try {
-        await calendars.remove(req.user!.id, cal, remote.remoteId);
+        await calendars.remove(userId, cal, remote.remoteId);
         return { ok: true };
       } catch (err) {
         return fail(reply, err);
       }
     }
-    const cur = db.prepare('SELECT calendar_id FROM calendar_events WHERE id = ?').get(req.params.id) as { calendar_id: string } | undefined;
-    if (!cur || !canEdit(req.user!.id, cur.calendar_id)) return bad(reply, 'Event not found, or you may not delete it', 404);
-    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(req.params.id);
+    const curRow = localRow(req.params.id);
+    if (!curRow || !canEdit(userId, String(curRow.calendar_id))) return bad(reply, 'Event not found, or you may not delete it', 404);
+    const cur = toEvent(userId, curRow);
+    const occurrence = req.query.occurrence && !Number.isNaN(Date.parse(req.query.occurrence)) ? req.query.occurrence : null;
+    const which = cur.recurrence === 'none' || !occurrence ? 'all' : req.query.scope === 'this' || req.query.scope === 'following' ? req.query.scope : 'all';
+    let mail: Promise<unknown> = Promise.resolve();
+    if (which === 'this') {
+      const series = calendars.local.skip(cur.id, occurrence!);
+      if (cur.isOrganizer) mail = calendars.inviteLocal(userId, series, 'REQUEST', { update: true });
+    } else if (which === 'following') {
+      const { kept } = calendars.local.endBefore(cur.id, occurrence!);
+      if (cur.isOrganizer) mail = kept ? calendars.inviteLocal(userId, kept, 'REQUEST', { update: true }) : calendars.inviteLocal(userId, cur, 'CANCEL');
+    } else {
+      // Guests hear about it before the event (and its UID) are gone.
+      if (cur.isOrganizer) await inviting(calendars.inviteLocal(userId, cur, 'CANCEL'), reply);
+      calendars.local.remove(cur.id);
+    }
+    await inviting(mail, reply);
     return { ok: true };
+  });
+
+  // ---- reminders ------------------------------------------------------------------------
+
+  // A changed event may change a reminder: look again soon.
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.user && req.method !== 'GET' && reply.statusCode < 400 && /^\/api\/(events|calendars)/.test(req.url)) reminders?.changed(req.user.id);
+  });
+
+  /** Reminders whose time has come (the reminder window). */
+  app.get('/api/reminders', async (req) => reminders?.active(req.user!.id) ?? []);
+
+  app.post('/api/reminders/dismiss', async (req, reply) => {
+    const body = z.object({ keys: z.array(z.string().max(2000)).min(1).max(200) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    reminders?.dismiss(req.user!.id, body.data.keys);
+    return reminders?.active(req.user!.id) ?? [];
+  });
+
+  app.post('/api/reminders/snooze', async (req, reply) => {
+    const body = z.object({ keys: z.array(z.string().max(2000)).min(1).max(200), minutes: z.union([z.number().int().min(1).max(10_080), z.literal('start')]) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    reminders?.snooze(req.user!.id, body.data.keys, body.data.minutes);
+    return reminders?.active(req.user!.id) ?? [];
   });
 
   // ---- invitations ----------------------------------------------------------------------
@@ -360,6 +487,17 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
     const userId = req.user!.id;
     try {
       return await calendars.answer(userId, body.data.ref, body.data.answer, body.data.calendarId, (id) => (canEdit(userId, id) ? row(id)! : null));
+    } catch (err) {
+      return fail(reply, err);
+    }
+  });
+
+  /** A guest's answer to an invitation you sent from DreyMail: shown on your event. */
+  app.post('/api/invite/reply', async (req, reply) => {
+    const body = z.object({ ref: refSchema }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      return { updated: await calendars.applyReply(req.user!.id, body.data.ref) };
     } catch (err) {
       return fail(reply, err);
     }

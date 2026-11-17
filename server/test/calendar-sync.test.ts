@@ -300,10 +300,11 @@ describe('invitations', () => {
     expect(state).toEqual({ answer: 'accepted', calendar: 'Personal', viaProvider: false, removable: true });
     expect(sent[0]).toMatchObject({ to: 'boss@example.com', subject: 'Accepted: Planning' });
     expect(sent[0]!.ics).toContain('ATTENDEE;PARTSTAT=ACCEPTED;CN=Sam:mailto:sam@example.com');
-    const copies = store.db.prepare('SELECT title, start_at, recurrence, notes FROM calendar_events WHERE ical_uid = ?').all('plan-1@example.com') as { title: string; start_at: number; recurrence: string; notes: string }[];
+    const copies = store.db.prepare('SELECT title, start_at, recurrence, repeat_count, reminder, notes FROM calendar_events WHERE ical_uid = ?').all('plan-1@example.com') as { title: string; start_at: number; recurrence: string; notes: string }[];
     expect(copies).toHaveLength(1);
-    expect(copies[0]).toMatchObject({ title: 'Planning', start_at: Date.parse('2026-11-20T14:00:00Z'), recurrence: 'none' });
-    expect(copies[0]!.notes).toContain('Repeats every week on Fri, 4 times');
+    // Every week, 4 times: DreyMail's own repeats hold that now (9.5), with the usual reminder.
+    expect(copies[0]).toMatchObject({ title: 'Planning', start_at: Date.parse('2026-11-20T14:00:00Z'), recurrence: 'weekly', repeat_count: 4, reminder: 15 });
+    expect(copies[0]!.notes).not.toContain('Repeats every');
 
     // Answering again replaces the copy; declining removes it.
     await svc.answer(user.id, ref, 'tentative', calId, canUse);

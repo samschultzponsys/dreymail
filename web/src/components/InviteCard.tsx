@@ -4,6 +4,7 @@
 // The invitation card above a message with a calendar invitation: what, when, where, who, and
 // Yes / Maybe / No. Google and Outlook mailboxes answer through their own calendar; other
 // mailboxes email the answer to the organizer and add the event to the calendar you pick.
+// Modified by samschultzponsys, 2026-11-17: guests' answers to your invitations go on your events.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, HelpCircle, MapPin, Repeat, Users, X } from 'lucide-react';
@@ -46,6 +47,18 @@ export function InviteCard({ invite, detail, account }: { invite: InviteView; de
     queryKey: ['invite', detail.accountId, invite.uid],
     queryFn: () => fetchJson<InviteState>('GET', `/api/invite?accountId=${encodeURIComponent(detail.accountId)}&uid=${encodeURIComponent(invite.uid)}`),
     enabled: tracked && !!account,
+  });
+  // A guest's answer to an invitation you sent from DreyMail goes on your event (once per message).
+  useQuery({
+    queryKey: ['invite-reply', detail.accountId, detail.uidValidity, detail.uid],
+    queryFn: async () => {
+      const r = await fetchJson<{ updated: boolean }>('POST', '/api/invite/reply', { ref: { accountId: detail.accountId, folder: detail.folder, uid: detail.uid, uidValidity: detail.uidValidity } });
+      if (r.updated) void qc.invalidateQueries({ queryKey: ['events'] });
+      return r;
+    },
+    enabled: invite.method === 'REPLY' && !!account,
+    staleTime: Infinity,
+    retry: false,
   });
   const cals = useQuery({ queryKey: ['calendars'], queryFn: () => fetchJson<CalendarView[]>('GET', '/api/calendars'), enabled: answerable && state.data?.viaProvider === false });
   const writable = (cals.data ?? []).filter((c) => c.access !== 'view');

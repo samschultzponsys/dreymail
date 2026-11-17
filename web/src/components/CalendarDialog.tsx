@@ -5,14 +5,16 @@
 // mailbox, and Shared with me), month / week / day / agenda views, and the event and calendar
 // editors. Repeating events are expanded here, in the browser's time zone. Shown as a page of its
 // own (/calendar), filling the space of the message list and reader.
+// Modified by samschultzponsys, 2026-11-17: the event editor moved to EventEditor.tsx (repeats, reminders, guests, meetings).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Menu, Pencil, Plus, RefreshCw, Repeat, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Menu, Pencil, Plus, RefreshCw, Repeat, Trash2, Video, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventInput, type EventOccurrence, type Recurrence } from '../../../shared/calendar';
+import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventOccurrence } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
 import { fetchJson } from '../api';
 import { ACCOUNT_COLORS } from '../util';
+import { EventEditor } from './EventEditor';
 
 type Mode = 'month' | 'week' | 'day' | 'agenda';
 const DAY = 86_400_000;
@@ -22,10 +24,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** Local calendar day as YYYY-MM-DD. */
 const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const utcKeyOf = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-const fromKey = (k: string) => {
-  const [y, m, d] = k.split('-').map(Number);
-  return new Date(y!, m! - 1, d!);
-};
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const startOfWeek = (d: Date) => addDays(startOfDay(d), -d.getDay());
@@ -166,6 +164,7 @@ export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; o
         {!o.allDay && <span className="cal-time">{timeLabel(new Date(o.occurrenceStart))}</span>}
         <span className="cal-title">{o.title}</span>
         {!compact && (o.recurrence !== 'none' || o.instance) && <Repeat size={11} />}
+        {!compact && o.joinUrl && <Video size={11} />}
       </button>
     );
   };
@@ -390,9 +389,11 @@ export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; o
         <EventEditor
           event={editing.event}
           calendars={cals.data ?? []}
+          accounts={accounts}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(warning) => {
             setEditing(null);
+            if (warning) setError(warning);
             refresh();
           }}
         />
@@ -463,239 +464,6 @@ function DayColumn({ day, items, color, onNew, onOpen }: { day: Date; items: Eve
           <span className="cal-time">{e - s < 45 * 60_000 ? timeLabel(new Date(o.occurrenceStart)) : `${timeLabel(new Date(o.occurrenceStart))} – ${timeLabel(new Date(o.occurrenceEnd))}`}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-// ---- the event editor -----------------------------------------------------------------------
-
-const toLocalInput = (iso: string) => {
-  const d = new Date(iso);
-  return { date: keyOf(d), time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
-};
-
-function EventEditor({ event, calendars, onClose, onSaved }: { event: Partial<CalendarEvent>; calendars: CalendarView[]; onClose: () => void; onSaved: () => void }) {
-  const cal = calendars.find((c) => c.id === event.calendarId);
-  const readOnly = !!event.id && (cal?.access === 'view' || !!event.readOnly);
-  const writable = calendars.filter((c) => c.access !== 'view');
-  /** Provider events stay in their calendar; one occurrence of a series can't change the series. */
-  const fromProvider = !!event.id && !!cal && cal.source !== 'local';
-  const s0 = event.allDay ? { date: utcKeyOf(new Date(event.start!)), time: '09:00' } : toLocalInput(event.start!);
-  const e0 = event.allDay ? { date: utcKeyOf(new Date(Date.parse(event.end!) - DAY)), time: '10:00' } : toLocalInput(event.end!);
-  const [title, setTitle] = useState(event.title ?? '');
-  const [calendarId, setCalendarId] = useState(event.calendarId ?? writable[0]?.id ?? '');
-  const [allDay, setAllDay] = useState(!!event.allDay);
-  const [startDate, setStartDate] = useState(s0.date);
-  const [startTime, setStartTime] = useState(s0.time);
-  const [endDate, setEndDate] = useState(e0.date);
-  const [endTime, setEndTime] = useState(e0.time);
-  const [recurrence, setRecurrence] = useState<Recurrence>(event.recurrence ?? 'none');
-  const [until, setUntil] = useState(event.until ?? '');
-  const [location, setLocation] = useState(event.location ?? '');
-  const [notes, setNotes] = useState(event.notes ?? '');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const save = async () => {
-    let start: string;
-    let end: string;
-    if (allDay) {
-      start = `${startDate}T00:00:00.000Z`;
-      end = new Date(Date.parse(`${endDate < startDate ? startDate : endDate}T00:00:00.000Z`) + DAY).toISOString();
-    } else {
-      const s = new Date(`${startDate}T${startTime}`);
-      const e = new Date(`${endDate}T${endTime}`);
-      if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return setError('Check the start and end');
-      if (e < s) return setError('The end must be after the start');
-      start = s.toISOString();
-      end = e.toISOString();
-    }
-    const body: EventInput & { instance?: boolean } = {
-      calendarId,
-      title: title.trim() || '(no title)',
-      start,
-      end,
-      allDay,
-      location,
-      notes,
-      recurrence: event.instance ? 'none' : recurrence,
-      until: recurrence === 'none' || !until ? null : until,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      instance: event.instance,
-    };
-    setBusy(true);
-    try {
-      if (event.id) await fetchJson('PUT', `/api/events/${encodeURIComponent(event.id)}`, body);
-      else await fetchJson('POST', '/api/events', body);
-      onSaved();
-    } catch (err) {
-      setError((err as Error).message);
-      setBusy(false);
-    }
-  };
-  const remove = async () => {
-    const question = event.instance ? 'Delete this occurrence? The other repeats stay.' : event.recurrence && event.recurrence !== 'none' ? 'Delete this event and all its repeats?' : 'Delete this event?';
-    if (!event.id || !window.confirm(question)) return;
-    try {
-      await fetchJson('DELETE', `/api/events/${encodeURIComponent(event.id)}`);
-      onSaved();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  if (readOnly) {
-    const s = new Date((event as EventOccurrence).occurrenceStart ?? event.start!);
-    const e = new Date((event as EventOccurrence).occurrenceEnd ?? event.end!);
-    return (
-      <div className="overlay" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
-        <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(440px, 100%)' }}>
-          <div className="dialog-head">
-            <h2>{event.title}</h2>
-            <button className="icon-btn" onClick={onClose} title="Close">
-              <X size={17} />
-            </button>
-          </div>
-          <div className="dialog-body">
-            <div>
-              {event.allDay
-                ? `${utcKeyOf(s) === utcKeyOf(new Date(e.getTime() - DAY)) ? fromKey(utcKeyOf(s)).toLocaleDateString([], { dateStyle: 'full' }) : `${fromKey(utcKeyOf(s)).toLocaleDateString()} – ${fromKey(utcKeyOf(new Date(e.getTime() - DAY))).toLocaleDateString()}`} · All day`
-                : `${s.toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })} – ${timeLabel(e)}`}
-            </div>
-            {event.location && (
-              <div>
-                <MapPin size={13} /> {event.location}
-              </div>
-            )}
-            {event.notes && <div style={{ whiteSpace: 'pre-wrap' }}>{event.notes}</div>}
-            <div className="hint">
-              <span className="cal-dot" style={{ background: cal?.color }} /> {cal?.name} ·{' '}
-              {cal?.source === 'local'
-                ? `shared by ${cal.ownerName} (view only)`
-                : event.readOnly && cal?.access !== 'view'
-                  ? 'repeating events of this calendar are changed in its own app'
-                  : 'read-only calendar'}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overlay" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(520px, 100%)' }}>
-        <div className="dialog-head">
-          <h2>{event.id ? 'Edit event' : 'New event'}</h2>
-          <button className="icon-btn" onClick={onClose} title="Close">
-            <X size={17} />
-          </button>
-        </div>
-        <div className="dialog-body">
-          <div>
-            <label className="label" htmlFor="ev-title">
-              Title
-            </label>
-            <input id="ev-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} autoFocus onKeyDown={(e) => e.key === 'Enter' && void save()} />
-          </div>
-          <div>
-            <label className="label" htmlFor="ev-cal">
-              Calendar
-            </label>
-            <select id="ev-cal" className="select" value={calendarId} disabled={fromProvider} onChange={(e) => setCalendarId(e.target.value)}>
-              {writable.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.access === 'edit' ? ` (${c.ownerName})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} /> All day
-          </label>
-          <div className="cal-when">
-            <div>
-              <label className="label">Starts</label>
-              <div className="cal-when-row">
-                <input
-                  type="date"
-                  className="input"
-                  value={startDate}
-                  onChange={(e) => {
-                    // Keep the length when the start moves.
-                    const shift = fromKey(e.target.value).getTime() - fromKey(startDate).getTime();
-                    setStartDate(e.target.value);
-                    if (e.target.value && !Number.isNaN(shift)) setEndDate(keyOf(new Date(fromKey(endDate).getTime() + shift + 12 * 3_600_000)));
-                  }}
-                  aria-label="Start date"
-                />
-                {!allDay && <input type="time" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} aria-label="Start time" />}
-              </div>
-            </div>
-            <div>
-              <label className="label">Ends</label>
-              <div className="cal-when-row">
-                <input type="date" className="input" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} aria-label="End date" />
-                {!allDay && <input type="time" className="input" value={endTime} onChange={(e) => setEndTime(e.target.value)} aria-label="End time" />}
-              </div>
-            </div>
-          </div>
-          {!event.instance && (
-          <div className="cal-when">
-            <div>
-              <label className="label" htmlFor="ev-repeat">
-                Repeats
-              </label>
-              <select id="ev-repeat" className="select" value={recurrence} onChange={(e) => setRecurrence(e.target.value as Recurrence)}>
-                <option value="none">Does not repeat</option>
-                <option value="daily">Every day</option>
-                <option value="weekly">Every week</option>
-                <option value="monthly">Every month</option>
-                <option value="yearly">Every year</option>
-              </select>
-            </div>
-            {recurrence !== 'none' && (
-              <div>
-                <label className="label" htmlFor="ev-until">
-                  Until (optional)
-                </label>
-                <input id="ev-until" type="date" className="input" value={until} min={startDate} onChange={(e) => setUntil(e.target.value)} />
-              </div>
-            )}
-          </div>
-          )}
-          <div>
-            <label className="label" htmlFor="ev-loc">
-              Location
-            </label>
-            <input id="ev-loc" className="input" value={location} onChange={(e) => setLocation(e.target.value)} maxLength={500} />
-          </div>
-          <div>
-            <label className="label" htmlFor="ev-notes">
-              Notes
-            </label>
-            <textarea id="ev-notes" className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={10_000} />
-          </div>
-          {event.id && event.recurrence && event.recurrence !== 'none' && <div className="hint">Changes apply to every repeat of this event.</div>}
-          {event.instance && <div className="hint">One occurrence of a repeating event: changes apply to this occurrence only.</div>}
-          {error && <div className="error-text">{error}</div>}
-        </div>
-        <div className="dialog-foot">
-          {event.id && (
-            <button className="btn" onClick={() => void remove()}>
-              <Trash2 size={14} /> Delete
-            </button>
-          )}
-          <span className="grow" />
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={busy || !calendarId} onClick={() => void save()}>
-            Save
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -49,7 +49,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.1 (server and client versions side by side).
      Modified by samschultzponsys, 2026-11-17: v9.2 (the receiving mailbox as a colored bubble).
      Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures).
-     Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree). -->
+     Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree).
+     Modified by samschultzponsys, 2026-11-17: v9.5 (calendar: full repeats, guests and invitations, Teams and Meet, reminders). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -61,12 +62,12 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search
-filters with saved searches, roles with permission flags, a calendar that brings together DreyMail's own shared calendars with Google, Outlook and CalDAV calendars and answers invitations, and an optional [AI mailbox
+filters with saved searches, roles with permission flags, a calendar that brings together DreyMail's own shared calendars with Google, Outlook and CalDAV calendars, sends and answers invitations (with Teams or Meet meetings) and reminds you before events, and an optional [AI mailbox
 assistant](#ai-mailbox-assistant) that sorts mail by rules you write in plain language. What's planned is in
 [`ROADMAP.md`](ROADMAP.md). This README is updated with every change.
 
@@ -272,22 +273,47 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   and a checkbox to show or hide each one.
   - **DreyMail's own calendars:** as many as you like, each with its own color, kept under "My
     calendars" or grouped under one of your mailboxes. Events have a title, a time or all day, a
-    location, notes, and can repeat every day, week, month or year (optionally until a date).
-    **Share** a calendar with other users of your DreyMail, to view or to edit; it shows up for them
-    under "Shared with me".
+    location, notes, a reminder and guests. **Share** a calendar with other users of your DreyMail,
+    to view or to edit; it shows up for them under "Shared with me".
   - **Google and Outlook calendars** of mailboxes added with Google or Microsoft sign-in appear under
     that mailbox by themselves. They are read live and changes go straight back, so they stay the
-    same as on your phone. Changing one occurrence of a repeating event changes just that one.
-    Mailboxes added before 3.9 ask to be reconnected once to allow calendar access.
+    same as on your phone. Mailboxes added before 3.9 ask to be reconnected once to allow calendar
+    access.
   - **CalDAV calendars** (Nextcloud, iCloud, Fastmail, Radicale, Baïkal and others): *Connect
     CalDAV* with the server address, username and an app password; DreyMail finds the calendars.
-    Add, change and delete events; repeating events from these calendars are shown, and changed in
-    their own app.
-- **Invitations:** a message with a calendar invitation shows a card with what, when, where and who,
-  and **Yes / Maybe / No**. Gmail and Outlook mailboxes signed in with Google or Microsoft answer
-  through their own calendar, which tells the organizer. Other mailboxes email the standard answer
-  (iTIP) to the organizer from that mailbox and put the event in the calendar you pick (a DreyMail,
-  Google, Outlook or CalDAV calendar). Canceled invitations say so and offer to remove the event.
+    Add, change and delete events, repeating ones included.
+- **Repeating events:** daily, weekly, monthly or yearly, every N days, weeks, months or years;
+  weekly on any set of weekdays (one click for Monday to Friday); monthly or yearly on the same day,
+  on the n-th weekday ("the second Tuesday") or on the last one; forever, until a day, or a number
+  of times. The editor says the rule in words ("Every 2 weeks on Monday, Wednesday, 10 times").
+  Opening one occurrence asks what a change or a deletion applies to: **This event**, **This and
+  following** (DreyMail's own calendars) or **All events**. That works for Google, Outlook and CalDAV
+  series too; a provider series with a rule the editor can't show (for example "the first weekday of
+  the month") keeps its rule, and its single occurrences can still be changed.
+- **Guests and invitations:** add guests (with suggestions from the people you write to), mark
+  them optional, and see who accepted, might come, declined or hasn't answered. For Google and
+  Outlook calendars, Google and Outlook send the invitations, updates and cancellations. For
+  DreyMail's own and CalDAV calendars, DreyMail emails standard invitations (iTIP, with the time
+  zone) from the mailbox you pick under *Invite from*; changes send updates, removed guests and
+  deleted events get cancellations, and guests' answers that arrive in your mail are added to the
+  event when you open them.
+- **Teams and Meet meetings:** for an Outlook calendar of a work or school Microsoft 365 account,
+  *Add a Teams meeting* makes the Teams meeting with the event, and Outlook puts the join link in the
+  invitation. Google calendars offer *Add a Google Meet video call* the same way. Events with a
+  meeting link (Teams, Meet, Zoom, Webex, GoTo, Whereby, Jitsi, also pasted into Location or Notes)
+  get a **Join** button.
+- **Reminders:** every event can have a reminder (none, at the start, 5 minutes up to a week
+  before; new events get 15 minutes, as in Outlook). Google and Outlook events use the reminder set
+  there. When the time comes, the server sends a notification to every device (the desktop app,
+  the Android app and browsers with notifications on), so it arrives even with DreyMail closed, and
+  the app shows a **reminder window** with Join, Snooze (5 minutes to a day, or until it starts),
+  Dismiss and Dismiss all. Snoozing or dismissing on one device does it on all of them.
+- **Invitations you receive:** a message with a calendar invitation shows a card with what, when,
+  where and who, and **Yes / Maybe / No**. Gmail and Outlook mailboxes signed in with Google or
+  Microsoft answer through their own calendar, which tells the organizer. Other mailboxes email the
+  standard answer (iTIP) to the organizer from that mailbox and put the event in the calendar you
+  pick (a DreyMail, Google, Outlook or CalDAV calendar), with its repeats and a 15-minute reminder.
+  Canceled invitations say so and offer to remove the event.
 - **Mailbox health:** a mailbox with a problem, such as an expired sign-in or an unreachable
   server, shows a warning in the sidebar with a link to fix it.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get

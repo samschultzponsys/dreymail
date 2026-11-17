@@ -6,9 +6,29 @@
 // The provider stays the source of truth: events are read for the range on screen and changes are
 // written straight back, as with mail.
 
+import crypto from 'node:crypto';
 import { parseDocument } from 'htmlparser2';
-import type { Recurrence } from '../../../shared/calendar.js';
-import { eventsOf, newEventIcs, occurrencesOf, parseIcal, ruleFor, updateEventIcs, utcToWall, validTimeZone, type EventFields } from './ical.js';
+import { findJoinUrl, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields } from '../../../shared/calendar.js';
+import { utcToWall as wallOf, wallToUtc } from '../../../shared/rrule.js';
+import {
+  eventsOf,
+  excludeOccurrenceIcs,
+  fieldsOfIcs,
+  newEventIcs,
+  occurrencesOf,
+  overrideOccurrenceIcs,
+  parseIcal,
+  reminderOf,
+  repeatFromRule,
+  ruleFor,
+  startWallOf,
+  statusOfPartstat,
+  updateEventIcs,
+  utcToWall,
+  validTimeZone,
+  windowsZone,
+  type EventFields,
+} from './ical.js';
 
 export type Http = (
   url: string,
@@ -22,6 +42,8 @@ export interface RemoteCalendar {
   writable: boolean;
   /** Shown at first (the user's checkbox decides afterwards). */
   visibleByDefault: boolean;
+  /** Online meetings the provider makes for events in this calendar. */
+  meetings?: MeetingKind[];
 }
 
 export interface RemoteEvent {
@@ -35,11 +57,22 @@ export interface RemoteEvent {
   /** For events that aren't expanded by the provider (none of these three are); kept for the editor. */
   recurrence: Recurrence;
   until: string | null;
-  /** One occurrence of a repeating series: edits change this occurrence only. */
+  /** One occurrence of a repeating series. */
   instance: boolean;
-  /** Can't be changed from DreyMail (repeating CalDAV events). */
+  /** Can't be changed from DreyMail. */
   readOnly: boolean;
+  /** For an occurrence: the provider id of its series. */
+  seriesId?: string;
+  reminder?: number | null;
+  attendees?: Attendee[];
+  organizer?: { email: string; name: string } | null;
+  /** The provider says you organize it (CalDAV leaves this to the caller). */
+  isOrganizer?: boolean;
+  joinUrl?: string | null;
 }
+
+/** A whole event or series, as the editor shows it. */
+export type RemoteSeries = RemoteEvent & RepeatFields & { timeZone?: string; exdates?: string[]; editable: boolean };
 
 export type InviteAnswer = 'accepted' | 'tentative' | 'declined';
 
@@ -49,6 +82,8 @@ export interface CalendarProvider {
   create(calendar: string, f: EventFields): Promise<string>;
   update(calendar: string, eventId: string, f: EventFields, instance: boolean): Promise<void>;
   remove(calendar: string, eventId: string): Promise<void>;
+  /** The whole event or series (for editing every occurrence). */
+  get(calendar: string, eventId: string): Promise<RemoteSeries>;
   /** The invitation with this iCalendar UID in the user's calendar, if the provider added it. */
   findInvite?(uid: string): Promise<{ eventId: string; answer: InviteAnswer | null } | null>;
   answerInvite?(eventId: string, answer: InviteAnswer): Promise<void>;
@@ -103,17 +138,33 @@ function explain(status: number, msg: string, reason: string): RemoteCalendarErr
 
 // ---- Google Calendar ------------------------------------------------------------------------------
 
+interface GPerson {
+  email?: string;
+  displayName?: string;
+  self?: boolean;
+  organizer?: boolean;
+  optional?: boolean;
+  responseStatus?: string;
+}
 interface GEvent {
   id: string;
   status?: string;
   summary?: string;
   location?: string;
   description?: string;
-  start?: { date?: string; dateTime?: string };
-  end?: { date?: string; dateTime?: string };
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
   recurringEventId?: string;
-  attendees?: { self?: boolean; responseStatus?: string; email?: string }[];
+  recurrence?: string[];
+  attendees?: GPerson[];
+  organizer?: GPerson;
+  reminders?: { useDefault?: boolean; overrides?: { method?: string; minutes?: number }[] };
+  hangoutLink?: string;
+  conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
 }
+
+const G_STATUS: Record<string, AttendeeStatus> = { accepted: 'accepted', tentative: 'tentative', declined: 'declined' };
+const G_RESPONSE: Record<AttendeeStatus, string> = { accepted: 'accepted', tentative: 'tentative', declined: 'declined', 'needs-action': 'needsAction' };
 
 export class GoogleCalendar implements CalendarProvider {
   private readonly base = 'https://www.googleapis.com/calendar/v3';
@@ -130,10 +181,10 @@ export class GoogleCalendar implements CalendarProvider {
     const out: RemoteCalendar[] = [];
     let page = '';
     for (let i = 0; i < 10; i++) {
-      const r = await this.req<{ items?: { id: string; summary?: string; summaryOverride?: string; backgroundColor?: string; accessRole?: string; selected?: boolean; hidden?: boolean; deleted?: boolean }[]; nextPageToken?: string }>(
-        'GET',
-        `/users/me/calendarList?maxResults=250${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`,
-      );
+      const r = await this.req<{
+        items?: { id: string; summary?: string; summaryOverride?: string; backgroundColor?: string; accessRole?: string; selected?: boolean; hidden?: boolean; deleted?: boolean; conferenceProperties?: { allowedConferenceSolutionTypes?: string[] } }[];
+        nextPageToken?: string;
+      }>('GET', `/users/me/calendarList?maxResults=250${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`);
       for (const c of r.items ?? [])
         if (!c.deleted)
           out.push({
@@ -142,6 +193,7 @@ export class GoogleCalendar implements CalendarProvider {
             color: /^#[0-9a-f]{6}$/i.test(c.backgroundColor ?? '') ? c.backgroundColor! : '#4285f4',
             writable: c.accessRole === 'owner' || c.accessRole === 'writer',
             visibleByDefault: c.selected === true && !c.hidden,
+            ...(c.conferenceProperties?.allowedConferenceSolutionTypes?.includes('hangoutsMeet') ? { meetings: ['meet' as const] } : {}),
           });
       if (!r.nextPageToken) break;
       page = r.nextPageToken;
@@ -149,33 +201,56 @@ export class GoogleCalendar implements CalendarProvider {
     return out;
   }
 
+  private toEvent(e: GEvent, defaults: { minutes?: number }[] = []): RemoteEvent {
+    const allDay = !!e.start!.date;
+    const people = (e.attendees ?? []).filter((a) => a.email && !a.organizer && !(a.self && e.organizer?.self));
+    const rem = e.reminders?.useDefault ? defaults : (e.reminders?.overrides ?? []);
+    const minutes = rem.map((x) => x.minutes).filter((x): x is number => typeof x === 'number');
+    return {
+      remoteId: e.id,
+      title: e.summary ?? '(no title)',
+      start: allDay ? `${e.start!.date}T00:00:00.000Z` : new Date(e.start!.dateTime!).toISOString(),
+      end: allDay ? `${e.end?.date ?? e.start!.date}T00:00:00.000Z` : new Date(e.end?.dateTime ?? e.start!.dateTime!).toISOString(),
+      allDay,
+      location: e.location ?? '',
+      notes: e.description ?? '',
+      recurrence: 'none',
+      until: null,
+      instance: !!e.recurringEventId,
+      readOnly: false,
+      seriesId: e.recurringEventId,
+      reminder: minutes.length ? Math.min(...minutes) : null,
+      attendees: people.map((a) => ({ email: a.email!.toLowerCase(), name: a.displayName ?? '', status: G_STATUS[a.responseStatus ?? ''] ?? 'needs-action', ...(a.optional ? { optional: true } : {}) })),
+      organizer: e.organizer?.email ? { email: e.organizer.email.toLowerCase(), name: e.organizer.displayName ?? '' } : null,
+      isOrganizer: !e.organizer || !!e.organizer.self,
+      joinUrl: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p) => p.entryPointType === 'video')?.uri ?? findJoinUrl(e.location, e.description),
+    };
+  }
+
   async events(calendar: string, from: number, to: number): Promise<RemoteEvent[]> {
     const out: RemoteEvent[] = [];
     let page = '';
     for (let i = 0; i < 10; i++) {
       const q = new URLSearchParams({ singleEvents: 'true', timeMin: new Date(from).toISOString(), timeMax: new Date(to).toISOString(), maxResults: '2500', ...(page ? { pageToken: page } : {}) });
-      const r = await this.req<{ items?: GEvent[]; nextPageToken?: string }>('GET', `/calendars/${encodeURIComponent(calendar)}/events?${q}`);
-      for (const e of r.items ?? []) {
-        if (e.status === 'cancelled' || !e.start) continue;
-        const allDay = !!e.start.date;
-        out.push({
-          remoteId: e.id,
-          title: e.summary ?? '(no title)',
-          start: allDay ? `${e.start.date}T00:00:00.000Z` : new Date(e.start.dateTime!).toISOString(),
-          end: allDay ? `${e.end?.date ?? e.start.date}T00:00:00.000Z` : new Date(e.end?.dateTime ?? e.start.dateTime!).toISOString(),
-          allDay,
-          location: e.location ?? '',
-          notes: e.description ?? '',
-          recurrence: 'none',
-          until: null,
-          instance: !!e.recurringEventId,
-          readOnly: false,
-        });
-      }
+      const r = await this.req<{ items?: GEvent[]; nextPageToken?: string; defaultReminders?: { minutes?: number }[] }>('GET', `/calendars/${encodeURIComponent(calendar)}/events?${q}`);
+      for (const e of r.items ?? []) if (e.status !== 'cancelled' && e.start) out.push(this.toEvent(e, r.defaultReminders));
       if (!r.nextPageToken) break;
       page = r.nextPageToken;
     }
     return out;
+  }
+
+  async get(calendar: string, eventId: string): Promise<RemoteSeries> {
+    const e = await this.req<GEvent>('GET', `/calendars/${encodeURIComponent(calendar)}/events/${encodeURIComponent(eventId)}`);
+    if (!e.start) throw new RemoteCalendarError('This event is no longer in the calendar', 404);
+    const base = this.toEvent(e);
+    const zone = e.start.timeZone && validTimeZone(e.start.timeZone) ? e.start.timeZone : undefined;
+    const line = e.recurrence?.find((x) => /^RRULE:/i.test(x));
+    if (!line) return { ...base, recurrence: 'none', until: null, timeZone: zone, editable: true };
+    const ms = Date.parse(base.start);
+    const start = base.allDay || !zone ? { ms, allDay: base.allDay, wall: ms, toUtc: (w: number) => w } : { ms, allDay: false, wall: wallOf(ms, zone), toUtc: (w: number) => wallToUtc(w, zone) };
+    const rep = repeatFromRule(line.slice(6), start);
+    return { ...base, ...(rep ?? { recurrence: 'none', until: null }), timeZone: zone, editable: !!rep };
   }
 
   private body(f: EventFields, withRecurrence: boolean) {
@@ -188,18 +263,26 @@ export class GoogleCalendar implements CalendarProvider {
       start: f.allDay ? { date: dateOf(f.start), dateTime: null } : { dateTime: f.start, timeZone: tz, date: null },
       end: f.allDay ? { date: dateOf(f.end), dateTime: null } : { dateTime: f.end, timeZone: tz, date: null },
       ...(withRecurrence ? { recurrence: rule ? [`RRULE:${rule}`] : [] } : {}),
+      ...(f.reminder !== undefined ? { reminders: { useDefault: false, overrides: f.reminder === null ? [] : [{ method: 'popup', minutes: f.reminder }] } } : {}),
+      ...(f.attendees ? { attendees: f.attendees.map((a) => ({ email: a.email, ...(a.name ? { displayName: a.name } : {}), ...(a.optional ? { optional: true } : {}), responseStatus: G_RESPONSE[a.status] ?? 'needsAction' })) } : {}),
+      ...(f.meeting === 'meet' ? { conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } } } : {}),
     };
   }
 
+  /** Guests hear about it from Google; a new Meet link needs conferenceDataVersion. */
+  private query(f: EventFields) {
+    return `?sendUpdates=all${f.meeting === 'meet' ? '&conferenceDataVersion=1' : ''}`;
+  }
+
   async create(calendar: string, f: EventFields): Promise<string> {
-    return (await this.req<{ id: string }>('POST', `/calendars/${encodeURIComponent(calendar)}/events`, this.body(f, true))).id;
+    return (await this.req<{ id: string }>('POST', `/calendars/${encodeURIComponent(calendar)}/events${this.query(f)}`, this.body(f, true))).id;
   }
   async update(calendar: string, eventId: string, f: EventFields, instance: boolean) {
-    await this.req('PATCH', `/calendars/${encodeURIComponent(calendar)}/events/${encodeURIComponent(eventId)}`, this.body(f, !instance));
+    await this.req('PATCH', `/calendars/${encodeURIComponent(calendar)}/events/${encodeURIComponent(eventId)}${this.query(f)}`, this.body(f, !instance));
   }
   async remove(calendar: string, eventId: string) {
     try {
-      await this.req('DELETE', `/calendars/${encodeURIComponent(calendar)}/events/${encodeURIComponent(eventId)}`);
+      await this.req('DELETE', `/calendars/${encodeURIComponent(calendar)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`);
     } catch (err) {
       if (!(err instanceof RemoteCalendarError && (err.status === 404 || err.status === 410))) throw err;
     }
@@ -239,17 +322,99 @@ const GRAPH_COLORS: Record<string, string> = {
 };
 const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+interface GraphPerson {
+  emailAddress?: { address?: string; name?: string };
+  type?: string;
+  status?: { response?: string };
+}
 interface GraphEvent {
   id: string;
   subject?: string;
   location?: { displayName?: string };
   body?: { content?: string };
-  start?: { dateTime: string };
-  end?: { dateTime: string };
+  start?: { dateTime: string; timeZone?: string };
+  end?: { dateTime: string; timeZone?: string };
   isAllDay?: boolean;
   isCancelled?: boolean;
   type?: string;
+  seriesMasterId?: string;
   responseStatus?: { response?: string };
+  attendees?: GraphPerson[];
+  organizer?: GraphPerson;
+  isOrganizer?: boolean;
+  isReminderOn?: boolean;
+  reminderMinutesBeforeStart?: number;
+  isOnlineMeeting?: boolean;
+  onlineMeeting?: { joinUrl?: string } | null;
+  onlineMeetingUrl?: string | null;
+  recurrence?: GraphRecurrence | null;
+  originalStartTimeZone?: string;
+}
+interface GraphRecurrence {
+  pattern: { type: string; interval?: number; daysOfWeek?: string[]; dayOfMonth?: number; month?: number; index?: string; firstDayOfWeek?: string };
+  range: { type: string; startDate?: string; endDate?: string; numberOfOccurrences?: number };
+}
+
+const GRAPH_STATUS: Record<string, AttendeeStatus> = { accepted: 'accepted', tentativelyAccepted: 'tentative', declined: 'declined' };
+const GRAPH_RESPONSE: Record<AttendeeStatus, string> = { accepted: 'accepted', tentative: 'tentativelyAccepted', declined: 'declined', 'needs-action': 'none' };
+const INDEX = ['', 'first', 'second', 'third', 'fourth'];
+const SELECT = 'id,subject,location,body,start,end,isAllDay,isCancelled,type,seriesMasterId,attendees,organizer,isOrganizer,isReminderOn,reminderMinutesBeforeStart,isOnlineMeeting,onlineMeeting,onlineMeetingUrl';
+
+/** A Graph repeat pattern for DreyMail's repeat fields (`localStart`: the start's wall time). */
+export function graphRecurrence(f: RepeatFields, localStart: Date): GraphRecurrence | null {
+  if (f.recurrence === 'none') return null;
+  const interval = Math.max(1, f.interval ?? 1);
+  const wd = localStart.getUTCDay();
+  const nth = f.monthlyBy === 'last' || Math.ceil(localStart.getUTCDate() / 7) > 4 ? 'last' : INDEX[Math.ceil(localStart.getUTCDate() / 7)]!;
+  const byWeekday = f.monthlyBy === 'weekday' || f.monthlyBy === 'last';
+  const pattern =
+    f.recurrence === 'daily'
+      ? { type: 'daily', interval }
+      : f.recurrence === 'weekly'
+        ? { type: 'weekly', interval, daysOfWeek: (f.byDay?.length ? [...new Set(f.byDay)].sort() : [wd]).map((d) => WEEKDAY_NAMES[d]!), firstDayOfWeek: 'sunday' }
+        : f.recurrence === 'monthly'
+          ? byWeekday
+            ? { type: 'relativeMonthly', interval, daysOfWeek: [WEEKDAY_NAMES[wd]!], index: nth }
+            : { type: 'absoluteMonthly', interval, dayOfMonth: localStart.getUTCDate() }
+          : byWeekday
+            ? { type: 'relativeYearly', interval, daysOfWeek: [WEEKDAY_NAMES[wd]!], index: nth, month: localStart.getUTCMonth() + 1 }
+            : { type: 'absoluteYearly', interval, dayOfMonth: localStart.getUTCDate(), month: localStart.getUTCMonth() + 1 };
+  const startDate = localStart.toISOString().slice(0, 10);
+  const range = f.count ? { type: 'numbered', startDate, numberOfOccurrences: f.count } : f.until ? { type: 'endDate', startDate, endDate: f.until } : { type: 'noEnd', startDate };
+  return { pattern, range };
+}
+
+/** DreyMail's repeat fields for a Graph pattern, or null when the editor can't show it. */
+export function repeatFromGraph(r: GraphRecurrence, localStart: Date): RepeatFields | null {
+  const p = r.pattern;
+  const interval = Math.max(1, p.interval ?? 1);
+  const range: Pick<RepeatFields, 'until' | 'count'> = r.range.type === 'numbered' ? { until: null, count: r.range.numberOfOccurrences ?? null } : r.range.type === 'endDate' ? { until: r.range.endDate ?? null, count: null } : { until: null, count: null };
+  const days = (p.daysOfWeek ?? []).map((d) => WEEKDAY_NAMES.indexOf(d.toLowerCase())).filter((d) => d >= 0);
+  const relative = (): Pick<RepeatFields, 'monthlyBy'> | null => {
+    if (days.length !== 1 || days[0] !== localStart.getUTCDay()) return null;
+    if (p.index === 'last') return { monthlyBy: 'last' };
+    return INDEX.indexOf(p.index ?? 'first') === Math.ceil(localStart.getUTCDate() / 7) ? { monthlyBy: 'weekday' } : null;
+  };
+  switch (p.type) {
+    case 'daily':
+      return { recurrence: 'daily', interval, ...range };
+    case 'weekly':
+      return { recurrence: 'weekly', interval, byDay: days.length ? days.sort() : undefined, ...range };
+    case 'absoluteMonthly':
+      return p.dayOfMonth === localStart.getUTCDate() ? { recurrence: 'monthly', interval, monthlyBy: 'day', ...range } : null;
+    case 'relativeMonthly': {
+      const r = relative();
+      return r ? { recurrence: 'monthly', interval, ...r, ...range } : null;
+    }
+    case 'absoluteYearly':
+      return p.dayOfMonth === localStart.getUTCDate() && p.month === localStart.getUTCMonth() + 1 ? { recurrence: 'yearly', interval, monthlyBy: 'day', ...range } : null;
+    case 'relativeYearly': {
+      const r = relative();
+      return r && p.month === localStart.getUTCMonth() + 1 ? { recurrence: 'yearly', interval, ...r, ...range } : null;
+    }
+    default:
+      return null;
+  }
 }
 
 export class OutlookCalendar implements CalendarProvider {
@@ -260,7 +425,13 @@ export class OutlookCalendar implements CalendarProvider {
   ) {}
 
   private async req<T>(method: string, pathOrUrl: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
-    return call<T>(this.http, pathOrUrl.startsWith('https://') ? pathOrUrl : `${this.base}${pathOrUrl}`, method, await this.token(), body, headers);
+    try {
+      return await call<T>(this.http, pathOrUrl.startsWith('https://') ? pathOrUrl : `${this.base}${pathOrUrl}`, method, await this.token(), body, headers);
+    } catch (err) {
+      if (err instanceof RemoteCalendarError && /onlineMeeting|teamsForBusiness|OnlineMeetingProvider/i.test(err.message))
+        throw new RemoteCalendarError('Outlook could not make a Teams meeting for this calendar. Teams meetings need a work or school Microsoft 365 account with Teams.', err.status);
+      throw err;
+    }
   }
 
   private async all<T>(first: string, headers?: Record<string, string>): Promise<T[]> {
@@ -276,34 +447,64 @@ export class OutlookCalendar implements CalendarProvider {
   }
 
   async listCalendars(): Promise<RemoteCalendar[]> {
-    const list = await this.all<{ id: string; name: string; hexColor?: string; color?: string; canEdit?: boolean; isDefaultCalendar?: boolean }>('/me/calendars?$top=100&$select=id,name,hexColor,color,canEdit,isDefaultCalendar');
+    const list = await this.all<{ id: string; name: string; hexColor?: string; color?: string; canEdit?: boolean; isDefaultCalendar?: boolean; allowedOnlineMeetingProviders?: string[] }>(
+      '/me/calendars?$top=100&$select=id,name,hexColor,color,canEdit,isDefaultCalendar,allowedOnlineMeetingProviders',
+    );
     return list.map((c) => ({
       remoteId: c.id,
       name: c.name,
       color: /^#[0-9a-f]{6}$/i.test(c.hexColor ?? '') ? c.hexColor! : GRAPH_COLORS[c.color ?? ''] ?? '#0078d4',
       writable: c.canEdit !== false,
       visibleByDefault: !!c.isDefaultCalendar || c.canEdit !== false,
+      ...(c.allowedOnlineMeetingProviders?.includes('teamsForBusiness') ? { meetings: ['teams' as const] } : {}),
     }));
   }
 
+  private toEvent(e: GraphEvent): RemoteEvent {
+    const people = (e.attendees ?? []).filter((a) => a.emailAddress?.address && a.status?.response !== 'organizer');
+    const organizer = e.organizer?.emailAddress?.address ? { email: e.organizer.emailAddress.address.toLowerCase(), name: e.organizer.emailAddress.name ?? '' } : null;
+    return {
+      remoteId: e.id,
+      title: e.subject || '(no title)',
+      start: e.isAllDay ? `${e.start!.dateTime.slice(0, 10)}T00:00:00.000Z` : new Date(`${e.start!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(),
+      end: e.isAllDay ? `${e.end!.dateTime.slice(0, 10)}T00:00:00.000Z` : new Date(`${e.end!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(),
+      allDay: !!e.isAllDay,
+      location: e.location?.displayName ?? '',
+      notes: (e.body?.content ?? '').trim().slice(0, 10_000),
+      recurrence: 'none' as Recurrence,
+      until: null,
+      instance: e.type === 'occurrence' || e.type === 'exception',
+      readOnly: false,
+      seriesId: e.seriesMasterId,
+      reminder: e.isReminderOn === false ? null : (e.reminderMinutesBeforeStart ?? null),
+      attendees: people.map((a) => ({
+        email: a.emailAddress!.address!.toLowerCase(),
+        name: a.emailAddress!.name ?? '',
+        status: GRAPH_STATUS[a.status?.response ?? ''] ?? 'needs-action',
+        ...(a.type === 'optional' ? { optional: true } : {}),
+      })),
+      organizer: people.length ? organizer : null,
+      isOrganizer: e.isOrganizer !== false,
+      joinUrl: e.onlineMeeting?.joinUrl ?? e.onlineMeetingUrl ?? findJoinUrl(e.location?.displayName, e.body?.content),
+    };
+  }
+
   async events(calendar: string, from: number, to: number): Promise<RemoteEvent[]> {
-    const q = new URLSearchParams({ startDateTime: new Date(from).toISOString(), endDateTime: new Date(to).toISOString(), $top: '250', $select: 'id,subject,location,body,start,end,isAllDay,isCancelled,type' });
+    const q = new URLSearchParams({ startDateTime: new Date(from).toISOString(), endDateTime: new Date(to).toISOString(), $top: '250', $select: SELECT });
     const list = await this.all<GraphEvent>(`/me/calendars/${encodeURIComponent(calendar)}/calendarView?${q}`, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
-    return list
-      .filter((e) => !e.isCancelled && e.start && e.end)
-      .map((e) => ({
-        remoteId: e.id,
-        title: e.subject || '(no title)',
-        start: e.isAllDay ? `${e.start!.dateTime.slice(0, 10)}T00:00:00.000Z` : new Date(`${e.start!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(),
-        end: e.isAllDay ? `${e.end!.dateTime.slice(0, 10)}T00:00:00.000Z` : new Date(`${e.end!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(),
-        allDay: !!e.isAllDay,
-        location: e.location?.displayName ?? '',
-        notes: (e.body?.content ?? '').trim().slice(0, 10_000),
-        recurrence: 'none' as Recurrence,
-        until: null,
-        instance: e.type === 'occurrence' || e.type === 'exception',
-        readOnly: false,
-      }));
+    return list.filter((e) => !e.isCancelled && e.start && e.end).map((e) => this.toEvent(e));
+  }
+
+  async get(_calendar: string, eventId: string): Promise<RemoteSeries> {
+    const e = await this.req<GraphEvent>('GET', `/me/events/${encodeURIComponent(eventId)}?$select=${SELECT},recurrence,originalStartTimeZone`, undefined, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
+    if (!e.start || !e.end) throw new RemoteCalendarError('This event is no longer in the calendar', 404);
+    const base = this.toEvent(e);
+    const zoneName = e.originalStartTimeZone && validTimeZone(e.originalStartTimeZone) ? e.originalStartTimeZone : (e.originalStartTimeZone ? windowsZone(e.originalStartTimeZone) : undefined);
+    if (!e.recurrence) return { ...base, recurrence: 'none', until: null, timeZone: zoneName, editable: true };
+    const ms = Date.parse(base.start);
+    const local = new Date(base.allDay || !zoneName ? ms : utcToWall(ms, zoneName));
+    const rep = repeatFromGraph(e.recurrence, local);
+    return { ...base, ...(rep ?? { recurrence: 'none', until: null }), timeZone: zoneName, editable: !!rep };
   }
 
   private body(f: EventFields, withRecurrence: boolean) {
@@ -311,20 +512,7 @@ export class OutlookCalendar implements CalendarProvider {
     const wall = (iso: string) => new Date(utcToWall(Date.parse(iso), tz)).toISOString().slice(0, 19);
     const start = f.allDay ? { dateTime: `${dateOf(f.start)}T00:00:00`, timeZone: 'UTC' } : { dateTime: wall(f.start), timeZone: tz };
     const end = f.allDay ? { dateTime: `${dateOf(f.end)}T00:00:00`, timeZone: 'UTC' } : { dateTime: wall(f.end), timeZone: tz };
-    let recurrence: unknown = null;
-    if (f.recurrence !== 'none') {
-      const localStart = new Date(f.allDay ? Date.parse(f.start) : utcToWall(Date.parse(f.start), tz));
-      const pattern =
-        f.recurrence === 'daily'
-          ? { type: 'daily', interval: 1 }
-          : f.recurrence === 'weekly'
-            ? { type: 'weekly', interval: 1, daysOfWeek: [WEEKDAY_NAMES[localStart.getUTCDay()]] }
-            : f.recurrence === 'monthly'
-              ? { type: 'absoluteMonthly', interval: 1, dayOfMonth: localStart.getUTCDate() }
-              : { type: 'absoluteYearly', interval: 1, dayOfMonth: localStart.getUTCDate(), month: localStart.getUTCMonth() + 1 };
-      const startDate = localStart.toISOString().slice(0, 10);
-      recurrence = { pattern, range: f.until ? { type: 'endDate', startDate, endDate: f.until } : { type: 'noEnd', startDate } };
-    }
+    const localStart = new Date(startWallOf({ ...f, timeZone: tz }));
     return {
       subject: f.title,
       body: { contentType: 'text', content: f.notes },
@@ -332,10 +520,16 @@ export class OutlookCalendar implements CalendarProvider {
       isAllDay: f.allDay,
       start,
       end,
-      ...(withRecurrence ? { recurrence } : {}),
+      ...(withRecurrence ? { recurrence: graphRecurrence(f, localStart) } : {}),
+      ...(f.reminder !== undefined ? { isReminderOn: f.reminder !== null, ...(f.reminder !== null ? { reminderMinutesBeforeStart: f.reminder } : {}) } : {}),
+      ...(f.attendees
+        ? { attendees: f.attendees.map((a) => ({ emailAddress: { address: a.email, ...(a.name ? { name: a.name } : {}) }, type: a.optional ? 'optional' : 'required', status: { response: GRAPH_RESPONSE[a.status] ?? 'none' } })) }
+        : {}),
+      ...(f.meeting === 'teams' ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' } : {}),
     };
   }
 
+  // Outlook sends the invitations, updates and cancellations to the guests itself.
   async create(calendar: string, f: EventFields): Promise<string> {
     return (await this.req<{ id: string }>('POST', `/me/calendars/${encodeURIComponent(calendar)}/events`, this.body(f, true))).id;
   }
@@ -344,7 +538,11 @@ export class OutlookCalendar implements CalendarProvider {
   }
   async remove(_calendar: string, eventId: string) {
     try {
-      await this.req('DELETE', `/me/events/${encodeURIComponent(eventId)}`);
+      // The organizer's cancel tells the guests; anyone else's is a plain delete.
+      await this.req('POST', `/me/events/${encodeURIComponent(eventId)}/cancel`, { comment: '' }).catch(async (err: unknown) => {
+        if (err instanceof RemoteCalendarError && (err.status === 400 || err.status === 403)) await this.req('DELETE', `/me/events/${encodeURIComponent(eventId)}`);
+        else throw err;
+      });
     } catch (err) {
       if (!(err instanceof RemoteCalendarError && err.status === 404)) throw err;
     }
@@ -532,7 +730,7 @@ export class CalDavCalendar implements CalendarProvider {
       const events = eventsOf(cal);
       // Servers that don't expand send the series itself; expand it here.
       for (const o of occurrencesOf(events, from, to)) {
-        const simple = !o.repeating && o.event.rrule === null;
+        const people = o.event.attendees.filter((a) => a.email !== o.event.organizer?.email);
         out.push({
           remoteId: o.repeating ? `${href}#${o.start}` : href,
           title: o.event.title || '(no title)',
@@ -544,7 +742,12 @@ export class CalDavCalendar implements CalendarProvider {
           recurrence: 'none',
           until: null,
           instance: o.repeating,
-          readOnly: !simple,
+          readOnly: false,
+          seriesId: o.repeating ? href : undefined,
+          reminder: reminderOf(o.event.component),
+          attendees: people.map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), ...(a.role === 'OPT-PARTICIPANT' ? { optional: true } : {}) })),
+          organizer: people.length && o.event.organizer ? { email: o.event.organizer.email, name: o.event.organizer.name } : null,
+          joinUrl: findJoinUrl(o.event.location, o.event.description),
         });
       }
     }
@@ -552,7 +755,8 @@ export class CalDavCalendar implements CalendarProvider {
   }
 
   async create(calendar: string, f: EventFields): Promise<string> {
-    const { uid, ics } = newEventIcs(f);
+    // DreyMail emails the guests itself; SCHEDULE-AGENT=CLIENT keeps the server from doing it too.
+    const { uid, ics } = newEventIcs(f, undefined, { clientSchedules: true });
     return this.putIcs(calendar, uid, ics);
   }
 
@@ -564,20 +768,47 @@ export class CalDavCalendar implements CalendarProvider {
     return href;
   }
 
-  async update(_calendar: string, eventId: string, f: EventFields) {
-    if (eventId.includes('#')) throw new RemoteCalendarError('Change repeating events of this calendar in its own app', 400);
-    const { res } = await this.dav(eventId, 'GET');
+  /** Reads a calendar object, changes it and writes it back (only if nobody changed it meanwhile). */
+  private async change(href: string, edit: (ics: string) => string) {
+    const { res } = await this.dav(href, 'GET');
     if (!res.ok) throw new RemoteCalendarError(`This event is no longer on the calendar server (${res.status})`, res.status);
     const etag = res.headers.get('etag');
-    const ics = updateEventIcs(await res.text(), f);
-    const put = await this.dav(eventId, 'PUT', ics, etag ? { 'if-match': etag } : {});
+    const put = await this.dav(href, 'PUT', edit(await res.text()), etag ? { 'if-match': etag } : {});
     if (put.res.status === 412) throw new RemoteCalendarError('This event was changed elsewhere in the meantime. Reload and try again.', 412);
     if (!put.res.ok) throw new RemoteCalendarError(`The calendar server did not save the change (${put.res.status})`, put.res.status);
   }
 
+  /** "href#start" is one occurrence of a repeating event: it gets an override of its own. */
+  private static split(eventId: string): { href: string; occurrence: number | null } {
+    const i = eventId.lastIndexOf('#');
+    const t = i >= 0 ? Number(eventId.slice(i + 1)) : NaN;
+    return i >= 0 && Number.isFinite(t) ? { href: eventId.slice(0, i), occurrence: t } : { href: eventId, occurrence: null };
+  }
+
+  async update(_calendar: string, eventId: string, f: EventFields, _instance?: boolean) {
+    const { href, occurrence } = CalDavCalendar.split(eventId);
+    await this.change(href, (ics) => (occurrence !== null ? overrideOccurrenceIcs(ics, occurrence, f, { clientSchedules: true }) : updateEventIcs(ics, f, { clientSchedules: true })));
+  }
+
   async remove(_calendar: string, eventId: string) {
-    if (eventId.includes('#')) throw new RemoteCalendarError('Delete repeating events of this calendar in its own app', 400);
-    const { res } = await this.dav(eventId, 'DELETE');
+    const { href, occurrence } = CalDavCalendar.split(eventId);
+    if (occurrence !== null) return this.change(href, (ics) => excludeOccurrenceIcs(ics, occurrence));
+    const { res } = await this.dav(href, 'DELETE');
     if (!res.ok && res.status !== 404) throw new RemoteCalendarError(`The calendar server did not delete the event (${res.status})`, res.status);
+  }
+
+  async get(_calendar: string, eventId: string): Promise<RemoteSeries> {
+    const { href } = CalDavCalendar.split(eventId);
+    const { res } = await this.dav(href, 'GET');
+    if (!res.ok) throw new RemoteCalendarError(`This event is no longer on the calendar server (${res.status})`, res.status);
+    const f = fieldsOfIcs(await res.text());
+    if (!f) throw new RemoteCalendarError('This event could not be read', 422);
+    return { ...f, remoteId: href, instance: false, readOnly: false, joinUrl: findJoinUrl(f.location, f.notes), organizer: f.attendees?.length ? f.organizer : null };
+  }
+
+  /** The raw calendar object (for invitations sent from DreyMail). */
+  async raw(eventId: string): Promise<string | null> {
+    const { res } = await this.dav(CalDavCalendar.split(eventId).href, 'GET');
+    return res.ok ? res.text() : null;
   }
 }

@@ -33,6 +33,7 @@
 // Modified by samschultzponsys, 2026-11-17: connecting single sign-on removes the account's password.
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
+// Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -502,6 +503,45 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      filled_at INTEGER NOT NULL,
      PRIMARY KEY (account_id, folder)
    );`,
+  // DreyMail 9.5: richer repeats (every N, weekdays, nth weekday, count, skipped occurrences),
+  // reminders, guests and online meetings on DreyMail's own events; reminder alerts per user.
+  (db) => {
+    const has = (table: string, col: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === col);
+    const add = (table: string, col: string, def: string) => {
+      if (!has(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+    };
+    add('calendar_events', 'repeat_interval', 'INTEGER NOT NULL DEFAULT 1');
+    add('calendar_events', 'by_day', "TEXT NOT NULL DEFAULT ''");
+    add('calendar_events', 'monthly_by', "TEXT NOT NULL DEFAULT 'day'");
+    add('calendar_events', 'repeat_count', 'INTEGER');
+    add('calendar_events', 'exdates', "TEXT NOT NULL DEFAULT '[]'");
+    add('calendar_events', 'time_zone', 'TEXT');
+    add('calendar_events', 'reminder', 'INTEGER');
+    add('calendar_events', 'attendees', "TEXT NOT NULL DEFAULT '[]'");
+    add('calendar_events', 'organizer', 'TEXT');
+    add('calendar_events', 'send_from', 'TEXT');
+    add('calendar_events', 'sequence', 'INTEGER NOT NULL DEFAULT 0');
+    add('calendars', 'meetings', "TEXT NOT NULL DEFAULT ''");
+    db.exec(`CREATE TABLE IF NOT EXISTS calendar_alerts (
+       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+       key TEXT NOT NULL,
+       event_id TEXT NOT NULL,
+       calendar_id TEXT NOT NULL,
+       title TEXT NOT NULL,
+       start_at INTEGER NOT NULL,
+       end_at INTEGER NOT NULL,
+       all_day INTEGER NOT NULL DEFAULT 0,
+       location TEXT NOT NULL DEFAULT '',
+       join_url TEXT,
+       color TEXT NOT NULL DEFAULT '',
+       base_fire INTEGER NOT NULL,
+       fire_at INTEGER NOT NULL,
+       notified INTEGER NOT NULL DEFAULT 0,
+       dismissed INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (user_id, key)
+     );
+     CREATE INDEX IF NOT EXISTS calendar_alerts_fire ON calendar_alerts(fire_at) WHERE dismissed = 0;`);
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

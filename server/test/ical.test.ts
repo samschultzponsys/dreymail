@@ -94,7 +94,7 @@ describe('writing', () => {
     const edited = updateEventIcs(withAlarm, { title: 'Lunch moved', location: '', notes: '', start: '2026-11-17T17:00:00.000Z', end: '2026-11-17T18:00:00.000Z', allDay: false, recurrence: 'none', until: null });
     expect(edited).toContain('X-KEEP:yes');
     expect(edited).toContain('BEGIN:VALARM');
-    expect(edited).not.toContain('RRULE');
+    expect(edited.slice(edited.indexOf('BEGIN:VEVENT'))).not.toContain('RRULE');
     const [e] = eventsOf(parseIcal(edited)[0]!);
     expect(e).toMatchObject({ uid, title: 'Lunch moved', sequence: 1 });
     expect(iso(e!.start.ms)).toBe('2026-11-17T17:00:00.000Z');
