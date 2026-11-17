@@ -45,7 +45,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.7 (Sending list under Compose).
      Modified by samschultzponsys, 2026-11-17: v8.8 (folding subfolders, on every device).
      Modified by samschultzponsys, 2026-11-17: v8.9 (the calendar as a page of its own).
-     Modified by samschultzponsys, 2026-11-17: v9.0 (readable dropdown lists in dark mode). -->
+     Modified by samschultzponsys, 2026-11-17: v9.0 (readable dropdown lists in dark mode).
+     Modified by samschultzponsys, 2026-11-17: v9.1 (server and client versions side by side). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -57,7 +58,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -300,8 +301,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   the privacy policy link Google and Microsoft ask for. It's linked next to Source code.
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
   "Show my full name"); typed in lower case it is capitalized for you.
-- **Version and what's new.** The server's version sits next to your name; click it for the
-  changelog. When a newer image is released, Superadmins (and roles allowed to see new versions) see a blinking dot on it and the
+- **Version and what's new.** Next to your name: the server's version ("Server 9.1"), and under it
+  the version of what you are using: "Web" in a browser, "App" in the desktop and Android apps.
+  Click either for the changelog. When they differ the second line turns red and says which side
+  to update: the server's image (an app newer than the server), the app (an app older than the
+  server; a click checks for its update), or the page (left open across a server update; a click
+  reloads it). When a newer image is released, Superadmins (and roles allowed to see new versions) see a blinking dot on it and the
   changelog says how to update (redeploy the stack in Arcane). The server checks GitHub at most
   every 6 hours; `DREYMAIL_UPDATE_CHECK=false` turns that off.
 - Keyboard shortcuts: `j`/`k` to move, `r` reply, `a` reply all, `f` forward, `e` archive,

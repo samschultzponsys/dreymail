@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
+// Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -69,6 +70,10 @@ import { ChangelogDialog } from './ChangelogDialog';
 import { InstallDialog } from './InstallDialog';
 import { runningAsApp } from '../install';
 import { UserAvatar } from './UserPicture';
+import { checkVersions } from '../../../shared/versions';
+import { WEB_VERSION } from '../buildInfo';
+import { desktopBridge } from '../desktop';
+import { androidBridge, androidInfo } from '../android';
 import { MailboxIcon } from './MailboxIcon';
 
 const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
@@ -522,16 +527,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           <UserAvatar src={userAvatar} name={userFullName} size={20} />
           {footerIdentity !== 'photo' && <span className="who name">{userLabel}</span>}
         </button>
-        {version.data && (
-          <button
-            className={`version-btn name ${version.data.update ? 'has-update' : ''}`}
-            onClick={() => setShowLog(true)}
-            title={version.data.update ? `DreyMail ${version.data.update.version} is available. Click for what's new.` : "What's new"}
-          >
-            v{version.data.version}
-            {version.data.update && <span className="update-dot" aria-label="Update available" />}
-          </button>
-        )}
+        {version.data && <VersionStack server={version.data.version} update={version.data.update?.version ?? null} onLog={() => setShowLog(true)} />}
         {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
         {blankMenu && <ContextMenu x={blankMenu.x} y={blankMenu.y} items={blankMenuItems} onClose={closeBlankMenu} />}
         {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
@@ -566,5 +562,44 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
         </button>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Bottom of the sidebar (DreyMail): the server's version, and under it the version of what you
+ * run: the web app in a browser, or the desktop / Android app. When they differ the second line
+ * warns and says which side to update; a click does what it can (reload the page, or the app's
+ * own update check).
+ */
+function VersionStack({ server, update, onLog }: { server: string; update: string | null; onLog: () => void }) {
+  const desktop = desktopBridge();
+  const android = androidBridge() ? androidInfo() : null;
+  const client = desktop
+    ? { kind: 'desktop' as const, version: desktop.version, label: 'App' }
+    : android
+      ? { kind: 'android' as const, version: android.version, label: 'App' }
+      : { kind: 'web' as const, version: WEB_VERSION ?? server, label: 'Web' };
+  const check = checkVersions(server, client, WEB_VERSION);
+  const fix = () => {
+    if (check.fix === 'reload') window.location.reload();
+    else if (check.fix === 'update-app') (desktop ?? androidBridge())?.checkForUpdates();
+    else onLog();
+  };
+  const shown = check.fix === 'reload' ? (WEB_VERSION ?? client.version) : client.version;
+  return (
+    <div className="version-stack name">
+      <button
+        className={`version-btn ${update ? 'has-update' : ''}`}
+        onClick={onLog}
+        title={update ? `Server ${server}. DreyMail ${update} is available: click for what's new.` : `Server ${server}: what's new`}
+      >
+        Server {server}
+        {update && <span className="update-dot" aria-label="Update available" />}
+      </button>
+      <button className={`version-btn client ${check.ok ? '' : 'warn'}`} onClick={check.ok ? onLog : fix} title={check.ok ? check.message : `${check.message} Click to ${check.fix === 'reload' ? 'reload' : check.fix === 'update-app' ? 'check for an update' : 'see what\'s new'}.`}>
+        {client.label} {shown}
+        {!check.ok && <TriangleAlert size={11} aria-label="Versions differ" />}
+      </button>
+    </div>
   );
 }

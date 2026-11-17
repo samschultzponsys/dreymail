@@ -38,7 +38,8 @@
    Modified by samschultzponsys, 2026-11-17: Sending list under Compose.
    Modified by samschultzponsys, 2026-11-17: fold buttons on folders with subfolders.
    Modified by samschultzponsys, 2026-11-17: calendar page and its sidebar button.
-   Modified by samschultzponsys, 2026-11-17: readable dropdown lists in dark mode. */
+   Modified by samschultzponsys, 2026-11-17: readable dropdown lists in dark mode.
+   Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -727,6 +728,11 @@ fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .version-btn { position: relative; border: 0; background: none; font: inherit; font-size: 11px; color: var(--muted); padding: 2px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .version-btn:hover { background: var(--hover); color: var(--text); }
 .version-btn.has-update { color: var(--accent); font-weight: 600; }
+/* Server version over the client's (DreyMail): two small lines; the second warns when they differ. */
+.version-stack { display: flex; flex-direction: column; align-items: stretch; gap: 0; flex-shrink: 0; }
+.version-stack .version-btn { font-size: 10.5px; line-height: 1.25; padding: 1px 6px; text-align: left; display: inline-flex; align-items: center; gap: 3px; }
+.version-btn.client.warn { color: var(--danger); font-weight: 600; background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.version-btn.client.warn:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
 .update-dot { position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 2px var(--bg-sidebar); animation: dm-blink 1.4s ease-in-out infinite; }
 @keyframes dm-blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.25; transform: scale(0.75); } }
 @media (prefers-reduced-motion: reduce) { .update-dot { animation: none; } }

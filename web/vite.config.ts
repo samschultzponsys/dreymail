@@ -1,7 +1,9 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-17: the web app knows its own version (__WEB_VERSION__).
 
+import fs from 'node:fs';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
@@ -57,8 +59,11 @@ export default defineConfig(({ command, mode }) => {
   }
   // Optionally also any host ending in DREYMAIL_DEV_ALLOWED_HOST_SUFFIX (several proxied ports).
   const suffix = command === 'serve' ? parseHostSuffix(env.DREYMAIL_DEV_ALLOWED_HOST_SUFFIX) : null;
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { version: string };
   return {
     root: import.meta.dirname,
+    // The version this page was built as, to notice a page left open across a server update.
+    define: { __WEB_VERSION__: JSON.stringify(pkg.version) },
     plugins: [react(), ...(suffix ? [devHostGuard(allowedHosts, suffix)] : [])],
     build: { outDir: path.join(root, 'dist/web'), emptyOutDir: true, sourcemap: false },
     server: {

@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.1): server and client versions side by side
+
+- **Two versions at the bottom of the sidebar:** "Server X.Y" and, under it, the version of what
+  you use: "Web X.Y" in a browser (the version the page was built as) or "App X.Y" in the desktop
+  and Android apps. When they differ the second line turns red with a warning and says which side
+  to update: the server's image when an app is newer than the server, the app when it is older (a
+  click starts its update check), or the page when it was loaded before the server was updated (a
+  click reloads it). The web build carries its version (`__WEB_VERSION__`, from `package.json`).
+- **Files:** `shared/versions.ts` (new), `web/src/buildInfo.ts` (new), `web/test/versions.test.ts`
+  (new), `web/src/components/Sidebar.tsx`, `web/vite.config.ts`, `web/src/styles.css`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.0): readable dropdown lists in dark mode
 
 - **Dropdown lists in dark mode** (the composer's From, and every other select): the list the
