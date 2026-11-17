@@ -182,8 +182,7 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
 
   const rolesView = () => ({ roles: store.listRoles(), defaultRole: store.defaultRole() });
   // Space used per user: their data in the main database and their mailboxes' copies in the mail cache.
-  app.get('/api/admin/storage', async (req, reply) => {
-    if (!may(req, reply, 'users.manage')) return reply;
+  const storageReport = (): StorageReport => {
     const db = databaseUsage(store.db);
     const cache = deps.storage?.cache ?? null;
     let cached: ReturnType<MailCache['usage']> = [];
@@ -206,12 +205,36 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
       return { id: u.id, name: u.displayName || u.name || u.username || u.email, avatar: pictureUrl(store, u), database, mailboxes, total };
     });
     users.sort((a, b) => b.total - a.total);
-    const report: StorageReport = {
+    return {
       files: (deps.storage?.files ?? []).filter((f) => f.path && f.path !== ':memory:').map((f) => ({ name: f.name, bytes: sqliteFileBytes(f.path) })),
       cacheEnabled: !!cache,
       users,
     };
-    return report;
+  };
+  app.get('/api/admin/storage', async (req, reply) => (may(req, reply, 'users.manage') ? storageReport() : reply));
+
+  // Clear a user's mail cache (all their mailboxes, or one). Mail stays on the mail servers; the
+  // copy fills again in the background the next time they use DreyMail.
+  const clearCache = (userId: string, accountId: string | null) => {
+    const cache = deps.storage?.cache;
+    if (!cache) return;
+    const ids = accountId ? [accountId] : [...new Set(cache.usage().filter((u) => u.userId === userId).map((u) => u.accountId))];
+    for (const id of ids) {
+      mail.forgetAccount(userId, id); // the cached folders and the remembered folder list
+      cache.dropAccount(userId, id);
+    }
+  };
+  app.delete<{ Params: { id: string } }>('/api/admin/users/:id/cache', async (req, reply) => {
+    if (!may(req, reply, 'users.manage')) return reply;
+    if (!store.getUser(req.params.id)) return reply.code(404).send({ error: 'User not found' });
+    clearCache(req.params.id, null);
+    return storageReport();
+  });
+  app.delete<{ Params: { id: string; accountId: string } }>('/api/admin/users/:id/cache/:accountId', async (req, reply) => {
+    if (!may(req, reply, 'users.manage')) return reply;
+    if (!store.getUser(req.params.id)) return reply.code(404).send({ error: 'User not found' });
+    clearCache(req.params.id, req.params.accountId);
+    return storageReport();
   });
 
   app.get('/api/admin/roles', async (req, reply) => (may(req, reply, 'roles.manage', 'users.manage') ? rolesView() : reply));

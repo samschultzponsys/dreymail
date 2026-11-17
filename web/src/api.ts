@@ -125,6 +125,8 @@ export const api = {
   signatures: () => request<Signature[]>('GET', '/api/signatures'),
   adminUsers: () => request<AdminUser[]>('GET', '/api/admin/users'),
   adminStorage: () => request<StorageReport>('GET', '/api/admin/storage'),
+  adminClearCache: (userId: string, accountId?: string) =>
+    request<StorageReport>('DELETE', `/api/admin/users/${encodeURIComponent(userId)}/cache${accountId ? `/${encodeURIComponent(accountId)}` : ''}`),
   adminFirebase: () => request<FirebaseSettingsView>('GET', '/api/admin/firebase'),
   adminSaveFirebase: (s: { serviceAccount: string; apiKey: string; appId: string; senderId: string }) => request<FirebaseSettingsView>('PUT', '/api/admin/firebase', s),
   androidPush: () => request<{ firebase: { projectId: string; apiKey: string; appId: string; senderId: string } | null }>('GET', '/api/push/android'),

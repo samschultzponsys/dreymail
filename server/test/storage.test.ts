@@ -26,7 +26,7 @@ async function register(username: string) {
   return `dm_session=${res.cookies.find((c) => c.name === 'dm_session')!.value}`;
 }
 
-async function call<T>(cookie: string, method: 'GET' | 'PUT', url: string, payload?: unknown) {
+async function call<T>(cookie: string, method: 'GET' | 'PUT' | 'DELETE', url: string, payload?: unknown) {
   const res = await ctx!.app.inject({ method, url, payload: payload as object, headers: { cookie, 'x-dreymail': '1' } });
   return { status: res.statusCode, json: JSON.parse(res.body) as T };
 }
@@ -76,5 +76,38 @@ describe('Settings → Storage', () => {
     );
     expect(second).toMatchObject({ name: 'sam', mailboxes: [] });
     expect(second!.database.pictures).toBe(0);
+  });
+
+  it('clears the mail cache of one mailbox or all of a user, to administrators only', async () => {
+    const store = new Store(':memory:', new Keyring(secret).credentialKey);
+    ctx = await buildApp(loadConfig({ DREYMAIL_SECRET_KEY: secret, DREYMAIL_REGISTRATION: 'open' }), { store, logger: false });
+    const sam = await register('sam');
+    const eve = await register('eve');
+    const eveId = store.listUsers().find((u) => u.username === 'eve')!.id;
+    const mk = (name: string) => store.createAccount(eveId, { name, email: `${name}@example.com`, displayName: 'Eve', color: '#22d3ee', imap, smtp, appendSent: true } as never);
+    const [work, home] = [mk('work'), mk('home')];
+    const cache = ctx.cache!;
+    for (const a of [work, home]) {
+      const f = cache.resetFolder(eveId, a.id, 'INBOX', 'inbox', '1');
+      cache.putMessages(f, [{ summary: summary(a.id, 'INBOX', 1), sortTime: 1, internalDate: null }]);
+      cache.putFolderList(eveId, a.id, { accountId: a.id, folders: [] });
+    }
+    // A mailbox removed meanwhile still shows (and can be cleared) until its copy is gone.
+    cache.resetFolder(eveId, 'gone', 'INBOX', 'inbox', '1');
+
+    expect((await call(eve, 'DELETE', `/api/admin/users/${eveId}/cache`)).status).toBe(403);
+    expect((await call(sam, 'DELETE', '/api/admin/users/nobody/cache')).status).toBe(404);
+
+    let r = await call<StorageReport>(sam, 'DELETE', `/api/admin/users/${eveId}/cache/${work.id}`);
+    expect(r.status).toBe(200);
+    expect(r.json.users.find((u) => u.id === eveId)!.mailboxes.map((m) => m.name ?? '(removed)').sort()).toEqual(['(removed)', 'home']);
+    expect(cache.folderList(eveId, work.id)).toBeNull();
+    expect(cache.folderList(eveId, home.id)).not.toBeNull();
+
+    r = await call<StorageReport>(sam, 'DELETE', `/api/admin/users/${eveId}/cache`);
+    expect(r.json.users.find((u) => u.id === eveId)!.mailboxes).toEqual([]);
+    expect(cache.folders(eveId, home.id)).toEqual([]);
+    // Their own data is untouched.
+    expect(store.listAccounts(eveId).length).toBe(2);
   });
 });

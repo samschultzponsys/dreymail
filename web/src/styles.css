@@ -639,6 +639,8 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .storage-table th:not(:first-child), .storage-table td:not(:first-child) { text-align: right; white-space: nowrap; }
 .storage-scroll { flex: 1 1 300px; min-width: 0; overflow-x: auto; }
 .storage-scroll .storage-table { width: 100%; }
+.storage-table td .icon-btn { margin: -5px 0; }
+.storage-clear { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 600px) { .storage-detail { padding-left: 12px; } .storage-narrow-hide { display: none; } }
 fieldset.group { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 14px; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
