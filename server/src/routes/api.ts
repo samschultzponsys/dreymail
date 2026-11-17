@@ -24,8 +24,10 @@
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: Not spam (unblocks the sender).
+// Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
+import type { AddressBook } from '../addressBook.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
 import { oneClickUnsubscribe } from '../net/unsubscribe.js';
 import { isMailboxIcon } from '../../../shared/mailboxIcons.js';
@@ -41,6 +43,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AccountInput, ActionResult, ComposePayload, Me, MessageAction, MessageRef, VersionInfo } from '../../../shared/types.js';
 import { DEFAULT_MESSAGE_BUTTONS, MESSAGE_BUTTONS, type MessageButton } from '../../../shared/types.js';
+import { DEFAULT_ADDRESS_LINES } from '../../../shared/addressLines.js';
 import { accountDefaultsFor, withDefaultPassword, type TemplateValues } from '../accountDefaults.js';
 import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
@@ -110,6 +113,7 @@ const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('snooze'), until: z.string().max(64) }),
   z.object({ type: z.literal('unsnooze') }),
   z.object({ type: z.literal('notJunk') }),
+  z.object({ type: z.literal('junk') }),
 ]);
 
 const swipe = z.enum(['none', 'delete', 'archive', 'toggleRead', 'toggleFlag']);
@@ -132,6 +136,15 @@ export const prefsSchema = z.object({
   sidebarCalendar: z.boolean().default(true),
   sidebarScheduled: z.boolean().default(true),
   sidebarSearches: z.boolean().default(true),
+  suggestScope: z.enum(['all', 'mailbox', 'group', 'chosen']).default('all'),
+  suggestAccounts: z.array(z.string().max(64)).max(200).default([]),
+  addressLines: z
+    .object({
+      all: z.object({ cc: z.boolean(), bcc: z.boolean() }),
+      groups: z.record(z.string().max(64), z.object({ cc: z.boolean().optional(), bcc: z.boolean().optional() })),
+      accounts: z.record(z.string().max(64), z.object({ cc: z.boolean().optional(), bcc: z.boolean().optional() })),
+    })
+    .default(DEFAULT_ADDRESS_LINES),
   messageButtons: z.array(z.enum(MESSAGE_BUTTONS as [MessageButton, ...MessageButton[]])).max(MESSAGE_BUTTONS.length).default([...DEFAULT_MESSAGE_BUTTONS]),
   // Up to 10 minutes: longer than that is what Send later is for.
   undoSendSeconds: z.number().int().min(0).max(600).default(10),
@@ -214,6 +227,7 @@ export interface ApiDeps {
   blocklist?: Blocklist;
   onBlocklistChanged?: (userId: string) => void;
   scheduled?: ScheduledSends;
+  addressBook?: AddressBook;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
@@ -653,6 +667,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       // Another server or login can mean another mailbox: cached mail no longer applies.
       if (existing.imap.host !== input.imap.host || existing.imap.port !== input.imap.port || existing.imap.user !== input.imap.user) {
         mail.forgetAccount(uid(req), req.params.id);
+        deps.addressBook?.forgetAccount(uid(req), req.params.id);
       }
       pool.invalidate(uid(req), req.params.id);
       mail.forgetFolders(uid(req), req.params.id);
@@ -900,7 +915,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         else {
           r = await mail.applyAction(userId, ref.accountId, ref.folder, ref.uidValidity, uids, action);
           // Snoozed messages moved or deleted by hand no longer come back on their own.
-          if (action.type === 'move' || action.type === 'archive' || action.type === 'delete' || action.type === 'notJunk') {
+          if (action.type === 'move' || action.type === 'archive' || action.type === 'delete' || action.type === 'notJunk' || action.type === 'junk') {
             store.deleteSnoozes(userId, ref.accountId, ref.folder, ref.uidValidity, uids);
           }
           // Not spam: senders blocked in DreyMail are unblocked, or their next mail goes straight back.
@@ -984,8 +999,19 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     }
   });
 
+  // Address suggestions while writing: people from sent and received mail of the mailboxes the
+  // user's scope preference picks (see AddressBook), then those written to before (all mailboxes).
   app.get('/api/recipients', async (req) => {
-    const q = z.object({ q: z.string().max(200).default('') }).parse(req.query);
-    return store.searchRecipients(uid(req), q.q);
+    const q = z.object({ q: z.string().max(200).default(''), from: z.string().max(64).optional() }).parse(req.query);
+    const userId = uid(req);
+    const prefs = store.getUser(userId)?.preferences;
+    const scope = prefs?.suggestScope ?? 'all';
+    const book = deps.addressBook;
+    const out = book ? book.search(userId, q.q, book.scope(userId, q.from ?? null, scope, prefs?.suggestAccounts ?? [])) : [];
+    if (out.length < 8 && (scope === 'all' || !book)) {
+      const seen = new Set(out.map((s) => s.address));
+      for (const r of store.searchRecipients(userId, q.q)) if (!seen.has(r.address) && out.length < 8) out.push(r);
+    }
+    return out;
   });
 }

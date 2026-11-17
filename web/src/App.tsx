@@ -443,10 +443,11 @@ export function App() {
           : action.type === 'move' ? `${what} moved to ${action.destination}`
           : action.type === 'snooze' ? `${what} snoozed until ${formatSnoozeTime(action.until)}`
           : action.type === 'unsnooze' ? `${what} back in the inbox`
+          : action.type === 'junk' ? `${what} moved to Junk`
           : action.type === 'notJunk'
             ? `${what} moved to the inbox as not spam${res.result?.unblocked?.length ? `; unblocked ${res.result.unblocked.join(', ')}` : ''}`
           : null;
-      for (const f of res.result?.createdFolders ?? []) push(`Created folder "${f}" for ${action.type === 'snooze' ? 'snoozed' : 'archived'} mail.`);
+      for (const f of res.result?.createdFolders ?? []) push(`Created folder "${f}" for ${action.type === 'snooze' ? 'snoozed' : action.type === 'junk' ? 'spam' : 'archived'} mail.`);
       const undo = res.undo;
       if (label) push(label, false, undo ? { label: 'Undo', run: () => void runUndo(undo) } : undefined);
       else if (undo && picked.length > 1) push(`${what} updated`, false, { label: 'Undo', run: () => void runUndo(undo) });

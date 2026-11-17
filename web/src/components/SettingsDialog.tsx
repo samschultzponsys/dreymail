@@ -33,6 +33,7 @@
 // Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
 // Modified by samschultzponsys, 2026-11-17: Install the app (This device, in a browser).
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
+// Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -45,6 +46,7 @@ import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } 
 import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
 import { StorageAdmin } from './StorageAdmin';
+import { WritingSettings } from './WritingSettings';
 import { ProfilePicture } from './UserPicture';
 import { AiConnections } from './AiConnections';
 import { SourceLink } from './SourceLink';
@@ -296,6 +298,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               Split the inbox into Personal, Updates and Newsletters tabs
             </label>
           )}
+          {tab === 'general' && <WritingSettings prefs={v} save={(p) => void save(p)} accounts={myAccounts.data ?? []} />}
           {tab === 'general' && (
             <SendDelay value={v.undoSendSeconds ?? 10} onChange={(n) => void save({ ...v, undoSendSeconds: n })} />
           )}

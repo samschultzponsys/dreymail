@@ -2,8 +2,10 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox is cached, filled in the background on its own connection.
 // Modified by samschultzponsys, 2026-11-17: listings of other folders always check with the server first, ahead of the filling.
+// Modified by samschultzponsys, 2026-11-17: tells about new messages and filled folders (address suggestions).
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
+import type { MessageSummary } from '../../../shared/types.js';
 import type { CacheConfig } from '../config.js';
 import type { ImapPool, Lane } from '../imap/pool.js';
 import { fetchSnippets, LIST_FETCH, sortTime, summaryOf, toDate } from '../imap/summary.js';
@@ -45,6 +47,10 @@ export interface CacheSyncDeps {
   cacheableFolders?: (userId: string, accountId: string) => Promise<string[]>;
   /** Whether the account's INBOX is being watched (IDLE) right now, so any change is reported. */
   isWatched: (userId: string, accountId: string) => boolean;
+  /** New messages arrived in a cached folder (not those of a first fill or of filling older mail) (DreyMail). */
+  onNewMessages?: (userId: string, accountId: string, folder: string, role: CachedRole, messages: MessageSummary[]) => void;
+  /** A folder's copy holds all it will hold (everything, or as many as configured) (DreyMail). */
+  onFilled?: (userId: string, accountId: string, folder: string, role: CachedRole, f: CachedFolder) => void;
   /** The cached copy of a folder changed (new, removed or re-flagged messages). */
   onChanged: (userId: string, accountId: string, folder: string) => void;
   log?: (msg: string, extra?: Record<string, unknown>) => void;
@@ -286,6 +292,14 @@ export class CacheSync {
         try {
           if (role === 'inbox') await this.prefetch(userId, accountId, path, interrupted);
           await this.fill(userId, accountId, path, interrupted);
+          const f = this.cache.folder(userId, accountId, path);
+          if (f && f.syncedAt > 0 && (f.complete || this.cache.count(f) >= this.limit(f.role))) {
+            try {
+              this.deps.onFilled?.(userId, accountId, path, f.role, f);
+            } catch {
+              /* a listener's problem is its own (and never the cache's) */
+            }
+          }
         } catch (err) {
           this.handleError(err, userId, accountId, path);
         }
@@ -396,8 +410,14 @@ export class CacheSync {
       // New messages. "n:*" always matches the newest message, even if its UID is below n.
       const fresh = (await client.fetchAll(`${f.uidNext}:*`, LIST_FETCH, { uid: true })).filter((m) => m.uid >= f!.uidNext);
       if (fresh.length) {
-        cache.putMessages(f, await this.entries(client, source, uidValidity, fresh));
+        const entries = await this.entries(client, source, uidValidity, fresh);
+        cache.putMessages(f, entries);
         changed = true;
+        try {
+          this.deps.onNewMessages?.(userId, accountId, path, role, entries.map((e) => e.summary));
+        } catch {
+          /* a listener's problem is its own */
+        }
       }
       const uidNext = Math.max(f.uidNext, ...fresh.map((m) => m.uid + 1));
 

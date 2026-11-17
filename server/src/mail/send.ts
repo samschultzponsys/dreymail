@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: answers to calendar invitations (iTIP REPLY).
 // Modified by samschultzponsys, 2026-11-16: sent mail carries its pictures as inline attachments.
+// Modified by samschultzponsys, 2026-11-17: tells who a message was sent to (address suggestions).
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
@@ -28,6 +29,8 @@ export class ComposeService {
       graphSend?: (userId: string, accountId: string, raw: Buffer) => Promise<void>;
       /** OAuth access token for SMTP (Gmail signed in with Google). */
       smtpToken?: (userId: string, accountId: string) => Promise<string>;
+      /** A message was sent from this mailbox to these people (address suggestions) (DreyMail). */
+      onSent?: (userId: string, accountId: string, recipients: { name: string; address: string }[]) => void;
     },
   ) {}
 
@@ -98,6 +101,11 @@ export class ComposeService {
     if (p.replaceDraft) await this.mail.deleteDraft(userId, p.replaceDraft).catch(() => undefined);
     if (p.answering) await this.mail.markAnswered(userId, p.answering);
     this.store.rememberRecipients(userId, recipients);
+    try {
+      this.opts.onSent?.(userId, account.id, recipients);
+    } catch {
+      /* suggestions are optional */
+    }
     return { messageId, savedToSent, warning: warnings.join(' ') || null };
   }
 

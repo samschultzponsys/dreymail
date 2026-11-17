@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-17: Schedule button with more quick times; longer send delays.
 // Modified by samschultzponsys, 2026-11-17: single line spacing (lines as <div>s, not <p>s).
+// Modified by samschultzponsys, 2026-11-17: address bubbles; suggestions per mailbox; Cc/Bcc lines pinned per mailbox, group or all.
 
 import {
   Bold,
@@ -24,14 +25,17 @@ import {
   Underline,
   X,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { resolveAddressLine, setAddressLine, type AddressLine } from '../../../shared/addressLines';
 import type { AccountView, AttachmentView, ComposePayload, MessageRef } from '../../../shared/types';
 import { accountPalette } from '../accountTheme';
+import { AddressField } from './AddressField';
 import { api } from '../api';
 import { useSignatures } from '../hooks';
 import { applySignature, signatureFor } from '../signature';
 import { toLocalInput } from '../snooze';
-import { formatAddress, formatDelay, formatSize } from '../util';
+import { formatDelay, formatSize } from '../util';
 
 export interface ComposerInit {
   accountId: string;
@@ -48,74 +52,6 @@ export interface ComposerInit {
   answering: MessageRef | null;
   /** Attachments picked before (reopening after "undo send") (DreyMail). */
   files?: File[];
-}
-
-function AddressInput({ label, value, onChange, extra }: { label: string; value: string; onChange: (v: string) => void; extra?: ReactNode }) {
-  const [suggestions, setSuggestions] = useState<{ name: string; address: string }[]>([]);
-  const [active, setActive] = useState(0);
-  const [focused, setFocused] = useState(false);
-  const token = value.split(',').pop()!.trim();
-
-  useEffect(() => {
-    if (!focused || token.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    const t = window.setTimeout(() => {
-      api
-        .recipients(token)
-        .then((r) => {
-          setSuggestions(r);
-          setActive(0);
-        })
-        .catch(() => setSuggestions([]));
-    }, 150);
-    return () => window.clearTimeout(t);
-  }, [token, focused]);
-
-  const pick = (s: { name: string; address: string }) => {
-    const parts = value.split(',');
-    parts[parts.length - 1] = ` ${formatAddress(s)}`;
-    onChange(`${parts.join(',').replace(/^\s+/, '')}, `);
-    setSuggestions([]);
-  };
-
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => window.setTimeout(() => setFocused(false), 150)}
-        onKeyDown={(e) => {
-          if (!suggestions.length) return;
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setActive((a) => Math.min(a + 1, suggestions.length - 1));
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActive((a) => Math.max(a - 1, 0));
-          } else if (e.key === 'Enter' || e.key === 'Tab') {
-            e.preventDefault();
-            pick(suggestions[active]!);
-          } else if (e.key === 'Escape') setSuggestions([]);
-        }}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      {extra}
-      {focused && suggestions.length > 0 && (
-        <div className="suggestions">
-          {suggestions.map((s, i) => (
-            <button key={s.address} className={i === active ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(s)}>
-              {s.name ? `${s.name} <${s.address}>` : s.address}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function Tool({ title, cmd, arg, children, onRun }: { title: string; cmd?: string; arg?: string; children: ReactNode; onRun?: () => void }) {
@@ -157,7 +93,11 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
   const [to, setTo] = useState(init.to);
   const [cc, setCc] = useState(init.cc);
   const [bcc, setBcc] = useState(init.bcc);
-  const [showCc, setShowCc] = useState(!!(init.cc || init.bcc));
+  // Cc and Bcc: shown when the settings say so for this mailbox (pinned), or opened for this message.
+  const [openLines, setOpenLines] = useState<Record<AddressLine, boolean>>({ cc: !!init.cc, bcc: !!init.bcc });
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ['me'], queryFn: api.me, staleTime: Infinity });
+  const groups = useQuery({ queryKey: ['groups'], queryFn: api.groups, staleTime: 60_000 });
   const [subject, setSubject] = useState(init.subject);
   const [files, setFiles] = useState<File[]>(init.files ?? []);
   const [fwd, setFwd] = useState<AttachmentView[]>(init.forwardAttachments);
@@ -329,6 +269,31 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
     document.execCommand('createLink', false, url.trim());
   };
 
+  // Cc/Bcc lines: the most specific setting (this mailbox, its group, all) decides; the pin changes it.
+  const fromAccount = accounts.find((a) => a.id === accountId);
+  const lineSetting = (l: AddressLine) => resolveAddressLine(me.data?.preferences.addressLines, fromAccount, l);
+  const lineShown = (l: AddressLine) => lineSetting(l).show || openLines[l] || !!(l === 'cc' ? cc : bcc).trim();
+  const linePin = (l: AddressLine) => {
+    const { show, level } = lineSetting(l);
+    const groupName = groups.data?.find((g) => g.id === fromAccount?.groupId)?.name;
+    return {
+      pinned: show,
+      scope: level === 'mailbox' ? `${fromAccount?.name ?? 'this mailbox'}` : level === 'group' ? `group ${groupName ?? ''}`.trim() : 'all mailboxes',
+      onToggle: () => {
+        const prefs = me.data?.preferences;
+        if (!prefs) return;
+        const next = { ...prefs, addressLines: setAddressLine(prefs.addressLines, fromAccount, level, l, !show) };
+        // Unpinned: the line stays for this message, and is a click away next time.
+        if (show) setOpenLines((o) => ({ ...o, [l]: true }));
+        qc.setQueryData(['me'], { ...me.data, preferences: next });
+        void api.savePreferences(next).catch((err: Error) => {
+          onToast(err.message, true);
+          void qc.invalidateQueries({ queryKey: ['me'] });
+        });
+      },
+    };
+  };
+
   return (
     <div
       className={`composer ${maximized ? 'maximized' : ''}`}
@@ -360,20 +325,21 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
           ))}
         </select>
       </div>
-      <AddressInput
+      <AddressField
         label="To"
         value={to}
         onChange={setTo}
-        extra={
-          !showCc && (
-            <button className="toggle" onClick={() => setShowCc(true)}>
-              Cc/Bcc
+        from={accountId}
+        extra={(['cc', 'bcc'] as const)
+          .filter((l) => !lineShown(l))
+          .map((l) => (
+            <button key={l} type="button" className="toggle" onClick={() => setOpenLines((o) => ({ ...o, [l]: true }))}>
+              {l === 'cc' ? 'Cc' : 'Bcc'}
             </button>
-          )
-        }
+          ))}
       />
-      {showCc && <AddressInput label="Cc" value={cc} onChange={setCc} />}
-      {showCc && <AddressInput label="Bcc" value={bcc} onChange={setBcc} />}
+      {lineShown('cc') && <AddressField label="Cc" value={cc} onChange={setCc} from={accountId} pin={linePin('cc')} />}
+      {lineShown('bcc') && <AddressField label="Bcc" value={bcc} onChange={setBcc} from={accountId} pin={linePin('bcc')} />}
       <div className="field">
         <label>Subject</label>
         <input value={subject} onChange={(e) => setSubject(e.target.value)} />

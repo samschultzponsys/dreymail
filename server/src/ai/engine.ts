@@ -487,7 +487,7 @@ export class AssistantEngine {
   async observeAction(userId: string, accountId: string, folder: string, uids: number[], action: MessageAction) {
     if (!this.learning(userId, accountId) || uids.length === 0) return;
     const kind =
-      action.type === 'archive' ? 'archived' : action.type === 'delete' ? 'deleted' : action.type === 'move' || action.type === 'notJunk' ? 'moved' : action.type === 'seen' && action.value ? 'read' : action.type === 'flagged' && action.value ? 'starred' : action.type === 'snooze' ? 'snoozed' : null;
+      action.type === 'archive' ? 'archived' : action.type === 'delete' ? 'deleted' : action.type === 'move' || action.type === 'notJunk' || action.type === 'junk' ? 'moved' : action.type === 'seen' && action.value ? 'read' : action.type === 'flagged' && action.value ? 'starred' : action.type === 'snooze' ? 'snoozed' : null;
     if (!kind) return;
     const envs = await this.deps.pool
       .withMailbox(userId, accountId, folder, async (client) => {
@@ -498,7 +498,7 @@ export class AssistantEngine {
         return out;
       })
       .catch(() => []);
-    for (const e of envs) this.deps.ai.observe(userId, accountId, { kind, ...e, detail: { folder, ...(action.type === 'move' ? { to: action.destination } : action.type === 'notJunk' ? { to: 'INBOX' } : {}) } });
+    for (const e of envs) this.deps.ai.observe(userId, accountId, { kind, ...e, detail: { folder, ...(action.type === 'move' ? { to: action.destination } : action.type === 'notJunk' ? { to: 'INBOX' } : action.type === 'junk' ? { to: 'Junk' } : {}) } });
   }
 
   /**

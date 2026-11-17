@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox cached in the background.
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
+// Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,13 +33,14 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { registerAuthRoutes } from './auth/routes.js';
 import { Sessions } from './auth/session.js';
 import type { Config } from './config.js';
-import { MailCache } from './cache/store.js';
+import { MailCache, type CachedRole } from './cache/store.js';
 import { CacheSync } from './cache/sync.js';
 import { Keyring } from './crypto.js';
 import { Store } from './db.js';
 import { MailService } from './imap/mail.js';
 import { ImapPool } from './imap/pool.js';
 import { ComposeService } from './mail/send.js';
+import { AddressBook } from './addressBook.js';
 import { SnoozeService } from './mail/snooze.js';
 import { PushService } from './push/service.js';
 import { createPushTransport, vapidKeysFromSeed, type PushTransport } from './push/webpush.js';
@@ -162,6 +164,12 @@ export async function buildApp(
   // With an injected store (tests) the cache defaults to memory too.
   const cacheFile = opts.cacheFile !== undefined ? opts.cacheFile : opts.store ? ':memory:' : path.join(config.dataDir, 'cache.db');
   const cache = config.cache && cacheFile !== null ? new MailCache(cacheFile, { cacheKey: keyring.cacheKey, indexKey: keyring.cacheIndexKey }, cacheLog) : null;
+  // Address suggestions (DreyMail): filled from the mail cache (each folder's existing mail once,
+  // then new mail) and from what is sent.
+  const addressBook = new AddressBook(store);
+  const harvesting = new Set<string>();
+  const useOf = async (userId: string, accountId: string, folder: string, role: CachedRole) =>
+    role === 'inbox' ? 'inbox' : role === 'sent' ? 'sent' : await mail.folderUse(userId, accountId, folder);
   const cacheSync =
     cache && config.cache
       ? new CacheSync({
@@ -173,6 +181,25 @@ export async function buildApp(
           cacheableFolders: (userId, accountId) => mail.cacheableFolders(userId, accountId),
           isWatched: (userId, accountId) => pool.isWatching(userId, accountId),
           onChanged: (userId, accountId, folder) => pool.onEvent(userId, { type: 'mailbox', accountId, folder }),
+          onNewMessages: (userId, accountId, folder, role, messages) => {
+            if (!addressBook.filled(accountId, folder)) return; // counted with the rest once the folder has filled
+            void useOf(userId, accountId, folder, role)
+              .then((use) => addressBook.harvest(userId, accountId, use, messages))
+              .catch(() => undefined);
+          },
+          onFilled: (userId, accountId, folder, role, f) => {
+            const k = `${accountId}\u0000${folder}`;
+            if (harvesting.has(k) || addressBook.filled(accountId, folder)) return;
+            harvesting.add(k);
+            void useOf(userId, accountId, folder, role)
+              .then((use) => {
+                if (!store.listAccounts(userId).some((a) => a.id === accountId)) return;
+                addressBook.harvest(userId, accountId, use, cache!.page(f, null, cache!.count(f)).map((m) => m.summary));
+                addressBook.markFilled(accountId, folder);
+              })
+              .catch(() => undefined)
+              .finally(() => harvesting.delete(k));
+          },
           log: cacheLog,
         })
       : null;
@@ -275,6 +302,7 @@ export async function buildApp(
     blockPrivateHosts: config.blockPrivateMailHosts,
     graphSend: (userId, accountId, raw) => microsoft.sendRaw(userId, accountId, raw),
     smtpToken: (userId, accountId) => google.accessToken(userId, accountId),
+    onSent: (userId, accountId, recipients) => addressBook.sent(userId, accountId, recipients),
   });
   const calendars = new CalendarService({
     store,
@@ -324,6 +352,7 @@ export async function buildApp(
     blocklist,
     onBlocklistChanged: (userId) => assistant.syncWatching(userId),
     scheduled,
+    addressBook,
   });
   await registerAdminRoutes(app, {
     config,

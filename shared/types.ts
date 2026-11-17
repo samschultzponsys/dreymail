@@ -27,9 +27,11 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: space used per user (Settings → Storage).
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
+// Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 
 // Types shared between the server API and the web client.
 
+import type { AddressLines } from './addressLines.js';
 import type { Permission } from './permissions.js';
 import type { UnsubscribeOptions } from './unsubscribe.js';
 import type { InviteView } from './calendar.js';
@@ -269,7 +271,9 @@ export type MessageAction =
   /** Back to the inbox right away. */
   | { type: 'unsnooze' }
   /** Not spam: back to the inbox, marked as not junk, and the sender unblocked (DreyMail). */
-  | { type: 'notJunk' };
+  | { type: 'notJunk' }
+  /** Spam: to the Junk folder (made if missing), marked as junk (DreyMail). */
+  | { type: 'junk' };
 
 /** Where moved messages ended up, so the move can be undone by moving them back. */
 export interface UndoInfo {
@@ -372,6 +376,12 @@ export interface Preferences {
   sidebarSearches: boolean;
   /** Buttons pinned to each message's header in a conversation (DreyMail). */
   messageButtons: MessageButton[];
+  /** Whose addresses are suggested when writing (DreyMail): all mailboxes, the sending one, its group, or chosen ones. */
+  suggestScope: SuggestScope;
+  /** The mailboxes for suggestScope 'chosen'. */
+  suggestAccounts: string[];
+  /** Whether the composer shows the Cc and Bcc lines by itself: for all, per group, per mailbox (DreyMail). */
+  addressLines: AddressLines;
 }
 
 /**
@@ -542,6 +552,9 @@ export interface StorageReport {
   cacheEnabled: boolean;
   users: StorageUserUsage[];
 }
+
+/** Address suggestions when writing come from: every mailbox, the one you write from, its group, or chosen mailboxes. */
+export type SuggestScope = 'all' | 'mailbox' | 'group' | 'chosen';
 
 export interface AdminUser {
   id: string;

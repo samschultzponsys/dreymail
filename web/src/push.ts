@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-17: Mark as spam closes the notification too.
 
 import type { MessageAction, MessageRef } from '../../shared/types';
 import { api } from './api';
@@ -152,7 +153,7 @@ export function setAppBadge(count: number) {
  * several messages are left to the server, which knows whether the others are still unread.
  */
 export function obsoleteNotificationTags(refs: MessageRef[], action: MessageAction): string[] {
-  const done = action.type === 'seen' ? action.value : ['move', 'archive', 'delete', 'snooze'].includes(action.type);
+  const done = action.type === 'seen' ? action.value : ['move', 'archive', 'delete', 'snooze', 'junk'].includes(action.type);
   if (!done) return [];
   return refs.filter((r) => r.folder.toUpperCase() === 'INBOX').map((r) => `${r.accountId}:${r.uid}`);
 }

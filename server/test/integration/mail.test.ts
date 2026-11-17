@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-17: Not spam, Mark as spam and address suggestions.
 
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
@@ -353,6 +354,45 @@ describe('actions', () => {
     expect(flags).not.toContain('$Junk');
     await c.logout();
     expect((await api<{ address: string }[]>('GET', '/api/blocked')).json.map((b) => b.address)).not.toContain('spammy@lookalike.example');
+  });
+
+  it('marks mail as spam: to Junk, marked $Junk', async () => {
+    const id = accounts.bob!.id;
+    const c = imapClient(BOB);
+    await c.connect();
+    await c.append('INBOX', rawMessage({ from: 'pushy@sales.example', to: BOB, subject: 'Buy now', date: new Date(), id: 'spam1' }), ['$NotJunk']);
+    const [msg] = await listAll(`accountId=${id}&folder=INBOX&q=Buy`);
+    const res = await api<{ undo: { folder: string }[] }>('POST', '/api/messages/actions', { messages: [ref(msg!)], action: { type: 'junk' } });
+    expect(res.status).toBe(200);
+    const junk = res.json.undo[0]!.folder;
+    expect(junk).toMatch(/junk/i);
+    expect(await listAll(`accountId=${id}&folder=INBOX&q=Buy`)).toEqual([]);
+    expect((await listAll(`accountId=${id}&folder=${encodeURIComponent(junk)}&q=Buy`)).map((m) => m.subject)).toEqual(['Buy now']);
+    await c.mailboxOpen(junk);
+    const flags = (await c.fetchAll({ header: { subject: 'Buy now' } } as never, { flags: true })).flatMap((m) => [...(m.flags ?? [])]);
+    expect(flags).toContain('$Junk');
+    expect(flags).not.toContain('$NotJunk');
+    await c.logout();
+  });
+
+  it('suggests people who wrote to you once the cache has them, never your own mailboxes', async () => {
+    const id = accounts.bob!.id;
+    // The sender marked "not spam" above is in Bob's inbox now.
+    let found: { address: string }[] = [];
+    await until(async () => {
+      await listAll(`accountId=${id}&folder=INBOX`);
+      found = (await api<{ address: string }[]>('GET', `/api/recipients?q=spammy&from=${id}`)).json;
+      return found.length > 0;
+    });
+    expect(found.map((s) => s.address)).toEqual(['spammy@lookalike.example']);
+    // Limited to the mailbox written from: Alice's mailbox never heard from them.
+    const prefs = (await api<{ preferences: Record<string, unknown> }>('GET', '/api/me')).json.preferences;
+    expect((await api('PUT', '/api/preferences', { ...prefs, suggestScope: 'mailbox' })).status).toBe(200);
+    expect((await api<unknown[]>('GET', `/api/recipients?q=spammy&from=${accounts.alice!.id}`)).json).toEqual([]);
+    expect((await api<unknown[]>('GET', `/api/recipients?q=spammy&from=${id}`)).json).toHaveLength(1);
+    await api('PUT', '/api/preferences', { ...prefs, suggestScope: 'all' });
+    // Alice and Bob are this user's own mailboxes: never suggested.
+    expect((await api<{ address: string }[]>('GET', `/api/recipients?q=example.com&from=${id}`)).json.map((s) => s.address)).not.toContain(ALICE);
   });
 });
 

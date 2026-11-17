@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles, permissions and profile pictures.
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage.
+// Modified by samschultzponsys, 2026-11-17: address suggestions for the mailbox written from.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
@@ -239,7 +240,8 @@ export const api = {
   saveSearch: (s: Omit<SavedSearch, 'id'>) => request<SavedSearch[]>('POST', '/api/searches', s),
   deleteSearch: (id: string) => request<SavedSearch[]>('DELETE', `/api/searches/${encodeURIComponent(id)}`),
 
-  recipients: (q: string) => request<{ name: string; address: string }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}`),
+  recipients: (q: string, from?: string) =>
+    request<{ name: string; address: string }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}${from ? `&from=${encodeURIComponent(from)}` : ''}`),
 };
 
 function composeForm(payload: ComposePayload, files: File[], sendAt?: Date): FormData {

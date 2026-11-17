@@ -40,7 +40,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.2 (Settings → Storage).
      Modified by samschultzponsys, 2026-11-17: v8.3 (clear a user's mail cache; clickable flatpak notifications).
      Modified by samschultzponsys, 2026-11-17: v8.4 (single line spacing when writing).
-     Modified by samschultzponsys, 2026-11-17: v8.5 (Not spam). -->
+     Modified by samschultzponsys, 2026-11-17: v8.5 (Not spam).
+     Modified by samschultzponsys, 2026-11-17: v8.6 (Spam, address suggestions and bubbles, Cc/Bcc lines). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -52,7 +53,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.5**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.6**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -193,8 +194,14 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   inline attachments, which every mail app shows.
 - Compose, reply, reply-all, and forward (with the original attachments). Includes a light
   rich-text editor, an automatic plain-text alternative, attachments, drafts (saved to the
-  account's Drafts folder), a copy in Sent, and recipient autocomplete from recently used
-  addresses. Special-use folders (`\Sent`, `\Drafts`, `\Trash`, `\Archive`, `\Junk`) are detected
+  account's Drafts folder), and a copy in Sent. Addresses turn into bubbles as soon as they are
+  complete (space, comma, Enter or leaving the field; Backspace edits the last one). While you
+  type, DreyMail suggests people you have written to and people who wrote to you (not newsletters
+  or no-reply senders), those you write to most first, from all mailboxes or, in Settings →
+  General, only the mailbox you write from, its group or chosen mailboxes. The list is built from
+  the mail cache (existing mail too) and kept per mailbox in the database. The Cc and Bcc lines show
+  by themselves or a click away: Cc shown and Bcc hidden by default, set for all mailboxes, per
+  group or per mailbox in Settings → General, or with the pin at the end of the line while writing. Special-use folders (`\Sent`, `\Drafts`, `\Trash`, `\Archive`, `\Junk`) are detected
   with name fallbacks.
 - `mailto:` links open a new message in DreyMail: in plain-text mail directly, in HTML mail in a
   new tab (clicks inside the sandboxed message frame can't be caught). Settings → "Open email links
@@ -225,7 +232,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   manage blocked senders in Settings → General. In Junk, **Not spam** (in the message's toolbar,
   or for selected messages in the list) moves mail back to the inbox, marks it as not junk for the
   server's spam filter (`$NotJunk`, where the server keeps such marks; Gmail learns from the move
-  itself), and unblocks the sender if you had blocked them.
+  itself), and unblocks the sender if you had blocked them. Everywhere else, **Spam** does the
+  opposite: to Junk (made if the mailbox has none), marked `$Junk`.
 - **Auto-replies** (Settings → Auto-replies): out of office, out sick, on leave, on vacation
   or your own, each for all mailboxes or for chosen mailboxes and groups, optionally from one
   date and time until another. Your server sends them, even with DreyMail closed. Each sender

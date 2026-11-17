@@ -32,6 +32,7 @@
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: connecting single sign-on removes the account's password.
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
+// Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -41,6 +42,7 @@ import { ALL_PERMISSIONS, isPermission, SUPERADMIN, USER_DEFAULTS, USER_ROLE, ty
 import { normalizeFilters, type SavedSearch, type SearchFilters } from '../../shared/search.js';
 import type { AccountInput, AccountView, MailboxGroupInput, MailboxGroupView, Preferences, PushSubscriptionInput, Signature, SignatureInput, TlsMode } from '../../shared/types.js';
 import { DEFAULT_MESSAGE_BUTTONS } from '../../shared/types.js';
+import { DEFAULT_ADDRESS_LINES } from '../../shared/addressLines.js';
 import { decrypt, encrypt } from './crypto.js';
 
 // Snoozed messages: where each one waits (IMAP folder, UIDVALIDITY, UID) and when it returns to
@@ -482,6 +484,24 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      sent_at INTEGER NOT NULL,
      PRIMARY KEY (reply_id, account_id, sender)
    );`,
+  // DreyMail 8.6: address suggestions per mailbox (people you sent to, people who wrote to you),
+  // and which folders' existing mail has been counted (once each).
+  `CREATE TABLE IF NOT EXISTS address_book (
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     address TEXT NOT NULL,
+     name TEXT NOT NULL DEFAULT '',
+     sent INTEGER NOT NULL DEFAULT 0,
+     received INTEGER NOT NULL DEFAULT 0,
+     last_seen INTEGER NOT NULL,
+     PRIMARY KEY (user_id, account_id, address)
+   );
+   CREATE TABLE IF NOT EXISTS address_book_filled (
+     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     folder TEXT NOT NULL,
+     filled_at INTEGER NOT NULL,
+     PRIMARY KEY (account_id, folder)
+   );`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -508,6 +528,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarScheduled: true,
   sidebarSearches: true,
   messageButtons: [...DEFAULT_MESSAGE_BUTTONS],
+  suggestScope: 'all',
+  suggestAccounts: [],
+  addressLines: DEFAULT_ADDRESS_LINES,
 };
 
 export interface User {

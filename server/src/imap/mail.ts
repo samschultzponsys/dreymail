@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-17: every folder answered from the cache (filled in the background).
 // Modified by samschultzponsys, 2026-11-17: other cached folders checked with the server before listing; Drafts never threaded.
 // Modified by samschultzponsys, 2026-11-17: Not spam (back to the inbox, marked $NotJunk).
+// Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -430,6 +431,14 @@ export class MailService {
     const special = list.filter((f) => MailService.specialUse(f) !== null);
     const rest = list.filter((f) => MailService.specialUse(f) === null);
     return [...special, ...rest].map((f) => f.path);
+  }
+
+  /** What a folder is for (inbox, sent, junk, …), or null for an ordinary folder (DreyMail). */
+  async folderUse(userId: string, accountId: string, path: string): Promise<SpecialUse | null> {
+    const f = (await this.pool.folders(userId, accountId)).find((x) => x.path === path);
+    // Gmail's Important only shows mail kept in other folders, like All mail.
+    if (f?.specialUse === '\\Important') return 'all';
+    return f ? MailService.specialUse(f) : null;
   }
 
   /** Find a special-use folder, preferring server-declared SPECIAL-USE over name matches. */
@@ -864,10 +873,10 @@ export class MailService {
    * none. Creating it is the least surprising fallback: "archive" and "snooze" keep working like
    * in other clients.
    */
-  async ensureFolder(userId: string, accountId: string, use: 'archive' | 'snoozed'): Promise<{ path: string; created: boolean }> {
+  async ensureFolder(userId: string, accountId: string, use: 'archive' | 'snoozed' | 'junk'): Promise<{ path: string; created: boolean }> {
     const existing = await this.specialFolder(userId, accountId, use);
     if (existing) return { path: existing, created: false };
-    const name = use === 'archive' ? 'Archive' : 'Snoozed';
+    const name = use === 'archive' ? 'Archive' : use === 'junk' ? 'Junk' : 'Snoozed';
     try {
       const res = await this.pool.withClient(userId, accountId, async (client) => {
         const created = await client.mailboxCreate([name]);
@@ -878,6 +887,10 @@ export class MailService {
       this.foldersChanged(userId, accountId);
       return { path: res.path, created: true };
     } catch (err) {
+      // Perhaps it was made meanwhile (elsewhere): the remembered folder list can be a minute old.
+      await this.pool.folders(userId, accountId, true).catch(() => undefined);
+      const now = await this.specialFolder(userId, accountId, use).catch(() => null);
+      if (now) return { path: now, created: false };
       const e = err as { responseText?: string; message?: string };
       throw new MailServerError(`This account has no ${name} folder and one could not be created: ${e.responseText || e.message}`, 'protocol');
     }
@@ -956,6 +969,11 @@ export class MailService {
     let createdFolder: string | null = null;
     if (action.type === 'move') destination = action.destination;
     if (action.type === 'notJunk') destination = 'INBOX';
+    if (action.type === 'junk') {
+      const junk = await this.ensureFolder(userId, accountId, 'junk');
+      destination = junk.path;
+      if (junk.created) createdFolder = junk.path;
+    }
     if (action.type === 'archive') {
       const archive = await this.ensureFolder(userId, accountId, 'archive');
       destination = archive.path;
@@ -994,6 +1012,10 @@ export class MailService {
             // not every server keeps keywords, and the move matters most (Gmail learns from it).
             await client.messageFlagsRemove(range, ['$Junk', 'Junk'], { uid: true }).catch(() => undefined);
             await client.messageFlagsAdd(range, ['$NotJunk', 'NonJunk'], { uid: true }).catch(() => undefined);
+          }
+          if (action.type === 'junk') {
+            await client.messageFlagsRemove(range, ['$NotJunk', 'NonJunk'], { uid: true }).catch(() => undefined);
+            await client.messageFlagsAdd(range, ['$Junk', 'Junk'], { uid: true }).catch(() => undefined);
           }
           const res = await client.messageMove(range, destination, { uid: true });
           return { res, ids, senders };

@@ -13,6 +13,43 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.6): Spam, address suggestions and bubbles, Cc/Bcc lines
+
+- **Spam:** a button in the message toolbar (outside Junk) and in the list's selection bar moves
+  mail to Junk (made if the mailbox has none), removes `$NotJunk`/`NonJunk` and adds
+  `$Junk`/`Junk`, with Undo. The AI assistant learns from it as a move to Junk. Making a missing
+  Archive or Junk folder now looks again when it fails (the folder list can be a minute old).
+- **Address suggestions** from sent and received mail, per mailbox: senders of mail in the inbox,
+  Archive and your own folders (not newsletters, updates or no-reply senders; not Junk, Trash,
+  Drafts or All mail), recipients of mail in Sent and of everything sent from DreyMail. Each
+  folder's existing mail is counted once, from the mail cache when it has filled, then only new
+  mail, so nothing counts twice (also after clearing a cache). Up to 5,000 people per mailbox in
+  the new `address_book` table (gone with the mailbox). Matches at the start of an address, name or
+  word come first, then people you write to most (a sent message counts three times a received
+  one). Settings → General → *Suggest addresses from*: all mailboxes (default), the mailbox you
+  write from, its group, or chosen mailboxes. Your own mailboxes' addresses are never suggested.
+- **Address bubbles:** in To, Cc and Bcc a complete address becomes a bubble on space, comma,
+  semicolon, Enter, Tab or leaving the field; pasted lists become bubbles; Backspace turns the last
+  bubble back into text; incomplete entries show in red. The fields stay comma-separated text
+  underneath, so drafts, replies and sending are unchanged.
+- **Cc and Bcc lines:** shown by themselves or a click away (*Cc* / *Bcc* on the To line). By
+  default Cc is shown and Bcc is not. Settings → General → *Cc and Bcc lines* sets it for all
+  mailboxes, and per group and per mailbox (a mailbox's choice wins over its group's, a group's
+  over all). The pin at the end of each line changes whichever setting applies to the mailbox you
+  write from; unpinning keeps the line for the message being written.
+- **Files:** `server/src/addressBook.ts` (new), `shared/addressLines.ts` (new),
+  `web/src/addresses.ts` (new), `web/src/components/AddressField.tsx` (new),
+  `web/src/components/WritingSettings.tsx` (new), `server/test/addressBook.test.ts` (new),
+  `web/test/addresses.test.ts` (new), `web/test/addressLines.test.ts` (new), `server/src/db.ts`
+  (migration: `address_book`, `address_book_filled`), `server/src/app.ts`,
+  `server/src/cache/sync.ts`, `server/src/imap/mail.ts`, `server/src/mail/send.ts`,
+  `server/src/routes/api.ts`, `server/src/ai/engine.ts`, `shared/types.ts`,
+  `web/src/components/Composer.tsx`, `web/src/components/Reader.tsx`,
+  `web/src/components/MessageList.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/App.tsx`,
+  `web/src/api.ts`, `web/src/push.ts`, `web/src/swipe.ts`, `web/src/sticky.ts`,
+  `web/src/styles.css`, `server/test/migrations.test.ts`, `server/test/integration/mail.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.5): Not spam
 
 - **Not spam** in Junk: a button in the message's toolbar (shown only in the Junk folder), and in
