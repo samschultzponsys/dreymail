@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-16: who is being followed (for keeping folder lists current).
 // Modified by samschultzponsys, 2026-11-16: start of new messages fetched for notification previews.
 // Modified by samschultzponsys, 2026-11-16: folder lists on their own connection, so opening a message never waits behind them.
+// Modified by samschultzponsys, 2026-11-17: a third command connection for filling the cache of other folders in the background.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -42,6 +43,9 @@ interface Watcher {
 }
 
 export class NotFoundError extends Error {}
+
+/** Which of an account's command connections (see ImapPool.client). */
+export type Lane = 'main' | 'folders' | 'sync';
 
 const FOLDER_CACHE_MS = 60_000;
 
@@ -96,10 +100,11 @@ export class ImapPool {
   /**
    * The account's command connection, or (`lane` 'folders') a second one that only lists folders:
    * listing every folder with its counts can take seconds on a big account, and opening a message
-   * must never wait behind it (DreyMail).
+   * must never wait behind it (DreyMail). Lane 'sync' fills the cache of folders other than INBOX
+   * and Sent in the background, also without getting in the way.
    */
-  private async client(userId: string, accountId: string, lane: 'main' | 'folders' = 'main'): Promise<{ conn: CommandConnection; client: ImapFlow }> {
-    const key = lane === 'main' ? this.key(userId, accountId) : `${this.key(userId, accountId)}#folders`;
+  private async client(userId: string, accountId: string, lane: Lane = 'main'): Promise<{ conn: CommandConnection; client: ImapFlow }> {
+    const key = lane === 'main' ? this.key(userId, accountId) : `${this.key(userId, accountId)}#${lane}`;
     let conn = this.conns.get(key);
     if (!conn) {
       conn = { client: null, connecting: null, lastUsed: Date.now(), inFlight: 0 };
@@ -126,7 +131,7 @@ export class ImapPool {
   }
 
   /** Run `fn` with a connection, without selecting a mailbox. */
-  async withClient<T>(userId: string, accountId: string, fn: (client: ImapFlow) => Promise<T>, lane: 'main' | 'folders' = 'main'): Promise<T> {
+  async withClient<T>(userId: string, accountId: string, fn: (client: ImapFlow) => Promise<T>, lane: Lane = 'main'): Promise<T> {
     const { conn, client } = await this.client(userId, accountId, lane);
     conn.inFlight++;
     try {
@@ -143,6 +148,7 @@ export class ImapPool {
     accountId: string,
     path: string,
     fn: (client: ImapFlow, mailbox: MailboxObject) => Promise<T>,
+    lane: Lane = 'main',
   ): Promise<T> {
     return this.withClient(userId, accountId, async (client) => {
       let lock;
@@ -157,7 +163,7 @@ export class ImapPool {
       } finally {
         lock.release();
       }
-    });
+    }, lane);
   }
 
   /** Folder list with a short cache (special-use lookups happen on most actions). */
@@ -174,7 +180,7 @@ export class ImapPool {
   invalidate(userId: string, accountId: string) {
     const key = this.key(userId, accountId);
     this.folderLists.delete(key);
-    for (const k of [key, `${key}#folders`]) {
+    for (const k of [key, `${key}#folders`, `${key}#sync`]) {
       const conn = this.conns.get(k);
       this.conns.delete(k);
       conn?.client?.logout().catch(() => conn.client?.close());

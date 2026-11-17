@@ -1,6 +1,10 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: every folder of a mailbox is cached, filled in the background on its own connection.
+
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { CacheConfig } from '../config.js';
-import type { ImapPool } from '../imap/pool.js';
+import type { ImapPool, Lane } from '../imap/pool.js';
 import { fetchSnippets, LIST_FETCH, sortTime, summaryOf, toDate } from '../imap/summary.js';
 import { CacheCorruptError, flagsOf, type CachedFolder, type CachedRole, type MailCache, type MessageEntry } from './store.js';
 
@@ -12,6 +16,14 @@ const PREFETCH_AMONG = 200;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
 export const LISTING_WAIT_MS = 1500;
 const DEBOUNCE_MS = 300;
+/**
+ * Other folders synced longer ago than this are brought up to date again when a session opens,
+ * and a listing waits for that (up to LISTING_WAIT_MS); fresher ones are shown at once and checked
+ * in the background (DreyMail).
+ */
+export const WARM_MAX_AGE_MS = 10 * 60_000;
+/** At most this many other folders per mailbox are cached (the special ones first). */
+export const WARM_MAX_FOLDERS = 100;
 /** SQLite result codes for a damaged database file: SQLITE_IOERR, SQLITE_CORRUPT, SQLITE_NOTADB. */
 const DAMAGED = new Set([10, 11, 26]);
 
@@ -30,6 +42,8 @@ export interface CacheSyncDeps {
   config: CacheConfig;
   /** The account's Sent folder, or null if it has none. */
   sentFolder: (userId: string, accountId: string) => Promise<string | null>;
+  /** Every folder that can hold messages, most important first (DreyMail). Throws if the list can't be had. */
+  cacheableFolders?: (userId: string, accountId: string) => Promise<string[]>;
   /** Whether the account's INBOX is being watched (IDLE) right now, so any change is reported. */
   isWatched: (userId: string, accountId: string) => boolean;
   /** The cached copy of a folder changed (new, removed or re-flagged messages). */
@@ -53,6 +67,9 @@ const sleep = (ms: number) =>
  *   UIDs still on the server, so messages deleted or moved elsewhere disappear.
  * - A new UIDVALIDITY empties the folder and it is filled again.
  * - After a sync of INBOX, the newest unread messages' content is loaded ahead.
+ * - Every other folder (DreyMail) gets a smaller copy (`messagesPerOtherFolder`), filled one
+ *   folder at a time when a mailbox is added or a session opens (warmAccount), on a connection of
+ *   its own so it never holds up what the user is doing.
  *
  * Syncs run on the account's pooled command connection, chunk by chunk, so user requests are not
  * stuck behind a long first fill. Only one sync per folder runs at a time; a request while one
@@ -67,6 +84,8 @@ export class CacheSync {
   private readonly jobs = new Map<string, Job>();
   /** Folders with activity that no sync has started on yet. */
   private readonly dirty = new Set<string>();
+  /** Accounts whose other folders are being filled (warmAccount), and whether to go round again. */
+  private readonly warming = new Map<string, { again: boolean }>();
   private stopped = false;
 
   constructor(private readonly deps: CacheSyncDeps) {}
@@ -77,6 +96,21 @@ export class CacheSync {
 
   private key(userId: string, accountId: string, path: string) {
     return `${userId}\u0000${accountId}\u0000${path}`;
+  }
+
+  /** Whether folders other than INBOX and Sent are cached. */
+  get cachesOtherFolders(): boolean {
+    return this.deps.config.messagesPerOtherFolder > 0 && !!this.deps.cacheableFolders;
+  }
+
+  /** How many of the newest messages a folder in this role keeps. */
+  private limit(role: CachedRole): number {
+    return role === 'folder' ? this.deps.config.messagesPerOtherFolder : this.deps.config.messagesPerFolder;
+  }
+
+  /** Other folders are filled on their own connection, so the user's requests never queue behind them. */
+  private lane(role: CachedRole): Lane {
+    return role === 'folder' ? 'sync' : 'main';
   }
 
   /** The cached copy of a folder, if it has been filled at least once. */
@@ -117,7 +151,7 @@ export class CacheSync {
     this.syncSoon(userId, accountId, path, f.role, 0);
   }
 
-  /** Sync INBOX and the Sent folder of an account in the background. */
+  /** Sync INBOX and the Sent folder of an account in the background, then fill the other folders. */
   syncAccount(userId: string, accountId: string) {
     this.syncSoon(userId, accountId, 'INBOX', 'inbox', 0);
     void this.deps
@@ -125,8 +159,68 @@ export class CacheSync {
       .then((sent) => {
         if (sent && sent !== 'INBOX') this.syncSoon(userId, accountId, sent, 'sent', 0);
         else if (!sent) this.forget(userId, accountId, 'sent');
+        this.warmAccount(userId, accountId, sent);
       })
       .catch(() => undefined);
+  }
+
+  /** Start caching an other folder now (it was just opened and isn't cached yet). */
+  startFolder(userId: string, accountId: string, path: string) {
+    if (!this.cachesOtherFolders || path === 'INBOX' || this.cache.folder(userId, accountId, path)) return;
+    this.syncSoon(userId, accountId, path, 'folder', 0);
+  }
+
+  /** Whether an other folder's copy is recent enough to be shown without waiting for the server. */
+  isFresh(userId: string, accountId: string, path: string): boolean {
+    const f = this.ready(userId, accountId, path);
+    return !!f && f.role === 'folder' && Date.now() - f.syncedAt < WARM_MAX_AGE_MS;
+  }
+
+  /**
+   * Fill (or bring up to date) the copy of every other folder of an account, one folder at a time
+   * in the background: those never cached first, then those not synced for a while. Folders no
+   * longer on the server are dropped. Never rejects.
+   */
+  warmAccount(userId: string, accountId: string, sent: string | null) {
+    if (!this.cachesOtherFolders || this.stopped) return;
+    const k = `${userId}\u0000${accountId}`;
+    const running = this.warming.get(k);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const state = { again: false };
+    this.warming.set(k, state);
+    void (async () => {
+      do {
+        state.again = false;
+        let paths: string[];
+        try {
+          paths = await this.deps.cacheableFolders!(userId, accountId);
+        } catch {
+          return;
+        }
+        const wanted = paths.filter((p) => p !== 'INBOX' && p !== sent).slice(0, WARM_MAX_FOLDERS);
+        const keep = new Set(wanted);
+        try {
+          for (const f of this.cache.folders(userId, accountId, 'folder')) if (!keep.has(f.path)) this.cache.dropFolder(userId, accountId, f.path);
+        } catch (err) {
+          this.handleError(err, userId, accountId, 'INBOX');
+        }
+        const syncedAt = (p: string) => this.cache.folder(userId, accountId, p)?.syncedAt ?? 0;
+        const due = wanted.filter((p) => Date.now() - syncedAt(p) >= WARM_MAX_AGE_MS).sort((a, b) => (syncedAt(a) === 0 ? 0 : 1) - (syncedAt(b) === 0 ? 0 : 1));
+        for (const path of due) {
+          if (this.stopped) return;
+          const role = this.roleOf(userId, accountId, path) ?? 'folder';
+          if (role !== 'folder') continue;
+          await this.sync(userId, accountId, path, role);
+          // Let the rest of the folder (older messages) come in before moving on.
+          await this.jobs.get(this.key(userId, accountId, path))?.running;
+        }
+      } while (state.again && !this.stopped);
+    })()
+      .catch((err: unknown) => this.deps.log?.('mail cache warm-up failed', { accountId, error: (err as Error).message }))
+      .finally(() => this.warming.delete(k));
   }
 
   private forget(userId: string, accountId: string, role: CachedRole) {
@@ -262,6 +356,7 @@ export class CacheSync {
    */
   private async update(userId: string, accountId: string, path: string, role: CachedRole): Promise<boolean> {
     const { cache, pool } = this.deps;
+    const limit = this.limit(role);
     return pool.withMailbox(userId, accountId, path, async (client, selected) => {
       // Not every server reports new mail in a selected folder by itself.
       await client.noop();
@@ -286,7 +381,7 @@ export class CacheSync {
 
       if (f.syncedAt === 0) {
         // First fill: the newest chunk, by sequence number (contiguous, so it covers every UID from its lowest up).
-        const start = Math.max(1, mailbox.exists - Math.min(FILL_CHUNK, this.deps.config.messagesPerFolder) + 1);
+        const start = Math.max(1, mailbox.exists - Math.min(FILL_CHUNK, limit) + 1);
         const msgs = await client.fetchAll(`${start}:${mailbox.exists}`, LIST_FETCH);
         cache.putMessages(f, await this.entries(client, source, uidValidity, msgs));
         const uids = msgs.map((m) => m.uid);
@@ -327,18 +422,19 @@ export class CacheSync {
         modseq: !condstore || modseq === null ? null : (f.modseq && BigInt(f.modseq) > modseq ? f.modseq : modseq.toString()),
         syncedAt: now,
       });
-      cache.trim(f, this.deps.config.messagesPerFolder);
+      cache.trim(f, limit);
       return changed;
-    });
+    }, this.lane(role));
   }
 
   /** Extend the folder towards older messages, a chunk at a time, up to the configured size. */
   private async fill(userId: string, accountId: string, path: string, interrupted: () => boolean) {
-    const { cache, pool, config } = this.deps;
+    const { cache, pool } = this.deps;
     for (;;) {
       if (interrupted()) return;
       const f = cache.folder(userId, accountId, path);
-      if (!f || f.syncedAt === 0 || f.complete || cache.count(f) >= config.messagesPerFolder) return;
+      const limit = f ? this.limit(f.role) : 0;
+      if (!f || f.syncedAt === 0 || f.complete || cache.count(f) >= limit) return;
       const more = await pool.withMailbox(userId, accountId, path, async (client, selected) => {
         const mailbox = (client.mailbox || selected) as MailboxObject;
         if (mailbox.uidValidity.toString() !== f.uidValidity) return false; // the next sync starts over
@@ -354,14 +450,14 @@ export class CacheSync {
           cache.updateFolder(f, { complete: true });
           return false;
         }
-        const want = Math.min(FILL_CHUNK, config.messagesPerFolder - cache.count(f));
+        const want = Math.min(FILL_CHUNK, limit - cache.count(f));
         const start = Math.max(1, top - want + 1);
         const msgs = (await client.fetchAll(`${start}:${top}`, LIST_FETCH)).filter((m) => m.uid < f.lowUid);
         cache.putMessages(f, await this.entries(client, { accountId, folder: path }, f.uidValidity, msgs));
         const uids = msgs.map((m) => m.uid);
         cache.updateFolder(f, { lowUid: uids.length ? Math.min(...uids) : f.lowUid, complete: start === 1 });
         return uids.length > 0 && start > 1;
-      });
+      }, this.lane(f.role));
       if (!more) return;
     }
   }

@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-15: Outlook / Microsoft 365 accounts (Microsoft sign-in, Graph sending).
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
+// Modified by samschultzponsys, 2026-11-17: DREYMAIL_CACHE_FOLDER_MESSAGES (every folder cached).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -102,8 +103,10 @@ export const LOGIN_ENV_NAMES: Record<keyof LoginEnv, string> = {
 };
 
 export interface CacheConfig {
-  /** Newest messages kept per cached folder. */
+  /** Newest messages kept per cached folder (INBOX and Sent). */
   messagesPerFolder: number;
+  /** Newest messages kept of every other folder, filled in the background (DreyMail); 0 = only INBOX and Sent. */
+  messagesPerOtherFolder: number;
   /** Largest message (bytes) whose content is kept. */
   maxBodyBytes: number;
   /** Total message content (bytes) kept per account; the least recently read goes first. */
@@ -184,12 +187,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cache: CacheConfig | null = bool(env.DREYMAIL_CACHE, true)
     ? {
         messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 2000),
+        messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 500),
         maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 1) * 1024 * 1024),
         bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
       }
     : null;
   if (cache && !(cache.messagesPerFolder >= 50 && cache.messagesPerFolder <= 100_000)) {
     errors.push('DREYMAIL_CACHE_MESSAGES must be between 50 and 100000');
+  }
+  if (cache && !(cache.messagesPerOtherFolder === 0 || (cache.messagesPerOtherFolder >= 50 && cache.messagesPerOtherFolder <= 100_000))) {
+    errors.push('DREYMAIL_CACHE_FOLDER_MESSAGES must be 0 or between 50 and 100000');
   }
   if (cache && !(cache.maxBodyBytes >= 0 && cache.bodyBytesPerAccount >= 0)) {
     errors.push('DREYMAIL_CACHE_MAX_BODY_MB and DREYMAIL_CACHE_ACCOUNT_MB must not be negative');

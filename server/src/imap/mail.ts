@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-16: automatic image loading rules (Settings → Images).
 // Modified by samschultzponsys, 2026-11-16: folder lists served at once from the last known one.
 // Modified by samschultzponsys, 2026-11-16: time taken per step when opening a message.
+// Modified by samschultzponsys, 2026-11-17: every folder answered from the cache (filled in the background).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -417,6 +418,18 @@ export class MailService {
       .slice(0, 40);
   }
 
+  /**
+   * Every folder that can hold messages, for filling the mail cache (DreyMail): the special ones
+   * (Drafts, Archive, Junk, Trash, …) first, then the rest in the server's order. Throws if the
+   * folder list can't be had.
+   */
+  async cacheableFolders(userId: string, accountId: string): Promise<string[]> {
+    const list = (await this.pool.folders(userId, accountId)).filter((f) => !f.flags.has('\\Noselect') && !f.flags.has('\\NonExistent'));
+    const special = list.filter((f) => MailService.specialUse(f) !== null);
+    const rest = list.filter((f) => MailService.specialUse(f) === null);
+    return [...special, ...rest].map((f) => f.path);
+  }
+
   /** Find a special-use folder, preferring server-declared SPECIAL-USE over name matches. */
   async specialFolder(userId: string, accountId: string, use: SpecialUse): Promise<string | null> {
     const list = await this.pool.folders(userId, accountId);
@@ -499,8 +512,9 @@ export class MailService {
     return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
       const f = sync.ready(userId, accountId, folder);
       if (!f) {
-        // Not cached yet: start filling it if it is INBOX or Sent (the IMAP server answers meanwhile).
+        // Not cached yet: start filling it (the IMAP server answers meanwhile).
         if (folder === 'INBOX' || cache.folder(userId, accountId, folder)) sync.syncAccount(userId, accountId);
+        else sync.startFolder(userId, accountId, folder);
         return null;
       }
       let reset = false;
@@ -621,6 +635,12 @@ export class MailService {
           if (!sync.ready(userId, accountId, folder)) return;
           const sent = cache.folderByRole(userId, accountId, 'sent');
           const others = sent && sent.path !== folder ? [sent.path] : [];
+          // Other folders synced a moment ago (DreyMail): show the copy at once, check in the background.
+          if (!fresh && sync.isFresh(userId, accountId, folder)) {
+            sync.refreshIfOlder(userId, accountId, folder, SENT_REFRESH_MS);
+            for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);
+            return;
+          }
           if (!fresh && sync.isCurrent(userId, accountId, folder)) {
             // Nothing tells us about changes in Sent; have a look in the background now and then.
             for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);

@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-15: privacy page at /privacy.
 // Modified by samschultzponsys, 2026-11-16: folder lists kept current in the background.
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
+// Modified by samschultzponsys, 2026-11-17: every folder of a mailbox cached in the background.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -154,7 +155,7 @@ export async function buildApp(
     blockPrivateHosts: config.blockPrivateMailHosts,
     log: (msg, extra) => app.log.info(extra ?? {}, msg),
   });
-  // The mail cache: copies of INBOX and Sent, kept in step with the IMAP server. Disposable, so a
+  // The mail cache: copies of INBOX and Sent (and of every other folder), kept in step with the IMAP server. Disposable, so a
   // separate file from the main database.
   const cacheLog = (msg: string, extra?: Record<string, unknown>) => app.log.warn(extra ?? {}, msg);
   // With an injected store (tests) the cache defaults to memory too.
@@ -168,6 +169,7 @@ export async function buildApp(
           config: config.cache,
           // Called only once a sync runs, after `mail` exists.
           sentFolder: (userId, accountId) => mail.specialFolder(userId, accountId, 'sent'),
+          cacheableFolders: (userId, accountId) => mail.cacheableFolders(userId, accountId),
           isWatched: (userId, accountId) => pool.isWatching(userId, accountId),
           onChanged: (userId, accountId, folder) => pool.onEvent(userId, { type: 'mailbox', accountId, folder }),
           log: cacheLog,

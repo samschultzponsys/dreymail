@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: each mailbox's folder list, kept encrypted.
+// Modified by samschultzponsys, 2026-11-17: every other folder cached too (role 'folder').
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,7 +14,8 @@ import { decryptBytes, encryptBytes } from '../crypto.js';
 import { matchesTerm, type LookupField, type LookupTerm } from '../imap/related.js';
 
 /**
- * Local copies of the newest messages of a few folders (INBOX and Sent), so listings and opening
+ * Local copies of the newest messages of each folder (INBOX and Sent, and since DreyMail 8.1 a
+ * smaller copy of every other folder), so listings and opening
  * a message don't have to wait for the IMAP server. The IMAP server stays the source of truth:
  * CacheSync (sync.ts) keeps this in step with it, and everything here can be thrown away at any
  * time. That is also how problems are handled: a format change, another secret key, a value that
@@ -45,7 +47,7 @@ const SCHEMA = `
     user_id TEXT NOT NULL,
     account_id TEXT NOT NULL,
     path TEXT NOT NULL,
-    -- Why the folder is cached: 'inbox' or 'sent'.
+    -- Why the folder is cached: 'inbox', 'sent' or 'folder' (any other folder).
     role TEXT NOT NULL,
     uid_validity TEXT NOT NULL,
     -- Every message with low_uid <= UID < uid_next is in the cache.
@@ -116,7 +118,8 @@ export function imapFlags(f: MessageFlags): Set<string> {
   return out;
 }
 
-export type CachedRole = 'inbox' | 'sent';
+/** 'inbox' and 'sent' are one folder per account; 'folder' is any other folder (DreyMail). */
+export type CachedRole = 'inbox' | 'sent' | 'folder';
 
 /** A cached folder. */
 export interface CachedFolder {
@@ -303,10 +306,24 @@ export class MailCache {
     return r ? toFolder(r) : null;
   }
 
-  /** Start a folder over, empty, for this UIDVALIDITY. Replaces any other folder with the same role. */
+  /** The account's cached folders (all, or those with this role). */
+  folders(userId: string, accountId: string, role?: CachedRole): CachedFolder[] {
+    const rows = (
+      role
+        ? this.db.prepare('SELECT * FROM folders WHERE user_id = ? AND account_id = ? AND role = ?').all(userId, accountId, role)
+        : this.db.prepare('SELECT * FROM folders WHERE user_id = ? AND account_id = ?').all(userId, accountId)
+    ) as unknown as FolderRow[];
+    return rows.map(toFolder);
+  }
+
+  /**
+   * Start a folder over, empty, for this UIDVALIDITY. Replaces any other folder with the same role
+   * ('inbox' and 'sent' are one per account; 'folder' only replaces the same path).
+   */
   resetFolder(userId: string, accountId: string, path: string, role: CachedRole, uidValidity: string): CachedFolder {
     return this.tx(() => {
-      this.db.prepare('DELETE FROM folders WHERE user_id = ? AND account_id = ? AND (path = ? OR role = ?)').run(userId, accountId, path, role);
+      if (role === 'folder') this.db.prepare('DELETE FROM folders WHERE user_id = ? AND account_id = ? AND path = ?').run(userId, accountId, path);
+      else this.db.prepare('DELETE FROM folders WHERE user_id = ? AND account_id = ? AND (path = ? OR role = ?)').run(userId, accountId, path, role);
       this.db
         .prepare(
           `INSERT INTO folders (user_id, account_id, path, role, uid_validity, uid_next, low_uid, complete, modseq, exists_count, synced_at)

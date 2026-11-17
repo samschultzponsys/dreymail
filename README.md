@@ -35,7 +35,8 @@
      Modified by samschultzponsys, 2026-11-17: Schedule button; longer send delays.
      Modified by samschultzponsys, 2026-11-17: pinned message buttons on every message.
      Modified by samschultzponsys, 2026-11-17: auto-replies.
-     Modified by samschultzponsys, 2026-11-17: Install the app; dreymail:// links. -->
+     Modified by samschultzponsys, 2026-11-17: Install the app; dreymail:// links.
+     Modified by samschultzponsys, 2026-11-17: v8.1 (every folder cached in the background). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -47,7 +48,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -63,8 +64,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Your mail server stays the source of truth.** DreyMail keeps users, their encrypted account
   settings and preferences (plus, for notifications, push subscriptions and the newest INBOX UID
   already notified about, and for snoozed mail, folder, UID and wake-up time) in one SQLite file.
-  To be quick, it also keeps an encrypted, disposable copy of each account's newest INBOX and Sent
-  mail in a second one; see [Mail cache](#mail-cache).
+  To be quick, it also keeps an encrypted, disposable copy of the newest mail of every folder in a
+  second one, filled in the background as soon as a mailbox is added; see [Mail cache](#mail-cache).
 - **One container.** Configured by environment variables, with a volume for the SQLite files. No
   Redis, no Postgres, no sidecars.
 - **Modern UI.** Clean three-pane layout, first-class dark mode, usable on a phone.
@@ -621,8 +622,9 @@ volume by itself:
 | `DREYMAIL_IMAP_IDLE_TIMEOUT` | no | `300` | Seconds before an unused pooled IMAP connection is closed. |
 | `DREYMAIL_MAX_MESSAGE_MB` | no | `50` | Largest message the server downloads for display. |
 | `DREYMAIL_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
-| `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest INBOX and Sent mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
-| `DREYMAIL_CACHE_MESSAGES` | no | `2000` | Newest messages kept per cached folder (50–100000). Older mail is fetched from the mail server as you scroll. |
+| `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
+| `DREYMAIL_CACHE_MESSAGES` | no | `2000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
+| `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `500` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
 | `DREYMAIL_CACHE_MAX_BODY_MB` | no | `1` | Largest message whose content is kept (`0`: keep no message content). |
 | `DREYMAIL_CACHE_ACCOUNT_MB` | no | `200` | Message content kept per account; the least recently read goes first. |
 | `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
@@ -823,8 +825,14 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
 Asking the mail server for everything on every click is slow: one page of a folder takes several
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
 searches that some servers are slow at. So DreyMail keeps a copy of the newest messages
-(`DREYMAIL_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder:
-sender, subject, snippet, flags and the headers that tie conversations together. It also keeps the
+(`DREYMAIL_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder, and of
+the newest messages of **every other folder** (`DREYMAIL_CACHE_FOLDER_MESSAGES`, 500 by default):
+sender, subject, snippet, flags and the headers that tie conversations together.
+
+The other folders are filled in the background, one at a time, as soon as a mailbox is added and
+again whenever a session opens (folders not checked in the last 10 minutes; up to 100 folders per
+mailbox, Drafts, Archive, Junk and Trash first). This runs on a connection of its own, so it never
+holds up what you are doing. A folder you open before its turn starts filling right away. It also keeps the
 content of messages you have opened, and loads the newest unread ones ahead, up to
 `DREYMAIL_CACHE_MAX_BODY_MB` per message and `DREYMAIL_CACHE_ACCOUNT_MB` per account. The limits
 are server settings; users can't change them.
@@ -835,13 +843,14 @@ The mail server stays the source of truth:
   once the server has done it.
 - The copy follows the server. While INBOX is watched (a browser is open, or notifications are on),
   every change reported by IDLE is fetched right away, so the inbox shows without asking the server.
-  Otherwise, and for Sent, a listing first gives the server a moment (1.5 s) to report changes, and
-  shows the copy if it is slower; the list updates by itself when the changes arrive. **Refresh**
+  Other folders checked in the last 10 minutes show at once and are checked in the background.
+  Otherwise, a listing first gives the server a moment (1.5 s) to report changes, and shows the
+  copy if it is slower; the list updates by itself when the changes arrive. **Refresh**
   always checks with the server first. Changes are fetched incrementally: new messages, changed
   flags (only those since the last check where the server supports CONDSTORE) and messages that are
   gone. A new UIDVALIDITY starts the folder over.
-- Other folders, searches, scrolling past the copy, attachments and folder counts always go to the
-  mail server.
+- Searches, scrolling past the copy, attachments and folder counts always go to the mail server.
+  Folders removed on the server are dropped from the copy.
 - The copy is disposable. It is a separate file (`cache.db`), and anything wrong with it (a damaged
   file, an entry that doesn't decrypt, another secret key, a new format) just empties it, or the
   folder concerned, and it is filled again from the server. Deleting the file while DreyMail is
@@ -972,7 +981,7 @@ server/src
   auth/             OIDC login (openid-client), password login (scrypt) and encrypted session cookies
   db.ts             SQLite store: users, encrypted accounts, preferences, recent recipients, image
                     allowlist, push subscriptions, snoozes
-  cache/store.ts    Mail cache: encrypted copies of INBOX and Sent (a separate, disposable SQLite file)
+  cache/store.ts    Mail cache: encrypted copies of every folder's newest mail (a separate, disposable SQLite file)
   cache/sync.ts     Keeps the mail cache in step with the IMAP server
   imap/pool.ts      Lazy per-account IMAP connections with idle timeout; IDLE watchers
   imap/mail.ts      Folders, unified listing (k-way merge with per-account UID cursors), actions

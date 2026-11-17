@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.1): every folder cached
+
+- **Other folders open at once:** the mail cache now keeps the newest 500 messages
+  (`DREYMAIL_CACHE_FOLDER_MESSAGES`, `0` for the old INBOX-and-Sent-only behavior) of every
+  folder, not only INBOX and Sent. They are filled one at a time in the background as soon as a
+  mailbox is added and whenever a session opens (folders not checked for 10 minutes; up to 100 per
+  mailbox, special folders first), on a third IMAP connection of their own so opening messages
+  never waits behind it. A folder opened before its turn starts filling right away. A folder
+  checked in the last 10 minutes is listed straight from the cache and checked in the background;
+  folders gone from the server are dropped from the cache. Conversations in those folders also come
+  from the cache instead of header searches on the server.
+- **Files:** `server/src/cache/store.ts`, `server/src/cache/sync.ts`, `server/src/imap/pool.ts`,
+  `server/src/imap/mail.ts`, `server/src/config.ts`, `server/src/app.ts`,
+  `server/test/cache.test.ts`, `server/test/cacheWarm.test.ts` (new), `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.0): install the app; open pages in the app
 
 - **Install the app:** in a browser, a download icon at the bottom of the sidebar (right-click

@@ -76,6 +76,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Right-click a mailbox's name to edit it, collapse it or show all its folders (6.0).
 - [x] Notifications can show the start of the message too; that setting is in the Android app (5.9, 6.0).
 - [x] Grips on the pane edges; the folder bar's width can be dragged too (5.7).
+- [x] Every folder cached, not only INBOX and Sent: filled in the background when a mailbox is
+      added or a session opens, on its own connection, so other folders open at once (8.1).
 - [x] Folder lists kept in the encrypted cache across restarts and refreshed in the background (5.5).
 - [x] Message list width dragged and kept per device; folder lists shown at once from the last known
       one; Settings tabs fit on phones (5.4).

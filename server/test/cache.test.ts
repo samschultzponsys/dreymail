@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-17: other folders cached ('folder' role, DREYMAIL_CACHE_FOLDER_MESSAGES).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -66,6 +67,21 @@ function inbox(cache: MailCache, userId = 'u1', accountId = 'a1', path = 'INBOX'
 }
 
 describe('mail cache storage', () => {
+  it("keeps any number of other folders ('folder' role) next to INBOX and Sent", () => {
+    const cache = new MailCache(':memory:', keysOf(secret()));
+    inbox(cache);
+    inbox(cache, 'u1', 'a1', 'Sent', 'sent');
+    cache.resetFolder('u1', 'a1', 'Archive', 'folder', '1');
+    cache.resetFolder('u1', 'a1', 'Junk', 'folder', '1');
+    cache.resetFolder('u1', 'a1', 'Archive', 'folder', '2'); // starts Archive over, keeps Junk
+    expect(cache.folders('u1', 'a1', 'folder').map((f) => [f.path, f.uidValidity]).sort()).toEqual([['Archive', '2'], ['Junk', '1']]);
+    expect(cache.folders('u1', 'a1').length).toBe(4);
+    // Sent stays one folder per account.
+    cache.resetFolder('u1', 'a1', 'Sent Items', 'sent', '1');
+    expect(cache.folders('u1', 'a1', 'sent').map((f) => f.path)).toEqual(['Sent Items']);
+    cache.close();
+  });
+
   it('keeps subjects, addresses, snippets, Message-IDs and message content encrypted on disk', () => {
     const file = tempFile();
     const cache = new MailCache(file, keysOf(secret()));
@@ -248,13 +264,14 @@ describe('mail cache settings', () => {
   const base = { DREYMAIL_SECRET_KEY: secret(), DREYMAIL_DEV_LOGIN: 'true' };
 
   it('is on by default with 2000 messages per folder, 1 MB per message and 200 MB per account', () => {
-    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 2000, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
+    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 2000, messagesPerOtherFolder: 500, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
   });
 
   it('can be switched off or sized by the administrator', () => {
     expect(loadConfig({ ...base, DREYMAIL_CACHE: 'false' }).cache).toBeNull();
-    expect(loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '500', DREYMAIL_CACHE_MAX_BODY_MB: '0.5', DREYMAIL_CACHE_ACCOUNT_MB: '50' }).cache).toEqual({
+    expect(loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '500', DREYMAIL_CACHE_FOLDER_MESSAGES: '0', DREYMAIL_CACHE_MAX_BODY_MB: '0.5', DREYMAIL_CACHE_ACCOUNT_MB: '50' }).cache).toEqual({
       messagesPerFolder: 500,
+      messagesPerOtherFolder: 0,
       maxBodyBytes: 512 * 1024,
       bodyBytesPerAccount: 50 * 1024 * 1024,
     });
@@ -263,5 +280,6 @@ describe('mail cache settings', () => {
   it('rejects an unreasonable number of messages per folder', () => {
     expect(() => loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '10' })).toThrow(/DREYMAIL_CACHE_MESSAGES/);
     expect(() => loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '10000000' })).toThrow(/DREYMAIL_CACHE_MESSAGES/);
+    expect(() => loadConfig({ ...base, DREYMAIL_CACHE_FOLDER_MESSAGES: '10' })).toThrow(/DREYMAIL_CACHE_FOLDER_MESSAGES/);
   });
 });
