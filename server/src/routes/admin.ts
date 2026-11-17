@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 // Administration: users (list, add, give a role, reset password, change picture, remove), roles
-// with permission flags, sign-in settings (OIDC, password login, registration) and the Android app's
+// with permission flags, sign-in settings (OIDC, password login, registration), server settings and the Android app's
 // Firebase setup. Each needs its own permission (shared/permissions.ts); /api's preHandler has
 // already authenticated the user and checked the CSRF header.
 
@@ -20,6 +20,7 @@ import type { Config } from '../config.js';
 import type { Store, User } from '../db.js';
 import type { MailService } from '../imap/mail.js';
 import type { ImapPool } from '../imap/pool.js';
+import { ServerSettingsError, type ServerSettings } from '../serverSettings.js';
 import { LoginSettingsError, type LoginSettings } from '../loginSettings.js';
 import type { FirebaseConfig } from '../push/fcm.js';
 import type { MailCache } from '../cache/store.js';
@@ -31,6 +32,8 @@ export interface AdminDeps {
   sessions: Sessions;
   access: Access;
   login: LoginSettings;
+  /** Server settings saved in the UI (DreyMail). */
+  serverSettings?: ServerSettings;
   pool: ImapPool;
   mail: MailService;
   firebase: FirebaseConfig;
@@ -59,7 +62,7 @@ const roleSchema = z.object({ name: z.string().trim().min(1).max(60), permission
 const testSchema = z.object({ issuerUrl: z.string().max(2000), clientId: z.string().max(500), clientSecret: z.string().max(2000) });
 
 export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps) {
-  const { config, store, sessions, access, login, pool, mail, firebase } = deps;
+  const { config, store, sessions, access, login, pool, mail, firebase, serverSettings } = deps;
   const ai = new AssistantStore(store);
 
   const view = (u: User & { accounts: number }): AdminUser => ({
@@ -270,6 +273,23 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
     if (!canGrant(req.user!, role)) return bad(reply, "You can't give that role");
     store.setDefaultRole(role.id);
     return rolesView();
+  });
+
+  // ---- server settings (DreyMail 9.7) -----------------------------------------------
+
+  app.get('/api/admin/server', async (req, reply) => (may(req, reply, 'server.manage') ? (serverSettings?.view() ?? { settings: [], restartNeeded: false }) : reply));
+
+  app.put('/api/admin/server', async (req, reply) => {
+    if (!may(req, reply, 'server.manage')) return reply;
+    if (!serverSettings) return bad(reply, 'Not available');
+    const body = z.object({ values: z.record(z.string(), z.string().max(2000).nullable()) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      return serverSettings.save(body.data.values);
+    } catch (err) {
+      if (err instanceof ServerSettingsError) return bad(reply, err.message);
+      throw err;
+    }
   });
 
   // ---- sign-in settings ------------------------------------------------------------

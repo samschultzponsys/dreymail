@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,6 +54,7 @@ import { registerPasskeyRoutes } from './auth/passkeys.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
+import { ServerSettings, withStoredSettings } from './serverSettings.js';
 import type { Http } from './calendar/remote.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
@@ -154,6 +156,9 @@ export async function buildApp(
   if (!opts.store) moveOldDataFiles(config.dataDir, (m) => app.log.info(m));
   const store = opts.store ?? new Store(path.join(config.dataDir, DB_FILE), keyring.credentialKey);
   rekeyOldSecrets(store, config.secretKey, (m) => app.log.info(m));
+  // Server settings saved in the UI, under the environment (which wins) (DreyMail).
+  config = withStoredSettings(config, store, (m) => app.log.warn(m));
+  const serverSettings = new ServerSettings(config, store);
   const sessions = new Sessions(keyring.sessionKey, config.baseUrl.protocol === 'https:');
   const pool = new ImapPool(store, {
     idleTimeoutMs: config.imapIdleTimeoutMs,
@@ -372,6 +377,7 @@ export async function buildApp(
     sessions,
     access,
     login,
+    serverSettings,
     pool,
     mail,
     firebase,

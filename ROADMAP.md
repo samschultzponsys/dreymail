@@ -21,12 +21,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Mail
 - [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
-- [ ] Gmail specifics: multi-label view and archive vs. delete semantics over IMAP.
-
-### Configuration
-- [ ] Remaining settings in the UI (account defaults, cache, push), stored in the database, with
-      compose-file environment variables overriding them and shown as locked. Bootstrap values
-      (secret key, data dir) stay env-only.
+- [ ] Gmail: a conversation's labels in the message list.
 
 ### Branding
 - [ ] Decide whether the running-squirrel phone animation stays or gets its own DreyMail motion.
@@ -107,6 +102,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Gmail with Sign in with Google, next to app passwords (2.3); both offered side by side with
       what each gives and costs (4.2).
 - [x] Provider list with server settings filled in (and picked from your address), or custom (4.3).
+- [x] Gmail: Archive moves to All Mail (no "Archive" label); a message's labels shown, added and
+      removed (9.7).
 - [x] Search with a visual filter builder (accounts, where, from/to, subject, text, dates, size,
       attachments, starred, replied) and saved searches as smart folders (2.4).
 
@@ -165,6 +162,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Settings → Storage: space used per user (mail cache per mailbox, own data by kind) and the
       database files' sizes (8.2); clearing a user's mail cache, per mailbox or all (8.3).
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
+- [x] Server settings in the UI (new-mailbox defaults, mail cache, limits, push contact, update
+      check), stored in the database, compose-file variables winning and shown locked (9.7).
 - [x] Connecting single sign-on to an existing account (4.4); connecting replaces the password,
       disconnecting sets a new one (7.6).
 - [x] Automatic single sign-on with `/login` as the way back in; OIDC redirect URIs shown for the

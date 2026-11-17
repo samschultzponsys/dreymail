@@ -9,9 +9,11 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam button in Junk; Spam button elsewhere.
 // Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a bubble in its color.
 // Modified by samschultzponsys, 2026-11-17: attached pictures open in an image viewer; a download arrow on their chip.
+// Modified by samschultzponsys, 2026-11-17: Gmail labels of the message.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
+import { GmailLabels } from './GmailLabels';
 import {
   AlarmClock,
   Archive,
@@ -706,6 +708,7 @@ function MessageCard({
           )}
 
           {d.invite && <InviteCard invite={d.invite} detail={d} account={account} />}
+          <GmailLabels detail={d} account={account} />
 
           {d.snoozedUntil && (
             <div className="notice">

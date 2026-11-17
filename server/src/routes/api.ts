@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam (unblocks the sender).
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
+// Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -805,6 +806,28 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       senderHosted: prefs?.imagesSenderHosted === true,
     };
   };
+
+  /** Gmail labels of a message (null for mailboxes without labels) (DreyMail). */
+  app.get('/api/message/labels', async (req, reply) => {
+    try {
+      const q = refSchema.parse(req.query);
+      requireAccount(uid(req), q.accountId);
+      return { labels: await mail.labels(uid(req), q) };
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
+
+  app.put('/api/message/labels', async (req, reply) => {
+    try {
+      const body = z.object({ ref: refSchema, add: z.array(z.string().min(1).max(1000)).max(50).default([]), remove: z.array(z.string().min(1).max(1000)).max(50).default([]) }).parse(req.body);
+      requireAccount(uid(req), body.ref.accountId);
+      await mail.setLabels(uid(req), body.ref, body.add, body.remove);
+      return { labels: await mail.labels(uid(req), body.ref).catch(() => null) };
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
 
   app.get('/api/message', async (req, reply) => {
     try {

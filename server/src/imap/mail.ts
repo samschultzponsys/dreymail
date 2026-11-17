@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam (back to the inbox, marked $NotJunk).
 // Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
 // Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
+// Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -976,9 +977,15 @@ export class MailService {
       if (junk.created) createdFolder = junk.path;
     }
     if (action.type === 'archive') {
-      const archive = await this.ensureFolder(userId, accountId, 'archive');
-      destination = archive.path;
-      if (archive.created) createdFolder = archive.path;
+      // Gmail has no Archive folder: archiving there is moving to All Mail (dropping the Inbox
+      // label), never making an "Archive" label (DreyMail).
+      const allMail = (await this.specialFolder(userId, accountId, 'archive')) ? null : await this.specialFolder(userId, accountId, 'all');
+      if (allMail) destination = allMail;
+      else {
+        const archive = await this.ensureFolder(userId, accountId, 'archive');
+        destination = archive.path;
+        if (archive.created) createdFolder = archive.path;
+      }
     }
     if (action.type === 'delete') {
       const trash = await this.specialFolder(userId, accountId, 'trash');
@@ -1065,6 +1072,39 @@ export class MailService {
     } catch {
       /* not critical */
     }
+  }
+
+  /**
+   * Gmail labels of a message (null when the server has no labels), with the labels it could have:
+   * the account's folders, as Gmail shows labels as folders (DreyMail).
+   */
+  async labels(userId: string, ref: MessageRef): Promise<{ labels: string[]; available: string[] } | null> {
+    const list = await this.pool.folders(userId, ref.accountId);
+    if (!list.some((f) => f.specialUse === '\\All')) return null;
+    const labels = await this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
+      this.checkValidity(mailbox, ref);
+      if (!client.capabilities.has('X-GM-EXT-1')) return null;
+      const m = await client.fetchOne(String(ref.uid), { uid: true, labels: true }, { uid: true });
+      if (!m) throw new MessageGoneError('Message not found');
+      return [...(m.labels ?? [])];
+    });
+    if (!labels) return null;
+    // System labels other than Inbox are folders of their own (Sent, Starred…) or not labels at all.
+    const shown = labels.filter((l) => l === '\\Inbox' || !l.startsWith('\\')).map((l) => (l === '\\Inbox' ? 'INBOX' : l));
+    const available = list.filter((f) => !f.specialUse && !f.flags.has('\\Noselect') && f.path !== 'INBOX').map((f) => f.path);
+    return { labels: shown, available: ['INBOX', ...available] };
+  }
+
+  /** Adds and removes Gmail labels of a message (a label is a folder there). */
+  async setLabels(userId: string, ref: MessageRef, add: string[], remove: string[]) {
+    const label = (l: string) => (l === 'INBOX' ? '\\Inbox' : l);
+    await this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
+      this.checkValidity(mailbox, ref);
+      if (!client.capabilities.has('X-GM-EXT-1')) throw new MailServerError('This mailbox has no labels', 'protocol');
+      if (add.length) await client.messageFlagsAdd(String(ref.uid), add.map(label), { uid: true, useLabels: true });
+      if (remove.length) await client.messageFlagsRemove(String(ref.uid), remove.map(label), { uid: true, useLabels: true });
+    });
+    for (const f of new Set([...add, ...remove, ref.folder])) this.folderChanged(userId, ref.accountId, f);
   }
 
   /** Whether a message with this Message-ID is in the folder (DreyMail: a provider that filed sent mail itself). */

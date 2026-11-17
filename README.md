@@ -51,7 +51,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures).
      Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree).
      Modified by samschultzponsys, 2026-11-17: v9.5 (calendar: full repeats, guests and invitations, Teams and Meet, reminders).
-     Modified by samschultzponsys, 2026-11-17: v9.6 (stay signed in, the app lock, one copy in Sent). -->
+     Modified by samschultzponsys, 2026-11-17: v9.6 (stay signed in, the app lock, one copy in Sent).
+     Modified by samschultzponsys, 2026-11-17: v9.7 (Gmail archive and labels, server settings in the UI). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -63,7 +64,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -201,6 +202,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   their website. Like remote images, the server fetches them, so these services never see your
   IP address or when you read a message. Turn them off in Settings.
 - Mark read/unread, flag, move, archive, delete (to Trash, expunge only from Trash), multi-select.
+  On Gmail, Archive moves mail to All Mail (taking off the Inbox label), as Gmail itself does, and
+  never makes an "Archive" label.
+- **Gmail labels:** a Gmail message shows its labels under the header; × takes one off and *Add
+  label* puts one on, so a message can be in several labels (each one a folder in DreyMail).
   On touch screens, swipe a message left or right to delete, archive, mark read/unread or flag it
   (which action each direction does is set in Settings).
 - "Unread only" filter for the current view. Messages you read there stay on screen until you
@@ -679,6 +684,15 @@ volume by itself:
   time DreyMail is opened on it.
 
 ## Configuration
+
+Settings → Administration → **Server** sets the starting values for new mailboxes
+(`DREYMAIL_DEFAULT_*`), the mail cache (`DREYMAIL_CACHE*`), limits (`DREYMAIL_MAX_MESSAGE_MB`,
+`DREYMAIL_MAX_UPLOAD_MB`, `DREYMAIL_IMAP_IDLE_TIMEOUT`, `DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS`), the
+push contact (`DREYMAIL_VAPID_SUBJECT`) and the update check (`DREYMAIL_UPDATE_CHECK`) in the app,
+stored in the database. Sign-in, Outlook, Google and Android have their own tabs. A variable set in
+the environment always wins and shows there locked with its name; mailbox defaults apply at once,
+the others after a restart. The secret key, data folder, address and proxy setting stay in the
+environment.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |

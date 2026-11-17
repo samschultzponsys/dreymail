@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   { key: 'users.pictures', group: 'Administration', label: "Change anyone's profile picture" },
   { key: 'roles.manage', group: 'Administration', label: 'Create roles and give users a role' },
   { key: 'signin.manage', group: 'Administration', label: 'Sign-in settings (OIDC, passwords, registration)' },
+  { key: 'server.manage', group: 'Administration', label: 'Server settings (new mailbox defaults, mail cache, limits, push)' },
   { key: 'providers.manage', group: 'Administration', label: 'Set up Sign in with Microsoft and Google' },
   { key: 'android.manage', group: 'Administration', label: 'Set up Android app notifications (Firebase)' },
   { key: 'ai.manage', group: 'Administration', label: 'Set up shared AI connections, and AI connections to servers on the local network' },

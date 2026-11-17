@@ -32,11 +32,12 @@
 // Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
 // Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
 // Modified by samschultzponsys, 2026-11-17: Install the app (This device, in a browser).
-// Modified by samschultzponsys, 2026-11-17: stay signed in and the idle lock (This device).
+// Modified by samschultzponsys, 2026-11-17: stay signed in and the idle lock (This device); Server settings.
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
 
 import { DeviceSessionSettings } from './AppLock';
+import { ServerAdmin } from './ServerAdmin';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -78,7 +79,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android';
 
 export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -113,6 +114,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
         ...(can('users.manage') ? [['storage', 'Storage'] as [SettingsTab, string]] : []),
         ...(can('roles.manage') ? [['roles', 'Roles'] as [SettingsTab, string]] : []),
         ...(can('signin.manage') ? [['signin', 'Sign-in'] as [SettingsTab, string]] : []),
+        ...(can('server.manage') ? [['server', 'Server'] as [SettingsTab, string]] : []),
         ...(can('providers.manage') ? ([['outlook', 'Outlook'], ['google', 'Google']] as [SettingsTab, string][]) : []),
         ...(can('android.manage') ? [['android', 'Android'] as [SettingsTab, string]] : []),
       ],
@@ -309,6 +311,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'signatures' && <SignaturesSettings />}
           {tab === 'autoreplies' && <AutoRepliesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
+          {tab === 'server' && <ServerAdmin />}
           {tab === 'privacy' && (
             <div>
               <label className="label">Load images by themselves</label>

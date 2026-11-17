@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 // Modified by samschultzponsys, 2026-11-17: DREYMAIL_CACHE_FOLDER_MESSAGES (every folder cached).
+// Modified by samschultzponsys, 2026-11-17: keeps the environment it was read from (server settings saved in the UI).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -17,6 +18,8 @@ import { oldEnvErrors } from './upgrade.js';
 import { TEMPLATE_TOKENS, unknownTokens, type AccountDefaultsConfig } from './accountDefaults.js';
 
 export interface Config {
+  /** The environment this configuration was read from (DreyMail: settings saved in the UI go under it). */
+  sourceEnv: NodeJS.ProcessEnv;
   production: boolean;
   host: string;
   port: number;
@@ -205,6 +208,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (errors.length) throw new Error(`Invalid configuration:\n  - ${errors.join('\n  - ')}`);
 
   return {
+    sourceEnv: env,
     production,
     host: env.HOST || '0.0.0.0',
     port,

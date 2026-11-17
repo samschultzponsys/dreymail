@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.7): Gmail archive and labels, server settings in the UI
+
+- **Gmail archive:** servers with an All Mail folder (`\\All`) and no Archive folder (Gmail) archive
+  by moving to All Mail; DreyMail used to make an "Archive" label there.
+- **Gmail labels:** the reader shows a Gmail message's labels (X-GM-LABELS) with × to remove one and
+  *Add label*; `GET`/`PUT /api/message/labels`.
+- **Server settings:** Settings → Server (permission `server.manage`) sets new-mailbox defaults, the
+  mail cache, limits, the push contact and the update check. They are stored as the values of
+  their environment variables and the configuration is read as the environment over them, with the
+  same checks (`loadConfig`); variables set in the environment win and show locked. Mailbox
+  defaults apply at once, the rest after a restart (the page says when one is waiting).
+- **Files:** `shared/serverSettings.ts` (new), `server/src/serverSettings.ts` (new),
+  `web/src/components/ServerAdmin.tsx` (new), `web/src/components/GmailLabels.tsx` (new),
+  `server/src/config.ts`, `server/src/app.ts`, `server/src/routes/admin.ts`,
+  `server/src/routes/api.ts`, `server/src/imap/mail.ts`, `shared/permissions.ts`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/components/Reader.tsx`, `web/src/styles.css`,
+  `server/test/gmail.test.ts` (new), `server/test/serverSettings.test.ts` (new), `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.6): stay signed in, the app lock, one copy in Sent
 
 - **Stay signed in** (Settings → This device): a trusted device's session slides, 30 days from the
