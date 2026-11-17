@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const update = require('./update.cjs');
 const notify = require('./notify.cjs');
+const dbus = require('./dbus.cjs');
 
 const APP_ID = 'io.github.samschultzponsys.dreymail';
 const SOURCE_URL = 'https://github.com/samschultzponsys/dreymail';
@@ -230,7 +231,11 @@ ipcMain.on('dreymail:minimize-to-tray', (e, on) => {
 });
 
 // Flatpak: straight to the desktop's notification service. Electron's own notifications only
-// showed there while the window was in front (KDE Plasma dropped the rest).
+// showed there while the window was in front (KDE Plasma dropped the rest). First over our own
+// long-lived D-Bus connection, which also hears clicks (KDE Plasma sends a click only to the
+// connection that showed the notification); if that can't be had, through `gdbus` as before.
+const busNotifier =
+  installKind === 'flatpak' ? dbus.createBusNotifier({ appName: 'DreyMail', desktopEntry: APP_ID, log: (m) => notifyLog({ error: m }) }) : null;
 const directNotifier =
   installKind === 'flatpak'
     ? notify.createNotifier({ execFile, spawn, appName: 'DreyMail', desktopEntry: APP_ID, log: (m) => notifyLog({ error: m }) })
@@ -286,12 +291,13 @@ ipcMain.on('dreymail:notify', (e, n) => {
     viaElectron();
     return;
   }
-  void directNotifier
-    .show({ tag: n.tag, title: n.title || 'DreyMail', body: n.body, iconPath: iconFile(icon.isEmpty() ? nativeImage.createFromPath(ICON) : icon), onClick: open })
-    .then((shown) => {
-      notifyLog({ ...entry, via: shown ? 'gdbus' : 'electron (gdbus failed)' });
-      if (!shown) viaElectron();
-    });
+  const shown = { tag: n.tag, title: n.title || 'DreyMail', body: n.body, iconPath: iconFile(icon.isEmpty() ? nativeImage.createFromPath(ICON) : icon), onClick: open };
+  void (async () => {
+    if (busNotifier && (await busNotifier.show(shown))) return notifyLog({ ...entry, via: 'dbus' });
+    if (await directNotifier.show(shown)) return notifyLog({ ...entry, via: 'gdbus (dbus failed)' });
+    notifyLog({ ...entry, via: 'electron (dbus and gdbus failed)' });
+    viaElectron();
+  })();
 });
 
 ipcMain.on('dreymail:change-server', (e) => {
@@ -477,6 +483,7 @@ app.on('open-url', (event, url) => {
 app.on('before-quit', () => {
   quitting = true;
   directNotifier?.stop();
+  busNotifier?.stop();
 });
 app.on('window-all-closed', () => {
   if (!tray) app.quit();

@@ -37,7 +37,8 @@
      Modified by samschultzponsys, 2026-11-17: auto-replies.
      Modified by samschultzponsys, 2026-11-17: Install the app; dreymail:// links.
      Modified by samschultzponsys, 2026-11-17: v8.1 (every folder cached in the background).
-     Modified by samschultzponsys, 2026-11-17: v8.2 (Settings → Storage). -->
+     Modified by samschultzponsys, 2026-11-17: v8.2 (Settings → Storage).
+     Modified by samschultzponsys, 2026-11-17: v8.3 (clear a user's mail cache; clickable flatpak notifications). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -49,7 +50,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -99,7 +100,9 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   resets passwords, changes pictures and removes users. Settings → Storage shows the space each user
   takes up, largest first: their mail cache per mailbox (folders, messages, message lists and kept
   message content) and their own data (mailboxes and settings, pictures, calendar, scheduled mail, AI
-  assistant), plus the size of `dreymail.db` and `cache.db` on disk. Settings → Sign-in sets up OIDC (with a connection test),
+  assistant), plus the size of `dreymail.db` and `cache.db` on disk. It also clears a user's mail
+  cache, for one mailbox or all of them; it fills again in the background the next time they use
+  DreyMail (the freed space is reused; the file itself doesn't shrink). Settings → Sign-in sets up OIDC (with a connection test),
   password login and who may register, without a restart. Any of these given as environment
   variables in the compose file win and show as locked in the UI.
 - **Accounts that feel separate.** Each account has its own color: the first one gets DreyMail

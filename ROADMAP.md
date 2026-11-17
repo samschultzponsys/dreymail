@@ -52,7 +52,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Collapsed folder bar: groups as tinted panels, unread dots, built-in mailbox icons, no
       sideways overflow (7.5).
 - [x] Flatpak notifications also while the window is in the background or the tray (KDE Plasma);
-      mailbox pictures and provider icons in notifications in any format (7.3).
+      mailbox pictures and provider icons in notifications in any format (7.3); clicking one opens
+      the message there too (8.3).
 - [x] Drag to rearrange groups and mailboxes in the sidebar, into and out of groups (7.0).
 - [x] Desktop notifications for every mailbox, always, with the mailbox's name, icon and color, and a
       test button; provider icons from the favicon services when a site refuses servers (6.9).
@@ -141,7 +142,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Administration and security
 - [x] Settings → Storage: space used per user (mail cache per mailbox, own data by kind) and the
-      database files' sizes (8.2).
+      database files' sizes (8.2); clearing a user's mail cache, per mailbox or all (8.3).
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
 - [x] Connecting single sign-on to an existing account (4.4); connecting replaces the password,
       disconnecting sets a new one (7.6).

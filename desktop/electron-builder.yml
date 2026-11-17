@@ -16,6 +16,7 @@ files:
   - preload.cjs
   - update.cjs
   - notify.cjs
+  - dbus.cjs
   - setup.html
   - build/icon.png
 extraResources:

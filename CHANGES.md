@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.3): clear a user's mail cache; clickable flatpak notifications
+
+- **Settings → Storage** clears a user's mail cache: per mailbox (the bin button on its row) or all
+  of it (*Clear …'s mail cache*), after a confirmation. Their mailboxes, settings and mail on the
+  mail servers are untouched; the copy fills again in the background the next time they use
+  DreyMail. `DELETE /api/admin/users/:id/cache` and `/api/admin/users/:id/cache/:accountId`.
+- **Flatpak: clicking a notification opens the message** (KDE Plasma). Notifications were shown
+  with a one-off `gdbus call`, and clicks were listened for with a separate `gdbus monitor`; KDE
+  Plasma sends the click only to the connection that showed the notification, which had already
+  exited, so the click was lost. The desktop app now shows notifications and hears their clicks
+  on one long-lived D-Bus connection of its own (a small built-in D-Bus client, no new
+  dependencies). If that connection can't be made, notifications go through `gdbus` as before,
+  then Electron's own.
+- **Files:** `desktop/dbus.cjs` (new), `desktop/main.cjs`, `desktop/electron-builder.yml`,
+  `web/test/desktopDbus.test.ts` (new; against a real `dbus-daemon`, checked against `gdbus`),
+  `server/src/routes/admin.ts`, `web/src/components/StorageAdmin.tsx`, `web/src/api.ts`,
+  `web/src/styles.css`, `server/test/storage.test.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-17 (v8.2): space used per user
 
 - **Settings → Storage** (administration, for roles that can manage users): the sizes of
