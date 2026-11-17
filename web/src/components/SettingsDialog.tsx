@@ -32,6 +32,7 @@
 // Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
 // Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
 // Modified by samschultzponsys, 2026-11-17: Install the app (This device, in a browser).
+// Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -43,6 +44,7 @@ import { desktopBridge, mailboxNotificationIcon } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
 import { SignaturesSettings } from './SignaturesSettings';
 import { AndroidAdmin, GoogleAdmin, OutlookAdmin, RolesAdmin, SignInAdmin, UsersAdmin } from './AdminSettings';
+import { StorageAdmin } from './StorageAdmin';
 import { ProfilePicture } from './UserPicture';
 import { AiConnections } from './AiConnections';
 import { SourceLink } from './SourceLink';
@@ -72,7 +74,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
 
 export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -104,6 +106,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
       label: 'Administration',
       tabs: [
         ...(can('users.manage') || can('users.pictures') || can('roles.manage') ? [['users', 'Users'] as [SettingsTab, string]] : []),
+        ...(can('users.manage') ? [['storage', 'Storage'] as [SettingsTab, string]] : []),
         ...(can('roles.manage') ? [['roles', 'Roles'] as [SettingsTab, string]] : []),
         ...(can('signin.manage') ? [['signin', 'Sign-in'] as [SettingsTab, string]] : []),
         ...(can('providers.manage') ? ([['outlook', 'Outlook'], ['google', 'Google']] as [SettingsTab, string][]) : []),
@@ -327,6 +330,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'privacy' && <ImageDomains />}
           {tab === 'password' && <ChangePassword />}
           {tab === 'users' && <UsersAdmin me={me} />}
+          {tab === 'storage' && <StorageAdmin />}
           {tab === 'roles' && <RolesAdmin me={me} />}
           {tab === 'signin' && <SignInAdmin />}
           {tab === 'outlook' && <OutlookAdmin />}

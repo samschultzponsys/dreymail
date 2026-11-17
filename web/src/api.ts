@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: search filters and saved searches.
 // Modified by samschultzponsys, 2026-11-15: roles, permissions and profile pictures.
+// Modified by samschultzponsys, 2026-11-17: Settings → Storage.
 // Modified by samschultzponsys, 2026-11-15: your own picture as a mailbox icon.
 // Modified by samschultzponsys, 2026-11-15: AI mailbox assistant.
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
@@ -38,7 +39,7 @@ export interface RolesView {
   roles: Role[];
   defaultRole: string;
 }
-import type { MailboxGroupInput, MailboxGroupView, AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, ScheduledSend, SendResult, Signature, SignatureInput, VersionInfo } from '../../shared/types';
+import type { MailboxGroupInput, MailboxGroupView, AccountFolders, AccountInput, AccountView, ActionResult, AdminUser, AuthMethods, ComposePayload, DomainName, DraftResult, FirebaseSettingsView, GoogleSettingsView, ListResponse, LoginSettingsInput, LoginSettingsView, Me, MessageAction, MessageDetail, MessageRef, MicrosoftSettingsView, Preferences, PushSubscriptionInput, ScheduledSend, SendResult, Signature, SignatureInput, StorageReport, VersionInfo } from '../../shared/types';
 
 export class ApiError extends Error {
   constructor(
@@ -123,6 +124,7 @@ export const api = {
   deleteAccount: (id: string) => request<{ ok: true }>('DELETE', `/api/accounts/${encodeURIComponent(id)}`),
   signatures: () => request<Signature[]>('GET', '/api/signatures'),
   adminUsers: () => request<AdminUser[]>('GET', '/api/admin/users'),
+  adminStorage: () => request<StorageReport>('GET', '/api/admin/storage'),
   adminFirebase: () => request<FirebaseSettingsView>('GET', '/api/admin/firebase'),
   adminSaveFirebase: (s: { serviceAccount: string; apiKey: string; appId: string; senderId: string }) => request<FirebaseSettingsView>('PUT', '/api/admin/firebase', s),
   androidPush: () => request<{ firebase: { projectId: string; apiKey: string; appId: string; senderId: string } | null }>('GET', '/api/push/android'),

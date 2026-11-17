@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.2): space used per user
+
+- **Settings → Storage** (administration, for roles that can manage users): the sizes of
+  `dreymail.db` and `cache.db` on disk, and every user's share, largest first, as a bar split into
+  message lists, kept message content and their own data. Click a user for their mail cache per
+  mailbox (folders, messages, lists, content) and their own data by kind (mailboxes and settings,
+  pictures, calendar, scheduled mail, AI assistant). Sizes are the stored (encrypted) values,
+  without SQLite's overhead. `GET /api/admin/storage`; `formatSize` now goes up to GB.
+- **Files:** `server/src/storage.ts` (new), `server/src/cache/store.ts`,
+  `server/src/routes/admin.ts`, `server/src/app.ts`, `shared/types.ts`,
+  `web/src/components/StorageAdmin.tsx` (new), `web/src/components/SettingsDialog.tsx`,
+  `web/src/api.ts`, `web/src/util.ts`, `web/src/styles.css`, `server/test/storage.test.ts` (new),
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.1): every folder cached
 
 - **Other folders open at once:** the mail cache now keeps the newest 500 messages

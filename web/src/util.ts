@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail cyan first in the preset account colours; more presets.
 // Modified by samschultzponsys, 2026-11-17: formatDelay for send delays.
+// Modified by samschultzponsys, 2026-11-17: formatSize goes up to GB.
 
 import type { Address, MessageRef, MessageSummary } from '../../shared/types';
 
@@ -39,7 +40,8 @@ export const formatFullDate = (iso: string) =>
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 export function initials(a: Address | undefined): string {

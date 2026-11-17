@@ -25,6 +25,7 @@
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: single sign-on status says whether disconnecting needs a new password.
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
+// Modified by samschultzponsys, 2026-11-17: space used per user (Settings → Storage).
 
 // Types shared between the server API and the web client.
 
@@ -491,6 +492,52 @@ export interface FirebaseSettingsView {
 }
 
 /** A user in Settings → Users (DreyMail). */
+/** A user's rows in the main database, in bytes, by what they hold (Settings → Storage). */
+export interface StorageDatabaseUsage {
+  /** Profile picture and uploaded mailbox and group icons. */
+  pictures: number;
+  calendar: number;
+  /** Mail waiting to be sent later (with its attachments). */
+  scheduled: number;
+  ai: number;
+  /** Mailboxes, settings, signatures, saved searches, recipients and everything else. */
+  settings: number;
+}
+
+/** One mailbox's copy in the mail cache. */
+export interface StorageMailboxUsage {
+  accountId: string;
+  /** Null for a mailbox that no longer exists (its copy is removed shortly). */
+  name: string | null;
+  email: string;
+  folders: number;
+  messages: number;
+  /** Encrypted message summaries, conversation keys and the folder list. */
+  messageBytes: number;
+  /** Messages whose full content is kept. */
+  bodies: number;
+  bodyBytes: number;
+}
+
+export interface StorageUserUsage {
+  id: string;
+  name: string;
+  avatar: string | null;
+  database: StorageDatabaseUsage;
+  mailboxes: StorageMailboxUsage[];
+  /** Everything above, in bytes. */
+  total: number;
+}
+
+/** Settings → Storage (administration): space used, per user and in total. */
+export interface StorageReport {
+  /** The SQLite files on disk (with their write-ahead logs). */
+  files: { name: string; bytes: number }[];
+  /** False when the mail cache is switched off. */
+  cacheEnabled: boolean;
+  users: StorageUserUsage[];
+}
+
 export interface AdminUser {
   id: string;
   name: string;

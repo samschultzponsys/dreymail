@@ -32,7 +32,8 @@
    Modified by samschultzponsys, 2026-11-16: message frames as tall as their message.
    Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
    Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
-   Modified by samschultzponsys, 2026-11-16: collapsed folder bar: groups as tinted panels, no overflow. */
+   Modified by samschultzponsys, 2026-11-16: collapsed folder bar: groups as tinted panels, no overflow.
+   Modified by samschultzponsys, 2026-11-17: Settings → Storage. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -613,6 +614,32 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .user-name { display: flex; align-items: center; gap: 6px; font-weight: 600; flex-wrap: wrap; }
 .user-meta { font-size: 12px; margin-top: 2px; }
 .user-actions { display: flex; align-items: center; gap: 4px; }
+/* Settings → Storage (DreyMail) */
+.storage-files { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.storage-file { display: flex; flex-direction: column; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); font-size: 12px; min-width: 120px; }
+.storage-file strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.storage-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; }
+.storage-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.storage-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.storage-list li.storage-user { display: block; padding: 0; }
+.storage-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.storage-row:hover { background: var(--surface-2); }
+.storage-total { margin-left: auto; font-variant-numeric: tabular-nums; }
+.storage-bar { display: flex; gap: 2px; height: 8px; margin-top: 6px; border-radius: 999px; overflow: hidden; min-width: 6px; }
+.storage-seg { display: block; min-width: 2px; }
+.storage-files .spin { animation: spin 0.8s linear infinite; }
+.storage-seg.lists, .storage-swatch.lists { background: var(--accent-fill); }
+.storage-seg.content, .storage-swatch.content { background: #6c7bd9; }
+.storage-seg.data, .storage-swatch.data { background: var(--text-2); opacity: 0.55; }
+.storage-detail { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 12px 12px 44px; }
+.storage-table { border-collapse: collapse; font-size: 13px; flex: 1 1 260px; min-width: 0; }
+.storage-detail > .storage-table { align-self: flex-start; }
+.storage-table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-2); padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); }
+.storage-table td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; vertical-align: top; }
+.storage-table th:not(:first-child), .storage-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+.storage-scroll { flex: 1 1 300px; min-width: 0; overflow-x: auto; }
+.storage-scroll .storage-table { width: 100%; }
+@media (max-width: 600px) { .storage-detail { padding-left: 12px; } .storage-narrow-hide { display: none; } }
 fieldset.group { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 14px; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 fieldset.group legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
 .locked { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; font-weight: 500; color: var(--text-2); font-family: ui-monospace, monospace; }

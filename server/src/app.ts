@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-16: folder lists kept current in the background.
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox cached in the background.
+// Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -324,7 +325,24 @@ export async function buildApp(
     onBlocklistChanged: (userId) => assistant.syncWatching(userId),
     scheduled,
   });
-  await registerAdminRoutes(app, { config, store, sessions, access, login, pool, mail, firebase, onAiAccess: (id) => assistant.syncWatching(id) });
+  await registerAdminRoutes(app, {
+    config,
+    store,
+    sessions,
+    access,
+    login,
+    pool,
+    mail,
+    firebase,
+    storage: {
+      cache,
+      files: [
+        { name: DB_FILE, path: opts.store ? null : path.join(config.dataDir, DB_FILE) },
+        ...(cache ? [{ name: 'cache.db', path: cacheFile }] : []),
+      ],
+    },
+    onAiAccess: (id) => assistant.syncWatching(id),
+  });
   registerAndroidPushRoutes(app, { store, pool, firebase });
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });

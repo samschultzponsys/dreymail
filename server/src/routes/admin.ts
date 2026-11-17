@@ -10,7 +10,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import { isPermission, SUPERADMIN, type Permission, type Role } from '../../../shared/permissions.js';
-import type { AdminUser, FirebaseSettingsView } from '../../../shared/types.js';
+import type { AdminUser, FirebaseSettingsView, StorageReport, StorageUserUsage } from '../../../shared/types.js';
 import type { Access } from '../access.js';
 import { parsePicture, PictureError, pictureUrl } from '../profilePicture.js';
 import { AssistantStore } from '../ai/store.js';
@@ -22,6 +22,8 @@ import type { MailService } from '../imap/mail.js';
 import type { ImapPool } from '../imap/pool.js';
 import { LoginSettingsError, type LoginSettings } from '../loginSettings.js';
 import type { FirebaseConfig } from '../push/fcm.js';
+import type { MailCache } from '../cache/store.js';
+import { databaseUsage, emptyDatabaseUsage, sqliteFileBytes } from '../storage.js';
 
 export interface AdminDeps {
   config: Config;
@@ -32,6 +34,8 @@ export interface AdminDeps {
   pool: ImapPool;
   mail: MailService;
   firebase: FirebaseConfig;
+  /** The mail cache (null when switched off) and the SQLite files, for Settings → Storage. */
+  storage?: { cache: MailCache | null; files: { name: string; path: string | null }[] };
   /** A user's AI assistant switch changed (start or stop watching their inboxes). */
   onAiAccess?: (userId: string) => void;
 }
@@ -177,6 +181,39 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
   // ---- roles -------------------------------------------------------------------
 
   const rolesView = () => ({ roles: store.listRoles(), defaultRole: store.defaultRole() });
+  // Space used per user: their data in the main database and their mailboxes' copies in the mail cache.
+  app.get('/api/admin/storage', async (req, reply) => {
+    if (!may(req, reply, 'users.manage')) return reply;
+    const db = databaseUsage(store.db);
+    const cache = deps.storage?.cache ?? null;
+    let cached: ReturnType<MailCache['usage']> = [];
+    try {
+      cached = cache?.usage() ?? [];
+    } catch {
+      /* the cache is optional; an unreadable one counts as empty */
+    }
+    const users: StorageUserUsage[] = store.listUsers().map((u) => {
+      const accounts = new Map(store.listAccounts(u.id).map((a) => [a.id, a]));
+      const mailboxes = cached
+        .filter((c) => c.userId === u.id)
+        .map((c) => {
+          const a = accounts.get(c.accountId);
+          return { accountId: c.accountId, name: a ? a.name : null, email: a?.email ?? '', folders: c.folders, messages: c.messages, messageBytes: c.messageBytes, bodies: c.bodies, bodyBytes: c.bodyBytes };
+        })
+        .sort((a, b) => b.messageBytes + b.bodyBytes - (a.messageBytes + a.bodyBytes));
+      const database = db.get(u.id) ?? emptyDatabaseUsage();
+      const total = Object.values(database).reduce((s, n) => s + n, 0) + mailboxes.reduce((s, m) => s + m.messageBytes + m.bodyBytes, 0);
+      return { id: u.id, name: u.displayName || u.name || u.username || u.email, avatar: pictureUrl(store, u), database, mailboxes, total };
+    });
+    users.sort((a, b) => b.total - a.total);
+    const report: StorageReport = {
+      files: (deps.storage?.files ?? []).filter((f) => f.path && f.path !== ':memory:').map((f) => ({ name: f.name, bytes: sqliteFileBytes(f.path) })),
+      cacheEnabled: !!cache,
+      users,
+    };
+    return report;
+  });
+
   app.get('/api/admin/roles', async (req, reply) => (may(req, reply, 'roles.manage', 'users.manage') ? rolesView() : reply));
 
   const saveRole = (req: FastifyRequest, reply: FastifyReply, id: string | null) => {

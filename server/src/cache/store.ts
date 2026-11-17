@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: each mailbox's folder list, kept encrypted.
 // Modified by samschultzponsys, 2026-11-17: every other folder cached too (role 'folder').
+// Modified by samschultzponsys, 2026-11-17: space used per mailbox (Settings → Storage).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -372,6 +373,34 @@ export class MailCache {
   putFolderList(userId: string, accountId: string, value: unknown) {
     const data = encryptBytes(this.keys.cacheKey, Buffer.from(JSON.stringify(value)), this.listAad(userId, accountId));
     this.db.prepare('INSERT INTO folder_lists (user_id, account_id, data, saved_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, account_id) DO UPDATE SET data = excluded.data, saved_at = excluded.saved_at').run(userId, accountId, data, Date.now());
+  }
+
+  /**
+   * Space used per mailbox (DreyMail, for Settings → Storage): cached folders and messages with
+   * the bytes of their encrypted summaries and conversation keys, kept message content, and the
+   * saved folder list.
+   */
+  usage(): { userId: string; accountId: string; folders: number; messages: number; messageBytes: number; bodies: number; bodyBytes: number }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT f.user_id AS userId, f.account_id AS accountId, COUNT(*) AS folders,
+                COALESCE(SUM(m.n), 0) AS messages, COALESCE(SUM(m.bytes), 0) + COALESCE(SUM(k.bytes), 0) AS messageBytes,
+                COALESCE(SUM(b.n), 0) AS bodies, COALESCE(SUM(b.bytes), 0) AS bodyBytes
+           FROM folders f
+           LEFT JOIN (SELECT folder_id, COUNT(*) AS n, SUM(length(data)) AS bytes FROM messages GROUP BY folder_id) m ON m.folder_id = f.id
+           LEFT JOIN (SELECT folder_id, SUM(length(hash) + 8) AS bytes FROM thread_keys GROUP BY folder_id) k ON k.folder_id = f.id
+           LEFT JOIN (SELECT folder_id, COUNT(*) AS n, SUM(length(data)) AS bytes FROM bodies GROUP BY folder_id) b ON b.folder_id = f.id
+          GROUP BY f.user_id, f.account_id`,
+      )
+      .all() as { userId: string; accountId: string; folders: number; messages: number; messageBytes: number; bodies: number; bodyBytes: number }[];
+    const lists = this.db.prepare('SELECT user_id AS userId, account_id AS accountId, length(data) AS bytes FROM folder_lists').all() as { userId: string; accountId: string; bytes: number }[];
+    const out = rows.map((r) => ({ ...r, folders: Number(r.folders), messages: Number(r.messages), messageBytes: Number(r.messageBytes), bodies: Number(r.bodies), bodyBytes: Number(r.bodyBytes) }));
+    for (const l of lists) {
+      const r = out.find((x) => x.userId === l.userId && x.accountId === l.accountId);
+      if (r) r.messageBytes += Number(l.bytes);
+      else out.push({ userId: l.userId, accountId: l.accountId, folders: 0, messages: 0, messageBytes: Number(l.bytes), bodies: 0, bodyBytes: 0 });
+    }
+    return out;
   }
 
   /** Forget accounts that no longer exist. `keep` holds `${userId}\0${accountId}`. */

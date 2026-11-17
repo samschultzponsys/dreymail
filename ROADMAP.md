@@ -140,6 +140,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       ends (3.3).
 
 ### Administration and security
+- [x] Settings → Storage: space used per user (mail cache per mailbox, own data by kind) and the
+      database files' sizes (8.2).
 - [x] Sign-in settings (OIDC, password login, registration) in the UI, env overrides locked (1.4).
 - [x] Connecting single sign-on to an existing account (4.4); connecting replaces the password,
       disconnecting sets a new one (7.6).
