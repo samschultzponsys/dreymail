@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe and block sender.
 // Modified by samschultzponsys, 2026-11-15: calendar invitation card.
 // Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
+// Modified by samschultzponsys, 2026-11-17: pinned buttons on every opened message, not only in conversations.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -328,7 +329,7 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
               onAction={onAction}
               onMailto={onMailto}
               onGone={k === key ? onGone : undefined}
-              buttons={threaded && !isDrafts ? messageButtons : []}
+              buttons={isDrafts ? [] : messageButtons}
               onReply={replyWith}
             />
           );
@@ -428,7 +429,7 @@ function MessageCard({
   onMailto: (mailto: string) => void;
   /** Only for the open message: it is gone or its folder changed. */
   onGone?: (stale: boolean) => void;
-  /** Small buttons in this message's header, acting on this message (in a conversation). */
+  /** Small buttons in this message's header, acting on this message. */
   buttons?: MessageButton[];
   onReply?: (kind: ReplyKind, detail: MessageDetail) => void;
 }) {

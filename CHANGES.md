@@ -13,6 +13,15 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v7.8): pinned buttons on every message
+
+- **Reader:** the buttons picked in Settings → General ("Buttons pinned to each message") showed
+  only on messages of conversations with two or more messages, so they never appeared on a
+  single message or in mailboxes with conversations turned off. Now every opened message has
+  them (not drafts).
+- **Files:** `web/src/components/Reader.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v7.7): Schedule button and longer send delays
 
 - **Composer:** the clock icon is now a labeled **Schedule** button, with more quick times (in 1

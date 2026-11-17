@@ -29,6 +29,7 @@
 // Modified by samschultzponsys, 2026-11-16: desktop app: minimize to the tray.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-17: send delay presets up to 5 minutes and a custom delay up to 10.
+// Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -251,7 +252,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           )}
           {tab === 'general' && (
             <div>
-              <label className="label">Buttons on each message of a conversation</label>
+              <label className="label">Buttons pinned to each message</label>
               <div className="check-list">
                 {(
                   [
@@ -277,7 +278,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
                   );
                 })}
               </div>
-              <div className="hint">Small buttons in each message’s header that act on that message only. The bar at the top acts on the whole conversation; the arrow at its right end makes its buttons bigger, with names.</div>
+              <div className="hint">Small buttons in the header of every opened message (also single messages and each message of a conversation) that act on that message only. The bar at the top acts on the whole conversation; the arrow at its right end makes its buttons bigger, with names.</div>
             </div>
           )}
           {tab === 'general' && (
