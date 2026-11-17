@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-16: sidebar rearranged by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
+// Modified by samschultzponsys, 2026-11-17: Not spam action.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -441,7 +442,10 @@ export function App() {
         action.type === 'archive' ? `${what} archived` : action.type === 'delete' ? (res.result?.permanent ? `${what} deleted permanently` : `${what} moved to Trash`)
           : action.type === 'move' ? `${what} moved to ${action.destination}`
           : action.type === 'snooze' ? `${what} snoozed until ${formatSnoozeTime(action.until)}`
-          : action.type === 'unsnooze' ? `${what} back in the inbox` : null;
+          : action.type === 'unsnooze' ? `${what} back in the inbox`
+          : action.type === 'notJunk'
+            ? `${what} moved to the inbox as not spam${res.result?.unblocked?.length ? `; unblocked ${res.result.unblocked.join(', ')}` : ''}`
+          : null;
       for (const f of res.result?.createdFolders ?? []) push(`Created folder "${f}" for ${action.type === 'snooze' ? 'snoozed' : 'archived'} mail.`);
       const undo = res.undo;
       if (label) push(label, false, undo ? { label: 'Undo', run: () => void runUndo(undo) } : undefined);

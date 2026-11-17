@@ -110,6 +110,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 - [x] Copy verification codes; unsubscribe button; block sender (address or domain); mailbox health
       warnings (3.4).
+- [x] Not spam in Junk: back to the inbox, marked `$NotJunk`, sender unblocked (8.5).
 - [x] Buttons pinned to every opened message, not only in conversations (7.8).
 - [x] Auto-replies (out of office, sick, on leave, …) per mailbox, per group or for all, with dates,
       sent by the server (7.9).

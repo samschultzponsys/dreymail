@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: Not spam action.
+
 import type { ActionResult, MessageAction, MessageRef, MessageSummary, SwipeAction } from '../../shared/types.js';
 
 /** Pure swipe-gesture logic, kept free of DOM access so it can be unit tested. */
@@ -72,7 +76,7 @@ export function swipeToAction(action: SwipeAction, m: Pick<MessageSummary, 'seen
 
 /** Does this action remove the row from the list (so it should animate out)? */
 export function removesFromList(action: MessageAction): boolean {
-  return action.type === 'delete' || action.type === 'archive' || action.type === 'move' || action.type === 'snooze' || action.type === 'unsnooze';
+  return action.type === 'delete' || action.type === 'archive' || action.type === 'move' || action.type === 'snooze' || action.type === 'unsnooze' || action.type === 'notJunk';
 }
 
 export interface UndoStep {

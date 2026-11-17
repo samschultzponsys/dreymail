@@ -39,7 +39,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.1 (every folder cached in the background).
      Modified by samschultzponsys, 2026-11-17: v8.2 (Settings → Storage).
      Modified by samschultzponsys, 2026-11-17: v8.3 (clear a user's mail cache; clickable flatpak notifications).
-     Modified by samschultzponsys, 2026-11-17: v8.4 (single line spacing when writing). -->
+     Modified by samschultzponsys, 2026-11-17: v8.4 (single line spacing when writing).
+     Modified by samschultzponsys, 2026-11-17: v8.5 (Not spam). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -51,7 +52,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -221,7 +222,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   the open message.
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender
   supports it). **Block sender** sends an address or a whole domain to Junk, now and in future;
-  manage blocked senders in Settings → General.
+  manage blocked senders in Settings → General. In Junk, **Not spam** (in the message's toolbar,
+  or for selected messages in the list) moves mail back to the inbox, marks it as not junk for the
+  server's spam filter (`$NotJunk`, where the server keeps such marks; Gmail learns from the move
+  itself), and unblocks the sender if you had blocked them.
 - **Auto-replies** (Settings → Auto-replies): out of office, out sick, on leave, on vacation
   or your own, each for all mailboxes or for chosen mailboxes and groups, optionally from one
   date and time until another. Your server sends them, even with DreyMail closed. Each sender

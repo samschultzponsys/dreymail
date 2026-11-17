@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-15: calendar invitation card.
 // Modified by samschultzponsys, 2026-11-16: larger toolbar with names; buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-17: pinned buttons on every opened message, not only in conversations.
+// Modified by samschultzponsys, 2026-11-17: Not spam button in Junk.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -28,6 +29,7 @@ import {
   Paperclip,
   PenSquare,
   Reply,
+  ShieldCheck,
   ReplyAll,
   Trash2,
   Ban,
@@ -275,6 +277,12 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
           </>
         )}
         <span className="spacer" />
+        {folders?.folders.find((f) => f.path === ref.folder)?.specialUse === 'junk' && (
+          <button className="icon-btn" title="Not spam: move to the inbox" onClick={() => onAction([ref], { type: 'notJunk' })}>
+            <ShieldCheck size={17} />
+            <span className="tb-label">Not spam</span>
+          </button>
+        )}
         <button className="icon-btn" title={seen ? 'Mark unread (u)' : 'Mark read'} onClick={() => onAction([ref], { type: 'seen', value: !seen })}>
           {seen ? <Mail size={17} /> : <MailOpen size={17} />}
           <span className="tb-label">{seen ? 'Unread' : 'Read'}</span>

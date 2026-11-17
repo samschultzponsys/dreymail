@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
+// Modified by samschultzponsys, 2026-11-17: Not spam (unblocks the sender).
 
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -108,6 +109,7 @@ const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('delete') }),
   z.object({ type: z.literal('snooze'), until: z.string().max(64) }),
   z.object({ type: z.literal('unsnooze') }),
+  z.object({ type: z.literal('notJunk') }),
 ]);
 
 const swipe = z.enum(['none', 'delete', 'archive', 'toggleRead', 'toggleFlag']);
@@ -898,8 +900,16 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         else {
           r = await mail.applyAction(userId, ref.accountId, ref.folder, ref.uidValidity, uids, action);
           // Snoozed messages moved or deleted by hand no longer come back on their own.
-          if (action.type === 'move' || action.type === 'archive' || action.type === 'delete') {
+          if (action.type === 'move' || action.type === 'archive' || action.type === 'delete' || action.type === 'notJunk') {
             store.deleteSnoozes(userId, ref.accountId, ref.folder, ref.uidValidity, uids);
+          }
+          // Not spam: senders blocked in DreyMail are unblocked, or their next mail goes straight back.
+          if (action.type === 'notJunk' && r.senders?.length && deps.blocklist) {
+            const removed = r.senders.flatMap((a) => deps.blocklist!.unblockSender(userId, ref.accountId, a));
+            if (removed.length) {
+              result.unblocked = [...new Set([...(result.unblocked ?? []), ...removed])];
+              deps.onBlocklistChanged?.(userId);
+            }
           }
         }
         // Read, moved or deleted from the inbox here: close its notifications on the user's devices

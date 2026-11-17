@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-17: single sign-on status says whether disconnecting needs a new password.
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: space used per user (Settings → Storage).
+// Modified by samschultzponsys, 2026-11-17: Not spam action.
 
 // Types shared between the server API and the web client.
 
@@ -266,7 +267,9 @@ export type MessageAction =
   /** Move to the Snoozed folder until `until` (ISO time), then back to the inbox. Again on a snoozed message: change the time. */
   | { type: 'snooze'; until: string }
   /** Back to the inbox right away. */
-  | { type: 'unsnooze' };
+  | { type: 'unsnooze' }
+  /** Not spam: back to the inbox, marked as not junk, and the sender unblocked (DreyMail). */
+  | { type: 'notJunk' };
 
 /** Where moved messages ended up, so the move can be undone by moving them back. */
 export interface UndoInfo {
@@ -283,6 +286,8 @@ export interface ActionResult {
   permanent: boolean;
   /** Folders that had to be created (e.g. a missing Archive). */
   createdFolders: string[];
+  /** Blocked-sender entries removed because their mail was marked as not spam (DreyMail). */
+  unblocked?: string[];
 }
 
 export type SwipeAction = 'none' | 'delete' | 'archive' | 'toggleRead' | 'toggleFlag';

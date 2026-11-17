@@ -6,9 +6,10 @@
 // Modified by samschultzponsys, 2026-11-15: copy codes, unsubscribe, block sender, mailbox health.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: the list's width can be dragged (tablets and PCs).
+// Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk.
 
 import { PaneResizer } from './PaneResizer';
-import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
+import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { findCode } from '../../../shared/codes';
 import { CATEGORY_TABS, type MailCategory } from '../../../shared/categories';
@@ -258,6 +259,12 @@ export function MessageList(p: Props) {
           <button className="icon-btn" title={anyUnflagged ? 'Flag' : 'Unflag'} onClick={() => p.onBulk({ type: 'flagged', value: anyUnflagged })}>
             <Flag size={16} />
           </button>
+          {checkedMsgs.length > 0 &&
+            checkedMsgs.every((m) => p.folders?.find((a) => a.accountId === m.accountId)?.folders.find((f) => f.path === m.folder)?.specialUse === 'junk') && (
+              <button className="icon-btn" title="Not spam: move to the inbox" onClick={() => p.onBulk({ type: 'notJunk' })}>
+                <ShieldCheck size={16} />
+              </button>
+            )}
           <button className="icon-btn" title="Archive" onClick={() => p.onBulk({ type: 'archive' })}>
             <Archive size={16} />
           </button>

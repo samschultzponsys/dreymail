@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-16: time taken per step when opening a message.
 // Modified by samschultzponsys, 2026-11-17: every folder answered from the cache (filled in the background).
 // Modified by samschultzponsys, 2026-11-17: other cached folders checked with the server before listing; Drafts never threaded.
+// Modified by samschultzponsys, 2026-11-17: Not spam (back to the inbox, marked $NotJunk).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -943,7 +944,7 @@ export class MailService {
     uidValidity: string,
     uids: number[],
     action: MessageAction,
-  ): Promise<{ undo: UndoInfo | null; permanent: boolean; createdFolder: string | null }> {
+  ): Promise<{ undo: UndoInfo | null; permanent: boolean; createdFolder: string | null; senders?: string[] }> {
     const none = { undo: null, permanent: false, createdFolder: null };
     if (action.type === 'snooze' || action.type === 'unsnooze') throw new Error('Snoozing is handled by SnoozeService');
     if (uids.length === 0) return none;
@@ -954,6 +955,7 @@ export class MailService {
     let expunge = false;
     let createdFolder: string | null = null;
     if (action.type === 'move') destination = action.destination;
+    if (action.type === 'notJunk') destination = 'INBOX';
     if (action.type === 'archive') {
       const archive = await this.ensureFolder(userId, accountId, 'archive');
       destination = archive.path;
@@ -984,11 +986,17 @@ export class MailService {
           }
           if (!destination) return null;
           // Remember Message-IDs in case the server can't tell us the new UIDs (no UIDPLUS).
-          const ids = (await client.fetchAll(range, { uid: true, envelope: true }, { uid: true }))
-            .map((m) => m.envelope?.messageId)
-            .filter((id): id is string => !!id);
+          const envelopes = await client.fetchAll(range, { uid: true, envelope: true }, { uid: true });
+          const ids = envelopes.map((m) => m.envelope?.messageId).filter((id): id is string => !!id);
+          const senders = [...new Set(envelopes.map((m) => m.envelope?.from?.[0]?.address?.toLowerCase()).filter((a): a is string => !!a))];
+          if (action.type === 'notJunk') {
+            // Tell the server's spam filter (RFC 5788 keywords, and Thunderbird's). Best effort:
+            // not every server keeps keywords, and the move matters most (Gmail learns from it).
+            await client.messageFlagsRemove(range, ['$Junk', 'Junk'], { uid: true }).catch(() => undefined);
+            await client.messageFlagsAdd(range, ['$NotJunk', 'NonJunk'], { uid: true }).catch(() => undefined);
+          }
           const res = await client.messageMove(range, destination, { uid: true });
-          return { res, ids };
+          return { res, ids, senders };
         }
       }
     });
@@ -1001,6 +1009,7 @@ export class MailService {
     }
     if (expunge) return { ...none, permanent: true };
     if (!moved || !destination) return { ...none, createdFolder };
+    const senders = action.type === 'notJunk' ? moved.senders : undefined;
     let newUids = moved.res && moved.res.uidMap ? [...moved.res.uidMap.values()] : [];
     let destValidity = moved.res && moved.res.uidValidity ? moved.res.uidValidity.toString() : null;
     if (!newUids.length || !destValidity) {
@@ -1019,7 +1028,7 @@ export class MailService {
     const undo: UndoInfo | null = newUids.length
       ? { accountId, folder: destination, uidValidity: destValidity, uids: newUids, restoreTo: folder }
       : null;
-    return { undo, permanent: false, createdFolder };
+    return { undo, permanent: false, createdFolder, ...(senders ? { senders } : {}) };
   }
 
   /** Mark the message a reply/forward refers to as \Answered (best effort). */

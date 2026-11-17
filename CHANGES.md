@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.5): Not spam
+
+- **Not spam** in Junk: a button in the message's toolbar (shown only in the Junk folder), and in
+  the list's selection bar when every selected message is in Junk. It moves the messages back to
+  the inbox (with Undo), marks them for the server's spam filter (removes `$Junk`/`Junk`, adds
+  `$NotJunk`/`NonJunk`; best effort, as not every server keeps such marks), and removes blocked-
+  sender entries that caught the sender (their address, or their domain), so their next message
+  doesn't go straight back. The AI assistant learns from it as a move to the inbox.
+- **Files:** `shared/types.ts`, `server/src/imap/mail.ts`, `server/src/routes/api.ts`,
+  `server/src/blocklist.ts`, `server/src/ai/engine.ts`, `web/src/components/Reader.tsx`,
+  `web/src/components/MessageList.tsx`, `web/src/App.tsx`, `web/src/swipe.ts`, `web/src/sticky.ts`,
+  `server/test/integration/mail.test.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-17 (v8.4): single line spacing when writing
 
 - **Enter starts a new line, not a new paragraph.** New messages, replies and forwards started with

@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: Not spam action.
+
 import type { MessageSummary } from '../../shared/types.js';
 
 /**
@@ -44,7 +48,7 @@ export function updateSticky(
   const next = new Set(current);
   if (action.type === 'seen' && action.value === true) for (const k of keys) next.add(k);
   // Marked unread again: the server returns it anyway. Moved/deleted: it must really go away.
-  else if (['seen', 'move', 'archive', 'delete', 'snooze', 'unsnooze'].includes(action.type)) {
+  else if (['seen', 'move', 'archive', 'delete', 'snooze', 'unsnooze', 'notJunk'].includes(action.type)) {
     for (const k of keys) next.delete(k);
   }
   return next;

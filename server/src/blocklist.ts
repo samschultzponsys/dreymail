@@ -71,6 +71,13 @@ export class Blocklist {
     return this.db.prepare('DELETE FROM blocked_senders WHERE user_id = ? AND account_id = ? AND address = ?').run(userId, accountId, address).changes > 0;
   }
 
+  /** Mail from `address` was marked as not spam: remove the entries that block it (the address, or its domain). */
+  unblockSender(userId: string, accountId: string, address: string): string[] {
+    const hit = this.entries(userId, accountId).filter((e) => blocks(address, e));
+    for (const e of hit) this.remove(userId, accountId, e);
+    return hit;
+  }
+
   private async toJunk(userId: string, accountId: string, uidValidity: string, uids: number[]) {
     const junk = (await this.deps.mail.specialFolder(userId, accountId, 'junk')) ?? (await this.deps.pool.withClient(userId, accountId, async (c) => (await c.mailboxCreate(['Junk'])).path));
     await this.deps.mail.applyAction(userId, accountId, 'INBOX', uidValidity, uids, { type: 'move', destination: junk });

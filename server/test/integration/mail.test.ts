@@ -332,6 +332,28 @@ describe('actions', () => {
     await api('POST', '/api/messages/actions', { messages: [ref(b!)], action: { type: 'move', destination: 'Trash' } });
     expect((await listAll(`accountId=${id}&folder=Trash`)).map((m) => m.subject)).toEqual(['B1']);
   });
+
+  it('marks junk as not spam: back to the inbox, $NotJunk, and the sender unblocked', async () => {
+    const id = accounts.bob!.id;
+    const c = imapClient(BOB);
+    await c.connect();
+    const junk = (await c.list()).find((f) => /^junk$/i.test(f.path))?.path ?? (await c.mailboxCreate('Junk')).path;
+    await c.append(junk, rawMessage({ from: 'spammy@lookalike.example', to: BOB, subject: 'Actually fine', date: new Date(), id: 'notjunk1' }), ['$Junk']);
+    expect((await api('POST', '/api/blocked', { accountId: id, address: 'spammy@lookalike.example' })).status).toBe(200);
+    const [msg] = await listAll(`accountId=${id}&folder=${encodeURIComponent(junk)}&q=Actually`);
+    const res = await api<{ unblocked?: string[]; undo: { folder: string }[] }>('POST', '/api/messages/actions', { messages: [ref(msg!)], action: { type: 'notJunk' } });
+    expect(res.status).toBe(200);
+    expect(res.json.unblocked).toEqual(['spammy@lookalike.example']);
+    expect(res.json.undo[0]!.folder).toBe('INBOX');
+    expect(await listAll(`accountId=${id}&folder=${encodeURIComponent(junk)}&q=Actually`)).toEqual([]);
+    expect((await listAll(`accountId=${id}&folder=INBOX&q=Actually`)).map((m) => m.subject)).toEqual(['Actually fine']);
+    await c.mailboxOpen('INBOX');
+    const flags = (await c.fetchAll({ header: { subject: 'Actually fine' } } as never, { flags: true })).flatMap((m) => [...(m.flags ?? [])]);
+    expect(flags).toContain('$NotJunk');
+    expect(flags).not.toContain('$Junk');
+    await c.logout();
+    expect((await api<{ address: string }[]>('GET', '/api/blocked')).json.map((b) => b.address)).not.toContain('spammy@lookalike.example');
+  });
 });
 
 describe('compose', () => {
