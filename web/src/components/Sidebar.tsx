@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
+// Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
 
@@ -64,6 +65,7 @@ import type { SavedSearch } from '../../../shared/search';
 import { PaneResizer } from './PaneResizer';
 import { ContextMenu, type MenuItem } from './MailboxMenu';
 import { applyDrop, currentOrder, type DropTarget, type Dragged, type SidebarOrder } from '../sidebarOrder';
+import { folderRows } from '../folderTree';
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -87,21 +89,6 @@ const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
   flagged: <Star size={16} />,
   snoozed: <AlarmClock size={16} />,
 };
-const SPECIAL_ORDER: SpecialUse[] = ['inbox', 'snoozed', 'drafts', 'sent', 'archive', 'junk', 'trash'];
-
-function sortFolders(folders: FolderView[]): FolderView[] {
-  const rank = (f: FolderView) => {
-    const i = f.specialUse ? SPECIAL_ORDER.indexOf(f.specialUse) : -1;
-    return i === -1 ? 100 : i;
-  };
-  return [...folders].sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path));
-}
-
-function depth(f: FolderView): number {
-  if (!f.parentPath || !f.delimiter) return 0;
-  return f.parentPath.split(f.delimiter).length;
-}
-
 interface Props {
   /** PCs: dragging the right edge sets the folder bar's width (null: back to the default). */
   onResize?: (width: number | null, done: boolean) => void;
@@ -170,7 +157,25 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
       return true;
     }
   });
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Collapsed mailboxes, groups and saved searches, remembered on this device (DreyMail).
+  const [collapsed, setCollapsedState] = useState<Record<string, boolean>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('navCollapsed') ?? '{}') as unknown;
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const setCollapsed = (f: (c: Record<string, boolean>) => Record<string, boolean>) =>
+    setCollapsedState((c) => {
+      const next = Object.fromEntries(Object.entries(f(c)).filter(([, v]) => v));
+      try {
+        localStorage.setItem('navCollapsed', JSON.stringify(next));
+      } catch {
+        /* private mode: kept until reload */
+      }
+      return next;
+    });
   /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
@@ -314,45 +319,29 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                   {af &&
                     (() => {
                       const pinned = acc.pinnedFolders ?? [];
-                      const all = sortFolders(af.folders);
                       // With folders pinned, only those show until "show all" is opened.
                       const limited = pinned.length > 0 && !showAll[acc.id];
                       const countOf = (f: FolderView) => (f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed' ? f.unread : 0);
-                      // Subfolders folded away under a collapsed folder (DreyMail): hidden, their unread
-                      // mail counted on the folder they are folded into.
-                      const folded = new Set(collapsedFolders[acc.id] ?? []);
-                      const byPath = new Map(af.folders.map((f) => [f.path, f]));
-                      const parentOf = (f: FolderView) => (f.parentPath && byPath.has(f.parentPath) ? f.parentPath : null);
-                      const hasChildren = new Set(af.folders.map(parentOf).filter((p): p is string => !!p));
-                      const foldedInto = (f: FolderView): string | null => {
-                        let top: string | null = null;
-                        for (let p = parentOf(f); p; p = parentOf(byPath.get(p)!)) if (folded.has(p)) top = p;
-                        return top;
-                      };
-                      const hiddenUnder = new Map<string, number>();
-                      for (const f of af.folders) {
-                        const into = foldedInto(f);
-                        if (into) hiddenUnder.set(into, (hiddenUnder.get(into) ?? 0) + countOf(f));
-                      }
-                      const visible = rail ? all : all.filter((f) => !foldedInto(f));
+                      // The folders as a tree (DreyMail): each under its parent, Inbox and Sent foldable
+                      // like any folder; folded subfolders hidden, their unread mail counted on the folder.
+                      const rows = folderRows(af.folders, { folded: rail ? [] : (collapsedFolders[acc.id] ?? []), only: limited ? pinned : null, count: countOf });
+                      const foldable = !rail && !!onToggleFolder;
                       // Room for the fold arrows, in a column, when any folder has subfolders.
-                      const foldRoom = !rail && !limited && !!onToggleFolder && hasChildren.size > 0 ? 16 : 0;
-                      const shown = limited ? visible.filter((f) => pinned.includes(f.path)) : visible;
-                      const hiddenUnread = limited ? all.filter((f) => !pinned.includes(f.path)).reduce((n, f) => n + countOf(f), 0) : 0;
+                      const foldRoom = foldable && rows.some((r) => r.hasChildren) ? 16 : 0;
+                      const hiddenUnread = limited ? af.folders.filter((f) => !pinned.includes(f.path)).reduce((n, f) => n + countOf(f), 0) : 0;
                       return (
                         <>
-                          {shown.map((f) => {
+                          {rows.map(({ folder: f, depth, hasChildren, folded: isFolded, hiddenUnread: underneath }) => {
                             const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
-                            const isFolded = folded.has(f.path);
-                            const showCount = countOf(f) + (isFolded ? (hiddenUnder.get(f.path) ?? 0) : 0);
+                            const showCount = countOf(f) + underneath;
                             const isPinned = pinned.includes(f.path);
-                            const canFold = !rail && !limited && !!onToggleFolder && hasChildren.has(f.path);
+                            const canFold = foldable && hasChildren;
                             return (
                               <div key={f.path} className={`nav-folder ${isPinned ? 'pinned' : ''} ${canFold ? 'foldable' : ''}`}>
                                 {canFold && (
                                   <button
                                     className="fold-btn"
-                                    style={{ left: depth(f) * 14 + 4 }}
+                                    style={{ left: depth * 14 + 4 }}
                                     title={isFolded ? `Show the folders in ${f.name}` : `Fold away the folders in ${f.name}`}
                                     aria-label={isFolded ? `Expand ${f.name}` : `Collapse ${f.name}`}
                                     aria-expanded={!isFolded}
@@ -364,7 +353,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                                 <button
                                   className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
                                   disabled={!f.selectable}
-                                  style={{ paddingLeft: rail ? undefined : 8 + foldRoom + depth(f) * 14, opacity: f.selectable ? 1 : 0.6 }}
+                                  style={{ paddingLeft: rail ? undefined : 8 + foldRoom + depth * 14, opacity: f.selectable ? 1 : 0.6 }}
                                   onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
                                   title={f.path}
                                 >

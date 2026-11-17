@@ -86,7 +86,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       the sender's own domain; folder lists load per mailbox; Calendar, Scheduled and Saved searches
       can be hidden from the sidebar (5.3).
 - [x] Pinned folders in the sidebar, the rest behind a "show all" line (5.2).
-- [x] Subfolders fold away in the sidebar, the same on every device (8.8).
+- [x] Subfolders fold away in the sidebar, the same on every device (8.8); a real folder tree with
+      Inbox and Sent foldable, Gmail's built-in mailboxes at the top, folding with pins (9.4).
 - [x] The calendar as a page of its own (`/calendar`) with a clear button under Compose (8.9).
 - [x] Server and client versions side by side at the bottom, with a warning that says what to update (9.1).
 - [x] Attached pictures open in an image viewer; a download arrow on their chip (9.3).

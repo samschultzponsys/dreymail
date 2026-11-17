@@ -48,7 +48,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.0 (readable dropdown lists in dark mode).
      Modified by samschultzponsys, 2026-11-17: v9.1 (server and client versions side by side).
      Modified by samschultzponsys, 2026-11-17: v9.2 (the receiving mailbox as a colored bubble).
-     Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures). -->
+     Modified by samschultzponsys, 2026-11-17: v9.3 (image viewer for attached pictures).
+     Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -60,7 +61,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -157,7 +158,11 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   folders, it shows just those; the line with the ⌄ under them shows all its folders (with the
   unread count of the hidden ones), and ⌃ folds them away again.
 - **Folding subfolders:** the arrow before a folder that has subfolders folds them away (their
-  unread mail then counts on that folder) and back. What is folded is saved with your account, so
+  unread mail then counts on that folder) and back. Inbox, Sent and the other built-in mailboxes
+  fold like any folder, with their subfolders listed right under them; Gmail's built-in mailboxes
+  sit at the top level, so folding "[Gmail]" never hides Sent or Drafts. Folding works with pinned
+  folders too (a pinned subfolder sits under its nearest pinned parent). Collapsed mailboxes and
+  groups stay collapsed on that device. What is folded is saved with your account, so
   every browser and the desktop and Android apps show the same, and open ones follow at once.
 - **Reading toolbar:** the arrow at its right end switches between compact icons and bigger buttons
   with their names (kept per device). Every opened message (on its own or in a conversation) also has small

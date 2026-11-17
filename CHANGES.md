@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.4): the folder bar as a real tree
+
+- **Folder order:** subfolders were sorted alphabetically after the built-in mailboxes, so the
+  subfolders of Inbox or Sent showed far below them (indented as if they belonged to the folder
+  above), and folding Inbox hid folders somewhere else in the list. Every folder now sits right
+  under its parent, in the built-in order (Inbox, Snoozed, Drafts, Sent, Archive, Junk, Trash) and
+  then alphabetically, at every level; Inbox and Sent fold like any folder.
+- **Gmail:** the built-in mailboxes inside "[Gmail]" (a container that can't hold mail) move to the
+  top level, so folding it never hides Sent, Drafts or Trash; the container is left out when nothing
+  else is in it.
+- **Pinned folders:** folding works there too; a pinned subfolder sits under its nearest pinned
+  parent.
+- **Collapsed mailboxes and groups** (and Saved searches) stay collapsed after a reload, per device.
+- **Files:** `web/src/folderTree.ts` (new), `web/test/folderTree.test.ts` (new),
+  `web/src/components/Sidebar.tsx`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.3): image viewer for attached pictures
 
 - **Image viewer:** a click on an attached picture (PNG, JPEG, GIF, WebP, AVIF, BMP) opens it full
