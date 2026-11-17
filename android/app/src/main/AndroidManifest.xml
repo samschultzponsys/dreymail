@@ -39,6 +39,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="mailto" />
             </intent-filter>
+            <!-- dreymail://open?path=/… ("Open this page in the app" on the web). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dreymail" />
+            </intent-filter>
         </activity>
 
         <service

@@ -22,6 +22,31 @@ const ICON = path.join(__dirname, 'build', 'icon.png');
 if (!app.requestSingleInstanceLock()) app.exit(0);
 app.setAppUserModelId(APP_ID);
 
+// dreymail://open?path=/… links ("Open this page in the app" on the web) open that page of the
+// configured server here. Only paths: a link can never point the app at another site.
+const LINK_SCHEME = 'dreymail';
+if (process.defaultApp) {
+  if (process.argv.length >= 2) app.setAsDefaultProtocolClient(LINK_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient(LINK_SCHEME);
+}
+/** The server path a dreymail:// link in these arguments asks for, or null. */
+function linkPath(argv) {
+  const link = argv.find((a) => typeof a === 'string' && a.toLowerCase().startsWith(`${LINK_SCHEME}://`));
+  if (!link) return null;
+  try {
+    const p = new URL(link).searchParams.get('path') || '/';
+    return p.startsWith('/') && !p.startsWith('//') ? p : '/';
+  } catch {
+    return '/';
+  }
+}
+function openLink(p) {
+  focusWindow();
+  const origin = serverOrigin();
+  if (win && origin) void win.loadURL(origin + p);
+}
+
 // ---- settings (server address) ----------------------------------------------------------------
 
 const configFile = () => path.join(app.getPath('userData'), 'config.json');
@@ -439,7 +464,16 @@ function refreshTrayMenu() {
 
 // ---- start ----------------------------------------------------------------------------------------
 
-app.on('second-instance', focusWindow);
+app.on('second-instance', (_event, argv) => {
+  focusWindow();
+  const p = linkPath(argv);
+  if (p) openLink(p);
+});
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  const p = linkPath([url]);
+  if (p && app.isReady()) openLink(p);
+});
 app.on('before-quit', () => {
   quitting = true;
   directNotifier?.stop();
@@ -456,6 +490,9 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(buildMenu());
   createWindow();
   createTray();
+  // Started by a dreymail:// link.
+  const startPath = linkPath(process.argv);
+  if (startPath && startPath !== '/' && serverOrigin()) void win.loadURL(serverOrigin() + startPath);
   // Check for a newer release on every start (quietly: only says something when there is one).
   setTimeout(() => void checkForUpdates(false), 8000);
 });

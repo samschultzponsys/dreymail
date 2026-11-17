@@ -110,6 +110,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Buttons pinned to every opened message, not only in conversations (7.8).
 - [x] Auto-replies (out of office, sick, on leave, …) per mailbox, per group or for all, with dates,
       sent by the server (7.9).
+- [x] Install the app: the right download and steps per device; "Open this page in the app" via
+      `dreymail://` links in the desktop and Android apps (8.0).
 - [x] Send later and undo send, sent by the server (3.5); Schedule button with more quick times,
       send delay presets up to 5 minutes and a custom delay up to 10 (7.7).
 - [x] Calendar: DreyMail's own calendars with colors and show/hide checkboxes, grouped by mailbox,

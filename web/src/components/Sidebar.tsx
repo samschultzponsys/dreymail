@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-16: right-click a group's name; group pictures.
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
+// Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -52,6 +53,7 @@ import {
   FolderPlus,
   TriangleAlert,
   X,
+  Download,
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
@@ -61,6 +63,8 @@ import { applyDrop, currentOrder, type DropTarget, type Dragged, type SidebarOrd
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
+import { InstallDialog } from './InstallDialog';
+import { runningAsApp } from '../install';
 import { UserAvatar } from './UserPicture';
 import { MailboxIcon } from './MailboxIcon';
 
@@ -141,6 +145,16 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
+  // In a browser only: the desktop and Android apps and installed web apps don't need it.
+  const [offerInstall, setOfferInstall] = useState(() => {
+    if (runningAsApp()) return false;
+    try {
+      return localStorage.getItem('dm-install-hidden') !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
@@ -477,6 +491,25 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
         {blankMenu && <ContextMenu x={blankMenu.x} y={blankMenu.y} items={blankMenuItems} onClose={closeBlankMenu} />}
         {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
         {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}
+        {showInstall && version.data && <InstallDialog version={version.data.version} onClose={() => setShowInstall(false)} />}
+        {offerInstall && version.data && (
+          <button
+            className="icon-btn"
+            title="Install the app (right-click to hide this button; it stays in Settings → This device)"
+            onClick={() => setShowInstall(true)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              try {
+                localStorage.setItem('dm-install-hidden', '1');
+              } catch {
+                /* only for this visit */
+              }
+              setOfferInstall(false);
+            }}
+          >
+            <Download size={17} />
+          </button>
+        )}
         <button className="icon-btn" title="Accounts" onClick={onAccounts}>
           <UserCog size={17} />
         </button>

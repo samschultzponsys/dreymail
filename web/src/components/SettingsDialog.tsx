@@ -31,6 +31,7 @@
 // Modified by samschultzponsys, 2026-11-17: send delay presets up to 5 minutes and a custom delay up to 10.
 // Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
 // Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
+// Modified by samschultzponsys, 2026-11-17: Install the app (This device, in a browser).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -48,6 +49,8 @@ import { SourceLink } from './SourceLink';
 import { Passkeys } from './Passkeys';
 import { SingleSignOn } from './SingleSignOn';
 import { AutoRepliesSettings } from './AutoReplies';
+import { InstallDialog } from './InstallDialog';
+import { runningAsApp } from '../install';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -933,6 +936,23 @@ function deviceName(): string {
  * version and updates, server address, interface size, this device's notifications, email links).
  * All other tabs are the account's and apply everywhere.
  */
+/** In a browser: the desktop, Android or web app for this device. */
+function InstallApp() {
+  const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000 });
+  const [open, setOpen] = useState(false);
+  if (runningAsApp() || !version.data) return null;
+  return (
+    <div>
+      <label className="label">Install the app</label>
+      <div className="hint">DreyMail as an app on this device: its own window, notifications in the background, and email links that open in it.</div>
+      <button className="btn" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={() => setOpen(true)}>
+        Install DreyMail…
+      </button>
+      {open && <InstallDialog version={version.data.version} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
 function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences) => Promise<void> }) {
   const desktop = desktopBridge();
   const android = androidBridge();
@@ -943,6 +963,7 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
         <span className="muted">These settings are stored on this device only. Every other tab belongs to your account and applies on all your devices.</span>
       </div>
       <DesktopApp />
+      <InstallApp />
       <InterfaceSize />
       <div>
         {(desktop || android) && <label className="label">Notifications on this device</label>}

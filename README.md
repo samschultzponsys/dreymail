@@ -34,7 +34,8 @@
      Modified by samschultzponsys, 2026-11-17: connecting single sign-on replaces the password.
      Modified by samschultzponsys, 2026-11-17: Schedule button; longer send delays.
      Modified by samschultzponsys, 2026-11-17: pinned message buttons on every message.
-     Modified by samschultzponsys, 2026-11-17: auto-replies. -->
+     Modified by samschultzponsys, 2026-11-17: auto-replies.
+     Modified by samschultzponsys, 2026-11-17: Install the app; dreymail:// links. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -46,7 +47,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -513,6 +514,15 @@ the data directory on start (it `chown`s it when anything in it belongs to someo
 ownership.
 
 ## Desktop apps (Linux and Windows)
+
+**Install the app** (the download icon at the bottom of the sidebar in a browser, or Settings →
+This device) picks the right download for the device (Windows, Linux, Android) with step-by-step
+instructions, or explains adding DreyMail to the home screen (iPhone, iPad) or as a web app (Mac).
+Right-clicking the sidebar icon hides it. **Open this page in the app** there opens the installed
+desktop or Android app at the same page through a `dreymail://open?path=…` link (the browser asks
+first; on Android, Chrome stays on the page when the app isn't installed). Browsers can't open an
+installed app by themselves when you visit the web address, so this is a button rather than
+automatic.
 
 Every release has desktop apps attached, with the version in the file name:
 

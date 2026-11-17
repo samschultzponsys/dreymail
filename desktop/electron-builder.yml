@@ -23,6 +23,9 @@ extraResources:
     to: LICENSE
   - from: ../NOTICE
     to: NOTICE
+protocols:
+  - name: DreyMail
+    schemes: [dreymail]
 linux:
   category: Network;Email
   icon: build/icon.png
@@ -33,6 +36,8 @@ linux:
   desktop:
     entry:
       StartupWMClass: DreyMail
+      # dreymail:// links ("Open this page in the app" on the web) open the app.
+      MimeType: x-scheme-handler/dreymail;
 deb:
   packageName: dreymail
 rpm:

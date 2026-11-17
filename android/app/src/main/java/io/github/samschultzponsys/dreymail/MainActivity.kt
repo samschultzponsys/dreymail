@@ -159,10 +159,14 @@ class MainActivity : Activity() {
         val data = intent?.data
         when {
             data?.scheme == "mailto" -> openMailto(data.toString())
+            data?.scheme == "dreymail" -> web.loadUrl(base.trimEnd('/') + linkPath(data?.getQueryParameter("path")))
             intent?.getStringExtra(EXTRA_PATH) != null -> web.loadUrl(base + intent.getStringExtra(EXTRA_PATH)!!.let { if (it.startsWith("/")) it else "/$it" })
             web.url == null -> web.loadUrl(base)
         }
     }
+
+    /** Only a path on the configured server: a dreymail:// link can never point the app elsewhere. */
+    private fun linkPath(path: String?): String = if (path != null && path.startsWith("/") && !path.startsWith("//")) path else "/"
 
     private fun openMailto(mailto: String) {
         val base = Prefs.serverUrl(this) ?: return

@@ -810,6 +810,16 @@ img.account-mark { object-fit: cover; }
 
 /* Send later (DreyMail) */
 .send-later { position: relative; }
+/* ---- Install the app ----------------------------------------------------------------------- */
+.install-platforms { flex-wrap: wrap; align-self: flex-start; }
+.dialog .install-platforms button { padding: 6px 12px; }
+.install .btn.primary, .install-choices .btn { align-self: flex-start; }
+.install-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.install-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
+.install-steps pre { margin: 6px 0; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; overflow-x: auto; white-space: pre; }
+.install-server { display: inline-flex; align-items: center; gap: 2px; }
+.install-server .icon-btn.small { width: 24px; height: 24px; }
+.install-open { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border); }
 .auto-reply-card { cursor: default; }
 .auto-reply-card:hover:not(:disabled) { background: var(--surface); }
 .auto-reply-card .sig-accounts { margin-left: 0; }

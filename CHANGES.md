@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.0): install the app; open pages in the app
+
+- **Install the app:** in a browser, a download icon at the bottom of the sidebar (right-click
+  hides it) and Settings → This device → *Install DreyMail…* open a dialog for this device:
+  Windows installer, Linux flatpak/.deb/.rpm with the commands, Android APK with the "install
+  unknown apps" step, Add to Home Screen on iPhone and iPad, web app on Mac (and Chrome/Edge's own
+  install prompt where offered). Files are the running version's release assets; the server
+  address to enter is shown with a copy button. Hidden inside the apps and installed web apps.
+- **Open this page in the app:** the desktop app registers `dreymail://` (Windows registry,
+  Linux desktop entry) and the Android app handles it; `dreymail://open?path=/…` opens that page
+  of the configured server (paths only, never another site). On Android the web link is an
+  `intent://` link that stays in Chrome when the app isn't installed.
+- **Files:** `web/src/install.ts` (new), `web/src/components/InstallDialog.tsx` (new),
+  `web/src/components/Sidebar.tsx`, `web/src/components/SettingsDialog.tsx`, `web/src/styles.css`,
+  `web/test/install.test.ts` (new), `desktop/main.cjs`, `desktop/electron-builder.yml`,
+  `android/app/src/main/AndroidManifest.xml`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/MainActivity.kt`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v7.9): auto-replies
 
 - **Settings → Auto-replies:** automatic answers to new mail (templates: out of office, out sick,
