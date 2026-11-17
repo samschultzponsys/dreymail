@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: routes carry search filters.
+// Modified by samschultzponsys, 2026-11-17: the calendar page.
 
 import { describe, expect, it } from 'vitest';
 import { buildUrl, HOME, listRoute, openMessageFolder, parseLocation, readHistoryState, sameRoute, viewKey, type Route } from '../src/routing';
@@ -12,6 +13,13 @@ const parse = (url: string) => {
 };
 
 describe('routing', () => {
+  it('has a page for the calendar', () => {
+    expect(parseLocation('/calendar', '')).toMatchObject({ calendar: true, accountId: null, open: null });
+    expect(buildUrl({ ...HOME, calendar: true })).toBe('/calendar');
+    expect(parseLocation('/', '').calendar).toBeUndefined();
+    expect(sameRoute({ ...HOME, calendar: true }, HOME)).toBe(false);
+  });
+
   it('parses the unified inbox', () => {
     expect(parse('/')).toEqual(HOME);
     expect(parse('/?q=invoice')).toEqual({ ...HOME, q: 'invoice' });

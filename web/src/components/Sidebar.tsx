@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
+// Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -121,6 +122,8 @@ interface Props {
   /** Folders whose subfolders are folded away, per mailbox (a preference, so every device shows the same) (DreyMail). */
   collapsedFolders?: Record<string, string[]>;
   onToggleFolder?: (accountId: string, path: string) => void;
+  /** The calendar page is showing (DreyMail). */
+  calendarActive?: boolean;
   onAccounts: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -148,7 +151,7 @@ interface Props {
   onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -422,6 +425,12 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
         <PenSquare size={16} /> <span className="name">Compose</span>
       </button>
       {!rail && belowCompose}
+      {onCalendar && (
+        <button className={`btn calendar-btn ${calendarActive ? 'active' : ''}`} onClick={onCalendar} title="Calendar" aria-current={calendarActive ? 'page' : undefined}>
+          <CalendarDays size={17} />
+          <span className="name">Calendar</span>
+        </button>
+      )}
       <nav
         className="nav"
         onContextMenu={(e) => {
@@ -442,12 +451,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
             {totalUnread > 0 && <span className="count">{totalUnread}</span>}
           </button>
         )}
-        {onCalendar && (
-          <button className="nav-item" onClick={onCalendar} title="Calendar">
-            <CalendarDays size={16} />
-            <span className="name">Calendar</span>
-          </button>
-        )}
+
         {scheduledCount > 0 && onScheduled && (
           <button className="nav-item" onClick={onScheduled} title="Scheduled">
             <Clock size={16} />

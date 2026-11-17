@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.9): the calendar as a page of its own
+
+- **Calendar page:** the calendar no longer opens as a dialog; it is a page of its own
+  (`/calendar`, so Back and links work) that fills the space of the message list and reader, on
+  PCs, tablets and phones (with the folder drawer button there). Choosing a folder in the sidebar
+  goes back to mail.
+- **Calendar button:** a full-width button right under Compose (and the Sending list), tinted in
+  the accent color and filled while the calendar is open, instead of a line among the folders.
+- **Files:** `web/src/components/CalendarDialog.tsx`, `web/src/components/Sidebar.tsx`,
+  `web/src/App.tsx`, `web/src/routing.ts`, `web/src/styles.css`, `web/test/routing.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.8): folding subfolders, on every device
 
 - **Folding subfolders:** folders with subfolders get an arrow in the sidebar that folds them away

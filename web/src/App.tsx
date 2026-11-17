@@ -31,6 +31,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Sending list under Compose (undo send after leaving the message).
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
+// Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -184,7 +185,6 @@ export function App() {
   const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
   const scheduledQ = useScheduled(loggedIn);
   const [showScheduled, setShowScheduled] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
   const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
   /** Mailbox to open straight into when Accounts opens (right-click on its name). */
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
@@ -667,6 +667,7 @@ export function App() {
   return (
     <div
       className={`app ${listWidth ? 'list-sized' : ''}`}
+      data-mode={route.calendar ? 'calendar' : 'mail'}
       style={{ ...(listWidth ? { ['--list-w' as string]: `${listWidth}px` } : {}), ...(sideWidth ? { ['--side-w' as string]: `${sideWidth}px` } : {}) } as React.CSSProperties} data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
@@ -725,7 +726,7 @@ export function App() {
         accounts={accounts}
         showUnified={unifiedInbox}
         folders={folders.data}
-        sel={effectiveSel}
+        sel={route.calendar ? { accountId: '', folder: '' } : effectiveSel}
         onSelect={(s) => {
           setChecked(new Set());
           // From the phone drawer, the folder replaces the drawer entry: Back then returns to the
@@ -786,9 +787,12 @@ export function App() {
         scheduledCount={me.data?.preferences.sidebarScheduled === false ? 0 : scheduledQ.data?.filter((m) => (Date.parse(m.sendAt) > Date.now() + 60_000 && !isSending(m)) || m.status === 'failed').length ?? 0}
         onScheduled={() => setShowScheduled(true)}
         onCalendar={me.data?.preferences.sidebarCalendar === false ? undefined : () => {
-          setShowCalendar(true);
-          closeOverlay('nav');
+          // Like a folder: from the phone drawer it replaces the drawer entry.
+          const r: Route = { ...HOME, calendar: true };
+          if (overlay === 'nav') navigate(r, { replace: true });
+          else go(r);
         }}
+        calendarActive={!!route.calendar}
         onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor({ id }) : undefined}
         onDeleteSearch={(s) => {
           if (!confirm(`Remove the saved search “${s.name}”?`)) return;
@@ -873,6 +877,7 @@ export function App() {
         confirmSwipe={(m, d) => swipeFor(d) !== 'delete' || !isTrash(m) || window.confirm('Delete this message permanently?')}
         onSwipe={(m, d) => void onSwipe(m, d)}
       />
+      {route.calendar && <CalendarDialog accounts={accounts} onNav={() => openOverlay('nav')} />}
       <Reader
         openRef={readerRef}
         conversation={readerRef ? rowOf(rows, readerRef) : undefined}
@@ -912,7 +917,6 @@ export function App() {
         />
       )}
       {dialog === 'accounts' && <AccountsDialog accounts={accounts} defaults={me.data!.accountDefaults} startWithNew={accounts.length === 0} canEdit={me.data!.permissions.includes('mail.accounts')} editAccountId={editAccountId} editGroupId={editGroupId} onClose={() => closeOverlay('accounts')} />}
-      {showCalendar && <CalendarDialog accounts={accounts} onClose={() => setShowCalendar(false)} />}
       {showScheduled && <ScheduledDialog accounts={accountMap} onClose={() => setShowScheduled(false)} />}
       {assistantFor && accountMap.get(assistantFor.id) && (
         <AssistantDialog

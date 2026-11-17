@@ -36,7 +36,8 @@
    Modified by samschultzponsys, 2026-11-17: Settings → Storage.
    Modified by samschultzponsys, 2026-11-17: address bubbles; Cc/Bcc line pins.
    Modified by samschultzponsys, 2026-11-17: Sending list under Compose.
-   Modified by samschultzponsys, 2026-11-17: fold buttons on folders with subfolders. */
+   Modified by samschultzponsys, 2026-11-17: fold buttons on folders with subfolders.
+   Modified by samschultzponsys, 2026-11-17: calendar page and its sidebar button. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -187,6 +188,14 @@ svg { flex-shrink: 0; }
 .brand-mark.night, [data-theme='dark'] .brand-mark.day { display: none; }
 [data-theme='dark'] .brand-mark.night { display: block; }
 .compose-btn { margin: 4px 12px 12px; height: 38px; justify-content: center; border-radius: var(--radius); }
+/* Calendar: a clear button of its own under Compose, filled in while the calendar is open (DreyMail). */
+.calendar-btn { margin: -4px 12px 12px; height: 36px; justify-content: center; gap: 8px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--accent-fill) 55%, var(--border)); background: color-mix(in srgb, var(--accent-fill) 10%, var(--surface)); color: var(--text); font-weight: 600; }
+.calendar-btn svg { color: var(--accent); }
+.calendar-btn:hover { background: color-mix(in srgb, var(--accent-fill) 20%, var(--surface)); }
+.calendar-btn.active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
+.calendar-btn.active svg { color: var(--accent-text); }
+.sidebar.rail .calendar-btn { margin: -4px 8px 12px; padding: 0; gap: 0; }
+.sidebar.rail .calendar-btn .name { display: none; }
 /* Sending: mail in its undo-send wait, under Compose (DreyMail) */
 .sending-box { margin: -4px 12px 12px; padding: 6px 4px 4px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .sending-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); margin-bottom: 2px; }
@@ -534,6 +543,7 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   }
   .app[data-view='nav'] .sidebar { transform: none; visibility: visible; }
   .app[data-view='nav'] .drawer-backdrop { display: block !important; position: absolute; inset: 0; z-index: 25; background: rgba(0, 0, 0, 0.35); }
+  .app .cal-pane { grid-column: 1 / -1; border-left: 0; }
 }
 
 /* Phones: one pane at a time. */
@@ -547,6 +557,8 @@ legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
   .app[data-view='list'] .list, .app[data-view='reader'] .reader, .app[data-view='nav'] .sidebar {
     visibility: visible; pointer-events: auto;
   }
+  .app[data-mode='calendar']:not([data-view='nav']) .cal-pane { visibility: visible; pointer-events: auto; }
+  .app .cal-pane { grid-column: 1; border-left: 0; }
   /* During a squirrel run the old view stays visible underneath while the new one is wiped in on top. */
   .app[data-leaving='list'] .list, .app[data-leaving='reader'] .reader, .app[data-leaving='nav'] .sidebar { visibility: visible; }
   .app[data-run][data-view='list'] .list, .app[data-run][data-view='reader'] .reader, .app[data-run][data-view='nav'] .sidebar { z-index: 1; }
@@ -907,7 +919,10 @@ img.account-mark { object-fit: cover; }
 .inbox-tab .count { font-size: 11px; font-weight: 700; color: var(--accent); }
 
 /* ---- calendar ---------------------------------------------------------------------------- */
-.cal-dialog { width: min(1180px, 100%); height: calc(100dvh / var(--ui-zoom, 1) - 32px); }
+.cal-page { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface); }
+/* The calendar page fills the space of the message list and reader (DreyMail). */
+.app[data-mode='calendar'] .list, .app[data-mode='calendar'] .reader { display: none; }
+.cal-pane { grid-column: 2 / -1; grid-row: 1; border-left: 1px solid var(--border); }
 .cal-head { flex-wrap: wrap; row-gap: 6px; }
 .cal-head .cal-range { min-width: 140px; }
 .cal-list-toggle { display: none; }
@@ -977,8 +992,7 @@ img.account-mark { object-fit: cover; }
 .cal-share { display: flex; align-items: center; gap: 10px; }
 .cal-share .cal-name { flex: 1; min-width: 0; }
 @media (max-width: 760px) {
-  .overlay:has(> .cal-dialog) { padding: 0; }
-  .cal-dialog { width: 100%; height: calc(100dvh / var(--ui-zoom, 1)); max-height: none; border-radius: 0; }
+
   .cal-list-toggle { display: inline-flex; }
   .cal-list { display: none; position: absolute; z-index: 5; top: 0; bottom: 0; left: 0; background: var(--surface); box-shadow: var(--shadow-lg); }
   .cal-list.open { display: flex; }

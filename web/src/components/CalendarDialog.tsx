@@ -3,10 +3,11 @@
 
 // The calendar: a list of calendars with show/hide checkboxes (grouped as My calendars, by
 // mailbox, and Shared with me), month / week / day / agenda views, and the event and calendar
-// editors. Repeating events are expanded here, in the browser's time zone.
+// editors. Repeating events are expanded here, in the browser's time zone. Shown as a page of its
+// own (/calendar), filling the space of the message list and reader.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Pencil, Plus, RefreshCw, Repeat, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Menu, Pencil, Plus, RefreshCw, Repeat, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventInput, type EventOccurrence, type Recurrence } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
@@ -50,7 +51,8 @@ const calendarsApi = {
   events: (from: number, to: number) => fetchJson<CalendarEvent[]>('GET', `/api/events?from=${encodeURIComponent(new Date(from).toISOString())}&to=${encodeURIComponent(new Date(to).toISOString())}`),
 };
 
-export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[]; onClose: () => void }) {
+/** The calendar page; `onNav` opens the folder drawer (phones and tablets). */
+export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; onNav: () => void }) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>(() => (window.matchMedia('(max-width: 700px)').matches ? 'agenda' : 'month'));
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
@@ -341,10 +343,12 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
   }
 
   return (
-    <div className="overlay">
-      {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
-      <div className="dialog cal-dialog" role="dialog" aria-modal="true" aria-label="Calendar">
+    <section className="pane cal-pane" aria-label="Calendar">
+      <div className="cal-page">
         <div className="dialog-head cal-head">
+          <button className="icon-btn mobile-only" onClick={onNav} title="Folders">
+            <Menu size={18} />
+          </button>
           <button className="icon-btn cal-list-toggle" title="Calendars" onClick={() => setShowList((s) => !s)}>
             <CalendarDays size={17} />
           </button>
@@ -370,9 +374,6 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
           </div>
           <button className="btn primary" onClick={() => newEvent(mode === 'month' && cursor.getMonth() !== new Date().getMonth() ? cursor : startOfDay(new Date()))} title="New event">
             <Plus size={15} /> <span className="cal-new-label">Event</span>
-          </button>
-          <button className="icon-btn" onClick={onClose} title="Close">
-            <X size={17} />
           </button>
         </div>
         {error && (
@@ -416,7 +417,7 @@ export function CalendarDialog({ accounts, onClose }: { accounts: AccountView[];
           }}
         />
       )}
-    </div>
+    </section>
   );
 }
 
