@@ -19,7 +19,7 @@ const ORDER = [
   'users', 'image_domains', 'push_subscriptions', 'snoozes', 'password_hash', 'username', 'signatures', 'is_admin', 'fcm_tokens',
   'auth', 'display_name', 'saved_searches', 'roles', 'icon', 'icon_image', 'ai_connections', 'learning_from', 'blocked_senders',
   'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth', 'mailbox_groups', 'threaded', 'pinned_folders',
-  'icon_image', 'users',
+  'icon_image', 'users', 'auto_replies',
 ];
 
 const marker = (m: (typeof MIGRATIONS)[number]) => {
@@ -67,7 +67,7 @@ describe('database migrations', () => {
     const linked = store.createPasswordUser('local', 'sam', 'hash1')!;
     const plain = store.createPasswordUser('local', 'eve', 'hash2')!;
     store.connectIdentity(linked.id, 'https://idp.example', 'sub-sam');
-    store.db.exec(MIGRATIONS.at(-1) as string);
+    store.db.exec(MIGRATIONS[ORDER.lastIndexOf('users')] as string);
     expect(store.getUser(linked.id)!.hasPassword).toBe(false);
     expect(store.getUser(plain.id)!.hasPassword).toBe(true);
     store.db.close();

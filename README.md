@@ -33,7 +33,8 @@
      Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an account.
      Modified by samschultzponsys, 2026-11-17: connecting single sign-on replaces the password.
      Modified by samschultzponsys, 2026-11-17: Schedule button; longer send delays.
-     Modified by samschultzponsys, 2026-11-17: pinned message buttons on every message. -->
+     Modified by samschultzponsys, 2026-11-17: pinned message buttons on every message.
+     Modified by samschultzponsys, 2026-11-17: auto-replies. -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -45,7 +46,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **7.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **7.9**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -211,6 +212,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender
   supports it). **Block sender** sends an address or a whole domain to Junk, now and in future;
   manage blocked senders in Settings → General.
+- **Auto-replies** (Settings → Auto-replies): out of office, out sick, on leave, on vacation
+  or your own, each for all mailboxes or for chosen mailboxes and groups, optionally from one
+  date and time until another. Your server sends them, even with DreyMail closed. Each sender
+  gets one at most once per interval (4 days by default), and mailing lists, newsletters, other
+  automatic mail, spam-flagged mail and no-reply addresses never get one (RFC 3834); replies are
+  marked as automatic so other auto-responders don't answer them.
 - **Schedule** (next to Send): in 1 or 3 hours, this evening, tomorrow morning or afternoon,
   Monday morning, or any date and time. **Send delay (undo send)**: Send waits 10 seconds by
   default, with an Undo button; Settings → General offers Off, 10 s, 30 s, 1, 2 or 5 minutes, or a

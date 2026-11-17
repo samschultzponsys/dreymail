@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v7.9): auto-replies
+
+- **Settings → Auto-replies:** automatic answers to new mail (templates: out of office, out sick,
+  on leave, on vacation, or blank). Each one answers for all mailboxes, or for chosen mailboxes
+  and groups; optionally from/until a date and time; on/off switch; how often the same sender
+  may get it again (1–30 days, 4 by default). When several apply, the one naming the mailbox
+  wins, then its group's, then one for all mailboxes. `{subject}` fills in the original subject.
+- **Server:** watches the inboxes of users with an auto-reply on (like blocked senders) and
+  answers new mail after blocked senders went to Junk, reading the headers before rules move
+  anything. Never answers mailing lists, bulk, automatic, spam-flagged or bounce mail, no-reply
+  addresses or the mailbox itself (RFC 3834); replies carry `Auto-Submitted: auto-replied` and
+  `X-Auto-Response-Suppress: All`, aren't saved to Sent, and an account sends at most 60 an
+  hour. New tables `auto_replies` and `auto_reply_log`.
+- **Files:** `server/src/autoReply.ts` (new), `server/src/routes/autoReplies.ts` (new),
+  `server/src/app.ts`, `server/src/db.ts`, `server/src/mail/send.ts`, `shared/types.ts`,
+  `web/src/components/AutoReplies.tsx` (new), `web/src/components/SettingsDialog.tsx`,
+  `web/src/styles.css`, `server/test/autoReply.test.ts` (new), `server/test/migrations.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v7.8): pinned buttons on every message
 
 - **Reader:** the buttons picked in Settings → General ("Buttons pinned to each message") showed

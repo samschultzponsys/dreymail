@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message.
 // Modified by samschultzponsys, 2026-11-17: send delay presets up to 5 minutes and a custom delay up to 10.
 // Modified by samschultzponsys, 2026-11-17: pinned message buttons apply to every message.
+// Modified by samschultzponsys, 2026-11-17: Auto-replies tab.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -46,6 +47,7 @@ import { AiConnections } from './AiConnections';
 import { SourceLink } from './SourceLink';
 import { Passkeys } from './Passkeys';
 import { SingleSignOn } from './SingleSignOn';
+import { AutoRepliesSettings } from './AutoReplies';
 import { androidBridge, androidInfo } from '../android';
 import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
@@ -67,7 +69,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'roles' | 'signin' | 'outlook' | 'google' | 'android';
 
 export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -89,6 +91,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
         ['profile', 'Profile'] as [SettingsTab, string],
         ['general', 'General'] as [SettingsTab, string],
         ['signatures', 'Signatures'] as [SettingsTab, string],
+        ['autoreplies', 'Auto-replies'] as [SettingsTab, string],
         ['privacy', 'Images'] as [SettingsTab, string],
         ...(me.hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
         ...(aiStatus.data?.allowed ? [['ai', 'AI connections'] as [SettingsTab, string]] : []),
@@ -293,6 +296,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'general' && <BlockedSenders accounts={myAccounts.data ?? []} />}
           {tab === 'ai' && <AiConnections accounts={myAccounts.data ?? []} canShare={!!aiStatus.data?.canShare} />}
           {tab === 'signatures' && <SignaturesSettings />}
+          {tab === 'autoreplies' && <AutoRepliesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'privacy' && (
             <div>

@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-15: Google, Outlook and CalDAV calendars; invitations.
 // Modified by samschultzponsys, 2026-11-15: privacy page at /privacy.
 // Modified by samschultzponsys, 2026-11-16: folder lists kept current in the background.
+// Modified by samschultzponsys, 2026-11-17: auto-replies.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,6 +68,8 @@ import { FcmSender, FirebaseConfig, type FetchLike } from './push/fcm.js';
 import type { NotificationContent } from '../../shared/types.js';
 import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
+import { AutoReplies } from './autoReply.js';
+import { registerAutoReplyRoutes } from './routes/autoReplies.js';
 
 /** CSP for the application itself. Message iframes (srcdoc) inherit it, plus their own. */
 export const APP_CSP = [
@@ -230,7 +233,9 @@ export async function buildApp(
   const scheduled = new ScheduledSends(store, (userId, payload, files) => compose.send(userId, payload, files), (msg, extra) => app.log.warn(extra ?? {}, msg));
   scheduled.start();
   app.addHook('onClose', async () => scheduled.stop());
-  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg), alsoWatch: () => blocklist.users() });
+  // Auto-replies (out of office, …): sent by the server to new mail in the mailboxes they cover.
+  const autoReplies = new AutoReplies({ store, pool, send: (userId, accountId, r) => compose.sendAutoReply(userId, accountId, r), log: (msg, extra) => app.log.warn(extra ?? {}, msg) });
+  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg), alsoWatch: () => [...blocklist.users(), ...autoReplies.users()] });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
     let fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));
@@ -240,6 +245,8 @@ export async function buildApp(
       const unblocked = await blocklist.handleNew(userId, accountId, fresh).catch(() => fresh.map((m) => m.uid));
       fresh = fresh.filter((m) => unblocked.includes(m.uid));
       if (fresh.length === 0) return;
+      // Auto-replies read the headers before anything moves the mail; they send in the background.
+      await autoReplies.handleNew(userId, accountId, fresh).catch((err: Error) => app.log.warn({ accountId, error: err.message }, 'auto-reply check failed'));
       // Mail the assistant moves out of the inbox doesn't need a notification.
       const stays = await assistant.handleNew(userId, accountId, fresh.map((m) => m.uid)).catch(() => null);
       if (stays) fresh = fresh.filter((m) => stays.includes(m.uid));
@@ -321,6 +328,7 @@ export async function buildApp(
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
   registerCalendarRoutes(app, { store, calendars });
+  registerAutoReplyRoutes(app, { autoReplies, onChanged: (userId) => assistant.syncWatching(userId) });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
   // Learning periods end on their own: stop watching inboxes that no longer need it.

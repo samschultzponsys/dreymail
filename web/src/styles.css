@@ -810,6 +810,16 @@ img.account-mark { object-fit: cover; }
 
 /* Send later (DreyMail) */
 .send-later { position: relative; }
+.auto-reply-card { cursor: default; }
+.auto-reply-card:hover:not(:disabled) { background: var(--surface); }
+.auto-reply-card .sig-accounts { margin-left: 0; }
+.auto-reply-card .grow { flex: 1; }
+.chip.live { background: var(--accent-fill); color: var(--accent-text); border-color: transparent; }
+.auto-reply-editor .label { margin: 0; }
+.auto-reply-editor textarea.input { min-height: 140px; resize: vertical; font: inherit; padding: 8px 10px; line-height: 1.45; }
+.auto-reply-scope { padding-left: 4px; }
+.auto-reply-dates { display: flex; gap: 12px; flex-wrap: wrap; }
+.auto-reply-dates label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; flex: 1; min-width: 200px; }
 .send-delay-custom { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; font-size: 13px; }
 .send-delay-custom .input { width: 72px; }
 .send-later-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 20; width: 280px; padding: 6px; display: flex; flex-direction: column; gap: 2px;

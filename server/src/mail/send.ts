@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-15: Sign in with Google for Gmail.
 // Modified by samschultzponsys, 2026-11-15: answers to calendar invitations (iTIP REPLY).
 // Modified by samschultzponsys, 2026-11-16: sent mail carries its pictures as inline attachments.
+// Modified by samschultzponsys, 2026-11-17: auto-replies.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -121,6 +122,31 @@ export class ComposeService {
     } catch (err) {
       throw describeError(err, `SMTP ${account.smtp.host}`);
     }
+  }
+
+  /**
+   * An auto-reply (out of office, …). Marked as one (RFC 3834 Auto-Submitted, and Microsoft's
+   * X-Auto-Response-Suppress) so other auto-responders don't answer it, and not saved to Sent.
+   */
+  async sendAutoReply(userId: string, accountId: string, r: { to: string; subject: string; text: string; inReplyTo: string | null }): Promise<void> {
+    const account = this.store.getAccountSecret(userId, accountId);
+    if (!account) throw new ComposeError('Unknown sender account');
+    if (!isValidAddress(r.to)) throw new ComposeError(`Invalid address: ${r.to}`);
+    const ref = r.inReplyTo && /^<[^<>\s@]+@[^<>\s@]+>$/.test(r.inReplyTo) ? r.inReplyTo : undefined;
+    const composer = new MailComposer({
+      from: { name: account.displayName, address: account.email },
+      to: r.to,
+      subject: r.subject,
+      text: r.text,
+      inReplyTo: ref,
+      references: ref ? [ref] : undefined,
+      headers: { 'Auto-Submitted': 'auto-replied', 'X-Auto-Response-Suppress': 'All' },
+      disableFileAccess: true,
+      disableUrlAccess: true,
+      xMailer: 'DreyMail',
+    });
+    const raw = await composer.compile().build();
+    await this.deliver(userId, account, raw, { from: account.email, to: [r.to] });
   }
 
   /** Answers a calendar invitation: a short note with the iTIP REPLY the organizer's calendar reads. */

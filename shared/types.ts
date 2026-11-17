@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: single sign-on status says whether disconnecting needs a new password.
+// Modified by samschultzponsys, 2026-11-17: auto-replies.
 
 // Types shared between the server API and the web client.
 
@@ -561,3 +562,28 @@ export type ClientEvent = {
   /** DreyMail desktop app: this session shows its own notifications for new mail. */
   notifications?: boolean;
 };
+
+/** An automatic reply (out of office, sick, on leave, …) sent by the server to new mail (DreyMail). */
+export interface AutoReply {
+  id: string;
+  /** The user's own name for it ("Out of office"). */
+  name: string;
+  /** Subject of the reply; {subject} is the original message's subject. */
+  subject: string;
+  /** Plain text; {subject} is the original message's subject. */
+  body: string;
+  enabled: boolean;
+  /** Only between these times (ISO), when set. */
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Which mailboxes it answers for: all of them, or these mailboxes and the mailboxes of these groups. */
+  allMailboxes: boolean;
+  accountIds: string[];
+  groupIds: string[];
+  /** Each sender gets it at most once in this many days (per mailbox). */
+  intervalDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AutoReplyInput = Omit<AutoReply, 'id' | 'createdAt' | 'updatedAt'>;

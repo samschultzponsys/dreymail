@@ -31,6 +31,7 @@
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: connecting single sign-on removes the account's password.
+// Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -455,6 +456,32 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
   // DreyMail 7.6: an account with single sign-on connected signs in with it (or a passkey), not a
   // password. Drop the passwords of accounts connected before then. Safe to run twice.
   `UPDATE users SET password_hash = NULL WHERE password_hash IS NOT NULL AND id IN (SELECT user_id FROM user_identities);`,
+  // DreyMail 7.9: auto-replies (out of office, …) and who got one when, so each sender gets it once
+  // per interval.
+  `CREATE TABLE IF NOT EXISTS auto_replies (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     subject TEXT NOT NULL,
+     body TEXT NOT NULL,
+     enabled INTEGER NOT NULL DEFAULT 0,
+     starts_at INTEGER,
+     ends_at INTEGER,
+     all_mailboxes INTEGER NOT NULL DEFAULT 0,
+     account_ids TEXT NOT NULL DEFAULT '[]',
+     group_ids TEXT NOT NULL DEFAULT '[]',
+     interval_days INTEGER NOT NULL DEFAULT 4,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS auto_replies_user ON auto_replies(user_id);
+   CREATE TABLE IF NOT EXISTS auto_reply_log (
+     reply_id TEXT NOT NULL REFERENCES auto_replies(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL,
+     sender TEXT NOT NULL,
+     sent_at INTEGER NOT NULL,
+     PRIMARY KEY (reply_id, account_id, sender)
+   );`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
