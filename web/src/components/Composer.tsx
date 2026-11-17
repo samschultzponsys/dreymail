@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-13: takes on the From account's colour.
 // Modified by samschultzponsys, 2026-11-15: send later and undo send.
 // Modified by samschultzponsys, 2026-11-17: Schedule button with more quick times; longer send delays.
+// Modified by samschultzponsys, 2026-11-17: single line spacing (lines as <div>s, not <p>s).
 
 import {
   Bold,
@@ -177,6 +178,8 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
   const sigShown = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
+    // Enter starts a new <div> line, not a <p> (which every mail client shows with a blank line around it).
+    document.execCommand('defaultParagraphSeparator', false, 'div');
     if (editor.current) editor.current.innerHTML = init.html;
     sigShown.current = undefined;
     if (init.to) {

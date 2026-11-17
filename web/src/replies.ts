@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-17: single line spacing (new messages, replies and forwards start with <div> lines, not <p>s).
+
 import type { AccountView, Address, MessageDetail } from '../../shared/types';
 import type { ComposerInit } from './components/Composer';
 import type { ReplyKind } from './components/Reader';
@@ -28,7 +32,8 @@ export function blankComposer(account: AccountView): ComposerInit {
     cc: '',
     bcc: '',
     subject: '',
-    html: '<p><br></p>',
+    // Lines as <div>s, like Gmail and Outlook: a <p> gets a blank line's margin in every mail client.
+    html: '<div><br></div>',
     inReplyTo: null,
     references: [],
     forwardFrom: null,
@@ -46,7 +51,7 @@ export function composerForMailto(fields: MailtoFields, account: AccountView): C
     cc: fields.cc,
     bcc: fields.bcc,
     subject: fields.subject,
-    html: fields.body ? `<p>${textToHtml(fields.body)}</p>` : '<p><br></p>',
+    html: fields.body ? `<div>${textToHtml(fields.body)}</div>` : '<div><br></div>',
   };
 }
 
@@ -84,7 +89,7 @@ export function composerFor(kind: ReplyKind, d: MessageDetail, account: AccountV
     return {
       ...base,
       subject: prefixSubject('Fwd', d.subject),
-      html: `<p><br></p><p>${header}</p><div>${originalBody(d)}</div>`,
+      html: `<div><br></div><br><div>${header}</div><div>${originalBody(d)}</div>`,
       references: d.messageId ? [...d.references, d.messageId] : d.references,
       forwardFrom: ref,
       forwardAttachments: d.attachments.filter((a) => !a.inline),
@@ -108,7 +113,7 @@ export function composerFor(kind: ReplyKind, d: MessageDetail, account: AccountV
     to: list(to),
     cc: list(cc),
     subject: prefixSubject('Re', d.subject),
-    html: `<p><br></p><p>On ${escapeHtml(formatFullDate(d.date))}, ${who} wrote:</p><blockquote type="cite">${originalBody(d)}</blockquote>`,
+    html: `<div><br></div><br><div>On ${escapeHtml(formatFullDate(d.date))}, ${who} wrote:</div><blockquote type="cite">${originalBody(d)}</blockquote>`,
     inReplyTo: d.messageId,
     references: d.messageId ? [...d.references, d.messageId] : d.references,
     answering: ref,

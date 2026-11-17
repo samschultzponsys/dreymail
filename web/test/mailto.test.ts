@@ -90,11 +90,11 @@ describe('composing from a mailto: link', () => {
   it('fills in recipients and subject, with the body as escaped plain text', () => {
     const init = composerForMailto({ to: 'a@example.com', cc: 'b@example.com', bcc: '', subject: 'Hi', body: '<b>bold</b>\nnext' }, account);
     expect(init).toMatchObject({ accountId: 'a1', to: 'a@example.com', cc: 'b@example.com', subject: 'Hi', inReplyTo: null, answering: null });
-    expect(init.html).toBe('<p>&lt;b&gt;bold&lt;/b&gt;<br>next</p>');
+    expect(init.html).toBe('<div>&lt;b&gt;bold&lt;/b&gt;<br>next</div>');
   });
 
   it('starts with an empty body when the link has none', () => {
-    expect(composerForMailto({ to: 'a@example.com', cc: '', bcc: '', subject: '', body: '' }, account).html).toBe('<p><br></p>');
+    expect(composerForMailto({ to: 'a@example.com', cc: '', bcc: '', subject: '', body: '' }, account).html).toBe('<div><br></div>');
   });
 });
 

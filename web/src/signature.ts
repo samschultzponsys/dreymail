@@ -30,8 +30,10 @@ export function applySignature(editor: HTMLElement, sigHtml: string | null): voi
   if (sigHtml === null) return;
   const div = editor.ownerDocument.createElement('div');
   div.setAttribute(SIGNATURE_ATTR, '1');
+  // A blank line's gap above it (the lines you type are <div>s without one); inline, so mail clients show it too.
+  div.style.marginTop = '1em';
   div.innerHTML = sigHtml;
   const first = editor.firstElementChild;
   if (first) first.after(div);
-  else editor.append(editor.ownerDocument.createElement('p'), div);
+  else editor.append(editor.ownerDocument.createElement('div'), div);
 }

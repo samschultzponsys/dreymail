@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.4): single line spacing when writing
+
+- **Enter starts a new line, not a new paragraph.** New messages, replies and forwards started with
+  a `<p>`, so every Enter made another `<p>`, which the editor and every recipient's mail client
+  show with a blank line's gap around it: everything looked double-spaced. Lines are now `<div>`s
+  (as in Gmail and Outlook), and Enter always makes a `<div>`. The signature keeps a one-line gap
+  above it (an inline margin, so recipients see it too). Drafts saved before keep their `<p>`s.
+- **Files:** `web/src/replies.ts`, `web/src/components/Composer.tsx`, `web/src/signature.ts`,
+  `web/test/mailto.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.3): clear a user's mail cache; clickable flatpak notifications
 
 - **Settings → Storage** clears a user's mail cache: per mailbox (the bin button on its row) or all
