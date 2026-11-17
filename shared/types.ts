@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-16: notifications can show the start of the message.
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
+// Modified by samschultzponsys, 2026-11-17: single sign-on status says whether disconnecting needs a new password.
 
 // Types shared between the server API and the web client.
 
@@ -519,8 +520,10 @@ export interface SsoStatus {
   connected: boolean;
   /** When it was connected (null for accounts made by single sign-on itself). */
   connectedAt: string | null;
-  /** It can be disconnected without locking the account out (it has a password or passkey). */
+  /** It can be disconnected without locking the account out (with a passkey, or a new password). */
   canDisconnect: boolean;
+  /** Disconnecting needs a new password, because the account has no other way in (no passkey). */
+  needsPassword: boolean;
 }
 
 export interface AuthMethods {

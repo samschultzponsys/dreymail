@@ -19,7 +19,7 @@ const ORDER = [
   'users', 'image_domains', 'push_subscriptions', 'snoozes', 'password_hash', 'username', 'signatures', 'is_admin', 'fcm_tokens',
   'auth', 'display_name', 'saved_searches', 'roles', 'icon', 'icon_image', 'ai_connections', 'learning_from', 'blocked_senders',
   'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth', 'mailbox_groups', 'threaded', 'pinned_folders',
-  'icon_image',
+  'icon_image', 'users',
 ];
 
 const marker = (m: (typeof MIGRATIONS)[number]) => {
@@ -60,5 +60,16 @@ describe('database migrations', () => {
     expect(store.saveGoogleAccount(user.id, { email: 'sam@gmail.com', name: 'Gmail', displayName: 'Sam', color: '#ef4444', refreshToken: 'rt' }).auth).toBe('google');
     store.db.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('drops the passwords of accounts with single sign-on connected (7.6)', () => {
+    const store = new Store(':memory:', new Keyring(crypto.randomBytes(48).toString('base64')).credentialKey);
+    const linked = store.createPasswordUser('local', 'sam', 'hash1')!;
+    const plain = store.createPasswordUser('local', 'eve', 'hash2')!;
+    store.connectIdentity(linked.id, 'https://idp.example', 'sub-sam');
+    store.db.exec(MIGRATIONS.at(-1) as string);
+    expect(store.getUser(linked.id)!.hasPassword).toBe(false);
+    expect(store.getUser(plain.id)!.hasPassword).toBe(true);
+    store.db.close();
   });
 });

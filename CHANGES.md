@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v7.6): single sign-on replaces the password
+
+- **Settings → Profile → Single sign-on:** connecting your provider now removes the account's
+  password. The account signs in with single sign-on (or a passkey) from then on, so the Password
+  tab and the administrators' *Set a new password* button go away for it. Connecting asks for
+  confirmation first. **Disconnect** asks for a new password (optional when the account has a
+  passkey), so the account always keeps a way in.
+- **Database:** a migration drops the passwords of accounts that were connected before 7.6.
+- **Files:** `server/src/auth/routes.ts`, `server/src/db.ts`, `shared/types.ts`,
+  `web/src/components/SingleSignOn.tsx`, `server/test/sso-connect.test.ts`,
+  `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-16 (v7.5): tidier collapsed folder bar
 
 - **Collapsed folder bar** (wide screens): a group's unread count stuck out of the bar, and its

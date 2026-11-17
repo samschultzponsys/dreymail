@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-15: passkey sign-in.
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 // Modified by samschultzponsys, 2026-11-15: connecting single sign-on to an existing account.
+// Modified by samschultzponsys, 2026-11-17: connecting single sign-on removes the password; disconnecting sets a new one.
 
 import { serverVersion } from '../version.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -122,6 +123,8 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
         const me = store.getUser(tx.link)!;
         if (me.issuer === claims.iss && me.subject === claims.sub) return back({ sso: 'connected' });
         store.connectIdentity(tx.link, claims.iss, claims.sub);
+        // From now on the account signs in with single sign-on (or a passkey), not a password.
+        store.clearPassword(tx.link);
         req.log.info({ user: tx.link }, 'single sign-on connected to an account');
         return back({ sso: 'connected' });
       }
@@ -155,20 +158,34 @@ export async function registerAuthRoutes(app: FastifyInstance, config: Config, s
     const o = login.current().oidc;
     const ids = store.identitiesOf(me.id);
     const ownOidc = !me.hasPassword && me.issuer !== 'dev-login';
+    const hasPasskey = !!store.db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(me.id);
+    const needsPassword = !me.hasPassword && !hasPasskey;
     return {
       available: !!o,
       label: o?.label ?? '',
       connected: ownOidc || ids.length > 0,
       connectedAt: ids[0] ? new Date(ids[0].createdAt).toISOString() : null,
-      // Disconnecting must leave a way in: a password or a passkey (and only connected identities can go).
-      canDisconnect: ids.length > 0 && (me.hasPassword || !!store.db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(me.id)),
+      // Disconnecting must leave a way in: a passkey, or a new password (only for username accounts,
+      // and only connected identities can go).
+      canDisconnect: ids.length > 0 && (!needsPassword || me.issuer === LOCAL_ISSUER),
+      needsPassword,
     };
   });
 
   app.delete('/api/sso', async (req, reply) => {
     const me = req.user!;
+    if (store.identitiesOf(me.id).length === 0) return reply.code(400).send({ error: 'Single sign-on is not connected to this account.' });
     const hasPasskey = !!store.db.prepare('SELECT 1 FROM passkeys WHERE user_id = ? LIMIT 1').get(me.id);
-    if (!me.hasPassword && !hasPasskey) return reply.code(400).send({ error: 'Add a password or passkey first, so you can still sign in.' });
+    const given = z.object({ password: z.string().max(1000).optional() }).safeParse(req.body ?? {});
+    const password = given.success && given.data.password ? given.data.password : '';
+    if (password || (!me.hasPassword && !hasPasskey)) {
+      // A new password, so the account can still sign in once single sign-on is gone.
+      if (me.issuer !== LOCAL_ISSUER) return reply.code(400).send({ error: 'Add a passkey first, so you can still sign in.' });
+      if (!password) return reply.code(400).send({ error: 'Choose a new password, so you can still sign in.' });
+      const valid = passwordSchema.safeParse(password);
+      if (!valid.success) return reply.code(400).send({ error: valid.error.issues[0]!.message });
+      store.setNewPasswordHash(me.id, await hashPassword(valid.data));
+    }
     store.disconnectIdentities(me.id);
     return { ok: true };
   });

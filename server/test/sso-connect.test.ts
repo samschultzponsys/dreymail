@@ -85,8 +85,12 @@ describe('connecting single sign-on to an account', () => {
     nextSubject = 'idp-sam';
     const linked = await ssoRoundTrip(sam, true);
     expect(linked.location).toBe('/?sso=connected');
-    expect(await status(sam)).toMatchObject({ connected: true, canDisconnect: true });
+    expect(await status(sam)).toMatchObject({ connected: true, canDisconnect: true, needsPassword: true });
     expect(store.listUsers()).toHaveLength(1); // no second account
+    // The password is gone: no password sign-in, no password change.
+    expect(store.getUser(samId)!.hasPassword).toBe(false);
+    const pwLogin = await ctx!.app.inject({ method: 'POST', url: '/auth/password/login', payload: { username: 'sam', password: 'a long password' }, headers: { 'x-dreymail': '1' } });
+    expect(pwLogin.statusCode).toBe(401);
 
     // A fresh browser signing in with SSO lands in Sam's account.
     const fresh = await ssoRoundTrip({});
@@ -102,7 +106,13 @@ describe('connecting single sign-on to an account', () => {
 
     // Admin list shows it; disconnecting goes back to separate accounts.
     expect(store.identitiesOf(samId)).toHaveLength(1);
-    expect((await ctx!.app.inject({ method: 'DELETE', url: '/api/sso', headers: { cookie: header(sam), 'x-dreymail': '1' } })).statusCode).toBe(200);
+    // Disconnecting without a passkey needs a new password.
+    const noPw = await ctx!.app.inject({ method: 'DELETE', url: '/api/sso', headers: { cookie: header(sam), 'x-dreymail': '1' } });
+    expect(noPw.statusCode).toBe(400);
+    expect(store.identitiesOf(samId)).toHaveLength(1);
+    expect((await ctx!.app.inject({ method: 'DELETE', url: '/api/sso', payload: { password: 'a new long password' }, headers: { cookie: header(sam), 'x-dreymail': '1' } })).statusCode).toBe(200);
+    const relogin = await ctx!.app.inject({ method: 'POST', url: '/auth/password/login', payload: { username: 'sam', password: 'a new long password' }, headers: { 'x-dreymail': '1' } });
+    expect(relogin.statusCode).toBe(200);
     nextSubject = 'idp-sam';
     const after = await ssoRoundTrip({});
     const who = (await ctx!.app.inject({ method: 'GET', url: '/api/me', headers: { cookie: header(after.jar) } })).json() as { id: string };

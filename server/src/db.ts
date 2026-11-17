@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-16: buttons pinned to each message (preference).
 // Modified by samschultzponsys, 2026-11-16: sidebar order by dragging.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
+// Modified by samschultzponsys, 2026-11-17: connecting single sign-on removes the account's password.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -451,6 +452,9 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     if (!has('icon_image_type')) db.exec("ALTER TABLE mailbox_groups ADD COLUMN icon_image_type TEXT NOT NULL DEFAULT ''");
     if (!has('icon_image_version')) db.exec('ALTER TABLE mailbox_groups ADD COLUMN icon_image_version INTEGER NOT NULL DEFAULT 0');
   },
+  // DreyMail 7.6: an account with single sign-on connected signs in with it (or a passkey), not a
+  // password. Drop the passwords of accounts connected before then. Safe to run twice.
+  `UPDATE users SET password_hash = NULL WHERE password_hash IS NOT NULL AND id IN (SELECT user_id FROM user_identities);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -924,6 +928,16 @@ export class Store {
 
   setPasswordHash(userId: string, passwordHash: string) {
     this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash IS NOT NULL').run(passwordHash, userId);
+  }
+
+  /** Sets a password on any account (setPasswordHash only changes an existing one). */
+  setNewPasswordHash(userId: string, passwordHash: string) {
+    this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+  }
+
+  /** Removes the account's password: it signs in with single sign-on or a passkey from now on. */
+  clearPassword(userId: string) {
+    this.db.prepare('UPDATE users SET password_hash = NULL WHERE id = ?').run(userId);
   }
 
   getPasswordHash(userId: string): string | null {
