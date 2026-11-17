@@ -29,11 +29,14 @@
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
+// Modified by samschultzponsys, 2026-11-17: Sending list under Compose (undo send after leaving the message).
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { AccountView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
+import type { AccountView, AttachmentView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
+import { composerFromPayload, filesFrom, isSending } from './sending';
+import { SendingBox } from './components/SendingBox';
 import { groupConversations, rowOf } from '../../shared/threads';
 import { inboxUnread } from '../../shared/unread';
 import { api, ApiError, type MailboxSel } from './api';
@@ -499,6 +502,43 @@ export function App() {
     },
     [effectiveSel.accountId, accountMap, accounts, startCompose],
   );
+  // Sending (under Compose): mail in its undo-send wait can be taken back until it goes out.
+  const sending = (scheduledQ.data ?? []).filter(isSending);
+  const [sendingBusy, setSendingBusy] = useState<string | null>(null);
+  const undoSending = async (id: string) => {
+    if (composerRef.current && composerDirty.current && !window.confirm('Discard the message you are writing?')) return;
+    setSendingBusy(id);
+    try {
+      const back = await api.undoScheduled(id);
+      let forwarded: AttachmentView[] = [];
+      const from = back.payload.forwardFrom;
+      if (from) {
+        try {
+          const d = await api.message({ accountId: from.accountId, folder: from.folder, uid: from.uid, uidValidity: from.uidValidity }, 'block');
+          forwarded = d.attachments.filter((a) => from.indices.includes(a.index));
+        } catch {
+          push('The forwarded attachments could not be added back; attach them again if needed.', true);
+        }
+      }
+      startCompose(composerFromPayload(back.payload, filesFrom(back.files), forwarded));
+      push('Not sent: the message is open again.');
+    } catch (err) {
+      push((err as Error).message, true);
+    } finally {
+      setSendingBusy(null);
+      void qc.invalidateQueries({ queryKey: ['scheduled'] });
+    }
+  };
+  const sendNowSending = async (id: string) => {
+    setSendingBusy(id);
+    try {
+      qc.setQueryData(['scheduled'], await api.sendScheduledNow(id));
+    } catch (err) {
+      push((err as Error).message, true);
+    } finally {
+      setSendingBusy(null);
+    }
+  };
   // Opened for a mailto: link (see main.tsx): compose once signed in and there is an account.
   useEffect(() => {
     if (!loggedIn || !accountsQ.isSuccess || accounts.length === 0) return;
@@ -678,6 +718,7 @@ export function App() {
           else go(r);
         }}
         onCompose={compose}
+        belowCompose={<SendingBox items={sending} busy={sendingBusy} onUndo={(id) => void undoSending(id)} onSendNow={(id) => void sendNowSending(id)} />}
         onAccounts={() => {
           setEditAccountId(null);
           setEditGroupId(null);
@@ -725,7 +766,7 @@ export function App() {
           if (overlay === 'nav') navigate(r, { replace: true });
           else go(r);
         }}
-        scheduledCount={me.data?.preferences.sidebarScheduled === false ? 0 : scheduledQ.data?.filter((m) => Date.parse(m.sendAt) > Date.now() + 60_000 || m.status === 'failed').length ?? 0}
+        scheduledCount={me.data?.preferences.sidebarScheduled === false ? 0 : scheduledQ.data?.filter((m) => (Date.parse(m.sendAt) > Date.now() + 60_000 && !isSending(m)) || m.status === 'failed').length ?? 0}
         onScheduled={() => setShowScheduled(true)}
         onCalendar={me.data?.preferences.sidebarCalendar === false ? undefined : () => {
           setShowCalendar(true);

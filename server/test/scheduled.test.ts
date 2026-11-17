@@ -56,4 +56,23 @@ describe('send later', () => {
     sched.stop();
     expect(sched.list(u.id)[0]).toMatchObject({ status: 'failed' });
   });
+
+  it('undo hands the message back, attachments included, only to its owner and only before it goes out', async () => {
+    const sent: string[] = [];
+    const { store, u, sched, payload } = setup(async (p) => void sent.push(p.subject));
+    const s = sched.schedule(u.id, payload, [{ filename: 'a.txt', contentType: 'text/plain', content: Buffer.from('attached') }], Date.now() + 10_000);
+    expect(Date.parse(s.createdAt)).toBeLessThanOrEqual(Date.now());
+    expect(sched.takeBack('someone-else', s.id)).toBeNull();
+    const back = sched.takeBack(u.id, s.id)!;
+    expect(back.payload.subject).toBe('Hello later');
+    expect(back.files).toEqual([{ filename: 'a.txt', contentType: 'text/plain', content: Buffer.from('attached').toString('base64') }]);
+    expect(sched.list(u.id)).toEqual([]);
+    expect(sched.takeBack(u.id, s.id)).toBeNull();
+    // Already going out: too late.
+    const t = sched.schedule(u.id, payload, [], Date.now() + 10_000);
+    store.db.prepare("UPDATE scheduled_sends SET status = 'sending' WHERE id = ?").run(t.id);
+    expect(sched.takeBack(u.id, t.id)).toBeNull();
+    await sched.tick();
+    expect(sent).toEqual([]);
+  });
 });

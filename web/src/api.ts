@@ -225,6 +225,8 @@ export const api = {
     request<SendResult & { scheduled?: ScheduledSend }>('POST', '/api/send', composeForm(payload, files, sendAt)),
   scheduled: () => request<ScheduledSend[]>('GET', '/api/scheduled'),
   cancelScheduled: (id: string) => request<ScheduledSend[]>('DELETE', `/api/scheduled/${encodeURIComponent(id)}`),
+  undoScheduled: (id: string) =>
+    request<{ payload: ComposePayload; files: { filename: string; contentType: string; content: string }[] }>('POST', `/api/scheduled/${encodeURIComponent(id)}/undo`),
   sendScheduledNow: (id: string) => request<ScheduledSend[]>('POST', `/api/scheduled/${encodeURIComponent(id)}/send`),
   saveDraft: (payload: ComposePayload, files: File[]) => request<DraftResult>('POST', '/api/drafts', composeForm(payload, files)),
   imageDomains: () => request<DomainName[]>('GET', '/api/image-domains'),

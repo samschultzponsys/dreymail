@@ -114,6 +114,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Spam button (to Junk, marked `$Junk`) (8.6).
 - [x] Address suggestions from sent and received mail, per mailbox, group, chosen mailboxes or all;
       addresses as bubbles; Cc/Bcc lines shown per mailbox, group or all, with a pin (8.6).
+- [x] Sending list under Compose: mail in its send delay with a countdown, Undo (opens it again) and
+      Send now (8.7).
 - [x] Buttons pinned to every opened message, not only in conversations (7.8).
 - [x] Auto-replies (out of office, sick, on leave, …) per mailbox, per group or for all, with dates,
       sent by the server (7.9).

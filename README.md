@@ -41,7 +41,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.3 (clear a user's mail cache; clickable flatpak notifications).
      Modified by samschultzponsys, 2026-11-17: v8.4 (single line spacing when writing).
      Modified by samschultzponsys, 2026-11-17: v8.5 (Not spam).
-     Modified by samschultzponsys, 2026-11-17: v8.6 (Spam, address suggestions and bubbles, Cc/Bcc lines). -->
+     Modified by samschultzponsys, 2026-11-17: v8.6 (Spam, address suggestions and bubbles, Cc/Bcc lines).
+     Modified by samschultzponsys, 2026-11-17: v8.7 (Sending list under Compose). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -53,7 +54,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **8.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -244,8 +245,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   Monday morning, or any date and time. **Send delay (undo send)**: Send waits 10 seconds by
   default, with an Undo button; Settings → General offers Off, 10 s, 30 s, 1, 2 or 5 minutes, or a
   custom delay up to 10 minutes. Your server
-  sends both, even if you close DreyMail. Waiting messages are listed under **Scheduled** in the
-  sidebar.
+  sends both, even if you close DreyMail. Mail in its send delay shows under **Sending**, right
+  below Compose, with a countdown, **Undo** (stops it and opens it again, attachments included)
+  and **Send now**, so it can be taken back after leaving it too. Mail scheduled for later is
+  listed under **Scheduled** in the sidebar.
 - **Calendar** (in the sidebar): month, week, day and agenda views, with every calendar in one list
   and a checkbox to show or hide each one.
   - **DreyMail's own calendars:** as many as you like, each with its own color, kept under "My

@@ -986,6 +986,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   app.delete<{ Params: { id: string } }>('/api/scheduled/:id', async (req, reply) =>
     deps.scheduled?.cancel(uid(req), req.params.id) ? deps.scheduled.list(uid(req)) : reply.code(404).send({ error: 'Already sent, or not found' }),
   );
+  // Undo send (from the Sending list under Compose): cancelled, and the message comes back to edit.
+  app.post<{ Params: { id: string } }>('/api/scheduled/:id/undo', async (req, reply) => {
+    const back = deps.scheduled?.takeBack(uid(req), req.params.id);
+    return back ?? reply.code(404).send({ error: 'Already sent, or not found' });
+  });
   app.post<{ Params: { id: string } }>('/api/scheduled/:id/send', async (req, reply) =>
     deps.scheduled?.sendNow(uid(req), req.params.id) ? deps.scheduled.list(uid(req)) : reply.code(404).send({ error: 'Already sent, or not found' }),
   );

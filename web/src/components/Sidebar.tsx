@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-16: right-click a mailbox's name for its menu.
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
 // Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
+// Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -114,6 +115,8 @@ interface Props {
   sel: MailboxSel;
   onSelect: (sel: MailboxSel) => void;
   onCompose: () => void;
+  /** Shown right under Compose (the Sending list) (DreyMail). */
+  belowCompose?: ReactNode;
   onAccounts: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -141,7 +144,7 @@ interface Props {
   onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -381,6 +384,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
       <button className="btn primary compose-btn" onClick={onCompose} disabled={accounts.length === 0} title="Compose">
         <PenSquare size={16} /> <span className="name">Compose</span>
       </button>
+      {!rail && belowCompose}
       <nav
         className="nav"
         onContextMenu={(e) => {

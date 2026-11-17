@@ -53,7 +53,7 @@ export class ScheduledSends {
   }
 
   list(userId: string): ScheduledSend[] {
-    return (this.db.prepare('SELECT id, account_id, send_at, subject, recipients, status, error FROM scheduled_sends WHERE user_id = ? ORDER BY send_at').all(userId) as Record<string, unknown>[]).map((r) => ({
+    return (this.db.prepare('SELECT id, account_id, send_at, subject, recipients, status, error, created_at FROM scheduled_sends WHERE user_id = ? ORDER BY send_at').all(userId) as Record<string, unknown>[]).map((r) => ({
       id: String(r.id),
       accountId: String(r.account_id),
       sendAt: new Date(Number(r.send_at)).toISOString(),
@@ -61,7 +61,33 @@ export class ScheduledSends {
       to: String(r.recipients),
       status: r.status as ScheduledSend['status'],
       error: String(r.error),
+      createdAt: new Date(Number(r.created_at)).toISOString(),
     }));
+  }
+
+  /**
+   * Undo: cancel a message that hasn't started sending and hand back what was composed (with its
+   * attachments, base64), so it can be opened again. Null if it is already going out or gone.
+   */
+  takeBack(userId: string, id: string): { payload: ComposePayload; files: { filename: string; contentType: string; content: string }[] } | null {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const row = this.db.prepare("SELECT message FROM scheduled_sends WHERE id = ? AND user_id = ? AND status != 'sending'").get(id, userId) as { message: string } | undefined;
+      if (!row) {
+        this.db.exec('ROLLBACK');
+        return null;
+      }
+      this.db.prepare('DELETE FROM scheduled_sends WHERE id = ?').run(id);
+      this.db.exec('COMMIT');
+      return JSON.parse(this.store.openSecret(context(id), row.message)) as { payload: ComposePayload; files: { filename: string; contentType: string; content: string }[] };
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        /* already done */
+      }
+      throw err;
+    }
   }
 
   /** Cancel a message that hasn't started sending. */

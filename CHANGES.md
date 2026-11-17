@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v8.7): Sending list under Compose
+
+- **Sending** (right under Compose in the sidebar): mail in its send delay (undo send), with a
+  countdown, **Undo** and **Send now**, refreshed every few seconds while anything is waiting. Undo
+  stops it and opens it again in the composer as it was (recipients, subject, body, attached files,
+  forwarded attachments, reply and draft links), also after the composer and its "Sending…" notice
+  are gone. Mail scheduled for later stays under Scheduled. Server: `POST /api/scheduled/:id/undo`
+  takes the message back (refused once it is going out); scheduled mail carries `createdAt`, which
+  tells a send delay from a send later.
+- **Files:** `web/src/sending.ts` (new), `web/src/components/SendingBox.tsx` (new),
+  `web/test/sending.test.ts` (new), `server/src/mail/scheduled.ts`, `server/src/routes/api.ts`,
+  `server/test/scheduled.test.ts`, `shared/types.ts`, `web/src/App.tsx`, `web/src/api.ts`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/ScheduledDialog.tsx`, `web/src/styles.css`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.6): Spam, address suggestions and bubbles, Cc/Bcc lines
 
 - **Spam:** a button in the message toolbar (outside Junk) and in the list's selection bar moves

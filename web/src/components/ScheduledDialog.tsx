@@ -8,8 +8,11 @@ import { Clock, Send, X } from 'lucide-react';
 import { useState } from 'react';
 import type { AccountView } from '../../../shared/types';
 import { api } from '../api';
+import { isSending } from '../sending';
 
-export const useScheduled = (enabled: boolean) => useQuery({ queryKey: ['scheduled'], queryFn: api.scheduled, enabled, refetchInterval: 60_000 });
+// While mail is in its undo-send wait (the Sending list under Compose), check every few seconds.
+export const useScheduled = (enabled: boolean) =>
+  useQuery({ queryKey: ['scheduled'], queryFn: api.scheduled, enabled, refetchInterval: (q) => (q.state.data?.some(isSending) ? 3000 : 60_000) });
 
 export function ScheduledDialog({ accounts, onClose }: { accounts: Map<string, AccountView>; onClose: () => void }) {
   const qc = useQueryClient();

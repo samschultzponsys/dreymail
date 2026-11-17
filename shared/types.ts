@@ -209,6 +209,8 @@ export interface ScheduledSend {
   to: string;
   status: 'pending' | 'sending' | 'failed';
   error: string;
+  /** When it was sent (or scheduled): a short wait from then is "undo send", longer is send later. */
+  createdAt: string;
 }
 
 export interface MessageDetail {
