@@ -23,7 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
-// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI.
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +55,7 @@ import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
 import { ServerSettings, withStoredSettings } from './serverSettings.js';
+import { assistantOutgoing } from './ai/outgoing.js';
 import type { Http } from './calendar/remote.js';
 import { Blocklist } from './blocklist.js';
 import { ScheduledSends } from './mail/scheduled.js';
@@ -272,7 +273,18 @@ export async function buildApp(
   app.addHook('onClose', async () => scheduled.stop());
   // Auto-replies (out of office, …): sent by the server to new mail in the mailboxes they cover.
   const autoReplies = new AutoReplies({ store, pool, send: (userId, accountId, r) => compose.sendAutoReply(userId, accountId, r), log: (msg, extra) => app.log.warn(extra ?? {}, msg) });
-  const assistant = new AssistantEngine({ store, ai: assistantStore, client: aiClient, pool, mail, access, log: (msg, extra) => app.log.warn(extra ?? {}, msg), alsoWatch: () => [...blocklist.users(), ...autoReplies.users()] });
+  const assistant = new AssistantEngine({
+    store,
+    ai: assistantStore,
+    client: aiClient,
+    pool,
+    mail,
+    access,
+    log: (msg, extra) => app.log.warn(extra ?? {}, msg),
+    alsoWatch: () => [...blocklist.users(), ...autoReplies.users()],
+    // Forwarding, reply drafts and Outlook categories (compose and Microsoft sign-in are made below).
+    outgoing: assistantOutgoing({ store, mail, compose: () => compose, microsoft: { addCategory: (...a: Parameters<MicrosoftAuth['addCategory']>) => microsoft.addCategory(...a) } as MicrosoftAuth, maxMessageBytes: config.maxMessageBytes }),
+  });
   pool.onNewMail = (userId, accountId, messages) => {
     // Snoozed mail coming back gets its own notification from the snooze service.
     let fresh = messages.filter((m) => !snooze.wasResurfaced(userId, accountId, m.messageId));

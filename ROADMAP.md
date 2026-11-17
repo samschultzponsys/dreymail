@@ -20,8 +20,11 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] "This and following" for Google, Outlook and CalDAV series (today: this event or all events).
 
 ### Mail
-- [ ] AI assistant actions: draft reply, forward, unsubscribe; Outlook categories via Microsoft Graph.
 - [ ] Gmail: a conversation's labels in the message list.
+- [ ] Outlook parity: importance (high / low), read receipts, follow-up flags with due dates,
+      printing, the company directory (Microsoft 365 and Google Workspace) in address suggestions.
+- [ ] Shared and delegated mailboxes (Microsoft 365), and signed or encrypted mail (S/MIME).
+- [ ] Contacts as a section of their own; tasks (Microsoft To Do, Google Tasks).
 
 ### Branding
 - [ ] Decide whether the running-squirrel phone animation stays or gets its own DreyMail motion.
@@ -145,6 +148,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       channel per account (own sound), tinted and colored icons, and an in-app updater (1.9, 2.0).
 
 ### AI mailbox assistant
+- [x] Rule actions that send and write: forward, AI reply drafts (saved in Drafts), one-click
+      unsubscribe, Outlook categories through Microsoft Graph (9.8).
 - [x] Plain-language rules with exact conditions, run on new mail, test, history with undo; AI
       connections (Anthropic, Gemini, OpenAI-style, local LM Studio/Ollama/…) per user or shared,
       per mailbox, with daily limits; accuracy slider; at-your-own-risk notice; permission and

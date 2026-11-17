@@ -24,6 +24,10 @@ const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('star') }),
   z.object({ type: z.literal('trash') }),
   z.object({ type: z.literal('spam') }),
+  z.object({ type: z.literal('forward'), to: z.string().trim().toLowerCase().email().max(320) }),
+  z.object({ type: z.literal('draftReply'), instructions: z.string().trim().max(2000) }),
+  z.object({ type: z.literal('unsubscribe') }),
+  z.object({ type: z.literal('category'), name: z.string().trim().min(1).max(100) }),
 ]);
 const ruleSchema = z.object({
   name: z.string().trim().min(1).max(100),

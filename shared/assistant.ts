@@ -17,7 +17,15 @@ export type RuleAction =
   | { type: 'read' }
   | { type: 'star' }
   | { type: 'trash' }
-  | { type: 'spam' };
+  | { type: 'spam' }
+  /** Forward the message to an address (DreyMail 9.8). */
+  | { type: 'forward'; to: string }
+  /** Have the AI write a reply, saved in Drafts for the owner to check and send (9.8). */
+  | { type: 'draftReply'; instructions: string }
+  /** Unsubscribe with the sender's one-click link (RFC 8058) when the message has one (9.8). */
+  | { type: 'unsubscribe' }
+  /** An Outlook category (Outlook / Microsoft 365 mailboxes; a label elsewhere) (9.8). */
+  | { type: 'category'; name: string };
 
 export const RULE_ACTION_LABELS: Record<RuleAction['type'], string> = {
   move: 'Move to folder',
@@ -27,6 +35,10 @@ export const RULE_ACTION_LABELS: Record<RuleAction['type'], string> = {
   star: 'Star',
   trash: 'Move to Trash',
   spam: 'Mark as spam',
+  forward: 'Forward to',
+  draftReply: 'Draft a reply (AI)',
+  unsubscribe: 'Unsubscribe (one click)',
+  category: 'Outlook category',
 };
 
 export interface RuleConditions {

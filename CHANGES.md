@@ -13,9 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.8): assistant actions that send and write
+
+- **New rule actions:** Forward to (with attachments), Draft a reply (the AI writes it from the
+  message and optional instructions; saved in Drafts, never sent), Unsubscribe (one-click, RFC
+  8058, only when offered) and Outlook category (Microsoft Graph `categories`, found by
+  `internetMessageId`; a label in other mailboxes).
+- **Outlook permission:** Mail.ReadWrite is not part of the normal Microsoft sign-in (work tenants
+  that limit consent keep working); *Allow Outlook categories* reconnects the mailbox asking for
+  it (`allow: ['mail']` on `/api/oauth/microsoft/start`).
+- **Files:** `server/src/ai/outgoing.ts` (new), `server/src/ai/engine.ts`, `shared/assistant.ts`,
+  `server/src/routes/assistant.ts`, `server/src/oauth/microsoft.ts`, `server/src/routes/microsoft.ts`,
+  `server/src/app.ts`, `web/src/components/AssistantDialog.tsx`, `server/test/assistant.test.ts`,
+  `CHANGES.md` (9.7 entry: `\All`), `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v9.7): Gmail archive and labels, server settings in the UI
 
-- **Gmail archive:** servers with an All Mail folder (`\\All`) and no Archive folder (Gmail) archive
+- **Gmail archive:** servers with an All Mail folder (`\All`) and no Archive folder (Gmail) archive
   by moving to All Mail; DreyMail used to make an "Archive" label there.
 - **Gmail labels:** the reader shows a Gmail message's labels (X-GM-LABELS) with × to remove one and
   *Add label*; `GET`/`PUT /api/message/labels`.

@@ -32,6 +32,8 @@ export const SCOPES = {
   imap: 'https://outlook.office.com/IMAP.AccessAsUser.All',
   graph: 'https://graph.microsoft.com/Mail.Send',
   calendar: 'https://graph.microsoft.com/Calendars.ReadWrite',
+  /** Changing mail (Outlook categories), asked for only when the user allows it (DreyMail 9.8). */
+  mail: 'https://graph.microsoft.com/Mail.ReadWrite',
 } as const;
 /** Asked for at sign-in: both resources (consented at once), a refresh token, and who the user is. */
 const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph} ${SCOPES.calendar}`;
@@ -117,7 +119,7 @@ export class MicrosoftAuth {
   }
 
   /** Where to send the browser to sign in. */
-  start(userId: string, color: string): string {
+  start(userId: string, color: string, extra: 'mail'[] = []): string {
     const c = this.settings.current();
     if (!this.settings.configured()) throw new MicrosoftError('Outlook sign-in is not set up yet (Settings → Outlook)');
     const now = Date.now();
@@ -132,7 +134,7 @@ export class MicrosoftAuth {
       response_type: 'code',
       redirect_uri: this.redirectUri,
       response_mode: 'query',
-      scope: SIGN_IN_SCOPES,
+      scope: [SIGN_IN_SCOPES, ...extra.map((x) => SCOPES[x])].join(' '),
       state,
       code_challenge: challenge,
       code_challenge_method: 'S256',
@@ -208,6 +210,29 @@ export class MicrosoftAuth {
       this.refreshing.set(key, job);
     }
     return job;
+  }
+
+  /**
+   * Puts an Outlook category on the message with this Message-ID (DreyMail 9.8). Needs the
+   * Mail.ReadWrite permission, which the user allows by reconnecting with it.
+   */
+  async addCategory(userId: string, accountId: string, messageId: string, name: string): Promise<void> {
+    let token: string;
+    try {
+      token = await this.accessToken(userId, accountId, 'mail');
+    } catch {
+      throw new MicrosoftError('Outlook categories need permission to change mail: in the assistant, click "Allow Outlook categories" for this mailbox.');
+    }
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const filter = encodeURIComponent(`internetMessageId eq '${messageId.replace(/'/g, "''")}'`);
+    const found = await this.fetchImpl(`https://graph.microsoft.com/v1.0/me/messages?$filter=${filter}&$select=id,categories&$top=5`, { method: 'GET', headers });
+    if (!found.ok) throw new MicrosoftError(`Outlook didn't find the message (${found.status})`);
+    const list = ((await found.json()) as { value?: { id: string; categories?: string[] }[] }).value ?? [];
+    for (const m of list) {
+      if (m.categories?.includes(name)) continue;
+      const res = await this.fetchImpl(`https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(m.id)}`, { method: 'PATCH', headers, body: JSON.stringify({ categories: [...(m.categories ?? []), name] }) });
+      if (!res.ok) throw new MicrosoftError(`Outlook didn't add the category (${res.status})`);
+    }
   }
 
   /** Sends a complete MIME message through Microsoft Graph; Microsoft keeps the copy in Sent. */

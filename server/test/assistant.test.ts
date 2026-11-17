@@ -190,3 +190,46 @@ describe('learning mode', () => {
     expect(ai.learning(u.id, a.id).observations).toBe(0);
   });
 });
+
+describe('sending and writing actions (9.8)', () => {
+  const setup = (aiReply: string) => {
+    const store = new Store(':memory:', new Keyring(secret).credentialKey);
+    const user = store.upsertUser('local', 'sam', '', 'Sam', 'sam');
+    const acc = store.createAccount(user.id, { name: 'Work', displayName: 'Sam', email: 'sam@example.com', color: '#22d3ee', imap: { host: 'imap.example.com', port: 993, tls: 'tls', user: 'sam', password: 'pw' }, smtp: { host: 'smtp.example.com', port: 465, tls: 'tls', user: 'sam', password: 'pw' }, appendSent: true } as never);
+    const ai = new AssistantStore(store);
+    const connId = ai.saveConnection(user.id, null, { name: 'Local', preset: 'ollama', baseUrl: 'http://x/v1', model: 'm', apiKey: '', dailyLimit: 0 })!;
+    ai.saveMailbox(user.id, { ...ai.mailbox(user.id, acc.id), connectionId: connId, enabled: true });
+    const { f, calls } = fakeFetch(() => ({ json: { choices: [{ message: { content: aiReply } }] } }));
+    const done: string[] = [];
+    const client = { fetchOne: async () => ({ uid: 5, envelope: { messageId: '<m1@shop.example>' }, headers: Buffer.from('List-Unsubscribe: <mailto:u@shop.example>\r\n') }) };
+    const engine = new AssistantEngine({
+      store,
+      ai,
+      client: new AiClient(f),
+      pool: { withMailbox: async (_u: string, _a: string, _f: string, fn: (c: typeof client) => unknown) => fn(client) } as never,
+      mail: { getParsed: async () => ({ from: { address: 'ada@shop.example', name: 'Ada' }, subject: 'Order 42', text: 'Where is my order?', attachments: [] }) } as never,
+      access: {} as never,
+      outgoing: {
+        forward: async (_u, ref, to) => void done.push(`forward ${ref.uid} to ${to}`),
+        draftReply: async (_u, ref, text) => void done.push(`draft for ${ref.uid}: ${text}`),
+        category: async (_u, _a, id, name) => (done.push(`category ${name} on ${id}`), true),
+      },
+    });
+    return { engine, user, acc, done, calls };
+  };
+
+  it('forwards, writes a reply draft with the AI, and puts on an Outlook category', async () => {
+    const t = setup('{"reply": "Hi Ada,\\n\\nIt ships tomorrow.\\n\\nSam"}');
+    await t.engine.apply(t.user.id, t.acc.id, { folder: 'INBOX', uidValidity: '1', uid: 5 }, [
+      { type: 'forward', to: 'boss@example.com' },
+      { type: 'draftReply', instructions: 'say it ships tomorrow' },
+      { type: 'category', name: 'Orders' },
+      { type: 'unsubscribe' },
+    ]);
+    expect(t.done).toEqual(['forward 5 to boss@example.com', 'draft for 5: Hi Ada,\n\nIt ships tomorrow.\n\nSam', 'category Orders on <m1@shop.example>']);
+    // The AI got the message as data, and the owner's instructions.
+    const sent = JSON.stringify(t.calls[0]!.body);
+    expect(sent).toContain('Where is my order?');
+    expect(sent).toContain('say it ships tomorrow');
+  });
+});

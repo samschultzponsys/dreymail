@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { ACCURACY_LEVELS } from '../../../shared/aiProviders';
 import { RULE_ACTION_LABELS, type AssistantDecision, type AssistantRule, type RuleAction, type RuleInput, type RuleSuggestion, type SenderGroup, LEARNING_PERIODS } from '../../../shared/assistant';
 import type { AccountFolders, AccountView } from '../../../shared/types';
-import { api } from '../api';
+import { api, fetchJson } from '../api';
 import { AiGuideLink, ConnectionForm, useAiConnections } from './AiConnections';
 import { MailboxIcon } from './MailboxIcon';
 
@@ -96,6 +96,9 @@ const EMPTY_RULE: RuleInput = { name: '', instructions: '', conditions: {}, acti
 function actionText(a: RuleAction): string {
   if (a.type === 'move') return `Move to ${a.folder}`;
   if (a.type === 'label') return `Label "${a.name}"`;
+  if (a.type === 'forward') return `Forward to ${a.to}`;
+  if (a.type === 'category') return `Outlook category "${a.name}"`;
+  if (a.type === 'draftReply') return a.instructions ? `Draft a reply: ${a.instructions}` : 'Draft a reply';
   return RULE_ACTION_LABELS[a.type];
 }
 
@@ -107,6 +110,7 @@ function RuleEditor({
   onCancel,
   onTest,
   busy,
+  account,
 }: {
   initial: RuleInput;
   folders: string[];
@@ -114,6 +118,8 @@ function RuleEditor({
   onCancel: () => void;
   onTest: (r: RuleInput) => void;
   busy: boolean;
+  /** The mailbox (Outlook mailboxes can allow categories). */
+  account?: AccountView;
 }) {
   const [r, setR] = useState<RuleInput>(initial);
   const c = r.conditions;
@@ -124,7 +130,7 @@ function RuleEditor({
     setR({ ...r, conditions: next });
   };
   const setAction = (i: number, a: RuleAction) => setR({ ...r, actions: r.actions.map((x, j) => (j === i ? a : x)) });
-  const valid = r.name.trim() && r.actions.length > 0 && r.actions.every((a) => (a.type === 'move' ? a.folder.trim() : a.type === 'label' ? a.name.trim() : true)) && (r.instructions.trim() || Object.keys(c).length > 0);
+  const valid = r.name.trim() && r.actions.length > 0 && r.actions.every((a) => (a.type === 'move' ? a.folder.trim() : a.type === 'label' || a.type === 'category' ? a.name.trim() : a.type === 'forward' ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.to.trim()) : true)) && (r.instructions.trim() || Object.keys(c).length > 0);
 
   return (
     <form
@@ -189,7 +195,18 @@ function RuleEditor({
               value={a.type}
               onChange={(e) => {
                 const t = e.target.value as RuleAction['type'];
-                setAction(i, t === 'move' ? { type: 'move', folder: '' } : t === 'label' ? { type: 'label', name: '' } : ({ type: t } as RuleAction));
+                setAction(
+                  i,
+                  t === 'move'
+                    ? { type: 'move', folder: '' }
+                    : t === 'label' || t === 'category'
+                      ? { type: t, name: '' }
+                      : t === 'forward'
+                        ? { type: 'forward', to: '' }
+                        : t === 'draftReply'
+                          ? { type: 'draftReply', instructions: '' }
+                          : ({ type: t } as RuleAction),
+                );
               }}
             >
               {(Object.keys(RULE_ACTION_LABELS) as RuleAction['type'][]).map((t) => (
@@ -209,6 +226,9 @@ function RuleEditor({
               </>
             )}
             {a.type === 'label' && <input className="input grow" value={a.name} placeholder="Label name" onChange={(e) => setAction(i, { type: 'label', name: e.target.value })} />}
+            {a.type === 'category' && <input className="input grow" value={a.name} placeholder="Category name, e.g. Red category or Clients" onChange={(e) => setAction(i, { type: 'category', name: e.target.value })} />}
+            {a.type === 'forward' && <input className="input grow" type="email" value={a.to} placeholder="Address to forward to" onChange={(e) => setAction(i, { type: 'forward', to: e.target.value })} />}
+            {a.type === 'draftReply' && <input className="input grow" value={a.instructions} placeholder="How to reply (optional), e.g. thank them and say I'll answer by Friday" onChange={(e) => setAction(i, { type: 'draftReply', instructions: e.target.value })} />}
             {r.actions.length > 1 && (
               <button type="button" className="icon-btn" title="Remove this action" onClick={() => setR({ ...r, actions: r.actions.filter((_, j) => j !== i) })}>
                 <X size={15} />
@@ -221,7 +241,28 @@ function RuleEditor({
             <Plus size={14} /> Another action
           </button>
         )}
-        <div className="hint">Labels are real labels in Gmail; elsewhere they are tags where the server supports them, or a copy in a folder of that name.</div>
+        <div className="hint">
+          Labels are real labels in Gmail; elsewhere they are tags where the server supports them, or a copy in a folder of that name. Outlook
+          categories need Outlook / Microsoft 365 mailboxes signed in with Microsoft (elsewhere they become labels). Draft replies are saved in
+          Drafts, never sent by themselves. Unsubscribe only uses the sender&apos;s one-click link.
+        </div>
+        {account?.auth === 'microsoft' && r.actions.some((a) => a.type === 'category') && (
+          <div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                void fetchJson<{ url: string }>('POST', '/api/oauth/microsoft/start', { color: account.color, allow: ['mail'] }).then(
+                  ({ url }) => (window.location.href = url),
+                  (e: Error) => window.alert(e.message),
+                )
+              }
+            >
+              Allow Outlook categories
+            </button>
+            <div className="hint">Signs in to this mailbox again, asking Microsoft for permission to change mail (needed once for categories).</div>
+          </div>
+        )}
       </fieldset>
       <div className="row-buttons">
         <button type="button" className="btn" disabled={!valid || busy} onClick={() => onTest(r)}>
@@ -733,6 +774,7 @@ export function AssistantDialog({ account, folders, onClose, initialTab = 'setup
                   <RuleEditor
                     initial={editing.rule}
                     folders={folderPaths}
+                    account={account}
                     busy={busy}
                     onCancel={() => {
                       setEditing(null);

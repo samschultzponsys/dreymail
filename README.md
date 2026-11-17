@@ -52,7 +52,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.4 (the folder bar as a real tree).
      Modified by samschultzponsys, 2026-11-17: v9.5 (calendar: full repeats, guests and invitations, Teams and Meet, reminders).
      Modified by samschultzponsys, 2026-11-17: v9.6 (stay signed in, the app lock, one copy in Sent).
-     Modified by samschultzponsys, 2026-11-17: v9.7 (Gmail archive and labels, server settings in the UI). -->
+     Modified by samschultzponsys, 2026-11-17: v9.7 (Gmail archive and labels, server settings in the UI).
+     Modified by samschultzponsys, 2026-11-17: v9.8 (assistant: forward, reply drafts, unsubscribe, Outlook categories). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -64,7 +65,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **9.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -499,7 +500,16 @@ Built point-and-click in the **Rules** tab:
   for, except from my bank*.
 - **Optional exact conditions:** from, to, subject, attachments.
 - **What to do:** move to a folder (created if needed), add a label, archive, mark read, star, move
-  to Trash, mark as spam.
+  to Trash, mark as spam, and:
+  - **Forward to** an address (with the attachments).
+  - **Draft a reply (AI):** the AI writes a reply in your name, optionally following your
+    instructions ("thank them and say I'll answer by Friday"), saved in **Drafts** for you to check
+    and send; it never sends by itself and leaves placeholders rather than making up facts.
+  - **Unsubscribe (one click):** uses the sender's one-click unsubscribe link (RFC 8058) when the
+    message has one.
+  - **Outlook category:** for Outlook / Microsoft 365 mailboxes signed in with Microsoft, a real
+    Outlook category (click *Allow Outlook categories* once in the rule to give DreyMail permission
+    to change mail); in other mailboxes it becomes a label.
 
 Rules are checked from the top; the first that applies wins. **Test this rule** shows what it would
 do with your newest messages before you save it.
