@@ -44,7 +44,8 @@
      Modified by samschultzponsys, 2026-11-17: v8.6 (Spam, address suggestions and bubbles, Cc/Bcc lines).
      Modified by samschultzponsys, 2026-11-17: v8.7 (Sending list under Compose).
      Modified by samschultzponsys, 2026-11-17: v8.8 (folding subfolders, on every device).
-     Modified by samschultzponsys, 2026-11-17: v8.9 (the calendar as a page of its own). -->
+     Modified by samschultzponsys, 2026-11-17: v8.9 (the calendar as a page of its own).
+     Modified by samschultzponsys, 2026-11-17: v9.0 (readable dropdown lists in dark mode). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -56,7 +57,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **8.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **9.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end

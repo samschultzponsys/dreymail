@@ -13,6 +13,14 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-17 (v9.0): readable dropdown lists in dark mode
+
+- **Dropdown lists in dark mode** (the composer's From, and every other select): the list the
+  system draws fell back to a white background behind the dark theme's light text, so the options
+  were barely readable (seen in the Linux desktop app). Options now get the theme's surface and
+  text colors.
+- **Files:** `web/src/styles.css`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-17 (v8.9): the calendar as a page of its own
 
 - **Calendar page:** the calendar no longer opens as a dialog; it is a page of its own
