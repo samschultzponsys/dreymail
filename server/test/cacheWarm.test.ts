@@ -85,8 +85,10 @@ describe('filling the cache of every folder', () => {
     expect(cache.page(folders.Archive!, null, 1, false)[0]!.summary.subject).toBe('Archive 700');
     expect(lanes.filter((l) => ['Archive', 'Junk', 'Empty'].includes(l.path)).every((l) => l.lane === 'sync')).toBe(true);
     expect(lanes.filter((l) => ['INBOX', 'Sent'].includes(l.path)).every((l) => l.lane === 'main')).toBe(true);
-    expect(sync.isFresh('u1', 'a1', 'Archive')).toBe(true);
-    expect(sync.isFresh('u1', 'a1', 'INBOX')).toBe(false);
+    // A listing waiting for a folder checks it on the main connection, not behind the filling.
+    lanes.length = 0;
+    await sync.beforeListing('u1', 'a1', ['Archive']);
+    expect(lanes.filter((l) => l.path === 'Archive')[0]).toEqual({ path: 'Archive', lane: 'main' });
     sync.stop();
     cache.close();
   });

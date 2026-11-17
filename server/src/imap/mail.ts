@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-16: folder lists served at once from the last known one.
 // Modified by samschultzponsys, 2026-11-16: time taken per step when opening a message.
 // Modified by samschultzponsys, 2026-11-17: every folder answered from the cache (filled in the background).
+// Modified by samschultzponsys, 2026-11-17: other cached folders checked with the server before listing; Drafts never threaded.
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -580,8 +581,8 @@ export class MailService {
           const terms = new Map<string, LookupTerm>();
           for (const it of group) for (const t of lookupTerms(it.headers)) terms.set(termKey(t), t);
           if (terms.size === 0) return;
-          // A cached folder is INBOX or Sent, never Drafts, and its account's Sent folder is
-          // known without asking the IMAP server.
+          // A cached INBOX or Sent is never Drafts, and its account's Sent folder is known without
+          // asking the IMAP server. Other cached folders (DreyMail) may be Drafts: checked below.
           const cachedSent = this.cachedFolderList(userId, accountId, folder);
           let lookIn: string[];
           if (cachedSent) lookIn = cachedSent;
@@ -617,7 +618,7 @@ export class MailService {
     return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
       const listed = sync.ready(userId, accountId, folder);
       const sent = cache.folderByRole(userId, accountId, 'sent');
-      if (!listed || !sent || sent.syncedAt === 0) return null;
+      if (!listed || listed.role === 'folder' || !sent || sent.syncedAt === 0) return null;
       return [...new Set([folder, sent.path])];
     });
   }
@@ -635,12 +636,6 @@ export class MailService {
           if (!sync.ready(userId, accountId, folder)) return;
           const sent = cache.folderByRole(userId, accountId, 'sent');
           const others = sent && sent.path !== folder ? [sent.path] : [];
-          // Other folders synced a moment ago (DreyMail): show the copy at once, check in the background.
-          if (!fresh && sync.isFresh(userId, accountId, folder)) {
-            sync.refreshIfOlder(userId, accountId, folder, SENT_REFRESH_MS);
-            for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);
-            return;
-          }
           if (!fresh && sync.isCurrent(userId, accountId, folder)) {
             // Nothing tells us about changes in Sent; have a look in the background now and then.
             for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);

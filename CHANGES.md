@@ -20,8 +20,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   show with a blank line's gap around it: everything looked double-spaced. Lines are now `<div>`s
   (as in Gmail and Outlook), and Enter always makes a `<div>`. The signature keeps a one-line gap
   above it (an inline margin, so recipients see it too). Drafts saved before keep their `<p>`s.
+- **Fix to 8.1's cache of every folder** (8.1 to 8.3 were never published: their release runs
+  failed these integration tests, so 8.4 is the first release with them):
+  - Cached folders other than INBOX and Sent were listed straight from the cache when checked in
+    the last 10 minutes, so a draft just saved, or a message just moved or archived there, was
+    missing until the background check caught up. Every listing now gives the server its quick
+    check first (up to 1.5 s), as INBOX and Sent do; that check runs on the main connection,
+    ahead of the background filling.
+  - Listing Drafts no longer pulls in the rest of the conversation (a shortcut assumed every
+    cached folder was INBOX or Sent).
 - **Files:** `web/src/replies.ts`, `web/src/components/Composer.tsx`, `web/src/signature.ts`,
-  `web/test/mailto.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+  `web/test/mailto.test.ts`, `server/src/cache/sync.ts`, `server/src/imap/mail.ts`,
+  `server/test/cacheWarm.test.ts`, `README.md`, `package.json`, `package-lock.json`.
 
 ## 2026-11-17 (v8.3): clear a user's mail cache; clickable flatpak notifications
 

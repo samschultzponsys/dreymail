@@ -851,9 +851,9 @@ The mail server stays the source of truth:
   once the server has done it.
 - The copy follows the server. While INBOX is watched (a browser is open, or notifications are on),
   every change reported by IDLE is fetched right away, so the inbox shows without asking the server.
-  Other folders checked in the last 10 minutes show at once and are checked in the background.
-  Otherwise, a listing first gives the server a moment (1.5 s) to report changes, and shows the
-  copy if it is slower; the list updates by itself when the changes arrive. **Refresh**
+  Otherwise, a listing first gives the server a moment (1.5 s) to report changes (a quick check
+  that goes ahead of the background filling), and shows the copy if it is slower; the list
+  updates by itself when the changes arrive. **Refresh**
   always checks with the server first. Changes are fetched incrementally: new messages, changed
   flags (only those since the last check where the server supports CONDSTORE) and messages that are
   gone. A new UIDVALIDITY starts the folder over.

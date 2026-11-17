@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox is cached, filled in the background on its own connection.
+// Modified by samschultzponsys, 2026-11-17: listings of other folders always check with the server first, ahead of the filling.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { CacheConfig } from '../config.js';
@@ -16,11 +17,7 @@ const PREFETCH_AMONG = 200;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
 export const LISTING_WAIT_MS = 1500;
 const DEBOUNCE_MS = 300;
-/**
- * Other folders synced longer ago than this are brought up to date again when a session opens,
- * and a listing waits for that (up to LISTING_WAIT_MS); fresher ones are shown at once and checked
- * in the background (DreyMail).
- */
+/** Other folders synced longer ago than this are brought up to date again when a session opens (DreyMail). */
 export const WARM_MAX_AGE_MS = 10 * 60_000;
 /** At most this many other folders per mailbox are cached (the special ones first). */
 export const WARM_MAX_FOLDERS = 100;
@@ -33,6 +30,8 @@ interface Job {
   waiters: (() => void)[];
   /** Run once more when done (something happened meanwhile). */
   again: boolean;
+  /** Someone waits for the next run: it goes on the main connection, ahead of background filling (DreyMail). */
+  urgent?: boolean;
   timer: NodeJS.Timeout | null;
 }
 
@@ -138,7 +137,8 @@ export class CacheSync {
     for (const path of paths) {
       const role = this.roleOf(userId, accountId, path);
       if (!role || (!opts.force && this.isCurrent(userId, accountId, path))) continue;
-      waits.push(this.sync(userId, accountId, path, role));
+      // Someone is waiting: on the main connection, not behind the background filling (DreyMail).
+      waits.push(this.sync(userId, accountId, path, role, true));
     }
     if (waits.length) await Promise.race([Promise.all(waits), sleep(opts.maxWaitMs ?? LISTING_WAIT_MS)]);
   }
@@ -168,12 +168,6 @@ export class CacheSync {
   startFolder(userId: string, accountId: string, path: string) {
     if (!this.cachesOtherFolders || path === 'INBOX' || this.cache.folder(userId, accountId, path)) return;
     this.syncSoon(userId, accountId, path, 'folder', 0);
-  }
-
-  /** Whether an other folder's copy is recent enough to be shown without waiting for the server. */
-  isFresh(userId: string, accountId: string, path: string): boolean {
-    const f = this.ready(userId, accountId, path);
-    return !!f && f.role === 'folder' && Date.now() - f.syncedAt < WARM_MAX_AGE_MS;
   }
 
   /**
@@ -259,7 +253,7 @@ export class CacheSync {
    * started after this call (loading older messages and message content may continue in the
    * background); never rejects.
    */
-  sync(userId: string, accountId: string, path: string, role: CachedRole): Promise<void> {
+  sync(userId: string, accountId: string, path: string, role: CachedRole, urgent = false): Promise<void> {
     if (this.stopped) return Promise.resolve();
     const k = this.key(userId, accountId, path);
     const job = this.job(userId, accountId, path);
@@ -268,6 +262,7 @@ export class CacheSync {
       job.timer = null;
     }
     const done = new Promise<void>((resolve) => job.waiters.push(resolve));
+    if (urgent) job.urgent = true;
     if (job.running) {
       job.again = true;
       return done;
@@ -277,8 +272,10 @@ export class CacheSync {
         job.again = false;
         const waiting = job.waiters.splice(0);
         this.dirty.delete(k);
+        const lane: Lane = job.urgent ? 'main' : this.lane(role);
+        job.urgent = false;
         try {
-          const changed = await this.update(userId, accountId, path, role);
+          const changed = await this.update(userId, accountId, path, role, lane);
           if (changed) this.deps.onChanged(userId, accountId, path);
         } catch (err) {
           this.handleError(err, userId, accountId, path);
@@ -354,7 +351,7 @@ export class CacheSync {
    * Bring the folder up to date (or start it: the newest chunk). Returns whether a listing would
    * look different now.
    */
-  private async update(userId: string, accountId: string, path: string, role: CachedRole): Promise<boolean> {
+  private async update(userId: string, accountId: string, path: string, role: CachedRole, lane: Lane = this.lane(role)): Promise<boolean> {
     const { cache, pool } = this.deps;
     const limit = this.limit(role);
     return pool.withMailbox(userId, accountId, path, async (client, selected) => {
@@ -424,7 +421,7 @@ export class CacheSync {
       });
       cache.trim(f, limit);
       return changed;
-    }, this.lane(role));
+    }, lane);
   }
 
   /** Extend the folder towards older messages, a chunk at a time, up to the configured size. */
