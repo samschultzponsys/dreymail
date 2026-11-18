@@ -17,7 +17,7 @@ import { assertPublicHost } from '../net/ssrf.js';
 import type { GoogleAuth } from '../oauth/google.js';
 import type { MicrosoftAuth } from '../oauth/microsoft.js';
 import { windowsZone } from './ical.js';
-import { describeRule, fieldsOfIcs, guestsOfStored, itipFromStored, repeatFromRule, replyIcs, requestIcs, statusOfPartstat, storableIcs, validTimeZone, type EventFields, type PartStat } from './ical.js';
+import { counterIcs, declineCounterIcs, describeRule, fieldsOfIcs, guestsOfStored, itipFromStored, repeatFromRule, replyIcs, requestIcs, statusOfPartstat, storableIcs, validTimeZone, type EventFields, type PartStat } from './ical.js';
 import { eventFromRow, LocalEvents } from './localEvents.js';
 import { findInvite, type FoundInvite } from './invites.js';
 import { CalDavCalendar, GoogleCalendar, OutlookCalendar, RemoteCalendarError, type CalendarProvider, type Http, type RemoteEvent, type RemoteSeries } from './remote.js';
@@ -250,7 +250,7 @@ export class CalendarService {
     const zone = validTimeZone(f.timeZone) ? f.timeZone : 'UTC';
     const when = f.allDay
       ? new Date(f.start).toLocaleDateString('en-US', { dateStyle: 'full', timeZone: 'UTC' })
-      : `${new Date(f.start).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short', timeZone: zone })} – ${new Date(f.end).toLocaleTimeString('en-US', { timeStyle: 'short', timeZone: zone, timeZoneName: 'short' })}`;
+      : `${new Date(f.start).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short', timeZone: zone })} – ${new Date(f.end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: zone, timeZoneName: 'short' })}`;
     const verb = method === 'CANCEL' ? 'Canceled' : update ? 'Updated invitation' : 'Invitation';
     const join = findJoinUrl(f.location, f.notes);
     const text = [
@@ -540,6 +540,81 @@ export class CalendarService {
     }
     this.record(userId, uid, answer, savedCal, savedRef);
     return this.inviteState(userId, account.id, uid);
+  }
+
+  /**
+   * Answers an invitation with a new time proposed (DreyMail 10.8): through Outlook for Outlook
+   * mailboxes, otherwise as an iTIP COUNTER email to the organizer.
+   */
+  async propose(userId: string, ref: MessageRef, p: { answer: 'tentative' | 'declined'; start: number; end: number; comment: string }): Promise<InviteState> {
+    const account = this.deps.store.getAccountSecret(userId, ref.accountId);
+    if (!account) throw new RemoteCalendarError('Mailbox not found', 404);
+    const inv = await this.loadInvite(userId, ref);
+    if (inv.method !== 'REQUEST') throw new RemoteCalendarError('This message is not an invitation you can answer', 400);
+    if (!(p.end > p.start)) throw new RemoteCalendarError('The new end must be after the new start', 400);
+    const uid = inv.event.uid;
+    if (account.auth === 'microsoft' && !account.sharedOf) {
+      const prov = this.provider(userId, 'microsoft', account.id)!;
+      const found = await prov.findInvite!(uid).catch(() => null);
+      if (found && prov.proposeTime) {
+        await prov.proposeTime(found.eventId, p.answer, p.start, p.end, p.comment);
+        this.record(userId, uid, p.answer, null, null);
+        return this.inviteState(userId, account.id, uid);
+      }
+    }
+    const organizer = inv.event.organizer?.email;
+    if (!organizer) throw new RemoteCalendarError('This invitation does not say who to answer', 400);
+    const me = { email: account.email, name: account.displayName };
+    const when = `${new Date(p.start).toUTCString().replace(' GMT', ' UTC')}`;
+    await this.deps.compose.sendInvitation(userId, account.id, {
+      to: [organizer],
+      subject: `New time proposed: ${inv.event.title || 'Invitation'}`,
+      text: `${me.name || me.email} proposes a new time: ${when}.${p.comment ? `\n\n${p.comment}` : ''}`,
+      ics: counterIcs(inv.event, me, p.start, p.end, p.answer === 'tentative' ? 'TENTATIVE' : 'DECLINED', p.comment),
+      method: 'COUNTER',
+    });
+    this.record(userId, uid, p.answer, null, null);
+    return this.inviteState(userId, account.id, uid);
+  }
+
+  /**
+   * A guest proposed a new time for an event the user organizes (a COUNTER message): accepting it
+   * moves the event (DreyMail's own, or in Outlook / Google, which tell the guests); declining it
+   * tells that guest (DreyMail 10.8).
+   */
+  async answerCounter(userId: string, ref: MessageRef, accept: boolean): Promise<{ moved: boolean }> {
+    const inv = await this.loadInvite(userId, ref);
+    if (inv.method !== 'COUNTER') throw new RemoteCalendarError('This message does not propose a new time', 400);
+    const e = inv.event;
+    const uid = e.uid;
+    const guest = e.attendees[0]?.email;
+    const local = this.db
+      .prepare('SELECT ev.* FROM calendar_events ev JOIN calendars c ON c.id = ev.calendar_id WHERE ev.ical_uid = ? AND c.owner_id = ?')
+      .get(uid, userId) as Record<string, unknown> | undefined;
+    if (!accept) {
+      const account = this.deps.store.getAccountSecret(userId, ref.accountId);
+      if (account && guest) {
+        const me = { email: account.email, name: account.displayName };
+        await this.deps.compose.sendInvitation(userId, account.id, { to: [guest], subject: `Proposal declined: ${e.title || 'Event'}`, text: `${me.name || me.email} kept the original time.`, ics: declineCounterIcs(e, me), method: 'DECLINECOUNTER' });
+      }
+      return { moved: false };
+    }
+    if (local) {
+      const cur = eventFromRow(local);
+      const saved = this.local.update(cur.id, { ...cur, start: new Date(e.start.ms).toISOString(), end: new Date(e.end).toISOString() }, cur.organizer ?? null);
+      await this.inviteLocal(userId, saved, 'REQUEST', { update: true });
+      return { moved: true };
+    }
+    for (const a of this.deps.store.listAccounts(userId).filter((x) => (x.auth === 'microsoft' || x.auth === 'google') && !x.sharedOf)) {
+      const prov = this.provider(userId, a.auth as 'microsoft' | 'google', a.id);
+      const found = await prov?.findInvite?.(uid).catch(() => null);
+      if (found && prov?.moveEvent) {
+        await prov.moveEvent(found.eventId, e.start.ms, e.end);
+        for (const k of this.cache.keys()) this.cache.delete(k);
+        return { moved: true };
+      }
+    }
+    throw new RemoteCalendarError("DreyMail can't find this event in your calendars to move it", 404);
   }
 
   /** After a cancellation: removes the copy DreyMail added. */

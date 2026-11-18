@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.8): proposing a new time
+
+- **As a guest:** *Propose a new time* on an invitation answers Maybe or No with a new time and a
+  note: Graph `tentativelyAccept` / `decline` with `proposedNewTime` for Outlook mailboxes, an iTIP
+  COUNTER email otherwise.
+- **As the organizer:** a COUNTER message offers Accept proposal (moves your DreyMail event and
+  emails the update, or moves the Outlook / Google event, which tells the guests) or Decline (an
+  iTIP DECLINECOUNTER to that guest).
+- **Fix:** invitation emails for DreyMail's own and CalDAV events failed to build their text
+  (a date format combining `timeStyle` with `timeZoneName`, which Node refuses).
+- **Files:** `server/src/calendar/ical.ts`, `server/src/calendar/service.ts`,
+  `server/src/calendar/remote.ts`, `server/src/routes/calendar.ts`, `server/src/mail/send.ts`,
+  `web/src/components/InviteCard.tsx`, `web/src/styles.css`, `server/test/calendar-sync.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.7): meeting rooms
 
 - **Rooms:** Microsoft 365 rooms (Graph `places/microsoft.graph.room`, Place.Read.All, allowed per

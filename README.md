@@ -62,7 +62,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks).
      Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes).
      Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail).
-     Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms). -->
+     Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms).
+     Modified by samschultzponsys, 2026-11-18: v10.8 (proposing a new time). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -74,7 +75,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -388,7 +389,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   Microsoft answer through their own calendar, which tells the organizer. Other mailboxes email the
   standard answer (iTIP) to the organizer from that mailbox and put the event in the calendar you
   pick (a DreyMail, Google, Outlook or CalDAV calendar), with its repeats and a 15-minute reminder.
-  Canceled invitations say so and offer to remove the event.
+  Canceled invitations say so and offer to remove the event. *Propose a new time* answers Maybe or
+  No with another time and a note: through Outlook for Outlook mailboxes, by email (iTIP COUNTER,
+  which Outlook and others understand) for the rest.
+- **Proposals for your events:** when a guest proposes a new time for an event you organize, the
+  message offers *Accept proposal* (the event moves and every guest gets the update, also for
+  Outlook and Google events) or *Decline* (the guest is told the original time stays).
 - **Mailbox health:** a mailbox with a problem, such as an expired sign-in or an unreachable
   server, shows a warning in the sidebar with a link to fix it.
 - Dark mode that follows the system, with a manual override. Simple HTML and plain-text mail get

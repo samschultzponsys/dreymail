@@ -837,3 +837,28 @@ export function guestsOfStored(stored: string): { organizer: string | null; atte
   const e = cal ? eventsOf(cal).find((x) => x.recurrenceId === null) : undefined;
   return { organizer: e?.organizer?.email ?? null, attendees: (e?.attendees ?? []).map((a) => a.email).filter((a) => a !== e?.organizer?.email) };
 }
+
+/**
+ * A new time proposed by a guest (iTIP COUNTER, RFC 5546 §3.2.7), from `me`, answering Maybe or No,
+ * with an optional note.
+ */
+export function counterIcs(invite: IcalEvent, me: { email: string; name: string }, start: number, end: number, partstat: 'TENTATIVE' | 'DECLINED', comment: string): string {
+  const keep = ['UID', 'SEQUENCE', 'RECURRENCE-ID', 'SUMMARY', 'ORGANIZER', 'LOCATION'];
+  const props: IcalProp[] = invite.component.props.filter((p) => keep.includes(p.name));
+  props.push(
+    mk('DTSTAMP', stamp()),
+    mk('DTSTART', `${icalDateTime(start)}Z`),
+    mk('DTEND', `${icalDateTime(end)}Z`),
+    mk('ATTENDEE', `mailto:${me.email}`, { PARTSTAT: partstat, ...(me.name ? { CN: me.name.replace(/"/g, '') } : {}) }),
+    ...(comment ? [mk('COMMENT', escapeText(comment.slice(0, 1000)))] : []),
+  );
+  return serialize({ name: 'VCALENDAR', props: [mk('VERSION', '2.0'), mk('PRODID', '-//DreyMail//Calendar//EN'), mk('METHOD', 'COUNTER')], children: [{ name: 'VEVENT', props, children: [] }] });
+}
+
+/** The organizer turns a proposed time down (iTIP DECLINECOUNTER). */
+export function declineCounterIcs(counter: IcalEvent, organizer: { email: string; name: string }): string {
+  const keep = ['UID', 'SEQUENCE', 'RECURRENCE-ID', 'ATTENDEE'];
+  const props: IcalProp[] = counter.component.props.filter((p) => keep.includes(p.name));
+  props.push(mk('DTSTAMP', stamp()), mk('ORGANIZER', `mailto:${organizer.email}`, organizer.name ? { CN: organizer.name.replace(/"/g, '') } : {}));
+  return serialize({ name: 'VCALENDAR', props: [mk('VERSION', '2.0'), mk('PRODID', '-//DreyMail//Calendar//EN'), mk('METHOD', 'DECLINECOUNTER')], children: [{ name: 'VEVENT', props, children: [] }] });
+}

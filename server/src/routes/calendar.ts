@@ -511,6 +511,30 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
     }
   });
 
+  /** Answer with a new time proposed (DreyMail 10.8). */
+  app.post('/api/invite/propose', async (req, reply) => {
+    const body = z.object({ ref: refSchema, answer: z.enum(['tentative', 'declined']), start: z.string().datetime(), end: z.string().datetime(), comment: z.string().max(1000).default('') }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Check the new time');
+    try {
+      return await calendars.propose(req.user!.id, body.data.ref, { answer: body.data.answer, start: Date.parse(body.data.start), end: Date.parse(body.data.end), comment: body.data.comment });
+    } catch (err) {
+      return fail(reply, err);
+    }
+  });
+
+  /** Accept or decline a guest's proposed new time for your event (DreyMail 10.8). */
+  app.post('/api/invite/counter', async (req, reply) => {
+    const body = z.object({ ref: refSchema, accept: z.boolean() }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Invalid request');
+    try {
+      const r = await calendars.answerCounter(req.user!.id, body.data.ref, body.data.accept);
+      reminders?.changed(req.user!.id);
+      return r;
+    } catch (err) {
+      return fail(reply, err);
+    }
+  });
+
   /** A guest's answer to an invitation you sent from DreyMail: shown on your event. */
   app.post('/api/invite/reply', async (req, reply) => {
     const body = z.object({ ref: refSchema }).safeParse(req.body);

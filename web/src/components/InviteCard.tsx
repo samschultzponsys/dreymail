@@ -5,6 +5,7 @@
 // Yes / Maybe / No. Google and Outlook mailboxes answer through their own calendar; other
 // mailboxes email the answer to the organizer and add the event to the calendar you pick.
 // Modified by samschultzponsys, 2026-11-17: guests' answers to your invitations go on your events.
+// Modified by samschultzponsys, 2026-11-18: propose a new time; accept or decline proposals for your events.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, HelpCircle, MapPin, Repeat, Users, X } from 'lucide-react';
@@ -108,6 +109,7 @@ export function InviteCard({ invite, detail, account }: { invite: InviteView; de
         <div className="invite-main">
           <div className="invite-title">
             {invite.method === 'CANCEL' && <span className="invite-badge">Canceled</span>}
+            {invite.method === 'COUNTER' && <span className="invite-badge">New time proposed</span>}
             {invite.title || '(no title)'}
           </div>
           <div className="invite-when">{when(invite)}</div>
@@ -194,7 +196,113 @@ export function InviteCard({ invite, detail, account }: { invite: InviteView; de
           </div>
         </>
       )}
+      {answerable && account && <ProposeTime invite={invite} detail={detail} onDone={(next) => qc.setQueryData(['invite', detail.accountId, invite.uid], next)} />}
+
+      {invite.method === 'COUNTER' && account && <CounterAnswer invite={invite} detail={detail} />}
       {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+const refOf = (d: MessageDetail) => ({ accountId: d.accountId, folder: d.folder, uid: d.uid, uidValidity: d.uidValidity });
+const pad = (n: number) => String(n).padStart(2, '0');
+const localInput = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/** Answer Maybe or No with a new time (DreyMail 10.8). */
+function ProposeTime({ invite, detail, onDone }: { invite: InviteView; detail: MessageDetail; onDone: (s: InviteState) => void }) {
+  const [open, setOpen] = useState(false);
+  const [start, setStart] = useState(() => localInput(invite.start));
+  const [end, setEnd] = useState(() => localInput(invite.end));
+  const [answer, setAnswer] = useState<'tentative' | 'declined'>('tentative');
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  if (invite.allDay) return null;
+  if (sent) return <div className="hint">New time proposed.</div>;
+  if (!open)
+    return (
+      <button className="link-btn invite-propose" onClick={() => setOpen(true)}>
+        Propose a new time
+      </button>
+    );
+  const send = async () => {
+    const s = new Date(start);
+    const e = new Date(end);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e <= s) return setError('The end must be after the start');
+    setBusy(true);
+    try {
+      onDone(await fetchJson<InviteState>('POST', '/api/invite/propose', { ref: refOf(detail), answer, start: s.toISOString(), end: e.toISOString(), comment }));
+      setSent(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="invite-propose-form">
+      <div className="cal-when-row">
+        <input className="input" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} aria-label="New start" />
+        <span>to</span>
+        <input className="input" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="New end" />
+      </div>
+      <div className="cal-when-row">
+        <select className="select" value={answer} onChange={(e) => setAnswer(e.target.value as 'tentative' | 'declined')} aria-label="Answer">
+          <option value="tentative">Maybe, at the new time</option>
+          <option value="declined">No, but propose the new time</option>
+        </select>
+      </div>
+      <input className="input" placeholder="A note (optional)" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={1000} />
+      <div className="cal-when-row">
+        <button className="btn primary" disabled={busy} onClick={() => void send()}>
+          Propose
+        </button>
+        <button className="btn" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/** A guest proposed a new time for your event: accept (moves it) or decline (DreyMail 10.8). */
+function CounterAnswer({ invite, detail }: { invite: InviteView; detail: MessageDetail }) {
+  const qc = useQueryClient();
+  const [done, setDone] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const who = invite.attendees[0]?.name || invite.attendees[0]?.email || 'A guest';
+  const go = async (accept: boolean) => {
+    setBusy(true);
+    try {
+      await fetchJson('POST', '/api/invite/counter', { ref: refOf(detail), accept });
+      setDone(accept ? 'Moved to the new time; the guests were told.' : `${who} was told the original time stays.`);
+      void qc.invalidateQueries({ queryKey: ['events'] });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="invite-actions">
+      <span className="grow">{done ?? `${who} proposes this new time.`}</span>
+      {!done && (
+        <>
+          <button className="btn primary" disabled={busy} onClick={() => void go(true)}>
+            <Check size={14} /> Accept proposal
+          </button>
+          <button className="btn" disabled={busy} onClick={() => void go(false)}>
+            Decline
+          </button>
+        </>
+      )}
+      {error && <span className="error-text">{error}</span>}
     </div>
   );
 }

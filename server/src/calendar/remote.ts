@@ -89,6 +89,10 @@ export interface CalendarProvider {
   /** The invitation with this iCalendar UID in the user's calendar, if the provider added it. */
   findInvite?(uid: string): Promise<{ eventId: string; answer: InviteAnswer | null } | null>;
   answerInvite?(eventId: string, answer: InviteAnswer): Promise<void>;
+  /** Answers with a new time proposed (DreyMail 10.8; Outlook only). */
+  proposeTime?(eventId: string, answer: 'tentative' | 'declined', start: number, end: number, comment: string): Promise<void>;
+  /** Moves an event the user organizes (accepting a guest's proposed time) (DreyMail 10.8). */
+  moveEvent?(eventId: string, start: number, end: number): Promise<void>;
   /** Busy times of these people (colleagues, shared calendars) between from and to (DreyMail 10.2). */
   freeBusy?(emails: string[], from: number, to: number): Promise<Record<string, BusyResult>>;
 }
@@ -324,6 +328,10 @@ export class GoogleCalendar implements CalendarProvider {
     if (!e) return null;
     const s = e.attendees?.find((a) => a.self)?.responseStatus;
     return { eventId: e.id, answer: s === 'accepted' || s === 'tentative' || s === 'declined' ? (s as InviteAnswer) : null };
+  }
+
+  async moveEvent(eventId: string, start: number, end: number) {
+    await this.req('PATCH', `/calendars/primary/events/${encodeURIComponent(eventId)}?sendUpdates=all`, { start: { dateTime: new Date(start).toISOString() }, end: { dateTime: new Date(end).toISOString() } });
   }
 
   async answerInvite(eventId: string, answer: InviteAnswer) {
@@ -618,6 +626,16 @@ export class OutlookCalendar implements CalendarProvider {
   async answerInvite(eventId: string, answer: InviteAnswer) {
     const action = answer === 'accepted' ? 'accept' : answer === 'tentative' ? 'tentativelyAccept' : 'decline';
     await this.req('POST', `/me/events/${encodeURIComponent(eventId)}/${action}`, { sendResponse: true });
+  }
+
+  async proposeTime(eventId: string, answer: 'tentative' | 'declined', start: number, end: number, comment: string) {
+    const t = (ms: number) => ({ dateTime: new Date(ms).toISOString().slice(0, 19), timeZone: 'UTC' });
+    await this.req('POST', `/me/events/${encodeURIComponent(eventId)}/${answer === 'tentative' ? 'tentativelyAccept' : 'decline'}`, { sendResponse: true, comment, proposedNewTime: { start: t(start), end: t(end) } });
+  }
+
+  async moveEvent(eventId: string, start: number, end: number) {
+    const t = (ms: number) => ({ dateTime: new Date(ms).toISOString().slice(0, 19), timeZone: 'UTC' });
+    await this.req('PATCH', `/me/events/${encodeURIComponent(eventId)}`, { start: t(start), end: t(end) });
   }
 }
 

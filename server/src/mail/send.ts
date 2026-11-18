@@ -185,7 +185,7 @@ export class ComposeService {
   }
 
   /** An iCalendar message (an invitation, an update, a cancellation or an answer) from a mailbox. */
-  async sendInvitation(userId: string, accountId: string, r: { to: string[]; subject: string; text: string; ics: string; method: 'REQUEST' | 'CANCEL' | 'REPLY' }): Promise<void> {
+  async sendInvitation(userId: string, accountId: string, r: { to: string[]; subject: string; text: string; ics: string; method: 'REQUEST' | 'CANCEL' | 'REPLY' | 'COUNTER' | 'DECLINECOUNTER' }): Promise<void> {
     const account = this.store.getAccountSecret(userId, accountId);
     if (!account) throw new ComposeError('Unknown sender account');
     const to = [...new Set(r.to.map((x) => x.trim()).filter(Boolean))];

@@ -321,3 +321,43 @@ describe('invitations', () => {
     expect(await svc.inviteState(user.id, acc.id, 'plan-1@example.com')).toMatchObject({ answer: null, removable: false });
   });
 });
+
+describe('proposing a new time (10.8)', () => {
+  it('emails a COUNTER as a guest, and moves your own event when you accept one', async () => {
+    const store = new Store(':memory:', new Keyring(crypto.randomBytes(48).toString('base64')).credentialKey);
+    const user = store.upsertUser('local', 'sam', '', 'Sam', 'sam');
+    const acc = store.createAccount(user.id, { name: 'Mail', displayName: 'Sam', email: 'sam@example.com', color: '#22d3ee', imap: { host: 'i', port: 993, tls: 'tls', user: 's', password: 'p' }, smtp: { host: 's', port: 465, tls: 'tls', user: 's', password: 'p' }, appendSent: true } as never);
+    const sent: { to: string[]; method: string; ics: string }[] = [];
+    let message = INVITE('REQUEST');
+    const svc = new CalendarService({
+      store,
+      google: {} as never,
+      microsoft: {} as never,
+      mail: { getParsed: async () => parseRaw(message) } as never,
+      compose: { sendInvitation: async (_u: string, _a: string, r: { to: string[]; method: string; ics: string }) => void sent.push(r) } as never,
+      http: (async () => {
+        throw new Error('no network');
+      }) as never,
+      blockPrivateHosts: false,
+      maxMessageBytes: 1e7,
+    });
+    const ref = { accountId: acc.id, folder: 'INBOX', uid: 1, uidValidity: '1' };
+    await svc.propose(user.id, ref, { answer: 'tentative', start: Date.parse('2026-11-20T16:00:00Z'), end: Date.parse('2026-11-20T17:00:00Z'), comment: 'After lunch?' });
+    expect(sent[0]).toMatchObject({ to: ['boss@example.com'], method: 'COUNTER' });
+    expect(sent[0]!.ics).toContain('DTSTART:20261120T160000Z');
+    expect(sent[0]!.ics).toContain('PARTSTAT=TENTATIVE');
+
+    // Now Sam organizes "plan-1" in DreyMail, and the boss proposes 16:00 back.
+    const calId = crypto.randomUUID();
+    store.db.prepare('INSERT INTO calendars (id, owner_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)').run(calId, user.id, 'Work', '#22d3ee', 1);
+    svc.local.insert({ calendarId: calId, title: 'Planning', start: '2026-11-20T14:00:00.000Z', end: '2026-11-20T15:00:00.000Z', allDay: false, location: '', notes: '', recurrence: 'none', until: null, attendees: [{ email: 'boss@example.com', name: 'Boss', status: 'needs-action' }] }, user.id, { email: 'sam@example.com', name: 'Sam' }, 'plan-1@example.com');
+    message = Buffer.from(INVITE('COUNTER').toString().replace('DTSTART;TZID=W. Europe Standard Time:20261120T150000', 'DTSTART:20261120T160000Z').replace('DTEND;TZID=W. Europe Standard Time:20261120T160000', 'DTEND:20261120T170000Z').replace('ATTENDEE;CN=Sam;PARTSTAT=NEEDS-ACTION', 'ATTENDEE;CN=Boss;PARTSTAT=TENTATIVE').replace('mailto:sam@example.com', 'mailto:boss@example.com'));
+    expect(await svc.answerCounter(user.id, ref, true)).toEqual({ moved: true });
+    const row = store.db.prepare('SELECT start_at FROM calendar_events WHERE ical_uid = ?').get('plan-1@example.com') as { start_at: number };
+    expect(new Date(row.start_at).toISOString()).toBe('2026-11-20T16:00:00.000Z');
+    expect(sent.at(-1)).toMatchObject({ to: ['boss@example.com'], method: 'REQUEST' });
+    // Declining tells the guest.
+    await svc.answerCounter(user.id, ref, false);
+    expect(sent.at(-1)).toMatchObject({ to: ['boss@example.com'], method: 'DECLINECOUNTER' });
+  });
+});
