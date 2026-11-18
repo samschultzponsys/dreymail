@@ -42,6 +42,7 @@ const eventSchema = z
     timeZone: z.string().max(64).optional(),
     /** Minutes before the start; null: none. */
     reminder: z.number().int().min(0).max(40_320).nullable().optional(),
+    showAs: z.enum(['busy', 'free', 'tentative', 'away', 'elsewhere']).optional(),
     attendees: z.array(attendeeSchema).max(200).optional(),
     /** Mailbox the invitations of DreyMail and CalDAV events go out from. */
     sendFrom: z.string().max(64).nullable().optional(),
@@ -267,6 +268,7 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
       ...(e.count ? { count: e.count } : {}),
       ...(e.timeZone ? { timeZone: e.timeZone } : {}),
       reminder: e.reminder ?? null,
+      ...(e.showAs && e.showAs !== 'busy' ? { showAs: e.showAs } : {}),
       ...(e.attendees?.length ? { attendees: e.attendees, organizer: e.organizer ?? null } : {}),
       isOrganizer: c.source === 'caldav' ? !org || calendars.myAddresses(userId).has(org) : e.isOrganizer !== false,
       joinUrl: e.joinUrl ?? null,
@@ -444,6 +446,17 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
     }
     await inviting(mail, reply);
     return { ok: true };
+  });
+
+  // ---- free/busy (scheduling assistant, DreyMail 10.2) ---------------------------------------
+
+  app.post('/api/freebusy', async (req, reply) => {
+    const body = z
+      .object({ calendarId: z.string().max(64).nullable().default(null), emails: z.array(z.string().trim().toLowerCase().email().max(320)).max(50), from: z.string().datetime(), to: z.string().datetime() })
+      .refine((b) => Date.parse(b.to) > Date.parse(b.from) && Date.parse(b.to) - Date.parse(b.from) <= 14 * 86_400_000, { message: 'Invalid range' })
+      .safeParse(req.body);
+    if (!body.success) return bad(reply, body.error.issues[0]?.message ?? 'Invalid request');
+    return calendars.freeBusy(req.user!.id, body.data.calendarId, body.data.emails, Date.parse(body.data.from), Date.parse(body.data.to));
   });
 
   // ---- reminders ------------------------------------------------------------------------

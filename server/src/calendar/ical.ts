@@ -7,7 +7,7 @@
 // occurrences), and writing events and invitation answers (iTIP REPLY).
 
 import crypto from 'node:crypto';
-import { ruleOf, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields } from '../../../shared/calendar.js';
+import { ruleOf, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields, type ShowAs } from '../../../shared/calendar.js';
 import { DAY, daysIn, expandRule, icalDate, icalDateTime, nthWeekday, parseRule, parseWall, untilMs, utcToWall, validTimeZone, WEEKDAYS, wallToUtc, type IcalTime } from '../../../shared/rrule.js';
 
 export { expandRule, icalDate, icalDateTime, parseRule, parseWall, utcToWall, validTimeZone, wallToUtc, type IcalTime };
@@ -408,6 +408,8 @@ export interface EventFields extends RepeatFields {
   exdates?: string[];
   /** Online meeting to make with the event (providers that offer one). */
   meeting?: MeetingKind | null;
+  /** Busy (default), free, tentative, away, working elsewhere. */
+  showAs?: ShowAs;
 }
 
 /** The event's start as a wall time in its zone (UTC fields = local fields). */
@@ -504,6 +506,14 @@ export function alarmOf(min: number): IcalComponent {
   return { name: 'VALARM', props: [mk('ACTION', 'DISPLAY'), mk('DESCRIPTION', 'Reminder'), mk('TRIGGER', min > 0 ? `-PT${Math.round(min)}M` : 'PT0S')], children: [] };
 }
 
+/** "Show as" of a VEVENT: Outlook's busy status, else TRANSP; undefined for busy. */
+export function showAsOf(c: IcalComponent): ShowAs | undefined {
+  const ms = prop(c, 'X-MICROSOFT-CDO-BUSYSTATUS')?.value.trim().toUpperCase();
+  const map: Record<string, ShowAs> = { FREE: 'free', TENTATIVE: 'tentative', OOF: 'away', WORKINGELSEWHERE: 'elsewhere' };
+  if (ms) return map[ms];
+  return prop(c, 'TRANSP')?.value.trim().toUpperCase() === 'TRANSPARENT' ? 'free' : undefined;
+}
+
 /** Minutes before the start of an event's first display/audio alarm relative to the start, if any. */
 export function reminderOf(c: IcalComponent): number | null {
   for (const a of c.children) {
@@ -530,6 +540,11 @@ function eventProps(f: EventFields): IcalProp[] {
   } else out.push(mk('DTSTART', `${icalDateTime(s)}Z`), mk('DTEND', `${icalDateTime(e)}Z`));
   if (f.location) out.push(mk('LOCATION', escapeText(f.location)));
   if (f.notes) out.push(mk('DESCRIPTION', escapeText(f.notes)));
+  if (f.showAs) {
+    // TRANSP is the standard; Outlook also reads its own busy status.
+    out.push(mk('TRANSP', f.showAs === 'free' ? 'TRANSPARENT' : 'OPAQUE'));
+    out.push(mk('X-MICROSOFT-CDO-BUSYSTATUS', { busy: 'BUSY', free: 'FREE', tentative: 'TENTATIVE', away: 'OOF', elsewhere: 'WORKINGELSEWHERE' }[f.showAs]));
+  }
   if (rule) out.push(mk('RRULE', rule));
   if (rule && f.exdates?.length) {
     const ex = f.exdates.map((x) => Date.parse(x)).filter((x) => !Number.isNaN(x));
@@ -627,6 +642,7 @@ export function updateEventIcs(existing: string, f: EventFields, opts: { clientS
   const ev = cal?.children.find((c) => c.name === 'VEVENT' && !prop(c, 'RECURRENCE-ID'));
   if (!cal || !ev) throw new Error('This event could not be read');
   const replaced = new Set(['SUMMARY', 'LOCATION', 'DESCRIPTION', 'DTSTART', 'DTEND', 'DURATION', 'RRULE', 'RDATE', 'DTSTAMP', 'LAST-MODIFIED', 'SEQUENCE']);
+  if (f.showAs) replaced.add('TRANSP').add('X-MICROSOFT-CDO-BUSYSTATUS');
   // Skipped occurrences stay while the event repeats (they are written anew when DreyMail has them).
   if (f.recurrence === 'none' || f.exdates) replaced.add('EXDATE');
   if (f.attendees) replaced.add('ORGANIZER').add('ATTENDEE');
@@ -697,6 +713,7 @@ export function fieldsOfIcs(existing: string): (EventFields & { uid: string; edi
     editable: !!rep,
     timeZone: zoneNameOf(prop(e.component, 'DTSTART')),
     reminder: reminderOf(e.component),
+    ...(showAsOf(e.component) ? { showAs: showAsOf(e.component) } : {}),
     attendees: e.attendees.filter((a) => a.email !== e.organizer?.email).map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), optional: a.role === 'OPT-PARTICIPANT' || undefined })),
     organizer: e.organizer ? { email: e.organizer.email, name: e.organizer.name } : null,
     exdates: [...e.exdates].map((x) => new Date(x).toISOString()),

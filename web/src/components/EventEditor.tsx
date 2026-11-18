@@ -13,6 +13,7 @@ import {
   DEFAULT_REMINDER,
   describeRepeat,
   REMINDER_CHOICES,
+  SHOW_AS_LABELS,
   reminderLabel,
   type Attendee,
   type CalendarEvent,
@@ -22,11 +23,13 @@ import {
   type MonthlyBy,
   type Recurrence,
   type SeriesScope,
+  type ShowAs,
 } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
 import { isAddress, splitAddresses } from '../addresses';
 import { fetchJson } from '../api';
 import { AddressField } from './AddressField';
+import { SchedulingAssistant } from './SchedulingAssistant';
 
 const DAY = 86_400_000;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -189,6 +192,8 @@ function EventForm({
   const [count, setCount] = useState(base.count ?? 10);
   const [reminder, setReminder] = useState<number | null>(isNew ? (base.allDay ? null : DEFAULT_REMINDER) : (base.reminder ?? null));
   const [reminderTouched, setReminderTouched] = useState(!isNew);
+  const [showAs, setShowAs] = useState<ShowAs>(base.showAs ?? 'busy');
+  const [showSched, setShowSched] = useState(false);
   const [location, setLocation] = useState(base.location ?? '');
   const [notes, setNotes] = useState(base.notes ?? '');
   const [guests, setGuests] = useState<Attendee[]>(base.attendees ?? []);
@@ -248,6 +253,7 @@ function EventForm({
       ...(canRepeat ? repeat : { recurrence: 'none' as const, until: null }),
       timeZone: base.timeZone && !isNew && scope === 'all' ? base.timeZone : Intl.DateTimeFormat().resolvedOptions().timeZone,
       reminder,
+      showAs,
       ...(people ? { attendees: people, sendFrom: people.length && mailsInvites ? sendFrom || null : null } : {}),
       ...(meeting && meetingKind ? { meeting: meetingKind } : {}),
     };
@@ -542,6 +548,20 @@ function EventForm({
             </select>
           </div>
           <div>
+            <label className="label" htmlFor="ev-show">
+              Show as
+            </label>
+            <select id="ev-show" className="select" value={showAs} onChange={(e) => setShowAs(e.target.value as ShowAs)}>
+              {(Object.keys(SHOW_AS_LABELS) as ShowAs[]).map((k) => (
+                <option key={k} value={k}>
+                  {SHOW_AS_LABELS[k]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="cal-when">
+          <div>
             <label className="label" htmlFor="ev-loc">
               Location
             </label>
@@ -584,6 +604,30 @@ function EventForm({
           )}
           {organizer && !mailsInvites && (guests.length > 0 || typed.trim()) && <div className="hint">{PROVIDER[selCal!.source]} sends the invitations and updates.</div>}
         </div>
+
+        {!allDay && allGuests().length > 0 && validStart && (
+          <div>
+            <button type="button" className="link-btn" onClick={() => setShowSched((v) => !v)} aria-expanded={showSched}>
+              {showSched ? 'Hide' : 'Show'} the scheduling assistant
+            </button>
+            {showSched && (
+              <SchedulingAssistant
+                calendarId={calendarId || null}
+                guests={allGuests().map((g) => g.email)}
+                start={new Date(`${startDate}T${startTime}`)}
+                end={new Date(`${endDate}T${endTime}`)}
+                onPick={(t) => {
+                  const len = new Date(`${endDate}T${endTime}`).getTime() - new Date(`${startDate}T${startTime}`).getTime();
+                  const e = new Date(t.getTime() + Math.max(len, 15 * 60_000));
+                  setStartDate(keyOf(t));
+                  setStartTime(`${pad(t.getHours())}:${pad(t.getMinutes())}`);
+                  setEndDate(keyOf(e));
+                  setEndTime(`${pad(e.getHours())}:${pad(e.getMinutes())}`);
+                }}
+              />
+            )}
+          </div>
+        )}
 
         <div>
           <label className="label" htmlFor="ev-notes">

@@ -174,3 +174,33 @@ describe('invitations from DreyMail events', () => {
     expect(findJoinUrl('https://example.com/x')).toBeNull();
   });
 });
+
+describe('show as and free/busy (10.2)', () => {
+  it('writes and reads "show as" in iCalendar', async () => {
+    const { showAsOf } = await import('../src/calendar/ical.js');
+    const { ics } = newEventIcs({ title: 'Lunch', location: '', notes: '', start: '2026-03-02T12:00:00.000Z', end: '2026-03-02T13:00:00.000Z', allDay: false, recurrence: 'none', until: null, showAs: 'away' });
+    expect(ics).toContain('X-MICROSOFT-CDO-BUSYSTATUS:OOF');
+    expect(showAsOf(parseIcal(ics)[0]!.children.find((c) => c.name === 'VEVENT')!)).toBe('away');
+    expect(fieldsOfIcs(ics)).toMatchObject({ showAs: 'away' });
+  });
+
+  it("reads colleagues' busy times from Outlook", async () => {
+    const { OutlookCalendar } = await import('../src/calendar/remote.js');
+    const http = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () =>
+        JSON.stringify({
+          value: [
+            { scheduleId: 'Ada@Corp.com', scheduleItems: [{ status: 'busy', start: { dateTime: '2026-11-18T14:00:00.0000000' }, end: { dateTime: '2026-11-18T15:00:00.0000000' } }, { status: 'free', start: { dateTime: '2026-11-18T16:00:00' }, end: { dateTime: '2026-11-18T17:00:00' } }] },
+            { scheduleId: 'bob@else.com', error: { message: 'The mailbox was not found' } },
+          ],
+        }),
+    });
+    const o = new OutlookCalendar(async () => 't', http as never);
+    const r = await o.freeBusy(['ada@corp.com', 'bob@else.com'], Date.parse('2026-11-18T00:00:00Z'), Date.parse('2026-11-19T00:00:00Z'));
+    expect(r['ada@corp.com']).toEqual({ busy: [{ start: '2026-11-18T14:00:00.000Z', end: '2026-11-18T15:00:00.000Z', status: 'busy' }] });
+    expect(r['bob@else.com']?.error).toBe('Not found in Outlook');
+  });
+});

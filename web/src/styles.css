@@ -42,7 +42,7 @@
    Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer.
    Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
    Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
-   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups. */
+   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups; calendar dragging and show-as. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1318,3 +1318,28 @@ body.resizing iframe { pointer-events: none; }
 .row-due { font-size: 11px; color: var(--text-2); white-space: nowrap; }
 .row-due.overdue, .followup-notice .overdue { color: var(--danger); font-weight: 600; }
 .followup-notice svg { color: var(--danger); }
+
+/* Calendar (DreyMail 10.2): dragging, and how "Show as" looks. */
+.cal-block.movable { cursor: grab; touch-action: none; }
+.cal-block.dragging { cursor: grabbing; opacity: 0.85; box-shadow: var(--shadow-lg); }
+.cal-block.show-free { background: color-mix(in srgb, var(--cal) 6%, var(--surface)); border-style: dashed; }
+.cal-block.show-tentative { background-image: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--cal) 18%, transparent) 5px 10px); }
+.cal-block.show-away { background: color-mix(in srgb, #7c3aed 22%, var(--surface)); }
+
+/* The scheduling assistant (DreyMail 10.2). */
+.sched { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sched-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.sched-head .grow { flex: 1; }
+.sched-state { font-size: 12px; color: #16a34a; }
+.sched-state.clash { color: var(--danger); font-weight: 600; }
+.sched-grid { display: flex; flex-direction: column; gap: 3px; }
+.sched-row { display: grid; grid-template-columns: minmax(70px, 30%) 1fr; align-items: center; gap: 8px; }
+.sched-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sched-track { position: relative; height: 20px; border-radius: 4px; background: var(--surface-2, var(--bg)); cursor: pointer; overflow: hidden; }
+.sched-hours .sched-track { background: none; height: 14px; cursor: default; }
+.sched-hour { position: absolute; top: 0; font-size: 9.5px; color: var(--muted); transform: translateX(-2px); white-space: nowrap; }
+.sched-busy { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; background: #3b82f6; opacity: 0.75; }
+.sched-busy.tentative { background: repeating-linear-gradient(135deg, #3b82f6 0 4px, transparent 4px 8px); }
+.sched-busy.away { background: #7c3aed; }
+.sched-busy.elsewhere { background: #94a3b8; }
+.sched-meeting { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent-fill); border-radius: 4px; background: color-mix(in srgb, var(--accent-fill) 18%, transparent); pointer-events: none; }

@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.2): dragging events, show as, scheduling assistant
+
+- **Drag to move:** week and day views move events by dragging (15-minute steps, across days);
+  an occurrence of a repeating DreyMail event moves on its own (scope "this"), provider occurrences
+  as instances.
+- **Show as:** busy, free, tentative, away, working elsewhere on events: a `show_as` column (new
+  migration), Graph `showAs`, Google `transparency`, CalDAV `TRANSP` and
+  `X-MICROSOFT-CDO-BUSYSTATUS`; free and tentative blocks look lighter.
+- **Scheduling assistant:** `POST /api/freebusy` returns your busy times (all visible calendars)
+  and guests' through Graph `getSchedule` or Google `freeBusy`; the editor's timeline shows them
+  with the meeting's time, a click moves it, and Next free time finds a slot on a weekday 7–20.
+- **Files:** `web/src/components/SchedulingAssistant.tsx` (new), `web/src/components/CalendarDialog.tsx`,
+  `web/src/components/EventEditor.tsx`, `server/src/calendar/remote.ts`, `server/src/calendar/ical.ts`,
+  `server/src/calendar/service.ts`, `server/src/calendar/localEvents.ts`, `server/src/routes/calendar.ts`,
+  `server/src/db.ts`, `shared/calendar.ts`, `web/src/styles.css`, `web/test/scheduling.test.ts` (new),
+  `server/test/repeats.test.ts`, `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.1): follow-up flags with due dates
 
 - **Follow up:** a reading-toolbar menu flags a message with a due date (Today, Tomorrow, This

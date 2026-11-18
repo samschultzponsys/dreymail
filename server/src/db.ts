@@ -34,7 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
-// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -561,6 +561,11 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      );`);
     const has = (db.prepare('PRAGMA table_info(calendar_alerts)').all() as { name: string }[]).some((c) => c.name === 'message_ref');
     if (!has) db.exec('ALTER TABLE calendar_alerts ADD COLUMN message_ref TEXT');
+  },
+  // DreyMail 10.2: "Show as" (busy, free, tentative, away, working elsewhere) on DreyMail's own events.
+  (db) => {
+    const has = (db.prepare('PRAGMA table_info(calendar_events)').all() as { name: string }[]).some((c) => c.name === 'show_as');
+    if (!has) db.exec("ALTER TABLE calendar_events ADD COLUMN show_as TEXT NOT NULL DEFAULT 'busy'");
   },
 ];
 

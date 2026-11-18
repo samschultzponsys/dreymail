@@ -13,10 +13,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Planned
 
 ### Calendar
-- [ ] Scheduling assistant: guests' free/busy times next to each other (Outlook and Google), and room
-      booking.
-- [ ] Show as busy, free, tentative or away; proposing a new time when answering an invitation.
-- [ ] Dragging events to move them in the week and day views.
+- [ ] Room booking (Microsoft 365 room lists need an administrator's consent).
+- [ ] Proposing a new time when answering an invitation.
 - [ ] "This and following" for Google, Outlook and CalDAV series (today: this event or all events).
 
 ### Mail
@@ -137,6 +135,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       updates and cancellations for its own and CalDAV calendars, and records guests' answers (9.5).
 - [x] Teams meetings (Outlook work accounts) and Google Meet with the event; Join buttons for
       meeting links (9.5).
+- [x] Drag events to another time or day; Show as (busy, free, tentative, away, working
+      elsewhere); scheduling assistant with guests' free/busy and Next free time (10.2).
 - [x] Reminders: notifications on every device from the server, and a reminder window with Join,
       Snooze and Dismiss, in step across devices (9.5).
 - [x] Automatic inbox tabs: Personal / Updates / Newsletters, without AI (3.7). Rules with a match

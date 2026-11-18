@@ -288,7 +288,7 @@ export class CalendarService {
    * Occurrences with a reminder in the user's visible calendars between from and to (DreyMail's own
    * repeats expanded in each event's zone), and the calendars that couldn't be read.
    */
-  async upcoming(userId: string, from: number, to: number): Promise<{ items: (EventOccurrence & { color: string })[]; failed: Set<string> }> {
+  async upcoming(userId: string, from: number, to: number, opts: { all?: boolean } = {}): Promise<{ items: (EventOccurrence & { color: string })[]; failed: Set<string> }> {
     const cals = this.db
       .prepare(
         `SELECT c.* FROM calendars c LEFT JOIN calendar_shares s ON s.calendar_id = c.id AND s.user_id = ?
@@ -301,7 +301,7 @@ export class CalendarService {
     const local = cals.filter((c) => c.source === 'local');
     if (local.length) {
       const rows = this.db
-        .prepare(`SELECT * FROM calendar_events WHERE calendar_id IN (${local.map(() => '?').join(',')}) AND reminder IS NOT NULL AND start_at < ? AND (end_at > ? OR recurrence != 'none')`)
+        .prepare(`SELECT * FROM calendar_events WHERE calendar_id IN (${local.map(() => '?').join(',')}) AND ${opts.all ? '1' : 'reminder IS NOT NULL'} AND start_at < ? AND (end_at > ? OR recurrence != 'none')`)
         .all(...local.map((c) => c.id), to, from) as Record<string, unknown>[];
       for (const r of rows) {
         const e = eventFromRow(r);
@@ -316,7 +316,7 @@ export class CalendarService {
           const list = await this.eventsOrNull(userId, c, from, to);
           if (!list) return failed.add(c.id);
           for (const e of list)
-            if (e.reminder !== null && e.reminder !== undefined)
+            if (opts.all || (e.reminder !== null && e.reminder !== undefined))
               items.push({
                 id: `${c.id}~${Buffer.from(e.remoteId).toString('base64url')}`,
                 calendarId: c.id,
@@ -329,6 +329,7 @@ export class CalendarService {
                 recurrence: 'none',
                 until: null,
                 reminder: e.reminder,
+                ...(e.showAs ? { showAs: e.showAs } : {}),
                 joinUrl: e.joinUrl ?? null,
                 occurrenceStart: e.start,
                 occurrenceEnd: e.end,
@@ -337,6 +338,44 @@ export class CalendarService {
         }),
     );
     return { items, failed };
+  }
+
+  /**
+   * Free/busy for the scheduling assistant (DreyMail 10.2): the user's own busy times from their
+   * visible calendars, and other people's from Outlook (getSchedule) or Google (freeBusy): through
+   * the calendar's own mailbox, else the user's first Outlook or Google mailbox.
+   */
+  async freeBusy(userId: string, calendarId: string | null, emails: string[], from: number, to: number) {
+    const mine = await this.upcoming(userId, from, to, { all: true });
+    const self = {
+      busy: mine.items
+        .filter((o) => !o.allDay && o.showAs !== 'free')
+        .map((o) => ({ start: o.occurrenceStart, end: o.occurrenceEnd, status: (o.showAs ?? 'busy') as 'busy' | 'tentative' | 'away' | 'elsewhere', title: o.title }))
+        .sort((a, b) => a.start.localeCompare(b.start)),
+    };
+    const cal = calendarId ? (this.db.prepare('SELECT * FROM calendars WHERE id = ? AND owner_id = ?').get(calendarId, userId) as CalendarRow | undefined) : undefined;
+    const accounts = this.deps.store.listAccounts(userId);
+    const via =
+      cal && (cal.source === 'microsoft' || cal.source === 'google')
+        ? { kind: cal.source, id: cal.source_id! }
+        : (() => {
+            const a = accounts.find((x) => x.auth === 'microsoft') ?? accounts.find((x) => x.auth === 'google');
+            return a ? { kind: a.auth as 'microsoft' | 'google', id: a.id } : null;
+          })();
+    const mineSet = this.myAddresses(userId);
+    const others = [...new Set(emails.map((e) => e.toLowerCase()))].filter((e) => !mineSet.has(e)).slice(0, 50);
+    let people: Record<string, { busy: { start: string; end: string; status: string }[]; error?: string }> = {};
+    if (others.length && via) {
+      const p = this.provider(userId, via.kind, via.id);
+      try {
+        people = (await p?.freeBusy?.(others, from, to)) ?? {};
+      } catch (err) {
+        const msg = err instanceof RemoteCalendarError ? err.message : (err as Error).message;
+        for (const e of others) people[e] = { busy: [], error: msg };
+      }
+    }
+    for (const e of others) people[e] ??= { busy: [], error: via ? 'Not available' : 'Free/busy needs an Outlook or Google mailbox signed in with Microsoft or Google' };
+    return { self, people, via: via?.kind ?? null };
   }
 
   /** A guest answered an invitation the user sent from DreyMail: their answer goes on the event. */

@@ -5,7 +5,7 @@
 // and changing one occurrence, this-and-following or the whole series of a repeating event.
 
 import crypto from 'node:crypto';
-import { occurrences, startTimeOf, type Attendee, type CalendarEvent, type EventInput, type MonthlyBy } from '../../../shared/calendar.js';
+import { occurrences, startTimeOf, type Attendee, type CalendarEvent, type EventInput, type MonthlyBy, type ShowAs } from '../../../shared/calendar.js';
 import { DAY } from '../../../shared/rrule.js';
 import type { Store } from '../db.js';
 
@@ -47,6 +47,7 @@ export function eventFromRow(r: Row): CalendarEvent {
     ...(json<string[]>(r.exdates, []).length ? { exdates: json<string[]>(r.exdates, []) } : {}),
     ...(r.time_zone ? { timeZone: String(r.time_zone) } : {}),
     reminder: r.reminder === null || r.reminder === undefined ? null : Number(r.reminder),
+    ...(r.show_as && r.show_as !== 'busy' ? { showAs: r.show_as as ShowAs } : {}),
     ...(attendees.length ? { attendees, organizer } : {}),
     sendFrom: (r.send_from as string | null) ?? null,
   };
@@ -72,6 +73,7 @@ function columns(e: EventInput & { exdates?: string[] }, organizer: { email: str
     exdates: JSON.stringify(repeating ? (e.exdates ?? []) : []),
     time_zone: e.timeZone ?? null,
     reminder: e.reminder ?? null,
+    show_as: e.showAs ?? 'busy',
     attendees: JSON.stringify(e.attendees ?? []),
     organizer: e.attendees?.length && organizer ? JSON.stringify(organizer) : null,
     send_from: e.attendees?.length ? (e.sendFrom ?? null) : null,

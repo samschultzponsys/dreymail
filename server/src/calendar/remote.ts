@@ -8,7 +8,7 @@
 
 import crypto from 'node:crypto';
 import { parseDocument } from 'htmlparser2';
-import { findJoinUrl, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields } from '../../../shared/calendar.js';
+import { findJoinUrl, type Attendee, type AttendeeStatus, type MeetingKind, type Recurrence, type RepeatFields, type ShowAs } from '../../../shared/calendar.js';
 import { utcToWall as wallOf, wallToUtc } from '../../../shared/rrule.js';
 import {
   eventsOf,
@@ -19,6 +19,7 @@ import {
   overrideOccurrenceIcs,
   parseIcal,
   reminderOf,
+  showAsOf,
   repeatFromRule,
   ruleFor,
   startWallOf,
@@ -68,6 +69,7 @@ export interface RemoteEvent {
   organizer?: { email: string; name: string } | null;
   /** The provider says you organize it (CalDAV leaves this to the caller). */
   isOrganizer?: boolean;
+  showAs?: ShowAs;
   joinUrl?: string | null;
 }
 
@@ -87,6 +89,14 @@ export interface CalendarProvider {
   /** The invitation with this iCalendar UID in the user's calendar, if the provider added it. */
   findInvite?(uid: string): Promise<{ eventId: string; answer: InviteAnswer | null } | null>;
   answerInvite?(eventId: string, answer: InviteAnswer): Promise<void>;
+  /** Busy times of these people (colleagues, shared calendars) between from and to (DreyMail 10.2). */
+  freeBusy?(emails: string[], from: number, to: number): Promise<Record<string, BusyResult>>;
+}
+
+/** Someone's busy times, or why they can't be seen. */
+export interface BusyResult {
+  busy: { start: string; end: string; status: 'busy' | 'tentative' | 'away' | 'elsewhere' }[];
+  error?: string;
 }
 
 export class RemoteCalendarError extends Error {
@@ -161,6 +171,7 @@ interface GEvent {
   reminders?: { useDefault?: boolean; overrides?: { method?: string; minutes?: number }[] };
   hangoutLink?: string;
   conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
+  transparency?: string;
 }
 
 const G_STATUS: Record<string, AttendeeStatus> = { accepted: 'accepted', tentative: 'tentative', declined: 'declined' };
@@ -223,6 +234,7 @@ export class GoogleCalendar implements CalendarProvider {
       attendees: people.map((a) => ({ email: a.email!.toLowerCase(), name: a.displayName ?? '', status: G_STATUS[a.responseStatus ?? ''] ?? 'needs-action', ...(a.optional ? { optional: true } : {}) })),
       organizer: e.organizer?.email ? { email: e.organizer.email.toLowerCase(), name: e.organizer.displayName ?? '' } : null,
       isOrganizer: !e.organizer || !!e.organizer.self,
+      ...(e.transparency === 'transparent' ? { showAs: 'free' as const } : {}),
       joinUrl: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p) => p.entryPointType === 'video')?.uri ?? findJoinUrl(e.location, e.description),
     };
   }
@@ -265,6 +277,7 @@ export class GoogleCalendar implements CalendarProvider {
       ...(withRecurrence ? { recurrence: rule ? [`RRULE:${rule}`] : [] } : {}),
       ...(f.reminder !== undefined ? { reminders: { useDefault: false, overrides: f.reminder === null ? [] : [{ method: 'popup', minutes: f.reminder }] } } : {}),
       ...(f.attendees ? { attendees: f.attendees.map((a) => ({ email: a.email, ...(a.name ? { displayName: a.name } : {}), ...(a.optional ? { optional: true } : {}), responseStatus: G_RESPONSE[a.status] ?? 'needsAction' })) } : {}),
+      ...(f.showAs ? { transparency: f.showAs === 'free' ? 'transparent' : 'opaque' } : {}),
       ...(f.meeting === 'meet' ? { conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } } } : {}),
     };
   }
@@ -286,6 +299,22 @@ export class GoogleCalendar implements CalendarProvider {
     } catch (err) {
       if (!(err instanceof RemoteCalendarError && (err.status === 404 || err.status === 410))) throw err;
     }
+  }
+
+  async freeBusy(emails: string[], from: number, to: number): Promise<Record<string, BusyResult>> {
+    const r = await this.req<{ calendars?: Record<string, { busy?: { start: string; end: string }[]; errors?: { reason?: string }[] }> }>('POST', '/freeBusy', {
+      timeMin: new Date(from).toISOString(),
+      timeMax: new Date(to).toISOString(),
+      items: emails.map((id) => ({ id })),
+    });
+    const out: Record<string, BusyResult> = {};
+    for (const e of emails) {
+      const c = r.calendars?.[e];
+      out[e] = c?.errors?.length
+        ? { busy: [], error: c.errors[0]?.reason === 'notFound' ? 'Not found in Google' : 'Their calendar isn\'t shared with you' }
+        : { busy: (c?.busy ?? []).map((b) => ({ start: new Date(b.start).toISOString(), end: new Date(b.end).toISOString(), status: 'busy' as const })) };
+    }
+    return out;
   }
 
   async findInvite(uid: string) {
@@ -349,6 +378,7 @@ interface GraphEvent {
   onlineMeetingUrl?: string | null;
   recurrence?: GraphRecurrence | null;
   originalStartTimeZone?: string;
+  showAs?: string;
 }
 interface GraphRecurrence {
   pattern: { type: string; interval?: number; daysOfWeek?: string[]; dayOfMonth?: number; month?: number; index?: string; firstDayOfWeek?: string };
@@ -358,7 +388,9 @@ interface GraphRecurrence {
 const GRAPH_STATUS: Record<string, AttendeeStatus> = { accepted: 'accepted', tentativelyAccepted: 'tentative', declined: 'declined' };
 const GRAPH_RESPONSE: Record<AttendeeStatus, string> = { accepted: 'accepted', tentative: 'tentativelyAccepted', declined: 'declined', 'needs-action': 'none' };
 const INDEX = ['', 'first', 'second', 'third', 'fourth'];
-const SELECT = 'id,subject,location,body,start,end,isAllDay,isCancelled,type,seriesMasterId,attendees,organizer,isOrganizer,isReminderOn,reminderMinutesBeforeStart,isOnlineMeeting,onlineMeeting,onlineMeetingUrl';
+const SELECT = 'id,subject,location,body,start,end,isAllDay,isCancelled,type,seriesMasterId,attendees,organizer,isOrganizer,isReminderOn,reminderMinutesBeforeStart,isOnlineMeeting,onlineMeeting,onlineMeetingUrl,showAs';
+const FROM_GRAPH_SHOW: Record<string, ShowAs> = { free: 'free', tentative: 'tentative', oof: 'away', workingElsewhere: 'elsewhere' };
+const TO_GRAPH_SHOW: Record<ShowAs, string> = { busy: 'busy', free: 'free', tentative: 'tentative', away: 'oof', elsewhere: 'workingElsewhere' };
 
 /** A Graph repeat pattern for DreyMail's repeat fields (`localStart`: the start's wall time). */
 export function graphRecurrence(f: RepeatFields, localStart: Date): GraphRecurrence | null {
@@ -485,6 +517,7 @@ export class OutlookCalendar implements CalendarProvider {
       })),
       organizer: people.length ? organizer : null,
       isOrganizer: e.isOrganizer !== false,
+      ...(FROM_GRAPH_SHOW[e.showAs ?? ''] ? { showAs: FROM_GRAPH_SHOW[e.showAs!] } : {}),
       joinUrl: e.onlineMeeting?.joinUrl ?? e.onlineMeetingUrl ?? findJoinUrl(e.location?.displayName, e.body?.content),
     };
   }
@@ -526,6 +559,7 @@ export class OutlookCalendar implements CalendarProvider {
         ? { attendees: f.attendees.map((a) => ({ emailAddress: { address: a.email, ...(a.name ? { name: a.name } : {}) }, type: a.optional ? 'optional' : 'required', status: { response: GRAPH_RESPONSE[a.status] ?? 'none' } })) }
         : {}),
       ...(f.meeting === 'teams' ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' } : {}),
+      ...(f.showAs ? { showAs: TO_GRAPH_SHOW[f.showAs] } : {}),
     };
   }
 
@@ -546,6 +580,29 @@ export class OutlookCalendar implements CalendarProvider {
     } catch (err) {
       if (!(err instanceof RemoteCalendarError && err.status === 404)) throw err;
     }
+  }
+
+  async freeBusy(emails: string[], from: number, to: number): Promise<Record<string, BusyResult>> {
+    const r = await this.req<{ value?: { scheduleId: string; scheduleItems?: { status?: string; start?: { dateTime: string }; end?: { dateTime: string } }[]; error?: { message?: string } }[] }>(
+      'POST',
+      '/me/calendar/getSchedule',
+      { schedules: emails, startTime: { dateTime: new Date(from).toISOString().slice(0, 19), timeZone: 'UTC' }, endTime: { dateTime: new Date(to).toISOString().slice(0, 19), timeZone: 'UTC' }, availabilityViewInterval: 15 },
+      { prefer: 'outlook.timezone="UTC"' },
+    );
+    const status = (x?: string) => (x === 'tentative' ? 'tentative' : x === 'oof' ? 'away' : x === 'workingElsewhere' ? 'elsewhere' : 'busy') as BusyResult['busy'][number]['status'];
+    const out: Record<string, BusyResult> = {};
+    for (const e of emails) out[e] = { busy: [], error: 'Not found in Outlook' };
+    for (const v of r.value ?? []) {
+      const key = emails.find((e) => e.toLowerCase() === v.scheduleId.toLowerCase()) ?? v.scheduleId;
+      out[key] = v.error
+        ? { busy: [], error: v.error.message?.includes('not found') ? 'Not found in Outlook' : "Their calendar can't be seen" }
+        : {
+            busy: (v.scheduleItems ?? [])
+              .filter((i) => i.status !== 'free' && i.start && i.end)
+              .map((i) => ({ start: new Date(`${i.start!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(), end: new Date(`${i.end!.dateTime.replace(/\.\d+$/, '')}Z`).toISOString(), status: status(i.status) })),
+          };
+    }
+    return out;
   }
 
   async findInvite(uid: string) {
@@ -745,6 +802,7 @@ export class CalDavCalendar implements CalendarProvider {
           readOnly: false,
           seriesId: o.repeating ? href : undefined,
           reminder: reminderOf(o.event.component),
+          ...(showAsOf(o.event.component) ? { showAs: showAsOf(o.event.component) } : {}),
           attendees: people.map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), ...(a.role === 'OPT-PARTICIPANT' ? { optional: true } : {}) })),
           organizer: people.length && o.event.organizer ? { email: o.event.organizer.email, name: o.event.organizer.name } : null,
           joinUrl: findJoinUrl(o.event.location, o.event.description),

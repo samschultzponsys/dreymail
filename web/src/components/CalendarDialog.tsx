@@ -6,10 +6,11 @@
 // editors. Repeating events are expanded here, in the browser's time zone. Shown as a page of its
 // own (/calendar), filling the space of the message list and reader.
 // Modified by samschultzponsys, 2026-11-17: the event editor moved to EventEditor.tsx (repeats, reminders, guests, meetings).
+// Modified by samschultzponsys, 2026-11-18: drag events to another time or day in the week and day views; show-as.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Menu, Pencil, Plus, RefreshCw, Repeat, Trash2, Video, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventOccurrence } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
 import { fetchJson } from '../api';
@@ -100,6 +101,31 @@ export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; o
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['events'] });
+  };
+  /**
+   * An event dragged to a new time (DreyMail 10.2). One occurrence of a repeating event moves on
+   * its own; guests get the update as from the editor.
+   */
+  const moveEvent = async (o: EventOccurrence, start: number) => {
+    const length = Date.parse(o.occurrenceEnd) - Date.parse(o.occurrenceStart);
+    const local = calMap.get(o.calendarId)?.source === 'local';
+    const repeatingHere = local && o.recurrence !== 'none';
+    const body = {
+      ...o,
+      start: new Date(start).toISOString(),
+      end: new Date(start + length).toISOString(),
+      ...(repeatingHere ? { recurrence: 'none', until: null, count: null, scope: 'this', occurrenceStart: o.occurrenceStart } : {}),
+      ...(!local ? { instance: !!o.instance } : {}),
+      timeZone: o.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      ...(o.isOrganizer === false ? { attendees: undefined } : {}),
+    };
+    try {
+      const r = await fetchJson<{ warning?: string }>('PUT', `/api/events/${encodeURIComponent(o.id)}`, body);
+      if (r?.warning) setError(r.warning);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    refresh();
   };
   const syncNow = async () => {
     setSyncing(true);
@@ -334,7 +360,16 @@ export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; o
             ))}
           </div>
           {days.map((d) => (
-            <DayColumn key={keyOf(d)} day={d} items={(byDay.get(keyOf(d)) ?? []).filter((o) => !o.allDay)} color={(id) => calMap.get(id)?.color} onNew={(h) => newEvent(d, h)} onOpen={open} />
+            <DayColumn
+              key={keyOf(d)}
+              day={d}
+              items={(byDay.get(keyOf(d)) ?? []).filter((o) => !o.allDay)}
+              color={(id) => calMap.get(id)?.color}
+              onNew={(h) => newEvent(d, h)}
+              onOpen={open}
+              canMove={(o) => !o.readOnly && calMap.get(o.calendarId)?.access !== 'view'}
+              onMove={(o, start) => void moveEvent(o, start)}
+            />
           ))}
         </div>
       </div>
@@ -423,7 +458,25 @@ export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; o
 }
 
 /** One day in the week or day view: hour rows, with overlapping events side by side. */
-function DayColumn({ day, items, color, onNew, onOpen }: { day: Date; items: EventOccurrence[]; color: (calendarId: string) => string | undefined; onNew: (hour: number) => void; onOpen: (o: EventOccurrence) => void }) {
+function DayColumn({
+  day,
+  items,
+  color,
+  onNew,
+  onOpen,
+  canMove,
+  onMove,
+}: {
+  day: Date;
+  items: EventOccurrence[];
+  color: (calendarId: string) => string | undefined;
+  onNew: (hour: number) => void;
+  onOpen: (o: EventOccurrence) => void;
+  /** Whether an event can be dragged to another time (DreyMail 10.2). */
+  canMove?: (o: EventOccurrence) => boolean;
+  /** Dropped at a new start (ms). */
+  onMove?: (o: EventOccurrence, start: number) => void;
+}) {
   const dayStart = day.getTime();
   const dayEnd = addDays(day, 1).getTime();
   // Lanes: each event goes in the first lane that is free at its start.
@@ -439,31 +492,83 @@ function DayColumn({ day, items, color, onNew, onOpen }: { day: Date; items: Eve
     });
     return out.map((p) => ({ ...p, lanes: Math.max(1, ...out.filter((q) => q.s < p.e && q.e > p.s).map((q) => q.lane + 1)) }));
   }, [items, dayStart, dayEnd]);
+  // Dragging (DreyMail 10.2): 15-minute steps, to another day of the week view too.
+  const [drag, setDrag] = useState<{ key: string; dx: number; dy: number; minutes: number; dayShift: number } | null>(null);
+  const col = useRef<HTMLDivElement>(null);
+  const startDrag = (e: React.PointerEvent<HTMLButtonElement>, o: EventOccurrence) => {
+    if (e.button !== 0 || !canMove?.(o) || !onMove || !col.current) return;
+    const key = `${o.id}-${o.occurrenceStart}`;
+    const own = col.current.getBoundingClientRect();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moved = false;
+    let last = { dx: 0, dy: 0, minutes: 0, dayShift: 0 };
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      moved = true;
+      const minutes = Math.round(((ev.clientY - y0) / own.height) * 1440 / 15) * 15;
+      const under = document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => el instanceof HTMLElement && el.dataset.day) as HTMLElement | undefined;
+      const dayShift = under ? Math.round((Number(under.dataset.day) - dayStart) / DAY) : last.dayShift;
+      const dx = under ? under.getBoundingClientRect().left - own.left : last.dx;
+      last = { dx, dy: (minutes / 1440) * own.height, minutes, dayShift };
+      setDrag({ key, ...last });
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      setDrag(null);
+      if (!moved) return onOpen(o);
+      if (last.minutes || last.dayShift) {
+        const from = new Date(o.occurrenceStart);
+        const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + last.dayShift, from.getHours(), from.getMinutes() + last.minutes);
+        onMove(o, to.getTime());
+      }
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
   const now = Date.now();
   return (
-    <div className="cal-tg-col">
+    <div className="cal-tg-col" ref={col} data-day={dayStart}>
       {Array.from({ length: 24 }, (_, h) => (
         <div key={h} className="cal-tg-slot" onClick={() => onNew(h)} />
       ))}
       {now >= dayStart && now < dayEnd && <div className="cal-now" style={{ top: `${((now - dayStart) / DAY) * 100}%` }} />}
-      {placed.map(({ o, s, e, lane, lanes }) => (
-        <button
-          key={`${o.id}-${o.occurrenceStart}`}
-          className={`cal-block ${e - s < 45 * 60_000 ? 'short' : ''}`}
-          style={{
-            ['--cal' as string]: color(o.calendarId) ?? 'var(--accent)',
-            top: `${((s - dayStart) / DAY) * 100}%`,
-            height: `${((e - s) / DAY) * 100}%`,
-            left: `${(lane / lanes) * 100}%`,
-            width: `${100 / lanes}%`,
-          }}
-          onClick={() => onOpen(o)}
-          title={o.title}
-        >
-          <span className="cal-title">{o.title}</span>
-          <span className="cal-time">{e - s < 45 * 60_000 ? timeLabel(new Date(o.occurrenceStart)) : `${timeLabel(new Date(o.occurrenceStart))} – ${timeLabel(new Date(o.occurrenceEnd))}`}</span>
-        </button>
-      ))}
+      {placed.map(({ o, s, e, lane, lanes }) => {
+        const key = `${o.id}-${o.occurrenceStart}`;
+        const dragging = drag?.key === key ? drag : null;
+        const shownStart = dragging ? new Date(new Date(o.occurrenceStart).getTime() + dragging.minutes * 60_000 + dragging.dayShift * DAY) : new Date(o.occurrenceStart);
+        const shownEnd = dragging ? new Date(new Date(o.occurrenceEnd).getTime() + dragging.minutes * 60_000 + dragging.dayShift * DAY) : new Date(o.occurrenceEnd);
+        return (
+          <button
+            key={key}
+            className={`cal-block ${e - s < 45 * 60_000 ? 'short' : ''} ${dragging ? 'dragging' : ''} ${canMove?.(o) ? 'movable' : ''} ${o.showAs ? `show-${o.showAs}` : ''}`}
+            style={{
+              ['--cal' as string]: color(o.calendarId) ?? 'var(--accent)',
+              top: `${((s - dayStart) / DAY) * 100}%`,
+              height: `${((e - s) / DAY) * 100}%`,
+              left: `${(lane / lanes) * 100}%`,
+              width: `${100 / lanes}%`,
+              ...(dragging ? { transform: `translate(${dragging.dx}px, ${dragging.dy}px)`, zIndex: 5 } : {}),
+            }}
+            onPointerDown={(ev) => startDrag(ev, o)}
+            onClick={(ev) => {
+              // Movable blocks open on pointer-up (a drag is not a click).
+              if (canMove?.(o) && onMove) ev.preventDefault();
+              else onOpen(o);
+            }}
+            onKeyDown={(ev) => ev.key === 'Enter' && onOpen(o)}
+            title={canMove?.(o) ? `${o.title} (drag to move)` : o.title}
+          >
+            <span className="cal-title">{o.title}</span>
+            <span className="cal-time">{e - s < 45 * 60_000 ? timeLabel(shownStart) : `${timeLabel(shownStart)} – ${timeLabel(shownEnd)}`}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

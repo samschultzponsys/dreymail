@@ -56,7 +56,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.8 (assistant: forward, reply drafts, unsubscribe, Outlook categories).
      Modified by samschultzponsys, 2026-11-18: v9.9 (importance, read receipts, printing).
      Modified by samschultzponsys, 2026-11-18: v10.0 (one short version label; the plain slide transition).
-     Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates). -->
+     Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates).
+     Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -68,7 +69,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -329,6 +330,15 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   invitation. Google calendars offer *Add a Google Meet video call* the same way. Events with a
   meeting link (Teams, Meet, Zoom, Webex, GoTo, Whereby, Jitsi, also pasted into Location or Notes)
   get a **Join** button.
+- **Moving events:** in the week and day views, drag an event to another time (15-minute steps)
+  or another day. One occurrence of a repeating event moves on its own; guests get the update.
+- **Show as:** Busy, Free, Tentative, Away or Working elsewhere, as in Outlook (kept in Outlook,
+  Google as busy/free, and CalDAV); free and tentative events look lighter in the calendar.
+- **Scheduling assistant:** with guests on an event, *Show the scheduling assistant* lays the day
+  out as a timeline with you and each guest on a row and busy times filled in: yours from your
+  calendars, colleagues' from Outlook / Microsoft 365 (their free/busy) or Google (calendars shared
+  with you, or your Workspace). It says when someone is busy at the chosen time; click a free spot,
+  or *Next free time*, to move the meeting there (working hours, weekdays).
 - **Reminders:** every event can have a reminder (none, at the start, 5 minutes up to a week
   before; new events get 15 minutes, as in Outlook). Google and Outlook events use the reminder set
   there. When the time comes, the server sends a notification to every device (the desktop app,

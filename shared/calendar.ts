@@ -35,6 +35,10 @@ export interface Attendee {
   optional?: boolean;
 }
 
+/** How the event shows to others looking at your free/busy times (Outlook's "Show as") (DreyMail 10.2). */
+export type ShowAs = 'busy' | 'free' | 'tentative' | 'away' | 'elsewhere';
+export const SHOW_AS_LABELS: Record<ShowAs, string> = { busy: 'Busy', free: 'Free', tentative: 'Tentative', away: 'Away', elsewhere: 'Working elsewhere' };
+
 /** An online meeting made with the event: Microsoft Teams (Outlook / Microsoft 365) or Google Meet. */
 export type MeetingKind = 'teams' | 'meet';
 
@@ -160,6 +164,8 @@ export interface CalendarEvent {
   timeZone?: string;
   /** Reminder, in minutes before the start (null: none). */
   reminder?: number | null;
+  /** Busy (the default), free, tentative, away or working elsewhere. */
+  showAs?: ShowAs;
   /** People invited (the organizer not among them). */
   attendees?: Attendee[];
   /** Who sent the invitations (null: nobody was invited, or it is yours). */
