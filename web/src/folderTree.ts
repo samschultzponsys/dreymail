@@ -102,3 +102,35 @@ export function folderRows(
   walk(null, 0);
   return rows;
 }
+
+/** A pinned folder in the pinned-only bar: shown flat, wherever it sits in the tree (DreyMail 11.1). */
+export interface PinnedRow {
+  folder: FolderView;
+  /** The folder it lives in, to tell apart folders with the same name ("" at the top). */
+  parentName: string;
+}
+
+/** Pinned folders in the order the user pinned (and dragged) them; ones that no longer exist are skipped. */
+export function pinnedRows(folders: FolderView[], pinned: string[]): PinnedRow[] {
+  const byPath = new Map(folders.map((f) => [f.path, f]));
+  const seen = new Set<string>();
+  const rows: PinnedRow[] = [];
+  for (const path of pinned) {
+    const f = byPath.get(path);
+    if (!f || seen.has(path)) continue;
+    seen.add(path);
+    const parent = f.parentPath && f.parentPath !== f.path ? byPath.get(f.parentPath) : undefined;
+    const parentName = parent && parent.selectable !== false ? (parent.specialUse === 'inbox' ? 'Inbox' : parent.name) : '';
+    rows.push({ folder: f, parentName });
+  }
+  return rows;
+}
+
+/** Moves `path` to just before `before` (or to the end) in the pinned order. */
+export function movePinned(pinned: string[], path: string, before: string | null): string[] {
+  if (path === before) return pinned;
+  const rest = pinned.filter((p) => p !== path);
+  const i = before ? rest.indexOf(before) : -1;
+  if (i === -1) return [...rest, path];
+  return [...rest.slice(0, i), path, ...rest.slice(i)];
+}

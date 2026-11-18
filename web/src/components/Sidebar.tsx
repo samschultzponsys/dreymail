@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Install the app button (in a browser).
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
+// Modified by samschultzponsys, 2026-11-18: pinned folders flat in a dragged order; unread in folded or unpinned folders stands out and flashes when new mail arrives.
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
@@ -69,7 +70,9 @@ import type { SavedSearch } from '../../../shared/search';
 import { PaneResizer } from './PaneResizer';
 import { ContextMenu, type MenuItem } from './MailboxMenu';
 import { applyDrop, currentOrder, type DropTarget, type Dragged, type SidebarOrder } from '../sidebarOrder';
-import { folderRows } from '../folderTree';
+import { folderRows, movePinned, pinnedRows, type FolderRow as TreeRow } from '../folderTree';
+
+type FolderRow = TreeRow & { parentName?: string };
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
 import { api, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
@@ -183,6 +186,9 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
       }
       return next;
     });
+  // A pinned folder being dragged into another place among the pinned ones.
+  const [pinDragging, setPinDrag] = useState<{ accountId: string; path: string } | null>(null);
+  const [pinOver, setPinOver] = useState<string | null>(null);
   /** Mailboxes whose unpinned folders are shown too (the ⌄ under the pinned ones). */
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [rail, setRail] = useState(() => localStorage.getItem('navRail') === '1');
@@ -331,20 +337,58 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                       const countOf = (f: FolderView) => (f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed' ? f.unread : 0);
                       // The folders as a tree (DreyMail): each under its parent, Inbox and Sent foldable
                       // like any folder; folded subfolders hidden, their unread mail counted on the folder.
-                      const rows = folderRows(af.folders, { folded: rail ? [] : (collapsedFolders[acc.id] ?? []), only: limited ? pinned : null, count: countOf });
+                      const rows: FolderRow[] = limited
+                        ? pinnedRows(af.folders, pinned).map((r) => ({ folder: r.folder, depth: 0, hasChildren: false, folded: false, hiddenUnread: 0, parentName: r.parentName }))
+                        : folderRows(af.folders, { folded: rail ? [] : (collapsedFolders[acc.id] ?? []), count: countOf });
                       const foldable = !rail && !!onToggleFolder;
                       // Room for the fold arrows, in a column, when any folder has subfolders.
                       const foldRoom = foldable && rows.some((r) => r.hasChildren) ? 16 : 0;
                       const hiddenUnread = limited ? af.folders.filter((f) => !pinned.includes(f.path)).reduce((n, f) => n + countOf(f), 0) : 0;
+                      // Pinned folders are dragged into the order wanted (DreyMail 11.1).
+                      const pinDrag = limited && !!onPin && !rail;
                       return (
                         <>
-                          {rows.map(({ folder: f, depth, hasChildren, folded: isFolded, hiddenUnread: underneath }) => {
+                          {rows.map(({ folder: f, depth, hasChildren, folded: isFolded, hiddenUnread: underneath, parentName }) => {
                             const active = !activeSearch && sel.accountId === acc.id && sel.folder === f.path;
-                            const showCount = countOf(f) + underneath;
+                            const own = countOf(f);
                             const isPinned = pinned.includes(f.path);
                             const canFold = foldable && hasChildren;
+                            const dragKey = `${acc.id}\u0000${f.path}`;
                             return (
-                              <div key={f.path} className={`nav-folder ${isPinned ? 'pinned' : ''} ${canFold ? 'foldable' : ''}`}>
+                              <div
+                                key={f.path}
+                                className={`nav-folder ${isPinned ? 'pinned' : ''} ${canFold ? 'foldable' : ''} ${pinOver === dragKey ? 'pin-drop' : ''}`}
+                                {...(pinDrag
+                                  ? {
+                                      draggable: true,
+                                      onDragStart: (e: React.DragEvent) => {
+                                        e.stopPropagation();
+                                        e.dataTransfer.effectAllowed = 'move';
+                                        e.dataTransfer.setData('text/plain', f.path);
+                                        setPinDrag({ accountId: acc.id, path: f.path });
+                                      },
+                                      onDragEnd: (e: React.DragEvent) => {
+                                        e.stopPropagation();
+                                        setPinDrag(null);
+                                        setPinOver(null);
+                                      },
+                                      onDragOver: (e: React.DragEvent) => {
+                                        if (pinDragging?.accountId !== acc.id) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (pinOver !== dragKey) setPinOver(dragKey);
+                                      },
+                                      onDrop: (e: React.DragEvent) => {
+                                        if (pinDragging?.accountId !== acc.id) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onPin!(acc.id, movePinned(pinned, pinDragging.path, f.path));
+                                        setPinDrag(null);
+                                        setPinOver(null);
+                                      },
+                                    }
+                                  : {})}
+                              >
                                 {canFold && (
                                   <button
                                     className="fold-btn"
@@ -358,15 +402,25 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                                   </button>
                                 )}
                                 <button
-                                  className={`nav-item ${active ? 'active' : ''} ${showCount ? 'unread' : ''}`}
+                                  className={`nav-item ${active ? 'active' : ''} ${own + underneath ? 'unread' : ''}`}
                                   disabled={!f.selectable}
                                   style={{ paddingLeft: rail ? undefined : 8 + foldRoom + depth * 14, opacity: f.selectable ? 1 : 0.6 }}
                                   onClick={() => onSelect({ accountId: acc.id, folder: f.path })}
                                   title={f.path}
                                 >
                                   {f.specialUse ? SPECIAL_ICON[f.specialUse] : <Folder size={16} />}
-                                  <span className="name">{f.specialUse === 'inbox' ? 'Inbox' : f.name}</span>
-                                  {showCount ? <span className="count">{showCount}</span> : null}
+                                  <span className="name">
+                                    {f.specialUse === 'inbox' ? 'Inbox' : f.name}
+                                    {parentName && !rail ? <span className="nav-parent"> · {parentName}</span> : null}
+                                  </span>
+                                  {own ? <span className="count">{own}</span> : null}
+                                  {underneath > 0 && (
+                                    <UnreadBubble
+                                      count={underneath}
+                                      flashKey={`fold:${acc.id}:${f.path}`}
+                                      title={`${underneath} unread in the folders folded away under ${f.name}`}
+                                    />
+                                  )}
                                 </button>
                                 {!rail && onPin && (
                                   <button
@@ -391,7 +445,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                             >
                               <span className="nav-more-line" />
                               {limited ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                              {hiddenUnread > 0 && <span className="count">{hiddenUnread}</span>}
+                              {hiddenUnread > 0 && <UnreadBubble count={hiddenUnread} flashKey={`more:${acc.id}`} title={`${hiddenUnread} unread in folders that aren't pinned`} />}
                               <span className="nav-more-line" />
                             </button>
                           )}
@@ -611,3 +665,34 @@ function VersionStack({ server, update, onLog }: { server: string; update: strin
     </button>
   );
 }
+
+/** How long a bubble flashes after new mail lands in folders it stands for. */
+const FLASH_MS = 2 * 60_000;
+// Kept outside the bubbles, so one that is shown again (a mailbox opened, the bar redrawn) neither
+// misses new mail nor flashes for old mail.
+const lastCount = new Map<string, number>();
+const flashUntil = new Map<string, number>();
+
+/**
+ * Unread mail in folders out of sight (folded away, or not pinned): a filled bubble that stands
+ * out, flashing for a while when the number goes up (DreyMail 11.1).
+ */
+export function UnreadBubble({ count, flashKey, title }: { count: number; flashKey: string; title: string }) {
+  const [, redraw] = useState(0);
+  const prev = lastCount.get(flashKey);
+  if (prev !== undefined && count > prev) flashUntil.set(flashKey, Date.now() + FLASH_MS);
+  lastCount.set(flashKey, count);
+  const until = flashUntil.get(flashKey) ?? 0;
+  const flashing = until > Date.now();
+  useEffect(() => {
+    if (!flashing) return;
+    const t = setTimeout(() => redraw((n) => n + 1), Math.max(0, until - Date.now()) + 50);
+    return () => clearTimeout(t);
+  }, [flashing, until]);
+  return (
+    <span className={`count hidden-unread ${flashing ? 'flash' : ''}`} title={flashing ? `${title} (new mail)` : title} aria-label={title}>
+      {count}
+    </span>
+  );
+}
+

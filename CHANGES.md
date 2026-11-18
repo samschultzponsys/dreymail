@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v11.1): pinned folders your way; unread out of sight stands out
+
+- **Pinned folders** show as one flat list in the order they were pinned, wherever they sit in the
+  folder tree, and can be dragged into another order; a subfolder shows the folder it lives in
+  after its name (to tell two "Acme" folders apart).
+- **Unread in folded or unpinned folders** shows as a filled, accent-colored bubble (on the folder
+  they are folded under, or on the ⌄ line under the pinned folders), separate from the folder's own
+  count, and flashes for two minutes when new mail arrives there (a steady ring with reduced motion).
+- **Files:** `web/src/folderTree.ts`, `web/src/components/Sidebar.tsx`, `web/src/styles.css`,
+  `web/test/folderTree.test.ts`, `web/test/sidebar.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v11.0): Gmail "Allow" takes effect at once
 
 - **Fix:** allowing contacts, tasks or the directory for a Gmail mailbox (Settings → Allow) kept

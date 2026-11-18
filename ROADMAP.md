@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (10.9). New ideas go here.
+Everything planned so far is done (11.1). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -22,6 +22,8 @@ Everything planned so far is done (10.9). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Pinned folders as one flat list in a dragged order, wherever they sit in the tree; unread in
+      folded or unpinned folders as a filled bubble that flashes on new mail (11.1).
 - [x] DreyMail's own icon and brand (1.1), name and identity throughout (1.5).
 - [x] "All inboxes" can be turned off (1.2).
 - [x] Per-account colors (presets or any color); the whole app recolors per open account (1.2).

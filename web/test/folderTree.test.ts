@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { FolderView, SpecialUse } from '../../shared/types';
-import { folderRows } from '../src/folderTree';
+import { folderRows, movePinned, pinnedRows } from '../src/folderTree';
 
 const f = (path: string, opts: { special?: SpecialUse; selectable?: boolean; unread?: number; d?: string } = {}): FolderView => {
   const d = opts.d ?? '/';
@@ -72,5 +72,23 @@ describe('folderRows', () => {
     const rows = folderRows([f('A'), { ...f('B'), parentPath: 'B' }, { ...f('C'), parentPath: 'missing' }], { folded: ['A'] });
     expect(outline(rows)).toEqual(['A', 'B', 'C']);
     expect(rows[0]!.folded).toBe(false);
+  });
+});
+
+describe('pinned folders (11.1)', () => {
+  const folders = [f('Inbox', { special: 'inbox' }), f('Inbox/Clients'), f('Inbox/Clients/Acme'), f('Archive/Acme'), f('Archive', { special: 'archive' }), f('Sent', { special: 'sent' })];
+
+  it('shows pinned folders flat, in the pinned order, wherever they sit in the tree', () => {
+    const rows = pinnedRows(folders, ['Inbox/Clients/Acme', 'Sent', 'Gone', 'Archive/Acme', 'Inbox']);
+    expect(rows.map((r) => r.folder.path)).toEqual(['Inbox/Clients/Acme', 'Sent', 'Archive/Acme', 'Inbox']);
+    // Two folders named Acme are told apart by the folder they live in.
+    expect(rows.map((r) => r.parentName)).toEqual(['Clients', '', 'Archive', '']);
+  });
+
+  it('moves a pinned folder before another, or to the end', () => {
+    expect(movePinned(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
+    expect(movePinned(['a', 'b', 'c'], 'a', 'c')).toEqual(['b', 'a', 'c']);
+    expect(movePinned(['a', 'b', 'c'], 'a', null)).toEqual(['b', 'c', 'a']);
+    expect(movePinned(['a', 'b', 'c'], 'b', 'b')).toEqual(['a', 'b', 'c']);
   });
 });

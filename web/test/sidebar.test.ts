@@ -3,13 +3,14 @@
 // Modified by samschultzponsys, 2026-11-13: renders inside a QueryClientProvider (the sidebar shows the version).
 // Modified by samschultzponsys, 2026-11-15: saved searches props.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-18: the unread bubble for folded or unpinned folders flashes on new mail.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AccountView } from '../../shared/types';
-import { Sidebar } from '../src/components/Sidebar';
+import { Sidebar, UnreadBubble } from '../src/components/Sidebar';
 
 beforeAll(() => {
   (globalThis as { localStorage?: unknown }).localStorage ??= { getItem: () => null, setItem: () => {} };
@@ -57,5 +58,17 @@ describe('Sidebar', () => {
   it('hides the spinner once the folders have arrived', () => {
     const html = render([{ accountId: 'a1', folders: [] }] as never);
     expect(html).not.toContain('nav-loading');
+  });
+});
+
+describe('unread in folders out of sight (11.1)', () => {
+  const bubble = (count: number) => renderToStaticMarkup(createElement(UnreadBubble, { count, flashKey: 'test', title: 'hidden' }));
+  it('stands out, and flashes only when new mail arrives', () => {
+    expect(bubble(3)).toContain('hidden-unread');
+    expect(bubble(3)).not.toContain('flash');
+    expect(bubble(2)).not.toContain('flash');
+    expect(bubble(4)).toContain('hidden-unread flash');
+    // Keeps flashing for a while, also when drawn again.
+    expect(bubble(4)).toContain('flash');
   });
 });

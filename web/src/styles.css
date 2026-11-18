@@ -1189,6 +1189,18 @@ a.btn { text-decoration: none; }
 .nav-more:hover { color: var(--text); }
 .nav-more-line { flex: 1; height: 1px; background: var(--border); }
 .nav-more .count { margin-left: 0; }
+/* Unread in folded or unpinned folders (DreyMail 11.1): a filled bubble, flashing when new mail arrives. */
+.count.hidden-unread { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 6px; margin-left: 4px; border-radius: 9px; background: var(--accent-fill); color: var(--accent-text); font-size: 11px; font-weight: 700; line-height: 1; }
+.nav-more .count.hidden-unread { margin-left: 0; }
+.count.hidden-unread.flash { animation: unread-flash 1.2s ease-in-out infinite; }
+@keyframes unread-flash {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-fill) 70%, transparent); transform: scale(1); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-fill) 0%, transparent); transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) { .count.hidden-unread.flash { animation: none; outline: 2px solid var(--accent-fill); outline-offset: 2px; } }
+.nav-folder[draggable='true'] { cursor: grab; }
+.nav-folder.pin-drop::before { content: ''; position: absolute; left: 8px; right: 8px; top: -1px; height: 2px; border-radius: 1px; background: var(--accent-fill); }
+.nav-parent { color: var(--muted); font-weight: 400; font-size: 11px; }
 @media (hover: none) { .nav-folder .pin-btn { display: inline-flex; opacity: 0.55; background: none; } }
 
 /* ---- settings tabs on phones: one full-width row per group, tabs scroll sideways ---------- */

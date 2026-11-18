@@ -65,7 +65,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms).
      Modified by samschultzponsys, 2026-11-18: v10.8 (proposing a new time).
      Modified by samschultzponsys, 2026-11-18: v10.9 (Gmail labels in the list; this and following for every calendar).
-     Modified by samschultzponsys, 2026-11-18: v11.0 (Gmail "Allow" takes effect at once). -->
+     Modified by samschultzponsys, 2026-11-18: v11.0 (Gmail "Allow" takes effect at once).
+     Modified by samschultzponsys, 2026-11-18: v11.1 (pinned folders flat in your order; unread out of sight stands out and flashes). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -77,7 +78,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -177,13 +178,16 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
 - Message list with sender, subject, snippet, date, unread/flagged/answered/attachment
   indicators, and an account color tag in the unified view.
 - **Pinned folders:** hover a folder in the sidebar and click the pin. Once a mailbox has pinned
-  folders, it shows just those; the line with the ⌄ under them shows all its folders (with the
-  unread count of the hidden ones), and ⌃ folds them away again.
+  folders, it shows just those, as one flat list wherever they sit in the folder tree (a subfolder
+  shows the folder it lives in after its name); drag them into the order you want. The line with
+  the ⌄ under them shows all its folders, and ⌃ folds them away again.
+- **Unread out of sight:** unread mail in folded or unpinned folders shows as a filled, accent-colored
+  bubble on the folder it is folded under (or on the ⌄ line), and the bubble flashes for two minutes
+  when new mail arrives there.
 - **Folding subfolders:** the arrow before a folder that has subfolders folds them away (their
   unread mail then counts on that folder) and back. Inbox, Sent and the other built-in mailboxes
   fold like any folder, with their subfolders listed right under them; Gmail's built-in mailboxes
-  sit at the top level, so folding "[Gmail]" never hides Sent or Drafts. Folding works with pinned
-  folders too (a pinned subfolder sits under its nearest pinned parent). Collapsed mailboxes and
+  sit at the top level, so folding "[Gmail]" never hides Sent or Drafts. Collapsed mailboxes and
   groups stay collapsed on that device. What is folded is saved with your account, so
   every browser and the desktop and Android apps show the same, and open ones follow at once.
 - **Reading toolbar:** the arrow at its right end switches between compact icons and bigger buttons
