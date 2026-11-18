@@ -42,7 +42,7 @@
    Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer.
    Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
    Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
-   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings. */
+   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1297,3 +1297,8 @@ body.resizing iframe { pointer-events: none; }
 .server-field .label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .locked-by-env { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--text-2); background: var(--surface-2, var(--bg)); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
 .warning-text { padding: 8px 10px; border-radius: 8px; background: var(--surface-2, var(--bg)); border-left: 3px solid var(--accent-fill); font-size: 13px; }
+
+/* Importance and read receipts (DreyMail 9.9). */
+.ind.importance-high { color: var(--danger, #dc2626); display: inline-flex; }
+.importance-notice svg { color: var(--danger, #dc2626); }
+.composer-foot .icon-btn.on { color: var(--accent); background: var(--active); }

@@ -27,7 +27,9 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
+// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending.
 
+import { receiptAddressOf } from '../../../shared/importance.js';
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
 import type { ScheduledSends } from '../mail/scheduled.js';
@@ -187,6 +189,8 @@ const composeSchema = z.object({
   forwardFrom: refSchema.extend({ indices: z.array(z.number().int().min(0)).max(100) }).nullable(),
   replaceDraft: refSchema.nullable(),
   answering: refSchema.nullable(),
+  importance: z.enum(['high', 'low']).nullable().optional(),
+  readReceipt: z.boolean().optional(),
 });
 
 // ---- helpers ------------------------------------------------------------------
@@ -806,6 +810,24 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       senderHosted: prefs?.imagesSenderHosted === true,
     };
   };
+
+  /** A read-receipt request answered: sent, or declined (DreyMail). Either way it is not asked again. */
+  app.post('/api/message/receipt', async (req, reply) => {
+    try {
+      const body = z.object({ ref: refSchema, send: z.boolean() }).parse(req.body);
+      requireAccount(uid(req), body.ref.accountId);
+      if (body.send) {
+        const e = await mail.getParsed(uid(req), body.ref, config.maxMessageBytes);
+        const to = receiptAddressOf((e.headers ?? []).map((h) => `${h.key}: ${h.value}`).join('\n'));
+        if (!to) return reply.code(400).send({ error: 'This message did not ask for a read receipt' });
+        await compose.sendReceipt(uid(req), body.ref.accountId, { to, subject: e.subject ?? '', messageId: e.messageId ?? null });
+      }
+      await mail.addKeyword(uid(req), body.ref, '$MDNSent');
+      return { ok: true };
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
 
   /** Gmail labels of a message (null for mailboxes without labels) (DreyMail). */
   app.get('/api/message/labels', async (req, reply) => {

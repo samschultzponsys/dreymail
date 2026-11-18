@@ -21,8 +21,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Mail
 - [ ] Gmail: a conversation's labels in the message list.
-- [ ] Outlook parity: importance (high / low), read receipts, follow-up flags with due dates,
-      printing, the company directory (Microsoft 365 and Google Workspace) in address suggestions.
+- [ ] Outlook parity: follow-up flags with due dates, the company directory (Microsoft 365 and
+      Google Workspace) in address suggestions.
 - [ ] Shared and delegated mailboxes (Microsoft 365), and signed or encrypted mail (S/MIME).
 - [ ] Contacts as a section of their own; tasks (Microsoft To Do, Google Tasks).
 
@@ -107,6 +107,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Provider list with server settings filled in (and picked from your address), or custom (4.3).
 - [x] Gmail: Archive moves to All Mail (no "Archive" label); a message's labels shown, added and
       removed (9.7).
+- [x] Importance (high / low) sent and shown; read receipts asked for and answered; printing (9.9).
 - [x] Search with a visual filter builder (accounts, where, from/to, subject, text, dates, size,
       attachments, starred, replied) and saved searches as smart folders (2.4).
 

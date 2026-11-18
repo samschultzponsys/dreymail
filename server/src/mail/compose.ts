@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-16: table layout attributes kept (signatures made for Outlook).
 // Modified by samschultzponsys, 2026-11-16: pictures inside the HTML sent as inline (cid:) attachments.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts.
 
 import crypto from 'node:crypto';
 import { convert } from 'html-to-text';
@@ -27,6 +28,10 @@ export interface OutgoingMessage {
   inReplyTo: string | null;
   references: string[];
   attachments: OutgoingAttachment[];
+  /** High or low importance (DreyMail). */
+  importance?: 'high' | 'low' | null;
+  /** Ask for a read receipt (Disposition-Notification-To) (DreyMail). */
+  readReceipt?: boolean;
 }
 
 const MESSAGE_ID = /^<[^<>\s@]+@[^<>\s@]+>$/;
@@ -147,6 +152,11 @@ export async function buildRawMessage(
       })),
       ...inlined.images.map((i) => ({ filename: i.filename, contentType: i.contentType, content: i.content, cid: i.cid, contentDisposition: 'inline' as const })),
     ],
+    headers: {
+      // Outlook, Gmail and others read one or the other.
+      ...(msg.importance === 'high' ? { Importance: 'High', 'X-Priority': '1 (Highest)', Priority: 'urgent' } : msg.importance === 'low' ? { Importance: 'Low', 'X-Priority': '5 (Lowest)', Priority: 'non-urgent' } : {}),
+      ...(msg.readReceipt ? { 'Disposition-Notification-To': `<${msg.from.address}>` } : {}),
+    },
     // Never let message content reference local files or fetch URLs on the server.
     disableFileAccess: true,
     disableUrlAccess: true,

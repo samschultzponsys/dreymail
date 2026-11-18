@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: sends calendar invitations, updates and cancellations (iTIP REQUEST/CANCEL).
 // Modified by samschultzponsys, 2026-11-17: no second copy in Sent when the server filed one itself.
+// Modified by samschultzponsys, 2026-11-18: importance, read receipts asked for and sent (RFC 8098).
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -73,6 +74,8 @@ export class ComposeService {
         inReplyTo: p.inReplyTo,
         references: p.references,
         attachments,
+        importance: p.importance ?? null,
+        readReceipt: !!p.readReceipt,
       },
     };
   }
@@ -185,6 +188,50 @@ export class ComposeService {
     });
     const raw = await composer.compile().build();
     await this.deliver(userId, account, raw, { from: account.email, to });
+  }
+
+  /**
+   * Answers a read-receipt request (RFC 8098): a multipart/report "displayed" notification to the
+   * address the sender gave. DreyMail only sends one when the user says so.
+   */
+  async sendReceipt(userId: string, accountId: string, r: { to: string; subject: string; messageId: string | null }): Promise<void> {
+    const account = this.store.getAccountSecret(userId, accountId);
+    if (!account) throw new ComposeError('Unknown sender account');
+    if (!isValidAddress(r.to)) throw new ComposeError(`Invalid address: ${r.to}`);
+    const boundary = `dm-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+    const when = new Date().toUTCString();
+    const domain = account.email.split('@')[1] ?? 'localhost';
+    const id = `<${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${domain}>`;
+    const enc = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s).toString('base64')}?=`);
+    const lines = [
+      `From: ${enc(account.displayName || account.email)} <${account.email}>`,
+      `To: <${r.to}>`,
+      `Subject: ${enc(`Read: ${r.subject}`)}`,
+      `Date: ${when}`,
+      `Message-ID: ${id}`,
+      'MIME-Version: 1.0',
+      'Auto-Submitted: auto-replied',
+      'X-Mailer: DreyMail',
+      `Content-Type: multipart/report; report-type=disposition-notification; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      `Your message "${r.subject}" was opened by ${account.email} on ${when}.`,
+      '',
+      `--${boundary}`,
+      'Content-Type: message/disposition-notification',
+      '',
+      'Reporting-UA: DreyMail',
+      `Final-Recipient: rfc822;${account.email}`,
+      ...(r.messageId ? [`Original-Message-ID: ${r.messageId}`] : []),
+      'Disposition: manual-action/MDN-sent-manually; displayed',
+      '',
+      `--${boundary}--`,
+      '',
+    ];
+    await this.deliver(userId, account, Buffer.from(lines.join('\r\n')), { from: account.email, to: [r.to] });
   }
 
   async saveDraft(userId: string, p: ComposePayload, uploads: OutgoingAttachment[]): Promise<DraftResult> {

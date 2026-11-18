@@ -7,9 +7,10 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: the list's width can be dragged (tablets and PCs).
 // Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk; Spam elsewhere.
+// Modified by samschultzponsys, 2026-11-18: high and low importance markers.
 
 import { PaneResizer } from './PaneResizer';
-import { AlarmClock, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
+import { AlarmClock, ArrowDown, CircleAlert, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { findCode } from '../../../shared/codes';
 import { CATEGORY_TABS, type MailCategory } from '../../../shared/categories';
@@ -371,6 +372,16 @@ export function MessageList(p: Props) {
                     {who}
                     {m.thread.length > 1 && <span className="row-count">{m.thread.length}</span>}
                   </span>
+                  {m.importance === 'high' && (
+                    <span className="ind importance-high" title="High importance">
+                      <CircleAlert size={13} />
+                    </span>
+                  )}
+                  {m.importance === 'low' && (
+                    <span className="ind" title="Low importance">
+                      <ArrowDown size={13} />
+                    </span>
+                  )}
                   {m.answered && <Reply size={13} className="ind" />}
                   {m.hasAttachments && <Paperclip size={13} className="ind" />}
                   {m.flagged && <Star size={13} className="flag" fill="currentColor" />}

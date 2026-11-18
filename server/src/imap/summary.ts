@@ -2,7 +2,9 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs (category of each message).
 // Modified by samschultzponsys, 2026-11-16: longer snippets with paragraphs, for notification previews.
+// Modified by samschultzponsys, 2026-11-18: importance (high / low) in message lists.
 
+import { importanceOf } from '../../../shared/importance.js';
 import { categoryFromHeaders } from '../../../shared/categories.js';
 import type { FetchMessageObject, FetchQueryObject, ImapFlow, MessageAddressObject } from 'imapflow';
 import type { Address, MessageSummary } from '../../../shared/types.js';
@@ -13,7 +15,7 @@ import { findTextPart, hasAttachments, SNIPPET_FETCH_BYTES, snippetFromPart, typ
 // Turning fetched IMAP messages into list entries, shared by live listings and the mail cache.
 
 /** What a message list needs of each message. */
-export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: true, bodyStructure: true, internalDate: true, size: true, headers: ['references', 'in-reply-to', 'list-id', 'list-unsubscribe', 'precedence', 'auto-submitted'] };
+export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: true, bodyStructure: true, internalDate: true, size: true, headers: ['references', 'in-reply-to', 'list-id', 'list-unsubscribe', 'precedence', 'auto-submitted', 'importance', 'priority', 'x-priority'] };
 
 /** References kept per message: the root and the most recent ancestors are what threading needs. */
 const MAX_REFERENCES = 30;
@@ -48,6 +50,7 @@ export function sortTime(msg: Pick<FetchMessageObject, 'internalDate' | 'envelop
 
 export function summaryOf(source: { accountId: string; folder: string }, uidValidity: string, msg: FetchMessageObject, snippet: string): MessageSummary {
   const env = msg.envelope ?? {};
+  const importance = importanceOf(msg.headers?.toString('latin1') ?? '');
   const flags = msg.flags ?? new Set<string>();
   const date = toDate(env.date) ?? toDate(msg.internalDate) ?? new Date(0);
   return {
@@ -68,6 +71,7 @@ export function summaryOf(source: { accountId: string; folder: string }, uidVali
     hasAttachments: hasAttachments(msg.bodyStructure),
     size: msg.size ?? 0,
     category: categoryFromHeaders(msg.headers?.toString('latin1') ?? '', env.from?.[0]?.address ?? ''),
+    ...(importance ? { importance } : {}),
   };
 }
 

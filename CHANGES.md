@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v9.9): importance, read receipts, printing
+
+- **Importance:** the composer sends high or low importance (Importance, X-Priority and Priority
+  headers); incoming importance is read from the same headers and shown in the message list and the
+  reader.
+- **Read receipts:** the composer can ask for one (Disposition-Notification-To). A message asking
+  for one offers Send receipt / Don't send; a receipt is an RFC 8098 disposition notification, and
+  either answer sets `$MDNSent` so it isn't asked again.
+- **Print:** the reading toolbar prints the message with its header (sanitized body in a frame
+  without scripts).
+- **Files:** `shared/importance.ts` (new), `web/src/print.ts` (new),
+  `web/src/components/ReadReceipt.tsx` (new), `shared/types.ts`, `server/src/imap/summary.ts`,
+  `server/src/mail/parse.ts`, `server/src/mail/compose.ts`, `server/src/mail/send.ts`,
+  `server/src/imap/mail.ts`, `server/src/routes/api.ts`, `web/src/components/Composer.tsx`,
+  `web/src/components/MessageList.tsx`, `web/src/components/Reader.tsx`, `web/src/styles.css`,
+  `server/test/importance.test.ts` (new), `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-17 (v9.8): assistant actions that send and write
 
 - **New rule actions:** Forward to (with attachments), Draft a reply (the AI writes it from the

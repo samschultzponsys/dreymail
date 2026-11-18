@@ -2,7 +2,9 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: unsubscribe options and verification codes in the message detail.
 // Modified by samschultzponsys, 2026-11-15: calendar invitations in the message detail.
+// Modified by samschultzponsys, 2026-11-18: importance and read-receipt requests of a message.
 
+import { importanceOf, receiptAddressOf } from '../../../shared/importance.js';
 import PostalMime from 'postal-mime';
 import type { Address as PmAddress, Attachment, Email } from 'postal-mime';
 import type { Address, AttachmentView, DomainName, MessageDetail } from '../../../shared/types.js';
@@ -125,6 +127,9 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     .filter((a) => !(a.mimeType === 'text/calendar' && /^attachment-\d+$/.test(a.filename)));
 
   const date = email.date ? new Date(email.date) : meta.internalDate;
+  const rawHeaders = (email.headers ?? []).map((h) => `${h.key}: ${h.value}`).join('\n');
+  const importance = importanceOf(rawHeaders);
+  const receiptTo = receiptAddressOf(rawHeaders);
   return {
     accountId: meta.accountId,
     folder: meta.folder,
@@ -155,5 +160,8 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     imagesAllowedBy: opts.allowlist?.allowedBy ?? null,
     allowlistSkipped: opts.allowlist?.skipped ?? null,
     attachments,
+    ...(importance ? { importance } : {}),
+    // Asked for a read receipt that wasn't answered yet ($MDNSent, RFC 3503), and not your own mail.
+    receiptTo: receiptTo && !meta.flags.has('$MDNSent') && !meta.flags.has('\\Draft') ? receiptTo : null,
   };
 }

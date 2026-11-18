@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
 // Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
 // Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
+// Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts).
 
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -1105,6 +1106,16 @@ export class MailService {
       if (remove.length) await client.messageFlagsRemove(String(ref.uid), remove.map(label), { uid: true, useLabels: true });
     });
     for (const f of new Set([...add, ...remove, ref.folder])) this.folderChanged(userId, ref.accountId, f);
+  }
+
+  /** Sets an IMAP keyword on a message (e.g. $MDNSent), best effort: not every server keeps them. */
+  async addKeyword(userId: string, ref: MessageRef, keyword: string) {
+    await this.pool
+      .withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
+        this.checkValidity(mailbox, ref);
+        await client.messageFlagsAdd(String(ref.uid), [keyword], { uid: true });
+      })
+      .catch(() => undefined);
   }
 
   /** Whether a message with this Message-ID is in the folder (DreyMail: a provider that filed sent mail itself). */

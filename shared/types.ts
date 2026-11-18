@@ -29,6 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts.
 
 // Types shared between the server API and the web client.
 
@@ -37,6 +38,7 @@ import type { Permission } from './permissions.js';
 import type { UnsubscribeOptions } from './unsubscribe.js';
 import type { InviteView } from './calendar.js';
 import type { MailCategory } from './categories.js';
+import type { Importance } from './importance.js';
 
 export type TlsMode = 'tls' | 'starttls' | 'none';
 
@@ -163,6 +165,8 @@ export interface MessageSummary {
   size: number;
   /** Automatic inbox tab (DreyMail). */
   category?: MailCategory;
+  /** High or low importance (DreyMail). */
+  importance?: Importance;
   /** ISO time the message returns to the inbox, while it waits in the Snoozed folder. */
   snoozedUntil?: string;
 }
@@ -255,6 +259,10 @@ export interface MessageDetail {
   invite?: InviteView | null;
   /** A one-time code found in the message (DreyMail). */
   code?: string | null;
+  /** High or low importance (DreyMail). */
+  importance?: Importance;
+  /** The sender asked for a read receipt, to this address, and none was sent or declined yet (DreyMail). */
+  receiptTo?: string | null;
 }
 
 /** A domain in its stored ASCII (punycode) form and its human-readable form. */
@@ -321,6 +329,10 @@ export interface ComposePayload {
   replaceDraft: MessageRef | null;
   /** Message being replied to; flagged as answered after sending. */
   answering: MessageRef | null;
+  /** High or low importance (DreyMail). */
+  importance?: Importance | null;
+  /** Ask for a read receipt (DreyMail). */
+  readReceipt?: boolean;
 }
 
 export interface SendResult {

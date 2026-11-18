@@ -10,10 +10,13 @@
 // Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a bubble in its color.
 // Modified by samschultzponsys, 2026-11-17: attached pictures open in an image viewer; a download arrow on their chip.
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of the message.
+// Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
 import { GmailLabels } from './GmailLabels';
+import { ReadReceipt } from './ReadReceipt';
+import { printMessage } from '../print';
 import {
   AlarmClock,
   Archive,
@@ -22,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleAlert,
+  Printer,
   Download,
   Flag,
   FolderInput,
@@ -313,6 +317,10 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
         <button className="icon-btn" title="Delete (#)" onClick={() => onAction([ref], { type: 'delete' })}>
           <Trash2 size={17} />
           <span className="tb-label">Delete</span>
+        </button>
+        <button className="icon-btn" title="Print" disabled={!d} onClick={() => d && printMessage(d)}>
+          <Printer size={17} />
+          <span className="tb-label">Print</span>
         </button>
         <button
           className="icon-btn tb-size"
@@ -709,6 +717,13 @@ function MessageCard({
 
           {d.invite && <InviteCard invite={d.invite} detail={d} account={account} />}
           <GmailLabels detail={d} account={account} />
+          {d.importance === 'high' && (
+            <div className="notice importance-notice">
+              <CircleAlert size={16} />
+              <span className="grow">The sender marked this message as high importance.</span>
+            </div>
+          )}
+          <ReadReceipt detail={d} />
 
           {d.snoozedUntil && (
             <div className="notice">

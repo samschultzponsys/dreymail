@@ -6,8 +6,12 @@
 // Modified by samschultzponsys, 2026-11-17: Schedule button with more quick times; longer send delays.
 // Modified by samschultzponsys, 2026-11-17: single line spacing (lines as <div>s, not <p>s).
 // Modified by samschultzponsys, 2026-11-17: address bubbles; suggestions per mailbox; Cc/Bcc lines pinned per mailbox, group or all.
+// Modified by samschultzponsys, 2026-11-18: importance (high / low) and asking for a read receipt.
 
 import {
+  ArrowDown,
+  CircleAlert,
+  MailCheck,
   Bold,
   Italic,
   Link,
@@ -52,6 +56,10 @@ export interface ComposerInit {
   answering: MessageRef | null;
   /** Attachments picked before (reopening after "undo send") (DreyMail). */
   files?: File[];
+  /** High or low importance (DreyMail). */
+  importance?: 'high' | 'low' | null;
+  /** Ask for a read receipt (DreyMail). */
+  readReceipt?: boolean;
 }
 
 function Tool({ title, cmd, arg, children, onRun }: { title: string; cmd?: string; arg?: string; children: ReactNode; onRun?: () => void }) {
@@ -93,6 +101,8 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
   const [to, setTo] = useState(init.to);
   const [cc, setCc] = useState(init.cc);
   const [bcc, setBcc] = useState(init.bcc);
+  const [importance, setImportance] = useState<'high' | 'low' | null>(init.importance ?? null);
+  const [readReceipt, setReadReceipt] = useState(!!init.readReceipt);
   // Cc and Bcc: shown when the settings say so for this mailbox (pinned), or opened for this message.
   const [openLines, setOpenLines] = useState<Record<AddressLine, boolean>>({ cc: !!init.cc, bcc: !!init.bcc });
   const qc = useQueryClient();
@@ -165,6 +175,8 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
     forwardFrom: fwdSource && fwd.length ? { ...fwdSource, indices: fwd.map((a) => a.index) } : null,
     replaceDraft: draft,
     answering: init.answering,
+    importance,
+    readReceipt,
   });
 
   /** The composer as it is now, to reopen it after "undo send". */
@@ -180,6 +192,8 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
     forwardAttachments: fwd,
     replaceDraft: draft,
     files,
+    importance,
+    readReceipt,
   });
 
   /** Send now (after the undo wait, if any), or at `at` (send later). */
@@ -464,6 +478,15 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
         />
         <button className="icon-btn" title="Attach files" onClick={() => fileInput.current?.click()}>
           <Paperclip size={17} />
+        </button>
+        <button className={`icon-btn ${importance === 'high' ? 'on' : ''}`} title="High importance" aria-pressed={importance === 'high'} onClick={() => setImportance((v) => (v === 'high' ? null : 'high'))}>
+          <CircleAlert size={17} />
+        </button>
+        <button className={`icon-btn ${importance === 'low' ? 'on' : ''}`} title="Low importance" aria-pressed={importance === 'low'} onClick={() => setImportance((v) => (v === 'low' ? null : 'low'))}>
+          <ArrowDown size={17} />
+        </button>
+        <button className={`icon-btn ${readReceipt ? 'on' : ''}`} title="Ask for a read receipt" aria-pressed={readReceipt} onClick={() => setReadReceipt((v) => !v)}>
+          <MailCheck size={17} />
         </button>
         <span className="grow error-text">{error}</span>
         <button className="icon-btn" title="Discard" onClick={close}>
