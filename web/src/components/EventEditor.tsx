@@ -97,13 +97,18 @@ export function EventEditor({
 
   // The whole series of a provider event comes from the provider.
   useEffect(() => {
-    if (!providerSeries || scope !== 'all' || series) return;
+    if (!providerSeries || scope === 'this' || series) return;
     fetchJson<CalendarEvent>('GET', `/api/events/${encodeURIComponent(event.seriesId!)}`).then(setSeries, (e: Error) => setLoadError(e.message));
   }, [providerSeries, scope, series, event.seriesId]);
 
   /** What the form shows: the occurrence, or the series it belongs to. */
   const base: Partial<CalendarEvent> | null = useMemo(() => {
-    if (providerSeries) return scope === 'all' ? series : { ...event, recurrence: 'none', until: null };
+    if (providerSeries) {
+      if (scope === 'this') return { ...event, recurrence: 'none', until: null };
+      if (!series) return null;
+      // This and following (10.9): the series' repeat, from this occurrence on.
+      return scope === 'all' ? series : { ...series, start: event.start, end: event.end, ...(series.count ? { count: series.count } : {}) };
+    }
     if (localSeries && scope !== 'all') return { ...event, start: event.occurrenceStart, end: event.occurrenceEnd, ...(scope === 'this' ? { recurrence: 'none' as const, until: null, count: null } : {}) };
     return event;
   }, [event, scope, series, providerSeries, localSeries]);
@@ -117,6 +122,7 @@ export function EventEditor({
     : providerSeries
       ? [
           { value: 'this', label: 'This event' },
+          { value: 'following', label: 'This and following' },
           { value: 'all', label: 'All events' },
         ]
       : [];
@@ -264,8 +270,14 @@ function EventForm({
     if (!isNew) {
       method = 'PUT';
       url = `/api/events/${encodeURIComponent(base.id!)}`;
-      if (fromProvider) body.instance = scope === 'this' && !!clicked.instance;
-      else if (clicked.recurrence && clicked.recurrence !== 'none' && clicked.occurrenceStart) {
+      if (fromProvider) {
+        body.instance = scope === 'this' && !!clicked.instance;
+        // This and following: the series is cut at the occurrence clicked (DreyMail 10.9).
+        if (scope === 'following' && clicked.instance) {
+          body.scope = 'following';
+          body.occurrenceStart = clicked.start!;
+        }
+      } else if (clicked.recurrence && clicked.recurrence !== 'none' && clicked.occurrenceStart) {
         body.scope = scope;
         body.occurrenceStart = clicked.occurrenceStart;
       }
@@ -295,7 +307,11 @@ function EventForm({
     if (!window.confirm(told)) return;
     try {
       const local = !fromProvider && clicked.recurrence && clicked.recurrence !== 'none' && clicked.occurrenceStart;
-      const q = local ? `?scope=${scope}&occurrence=${encodeURIComponent(clicked.occurrenceStart!)}` : '';
+      const q = local
+        ? `?scope=${scope}&occurrence=${encodeURIComponent(clicked.occurrenceStart!)}`
+        : fromProvider && scope === 'following' && clicked.instance
+          ? `?scope=following&occurrence=${encodeURIComponent(clicked.start!)}`
+          : '';
       await fetchJson('DELETE', `/api/events/${encodeURIComponent(base.id)}${q}`);
       onSaved();
     } catch (err) {

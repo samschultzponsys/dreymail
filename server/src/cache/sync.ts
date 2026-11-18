@@ -3,12 +3,13 @@
 // Modified by samschultzponsys, 2026-11-17: every folder of a mailbox is cached, filled in the background on its own connection.
 // Modified by samschultzponsys, 2026-11-17: listings of other folders always check with the server first, ahead of the filling.
 // Modified by samschultzponsys, 2026-11-17: tells about new messages and filled folders (address suggestions).
+// Modified by samschultzponsys, 2026-11-18: Gmail labels fetched with message lists.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
 import type { CacheConfig } from '../config.js';
 import type { ImapPool, Lane } from '../imap/pool.js';
-import { fetchSnippets, LIST_FETCH, sortTime, summaryOf, toDate } from '../imap/summary.js';
+import { fetchSnippets, listFetch, sortTime, summaryOf, toDate } from '../imap/summary.js';
 import { CacheCorruptError, flagsOf, type CachedFolder, type CachedRole, type MailCache, type MessageEntry } from './store.js';
 
 /** Messages fetched per IMAP command while filling a folder, so other requests get their turn in between. */
@@ -393,7 +394,7 @@ export class CacheSync {
       if (f.syncedAt === 0) {
         // First fill: the newest chunk, by sequence number (contiguous, so it covers every UID from its lowest up).
         const start = Math.max(1, mailbox.exists - Math.min(FILL_CHUNK, limit) + 1);
-        const msgs = await client.fetchAll(`${start}:${mailbox.exists}`, LIST_FETCH);
+        const msgs = await client.fetchAll(`${start}:${mailbox.exists}`, listFetch(client));
         cache.putMessages(f, await this.entries(client, source, uidValidity, msgs));
         const uids = msgs.map((m) => m.uid);
         cache.updateFolder(f, {
@@ -408,7 +409,7 @@ export class CacheSync {
       }
 
       // New messages. "n:*" always matches the newest message, even if its UID is below n.
-      const fresh = (await client.fetchAll(`${f.uidNext}:*`, LIST_FETCH, { uid: true })).filter((m) => m.uid >= f!.uidNext);
+      const fresh = (await client.fetchAll(`${f.uidNext}:*`, listFetch(client), { uid: true })).filter((m) => m.uid >= f!.uidNext);
       if (fresh.length) {
         const entries = await this.entries(client, source, uidValidity, fresh);
         cache.putMessages(f, entries);
@@ -469,7 +470,7 @@ export class CacheSync {
         }
         const want = Math.min(FILL_CHUNK, limit - cache.count(f));
         const start = Math.max(1, top - want + 1);
-        const msgs = (await client.fetchAll(`${start}:${top}`, LIST_FETCH)).filter((m) => m.uid < f.lowUid);
+        const msgs = (await client.fetchAll(`${start}:${top}`, listFetch(client))).filter((m) => m.uid < f.lowUid);
         cache.putMessages(f, await this.entries(client, { accountId, folder: path }, f.uidValidity, msgs));
         const uids = msgs.map((m) => m.uid);
         cache.updateFolder(f, { lowUid: uids.length ? Math.min(...uids) : f.lowUid, complete: start === 1 });

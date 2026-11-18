@@ -63,7 +63,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes).
      Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail).
      Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms).
-     Modified by samschultzponsys, 2026-11-18: v10.8 (proposing a new time). -->
+     Modified by samschultzponsys, 2026-11-18: v10.8 (proposing a new time).
+     Modified by samschultzponsys, 2026-11-18: v10.9 (Gmail labels in the list; this and following for every calendar). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -75,7 +76,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.9**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -253,7 +254,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   (opening the message, with *Complete*). The flag is the mail server's own, so other apps see it;
   unflagging or deleting the message ends the follow-up.
 - **Print:** the Print button in the reading toolbar prints the message with its header.
-- **Gmail labels:** a Gmail message shows its labels under the header; × takes one off and *Add
+- **Gmail labels:** the message list shows each Gmail message's other labels as small tags; a
+  Gmail message shows its labels under the header; × takes one off and *Add
   label* puts one on, so a message can be in several labels (each one a folder in DreyMail).
   On touch screens, swipe a message left or right to delete, archive, mark read/unread or flag it
   (which action each direction does is set in Settings).
@@ -348,8 +350,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   on the n-th weekday ("the second Tuesday") or on the last one; forever, until a day, or a number
   of times. The editor says the rule in words ("Every 2 weeks on Monday, Wednesday, 10 times").
   Opening one occurrence asks what a change or a deletion applies to: **This event**, **This and
-  following** (DreyMail's own calendars) or **All events**. That works for Google, Outlook and CalDAV
-  series too; a provider series with a rule the editor can't show (for example "the first weekday of
+  following** or **All events**, for DreyMail's own, Google, Outlook and CalDAV series alike (this and
+  following ends the series before that occurrence and starts a new one with the changes); a provider series with a rule the editor can't show (for example "the first weekday of
   the month") keeps its rule, and its single occurrences can still be changed.
 - **Guests and invitations:** add guests (with suggestions from the people you write to), mark
   them optional, and see who accepted, might come, declined or hasn't answered. For Google and

@@ -8,7 +8,8 @@
 // Shared mailboxes (10.5) bring no calendars of their own.
 
 import crypto from 'node:crypto';
-import { findJoinUrl, occurrences, type CalendarEvent, type CalendarSourceView, type EventOccurrence, type InviteAnswer, type InviteState } from '../../../shared/calendar.js';
+import { DAY } from '../../../shared/rrule.js';
+import { findJoinUrl, occurrences, startTimeOf, type CalendarEvent, type CalendarSourceView, type EventOccurrence, type InviteAnswer, type InviteState } from '../../../shared/calendar.js';
 import type { MessageRef } from '../../../shared/types.js';
 import type { Store } from '../db.js';
 import type { MailService } from '../imap/mail.js';
@@ -277,6 +278,47 @@ export class CalendarService {
     const f: EventFields = { ...e, organizer: e.organizer ?? { email: from.email, name: from.displayName } };
     const ics = requestIcs(uid.uid, f, method, uid.sequence);
     await this.mailInvitation(userId, from, method, opts.to ?? e.attendees.map((a) => a.email), f, ics, !!opts.update);
+  }
+
+  /**
+   * "This and following" for a provider series (DreyMail 10.9): the series ends before the
+   * occurrence (until the day before, or after as many times as came before), and with `f` a new
+   * series starts at it with the changes. Without `f` (deleting), the series just ends there.
+   */
+  async splitSeries(userId: string, cal: CalendarRow, seriesId: string, occurrenceStart: string, f: (EventFields & { sendFrom?: string | null }) | null) {
+    const p = this.need(userId, cal);
+    const series = await p.get(cal.remote_id!, seriesId);
+    if (series.recurrence === 'none') throw new RemoteCalendarError('This event does not repeat', 400);
+    if (!series.editable) throw new RemoteCalendarError("This series repeats in a way DreyMail can't change; change it in its own app", 400);
+    const at = Date.parse(occurrenceStart);
+    const asEvent = { ...series, id: '', calendarId: cal.id, exdates: [] } as unknown as CalendarEvent;
+    const before = occurrences(asEvent, Date.parse(series.start), at, series.timeZone).filter((o) => Date.parse(o.occurrenceStart) < at).length;
+    if (before === 0) {
+      // From the first occurrence on: that is the whole series.
+      if (f) await this.update(userId, cal, seriesId, f, false);
+      else await this.remove(userId, cal, seriesId);
+      return;
+    }
+    const st = startTimeOf(asEvent, series.timeZone);
+    const dayBefore = new Date(at + (st.wall - st.ms) - DAY).toISOString().slice(0, 10);
+    const ended: EventFields = {
+      title: series.title,
+      location: series.location,
+      notes: series.notes,
+      start: series.start,
+      end: series.end,
+      allDay: series.allDay,
+      recurrence: series.recurrence,
+      interval: series.interval,
+      byDay: series.byDay,
+      monthlyBy: series.monthlyBy,
+      ...(series.count ? { count: before, until: null } : { count: null, until: dayBefore }),
+      timeZone: series.timeZone,
+      onlyRepeat: true,
+    };
+    await p.update(cal.remote_id!, seriesId, ended, false);
+    this.forget(cal.id);
+    if (f) await this.create(userId, cal, { ...f, count: f.count ? Math.max(1, f.count - before) : f.count });
   }
 
   /** The whole event or series of a provider calendar (for editing every occurrence). */

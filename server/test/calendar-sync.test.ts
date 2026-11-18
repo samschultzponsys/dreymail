@@ -361,3 +361,38 @@ describe('proposing a new time (10.8)', () => {
     expect(sent.at(-1)).toMatchObject({ to: ['boss@example.com'], method: 'DECLINECOUNTER' });
   });
 });
+
+describe('this and following at providers (10.9)', () => {
+  it('ends a Google series before the occurrence and starts a new one with the changes', async () => {
+    const store = new Store(':memory:', new Keyring(crypto.randomBytes(48).toString('base64')).credentialKey);
+    const user = store.upsertUser('local', 'sam', '', 'Sam', 'sam');
+    const acc = store.saveGoogleAccount(user.id, { email: 'sam@gmail.com', name: 'Gmail', displayName: 'Sam', color: '#ef4444', refreshToken: 'rt' });
+    const calls: { method: string; url: string; body: any }[] = [];
+    const svc = new CalendarService({
+      store,
+      google: { accessToken: async () => 't' } as never,
+      microsoft: {} as never,
+      mail: {} as never,
+      compose: {} as never,
+      http: (async (url: string, init: { method: string; body?: string }) => {
+        calls.push({ method: init.method, url, body: init.body ? JSON.parse(init.body) : null });
+        const body =
+          init.method === 'GET'
+            ? { id: 'S1', summary: 'Standup', start: { dateTime: '2026-11-02T09:00:00-05:00', timeZone: 'America/New_York' }, end: { dateTime: '2026-11-02T09:15:00-05:00', timeZone: 'America/New_York' }, recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'] }
+            : { id: 'S2' };
+        return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) };
+      }) as never,
+      blockPrivateHosts: false,
+      maxMessageBytes: 1e7,
+    });
+    const calId = crypto.randomUUID();
+    store.db.prepare("INSERT INTO calendars (id, owner_id, name, color, created_at, source, source_id, remote_id, writable) VALUES (?, ?, 'Sam', '#000000', 1, 'google', ?, 'primary', 1)").run(calId, user.id, acc.id);
+    const cal = store.db.prepare('SELECT * FROM calendars WHERE id = ?').get(calId) as never;
+    await svc.splitSeries(user.id, cal, 'S1', '2026-11-16T14:00:00.000Z', { title: 'Standup (new time)', location: '', notes: '', start: '2026-11-16T15:00:00.000Z', end: '2026-11-16T15:15:00.000Z', allDay: false, recurrence: 'weekly', until: null, timeZone: 'America/New_York' });
+    const patch = calls.find((c) => c.method === 'PATCH')!;
+    // Only the repeat changes: until the day before (Sunday Nov 15, end of day in New York).
+    expect(patch.body).toEqual({ recurrence: ['RRULE:FREQ=WEEKLY;UNTIL=20261116T045959Z'] });
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.body).toMatchObject({ summary: 'Standup (new time)', recurrence: ['RRULE:FREQ=WEEKLY'] });
+  });
+});

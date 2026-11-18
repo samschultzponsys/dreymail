@@ -7,7 +7,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs.
 // Modified by samschultzponsys, 2026-11-16: the list's width can be dragged (tablets and PCs).
 // Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk; Spam elsewhere.
-// Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates.
+// Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates; Gmail labels.
 
 import { PaneResizer } from './PaneResizer';
 import { AlarmClock, ArrowDown, CircleAlert, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
@@ -385,6 +385,11 @@ export function MessageList(p: Props) {
                   {m.answered && <Reply size={13} className="ind" />}
                   {m.hasAttachments && <Paperclip size={13} className="ind" />}
                   {m.flagged && <Star size={13} className="flag" fill="currentColor" />}
+                  {m.labels?.map((l) => (
+                    <span key={l} className="row-label" title={`Label: ${l === 'INBOX' ? 'Inbox' : l}`}>
+                      {l === 'INBOX' ? 'Inbox' : l.split('/').pop()}
+                    </span>
+                  ))}
                   {m.followUp?.due && (
                     <span className={`row-due ${Date.parse(m.followUp.due) < Date.now() ? 'overdue' : ''}`} title={`Follow up by ${new Date(m.followUp.due).toLocaleString()}`}>
                       Due {formatSnoozeTime(m.followUp.due)}

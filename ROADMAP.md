@@ -12,11 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-### Calendar
-- [ ] "This and following" for Google, Outlook and CalDAV series (today: this event or all events).
-
-### Mail
-- [ ] Gmail: a conversation's labels in the message list.
+Everything planned so far is done (10.9). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -97,6 +93,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Gmail with Sign in with Google, next to app passwords (2.3); both offered side by side with
       what each gives and costs (4.2).
 - [x] Provider list with server settings filled in (and picked from your address), or custom (4.3).
+- [x] Gmail labels shown in the message list (10.9).
 - [x] Gmail: Archive moves to All Mail (no "Archive" label); a message's labels shown, added and
       removed (9.7).
 - [x] Shared Microsoft 365 mailboxes, opened with your own sign-in (10.5).
@@ -136,6 +133,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
       updates and cancellations for its own and CalDAV calendars, and records guests' answers (9.5).
 - [x] Teams meetings (Outlook work accounts) and Google Meet with the event; Join buttons for
       meeting links (9.5).
+- [x] This and following for Google, Outlook and CalDAV series too (10.9).
 - [x] Propose a new time when answering; accept or decline guests' proposals (10.8).
 - [x] Meeting rooms from Microsoft 365 and an administrator's list, booked with their availability (10.7).
 - [x] Drag events to another time or day; Show as (busy, free, tentative, away, working

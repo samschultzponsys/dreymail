@@ -2,7 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs (category of each message).
 // Modified by samschultzponsys, 2026-11-16: longer snippets with paragraphs, for notification previews.
-// Modified by samschultzponsys, 2026-11-18: importance (high / low) in message lists.
+// Modified by samschultzponsys, 2026-11-18: importance (high / low) in message lists; Gmail labels.
 
 import { importanceOf } from '../../../shared/importance.js';
 import { categoryFromHeaders } from '../../../shared/categories.js';
@@ -19,6 +19,18 @@ export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: 
 
 /** References kept per message: the root and the most recent ancestors are what threading needs. */
 const MAX_REFERENCES = 30;
+
+/** LIST_FETCH, with Gmail's labels on Gmail (X-GM-EXT-1) (DreyMail 10.9). */
+export function listFetch(client: { capabilities?: Map<string, unknown> | Set<string> }): FetchQueryObject {
+  return client.capabilities?.has('X-GM-EXT-1') ? { ...LIST_FETCH, labels: true } : LIST_FETCH;
+}
+
+/** Gmail labels worth showing in a list: user labels (and Inbox), not the folder being looked at. */
+export function shownLabels(labels: Set<string> | undefined, folder: string): string[] | undefined {
+  if (!labels?.size) return undefined;
+  const out = [...labels].filter((l) => !l.startsWith('\\') || l === '\\Inbox').map((l) => (l === '\\Inbox' ? 'INBOX' : l)).filter((l) => l !== folder);
+  return out.length ? out.slice(0, 6) : undefined;
+}
 
 /** Message-ID, In-Reply-To and References of a message fetched with LIST_FETCH. */
 export function threadHeaders(msg: Pick<FetchMessageObject, 'envelope' | 'headers'>): ThreadHeaders {
@@ -72,6 +84,7 @@ export function summaryOf(source: { accountId: string; folder: string }, uidVali
     size: msg.size ?? 0,
     category: categoryFromHeaders(msg.headers?.toString('latin1') ?? '', env.from?.[0]?.address ?? ''),
     ...(importance ? { importance } : {}),
+    ...(shownLabels(msg.labels, source.folder) ? { labels: shownLabels(msg.labels, source.folder) } : {}),
   };
 }
 

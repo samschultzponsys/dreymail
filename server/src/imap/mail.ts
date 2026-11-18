@@ -11,7 +11,7 @@
 // Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
 // Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
 // Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
-// Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading.
+// Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading; Gmail labels in lists.
 
 import type { SmimeInfo } from '../mail/smime.js';
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
@@ -39,7 +39,7 @@ import { inlineRemoteImages, type InlineOptions, type RemoteImageCache } from '.
 import { MailServerError, describeError } from './connect.js';
 import type { ImapPool } from './pool.js';
 import { lookupTerms, matchesTerm, RelatedIndex, searchFor, termKey, type LookupTerm } from './related.js';
-import { addresses, fetchSnippets, LIST_FETCH, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
+import { addresses, fetchSnippets, listFetch, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
 
 export { threadHeaders };
 
@@ -509,7 +509,7 @@ export class MailService {
         exhausted = start === 1;
       }
 
-      const msgs = await client.fetchAll(range, LIST_FETCH, { uid: useUid });
+      const msgs = await client.fetchAll(range, listFetch(client), { uid: useUid });
       const items = msgs
         .filter((m) => !cursor || m.uid < cursor.beforeUid)
         .sort((a, b) => b.uid - a.uid)
@@ -570,7 +570,7 @@ export class MailService {
         for (const t of s.terms) searched.add(termKey(t));
       }
       const uids = [...candidates].sort((a, b) => b - a).slice(0, MAX_RELATED);
-      const msgs = uids.length ? await client.fetchAll(uids.join(','), LIST_FETCH, { uid: true }) : [];
+      const msgs = uids.length ? await client.fetchAll(uids.join(','), listFetch(client), { uid: true }) : [];
       const found = msgs.map((msg) => fetchedItem(source, uidValidity, msg));
       this.relatedIndex.record(key, uidValidity, uidNext, terms, searched, found);
       return found.filter((f) => terms.some((t) => matchesTerm(t, f.headers)));

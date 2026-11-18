@@ -173,6 +173,8 @@ export interface MessageSummary {
   snoozedUntil?: string;
   /** Flagged for follow-up, with its due date if any (DreyMail). */
   followUp?: FollowUp;
+  /** Gmail: the message's other labels (DreyMail 10.9). */
+  labels?: string[];
 }
 
 /** A follow-up flag (DreyMail 10.1): due (ISO) or no date. */

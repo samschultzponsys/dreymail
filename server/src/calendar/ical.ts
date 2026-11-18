@@ -412,6 +412,8 @@ export interface EventFields extends RepeatFields {
   meeting?: MeetingKind | null;
   /** Busy (default), free, tentative, away, working elsewhere. */
   showAs?: ShowAs;
+  /** Change only how the series repeats (ending it for "this and following"); providers leave the rest. */
+  onlyRepeat?: boolean;
 }
 
 /** The event's start as a wall time in its zone (UTC fields = local fields). */

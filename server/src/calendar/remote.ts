@@ -273,6 +273,7 @@ export class GoogleCalendar implements CalendarProvider {
   private body(f: EventFields, withRecurrence: boolean) {
     const tz = validTimeZone(f.timeZone) ? f.timeZone : 'UTC';
     const rule = ruleFor(f);
+    if (f.onlyRepeat) return { recurrence: rule ? [`RRULE:${rule}`] : [] };
     return {
       summary: f.title,
       location: f.location,
@@ -556,6 +557,7 @@ export class OutlookCalendar implements CalendarProvider {
     const start = f.allDay ? { dateTime: `${dateOf(f.start)}T00:00:00`, timeZone: 'UTC' } : { dateTime: wall(f.start), timeZone: tz };
     const end = f.allDay ? { dateTime: `${dateOf(f.end)}T00:00:00`, timeZone: 'UTC' } : { dateTime: wall(f.end), timeZone: tz };
     const localStart = new Date(startWallOf({ ...f, timeZone: tz }));
+    if (f.onlyRepeat) return { recurrence: graphRecurrence(f, localStart) };
     return {
       subject: f.title,
       body: { contentType: 'text', content: f.notes },

@@ -1412,3 +1412,6 @@ body.resizing iframe { pointer-events: none; }
 /* Proposing a new time (DreyMail 10.8). */
 .invite-propose { margin-top: 6px; font-size: 13px; }
 .invite-propose-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+/* Gmail labels in the message list (DreyMail 10.9). */
+.row-label { font-size: 10.5px; line-height: 16px; padding: 0 6px; border-radius: 999px; background: var(--surface-2, var(--bg)); border: 1px solid var(--border); color: var(--text-2); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }

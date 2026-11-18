@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.9): Gmail labels in the list; this and following for every calendar
+
+- **Gmail labels in lists:** on Gmail (X-GM-EXT-1) message lists are fetched with X-GM-LABELS
+  (also into the mail cache); the list shows a message's other labels as tags.
+- **This and following** for Google, Outlook and CalDAV series: the series' repeat is cut before
+  the occurrence (until the day before in its zone, or a count), changing only the repeat at
+  Google and Outlook (`onlyRepeat`), and a new series starts there with the changes; deleting
+  this-and-following only cuts.
+- **Files:** `server/src/imap/summary.ts`, `server/src/imap/mail.ts`, `server/src/cache/sync.ts`,
+  `server/src/calendar/service.ts`, `server/src/calendar/remote.ts`, `server/src/calendar/ical.ts`,
+  `server/src/routes/calendar.ts`, `shared/types.ts`, `web/src/components/MessageList.tsx`,
+  `web/src/components/EventEditor.tsx`, `web/src/styles.css`, `server/test/calendar-sync.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.8): proposing a new time
 
 - **As a guest:** *Propose a new time* on an invitation answers Maybe or No with a new time and a

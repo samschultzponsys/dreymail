@@ -372,6 +372,11 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
       if (!cal || cal.owner_id !== userId || cal.source === 'local') return bad(reply, 'Event not found', 404);
       if (e.calendarId !== cal.id) return bad(reply, 'Events from your provider stay in their calendar');
       try {
+        // This and the following ones of a provider series (DreyMail 10.9).
+        if (scope === 'following' && occurrenceStart) {
+          await calendars.splitSeries(userId, cal, remote.remoteId, occurrenceStart, e);
+          return { ok: true };
+        }
         await calendars.update(userId, cal, remote.remoteId, e, !!instance);
         return { ok: true };
       } catch (err) {
@@ -423,7 +428,8 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
       const cal = row(remote.calendarId);
       if (!cal || cal.owner_id !== userId || cal.source === 'local') return bad(reply, 'Event not found', 404);
       try {
-        await calendars.remove(userId, cal, remote.remoteId);
+        if (req.query.scope === 'following' && req.query.occurrence && !Number.isNaN(Date.parse(req.query.occurrence))) await calendars.splitSeries(userId, cal, remote.remoteId, req.query.occurrence, null);
+        else await calendars.remove(userId, cal, remote.remoteId);
         return { ok: true };
       } catch (err) {
         return fail(reply, err);
