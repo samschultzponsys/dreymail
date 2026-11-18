@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
 // Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes; S/MIME.
+// Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -1058,6 +1059,23 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     deps.blocklist?.remove(uid(req), body.data.accountId, body.data.address);
     deps.onBlocklistChanged?.(uid(req));
     return deps.blocklist?.list(uid(req)) ?? [];
+  });
+
+  // Mark all as read, from a folder's right-click menu (DreyMail 11.3).
+  app.post('/api/folders/read', async (req, reply) => {
+    try {
+      const body = z.object({ accountId: z.string().min(1), folder: z.string().min(1).max(1000) }).parse(req.body);
+      const userId = uid(req);
+      requireAccount(userId, body.accountId);
+      const r = await mail.markFolderRead(userId, body.accountId, body.folder);
+      if (r.uids.length) {
+        await deps.onAction?.(userId, body.accountId, body.folder, r.uids, { type: 'seen', value: true }).catch(() => undefined);
+        if (body.folder.toUpperCase() === 'INBOX') push.inboxChanged(userId, body.accountId);
+      }
+      return { marked: r.uids.length };
+    } catch (err) {
+      return sendError(reply, err);
+    }
   });
 
   app.post('/api/messages/actions', async (req, reply) => {

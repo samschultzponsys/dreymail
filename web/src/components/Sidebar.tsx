@@ -24,17 +24,18 @@
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
 // Modified by samschultzponsys, 2026-11-18: pinned folders flat in a dragged order; unread in folded or unpinned folders stands out and flashes when new mail arrives.
-// Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned.
+// Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned; right-click a folder to mark it all read; the open mailbox's icon and name at the top.
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
 // Modified by samschultzponsys, 2026-11-18: the version as one short label (a red ! when the app is out of step).
 // Modified by samschultzponsys, 2026-11-18: Contacts and Tasks buttons under Calendar.
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlarmClock,
   ChevronUp,
+  MailOpen,
   Pin,
   PinOff,
   BellOff,
@@ -75,7 +76,7 @@ import { folderRows, movePinned, pinnedRows, type FolderRow as TreeRow } from '.
 
 type FolderRow = TreeRow & { parentName?: string };
 import type { AccountFolders, AccountView, FolderView, MailboxGroupView, SpecialUse } from '../../../shared/types';
-import { api, type MailboxSel } from '../api';
+import { api, fetchJson, type MailboxSel } from '../api';
 import { ChangelogDialog } from './ChangelogDialog';
 import { InstallDialog } from './InstallDialog';
 import { runningAsApp } from '../install';
@@ -244,6 +245,39 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
   /** The right-click menu on a mailbox's name. */
   const [menu, setMenu] = useState<{ acc: AccountView; x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  // The mailbox shown at the top of the bar: the one open, if any.
+  const current = sel.accountId ? (accounts.find((a) => a.id === sel.accountId) ?? null) : null;
+  const currentFolderView = current ? folders?.find((x) => x.accountId === current.id)?.folders.find((x) => x.path === sel.folder) : undefined;
+  const currentFolder = activeSearch || calendarActive || pageActive ? '' : currentFolderView ? (currentFolderView.specialUse === 'inbox' ? 'Inbox' : currentFolderView.name) : '';
+  // A folder's right-click menu (DreyMail 11.3): mark all as read, pin or unpin.
+  const qc = useQueryClient();
+  const [folderMenu, setFolderMenu] = useState<{ acc: AccountView; folder: FolderView; x: number; y: number } | null>(null);
+  const closeFolderMenu = useCallback(() => setFolderMenu(null), []);
+  const folderMenuItems = (acc: AccountView, f: FolderView): MenuItem[] => {
+    const pinned = acc.pinnedFolders ?? [];
+    const isPinned = pinned.includes(f.path);
+    const items: MenuItem[] = [];
+    if (f.selectable)
+      items.push({
+        label: 'Mark all as read',
+        icon: <MailOpen size={14} />,
+        onClick: () => {
+          fetchJson<{ marked: number }>('POST', '/api/folders/read', { accountId: acc.id, folder: f.path })
+            .then(() => {
+              void qc.invalidateQueries({ queryKey: ['folders'] });
+              void qc.invalidateQueries({ queryKey: ['messages'] });
+            })
+            .catch((e: Error) => window.alert(`Couldn't mark ${f.name} as read: ${e.message}`));
+        },
+      });
+    if (onPin)
+      items.push({
+        label: isPinned ? 'Unpin' : 'Pin: always shown',
+        icon: isPinned ? <PinOff size={14} /> : <Pin size={14} />,
+        onClick: () => onPin(acc.id, isPinned ? pinned.filter((p) => p !== f.path) : [...pinned, f.path]),
+      });
+    return items;
+  };
   /** The right-click menu on a group's name. */
   const [groupMenu, setGroupMenu] = useState<{ group: MailboxGroupView; x: number; y: number } | null>(null);
   const closeGroupMenu = useCallback(() => setGroupMenu(null), []);
@@ -361,6 +395,11 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                               <div
                                 key={f.path}
                                 className={`nav-folder ${isPinned ? 'pinned' : ''} ${canFold ? 'foldable' : ''} ${pinOver === dragKey ? 'pin-drop' : ''}`}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setFolderMenu({ acc, folder: f, x: e.clientX, y: e.clientY });
+                                }}
                                 {...(pinDrag
                                   ? {
                                       draggable: true,
@@ -465,9 +504,26 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
     <aside className={`pane sidebar ${rail ? 'rail' : ''}`}>
       {onResize && !rail && <PaneResizer label="Resize the folder bar" min={180} max={(room) => Math.min(440, room - 600)} onResize={onResize} />}
       <div className="brand">
-        <img className="brand-mark day" src="/brand-day.svg" alt="" />
-        <img className="brand-mark night" src="/brand-night.svg" alt="" />
-        <span className="name" style={{ flex: 1 }}>DreyMail</span>
+        {current ? (
+          // The open mailbox's icon and name, following what is selected (DreyMail 11.3).
+          <span className="brand-mailbox" title={current.email ? `${current.name} (${current.email})` : current.name} style={{ ['--mb-color' as string]: current.color }}>
+            <span className="brand-mailbox-icon">
+              <MailboxIcon icon={current.icon} image={current.iconImage} color={current.color} size={18} />
+            </span>
+            <span className="name brand-mailbox-text">
+              <span className="brand-mailbox-name">{current.name}</span>
+              {currentFolder && <span className="brand-mailbox-folder">{currentFolder}</span>}
+            </span>
+          </span>
+        ) : (
+          <>
+            <img className="brand-mark day" src="/brand-day.svg" alt="" />
+            <img className="brand-mark night" src="/brand-night.svg" alt="" />
+            <span className="name" style={{ flex: 1 }}>
+              {showUnified && sel.accountId === null && !activeSearch ? 'All inboxes' : 'DreyMail'}
+            </span>
+          </>
+        )}
         <button
           className="icon-btn rail-toggle desktop-only"
           title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -596,6 +652,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           {version.data && <VersionStack server={version.data.version} update={version.data.update?.version ?? null} onLog={() => setShowLog(true)} />}
         </div>
         {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
+        {folderMenu && <ContextMenu x={folderMenu.x} y={folderMenu.y} title={folderMenu.folder.specialUse === 'inbox' ? 'Inbox' : folderMenu.folder.name} items={folderMenuItems(folderMenu.acc, folderMenu.folder)} onClose={closeFolderMenu} />}
         {blankMenu && <ContextMenu x={blankMenu.x} y={blankMenu.y} items={blankMenuItems} onClose={closeBlankMenu} />}
         {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
         {showLog && version.data && <ChangelogDialog version={version.data} onClose={() => setShowLog(false)} />}

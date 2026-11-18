@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
 // Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
 // Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading; Gmail labels in lists.
+// Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 
 import type { SmimeInfo } from '../mail/smime.js';
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
@@ -962,6 +963,18 @@ export class MailService {
    * archive, delete-to-Trash) the result describes where the messages went, so the client can
    * undo the action by moving them back.
    */
+  /** Marks everything in a folder read (DreyMail 11.3): the unread messages, found on the server. */
+  async markFolderRead(userId: string, accountId: string, folder: string): Promise<{ uids: number[]; uidValidity: string }> {
+    const r = await this.pool.withMailbox(userId, accountId, folder, async (client: ImapFlow, mailbox) => {
+      const uids = ((await client.search({ seen: false }, { uid: true })) || []) as number[];
+      if (uids.length) await client.messageFlagsAdd(uids.join(','), ['\\Seen'], { uid: true });
+      return { uids, uidValidity: mailbox.uidValidity.toString() };
+    });
+    if (r.uids.length) this.updateCache(userId, accountId, folder, r.uidValidity, (cache, f) => cache.changeFlag(f, r.uids, 'seen', true));
+    else this.foldersChanged(userId, accountId);
+    return r;
+  }
+
   async applyAction(
     userId: string,
     accountId: string,

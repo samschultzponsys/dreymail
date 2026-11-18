@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v11.3): mark a folder all read; the open mailbox at the top
+
+- **Mark all as read:** right-clicking a folder (long-press on a phone) opens a menu with Mark all
+  as read (every unread message in the folder, on the server and in the cache) and Pin / Unpin.
+  New route `POST /api/folders/read`.
+- **The open mailbox at the top of the folder bar:** its icon (on a tile in its color), name and
+  the open folder replace DreyMail's mark, following the selection; All inboxes keeps the mark.
+- **Files:** `server/src/imap/mail.ts`, `server/src/routes/api.ts`,
+  `web/src/components/Sidebar.tsx`, `web/src/styles.css`, `web/test/sidebar.test.ts`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v11.2): no ⌄ line when every folder is pinned
 
 - With every folder of a mailbox pinned there is nothing more to show, so the ⌄ line under the

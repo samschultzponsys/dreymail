@@ -42,7 +42,8 @@
    Modified by samschultzponsys, 2026-11-17: server and client versions in the sidebar footer.
    Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
    Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
-   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups; calendar dragging and show-as. */
+   Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups; calendar dragging and show-as.
+   Modified by samschultzponsys, 2026-11-18: unread bubble for folders out of sight; dragged pinned folders; the open mailbox at the top of the bar. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -192,6 +193,13 @@ svg { flex-shrink: 0; }
 /* Two logos (day and night); only the one matching the app's theme shows. */
 .brand-mark.night, [data-theme='dark'] .brand-mark.day { display: none; }
 [data-theme='dark'] .brand-mark.night { display: block; }
+.brand-mailbox { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.brand-mailbox-icon { flex: none; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--mb-color) 16%, transparent); }
+.brand-mailbox-icon .mailbox-image { border-radius: 4px; }
+.brand-mailbox-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.brand-mailbox-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-mailbox-folder { font-size: 12px; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0; }
+.sidebar.rail .brand-mailbox { flex: none; }
 .compose-btn { margin: 4px 12px 12px; height: 38px; justify-content: center; border-radius: var(--radius); }
 /* Calendar: a clear button of its own under Compose, filled in while the calendar is open (DreyMail). */
 .calendar-btn { margin: -4px 12px 12px; height: 36px; justify-content: center; gap: 8px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--accent-fill) 55%, var(--border)); background: color-mix(in srgb, var(--accent-fill) 10%, var(--surface)); color: var(--text); font-weight: 600; }

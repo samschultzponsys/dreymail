@@ -67,7 +67,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.9 (Gmail labels in the list; this and following for every calendar).
      Modified by samschultzponsys, 2026-11-18: v11.0 (Gmail "Allow" takes effect at once).
      Modified by samschultzponsys, 2026-11-18: v11.1 (pinned folders flat in your order; unread out of sight stands out and flashes).
-     Modified by samschultzponsys, 2026-11-18: v11.2 (no ⌄ line when every folder is pinned). -->
+     Modified by samschultzponsys, 2026-11-18: v11.2 (no ⌄ line when every folder is pinned).
+     Modified by samschultzponsys, 2026-11-18: v11.3 (mark a folder all read; the open mailbox at the top of the bar). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -79,7 +80,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -183,6 +184,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   shows the folder it lives in after its name); drag them into the order you want. The line with
   the ⌄ under them shows all its folders, and ⌃ folds them away again; with every folder pinned,
   that line goes away.
+- **Folder menu:** right-click a folder (long-press on a phone) to mark everything in it read, or
+  to pin or unpin it.
+- **The open mailbox at the top:** the top of the folder bar shows the open mailbox's icon and name
+  with the folder below it, changing as you move around (DreyMail's own mark in All inboxes).
 - **Unread out of sight:** unread mail in folded or unpinned folders shows as a filled, accent-colored
   bubble on the folder it is folded under (or on the ⌄ line), and the bubble flashes for two minutes
   when new mail arrives there.
