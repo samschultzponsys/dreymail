@@ -3,7 +3,7 @@
 
 // The reminder window, as in Outlook: event reminders whose time has come, over whatever is open,
 // with Join (online meetings), Snooze and Dismiss. Snoozing or dismissing on one device does it on
-// every device.
+// every device. Follow-up flags with due dates (10.1) remind here too, opening their message.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Video, X } from 'lucide-react';
@@ -39,7 +39,7 @@ export function dueText(a: Pick<ReminderAlert, 'start' | 'end' | 'allDay'>, now:
   return Date.parse(a.end) > now ? `Started ${span(-min)} ago` : 'Over';
 }
 
-export function ReminderWindow({ enabled, onOpenCalendar }: { enabled: boolean; onOpenCalendar: () => void }) {
+export function ReminderWindow({ enabled, onOpenCalendar, onOpenMessage }: { enabled: boolean; onOpenCalendar: () => void; onOpenMessage?: (m: NonNullable<ReminderAlert['message']>) => void }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['reminders'], queryFn: () => fetchJson<ReminderAlert[]>('GET', '/api/reminders'), enabled, refetchInterval: 60_000 });
   const [now, setNow] = useState(() => Date.now());
@@ -89,7 +89,7 @@ export function ReminderWindow({ enabled, onOpenCalendar }: { enabled: boolean; 
       <div className="reminders-list">
         {list.map((a) => (
           <div key={a.key} className="reminder" style={{ ['--cal' as string]: a.color || 'var(--accent)' }}>
-            <button className="reminder-main" onClick={onOpenCalendar} title="Open the calendar">
+            <button className="reminder-main" onClick={() => (a.message && onOpenMessage ? onOpenMessage(a.message) : onOpenCalendar())} title={a.message ? 'Open the message' : 'Open the calendar'}>
               <span className="reminder-title">{a.title}</span>
               <span className={`reminder-when ${Date.parse(a.start) <= now ? 'due' : ''}`}>
                 {dueText(a, now)}
@@ -102,6 +102,19 @@ export function ReminderWindow({ enabled, onOpenCalendar }: { enabled: boolean; 
                 <a className="btn primary" href={a.joinUrl} target="_blank" rel="noreferrer" onClick={() => void act('dismiss', [a.key])} title={a.joinUrl}>
                   <Video size={14} /> Join
                 </a>
+              )}
+              {a.message && (
+                <button
+                  className="btn"
+                  title="Mark the follow-up complete"
+                  onClick={() =>
+                    void fetchJson('PUT', '/api/followup', { ref: { accountId: a.message!.accountId, folder: a.message!.folder, uid: a.message!.uid, uidValidity: a.message!.uidValidity }, done: true })
+                      .then(() => act('dismiss', [a.key]))
+                      .catch((e: Error) => setError(e.message))
+                  }
+                >
+                  Complete
+                </button>
               )}
               <button className="btn" onClick={() => void act('snooze', [a.key])}>
                 Snooze

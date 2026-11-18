@@ -34,7 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
-// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -542,6 +542,25 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
        PRIMARY KEY (user_id, key)
      );
      CREATE INDEX IF NOT EXISTS calendar_alerts_fire ON calendar_alerts(fire_at) WHERE dismissed = 0;`);
+  },
+  // DreyMail 10.1: follow-up flags with due dates (by Message-ID, so they survive moves), and the
+  // message a reminder is about.
+  (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS followups (
+       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+       message_id TEXT NOT NULL,
+       folder TEXT NOT NULL,
+       uid_validity TEXT NOT NULL,
+       uid INTEGER NOT NULL,
+       subject TEXT NOT NULL DEFAULT '',
+       sender TEXT NOT NULL DEFAULT '',
+       due_at INTEGER,
+       created_at INTEGER NOT NULL,
+       PRIMARY KEY (user_id, account_id, message_id)
+     );`);
+    const has = (db.prepare('PRAGMA table_info(calendar_alerts)').all() as { name: string }[]).some((c) => c.name === 'message_ref');
+    if (!has) db.exec('ALTER TABLE calendar_alerts ADD COLUMN message_ref TEXT');
   },
 ];
 

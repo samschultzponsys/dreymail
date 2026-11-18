@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.1): follow-up flags with due dates
+
+- **Follow up:** a reading-toolbar menu flags a message with a due date (Today, Tomorrow, This
+  week, Next week, a date and time, or none) or marks it complete. Follow-ups are kept by
+  Message-ID per mailbox (`followups` table, new migration) and the message is \Flagged on the
+  server. Lists and the reader show the due date (red when overdue); unflagging or deleting ends it.
+- **Reminders:** due follow-ups come through the reminder engine (`calendar_alerts.message_ref`,
+  new column): a notification on every device that opens the message, and the reminder window
+  with Complete.
+- **Files:** `server/src/mail/followups.ts` (new), `web/src/components/FollowUpMenu.tsx` (new),
+  `server/src/calendar/reminders.ts`, `server/src/routes/api.ts`, `server/src/app.ts`,
+  `server/src/db.ts`, `shared/types.ts`, `shared/calendar.ts`, `web/src/components/Reader.tsx`,
+  `web/src/components/MessageList.tsx`, `web/src/components/ReminderWindow.tsx`, `web/src/App.tsx`,
+  `web/src/styles.css`, `server/test/followups.test.ts` (new), `server/test/migrations.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.0): one short version label; the plain slide transition
 
 - **Version label:** the sidebar footer shows the server's version as one short label under your

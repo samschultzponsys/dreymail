@@ -103,6 +103,8 @@ export interface ReminderAlert {
   location: string;
   joinUrl: string | null;
   color: string;
+  /** A follow-up reminder: the message it is about (DreyMail 10.1). */
+  message?: { accountId: string; folder: string; uid: number; uidValidity: string; messageId: string } | null;
 }
 
 /** An invitation found in an email (an iCalendar attachment). */

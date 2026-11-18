@@ -23,7 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
-// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions.
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,6 +54,7 @@ import { registerPasskeyRoutes } from './auth/passkeys.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
+import { Followups } from './mail/followups.js';
 import { ServerSettings, withStoredSettings } from './serverSettings.js';
 import { assistantOutgoing } from './ai/outgoing.js';
 import type { Http } from './calendar/remote.js';
@@ -334,9 +335,11 @@ export async function buildApp(
     maxMessageBytes: config.maxMessageBytes,
   });
   // Event reminders: notifications on every device and the reminder window, sent by the server.
+  const followups = new Followups(store);
   const reminders = new Reminders({
     store,
     calendars,
+    followups,
     push: (userId, payload) => push.notifyReminder(userId, payload),
     emit: (userId, event) => pool.onEvent(userId, event),
     log: (msg, extra) => app.log.warn(extra ?? {}, msg),
@@ -366,6 +369,8 @@ export async function buildApp(
     config,
     store,
     sessions,
+    followups,
+    onFollowupsChanged: (userId) => reminders.changed(userId),
     pool,
     mail,
     compose,

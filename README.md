@@ -55,7 +55,8 @@
      Modified by samschultzponsys, 2026-11-17: v9.7 (Gmail archive and labels, server settings in the UI).
      Modified by samschultzponsys, 2026-11-17: v9.8 (assistant: forward, reply drafts, unsubscribe, Outlook categories).
      Modified by samschultzponsys, 2026-11-18: v9.9 (importance, read receipts, printing).
-     Modified by samschultzponsys, 2026-11-18: v10.0 (one short version label; the plain slide transition). -->
+     Modified by samschultzponsys, 2026-11-18: v10.0 (one short version label; the plain slide transition).
+     Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -67,7 +68,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -211,6 +212,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   importance (shown in the message list and the reader for mail you get), and the ✓ envelope asks
   for a read receipt. A message that asks for one shows *Send receipt* / *Don't send*; nothing is
   sent unless you say so, and either answer is remembered on the message.
+- **Follow up:** the flag-with-a-date button in the reading toolbar flags a message for follow-up
+  Today, Tomorrow, This week, Next week, at a date and time, or with no date (Outlook's choices).
+  The message list shows "Due …" (red once overdue), the message says "Follow up by …" with
+  *Mark complete*, and at the due time a reminder comes on every device and in the reminder window
+  (opening the message, with *Complete*). The flag is the mail server's own, so other apps see it;
+  unflagging or deleting the message ends the follow-up.
 - **Print:** the Print button in the reading toolbar prints the message with its header.
 - **Gmail labels:** a Gmail message shows its labels under the header; × takes one off and *Add
   label* puts one on, so a message can be in several labels (each one a folder in DreyMail).

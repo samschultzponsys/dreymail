@@ -33,7 +33,7 @@
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
 // Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
-// Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default).
+// Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -946,7 +946,11 @@ export function App() {
       )}
       {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
-      <ReminderWindow enabled={loggedIn && accounts.length > 0} onOpenCalendar={() => go({ ...HOME, calendar: true })} />
+      <ReminderWindow
+        enabled={loggedIn && accounts.length > 0}
+        onOpenCalendar={() => go({ ...HOME, calendar: true })}
+        onOpenMessage={(m) => go({ ...HOME, accountId: m.accountId, folder: m.folder, open: { accountId: m.accountId, uidValidity: m.uidValidity, uid: m.uid } })}
+      />
       <AppLock enabled={loggedIn} />
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (

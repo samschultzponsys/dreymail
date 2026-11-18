@@ -29,7 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
-// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags.
 
 // Types shared between the server API and the web client.
 
@@ -169,6 +169,13 @@ export interface MessageSummary {
   importance?: Importance;
   /** ISO time the message returns to the inbox, while it waits in the Snoozed folder. */
   snoozedUntil?: string;
+  /** Flagged for follow-up, with its due date if any (DreyMail). */
+  followUp?: FollowUp;
+}
+
+/** A follow-up flag (DreyMail 10.1): due (ISO) or no date. */
+export interface FollowUp {
+  due: string | null;
 }
 
 /** Per-account position in a mailbox stream. */
@@ -263,6 +270,8 @@ export interface MessageDetail {
   importance?: Importance;
   /** The sender asked for a read receipt, to this address, and none was sent or declined yet (DreyMail). */
   receiptTo?: string | null;
+  /** Flagged for follow-up (DreyMail). */
+  followUp?: FollowUp;
 }
 
 /** A domain in its stored ASCII (punycode) form and its human-readable form. */

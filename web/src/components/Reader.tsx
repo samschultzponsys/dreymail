@@ -10,13 +10,15 @@
 // Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a bubble in its color.
 // Modified by samschultzponsys, 2026-11-17: attached pictures open in an image viewer; a download arrow on their chip.
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of the message.
-// Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing.
+// Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing; follow-up flags.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
 import { GmailLabels } from './GmailLabels';
 import { ReadReceipt } from './ReadReceipt';
 import { printMessage } from '../print';
+import { FollowUpMenu } from './FollowUpMenu';
+import { fetchJson } from '../api';
 import {
   AlarmClock,
   Archive,
@@ -25,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleAlert,
+  FlagTriangleRight,
   Printer,
   Download,
   Flag,
@@ -308,6 +311,13 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
           <Flag size={17} fill={flagged ? 'currentColor' : 'none'} />
           <span className="tb-label">{flagged ? 'Unflag' : 'Flag'}</span>
         </button>
+        <FollowUpMenu
+          iconSize={17}
+          label="Follow up"
+          current={d?.followUp ? d.followUp.due : undefined}
+          onSet={(due) => void setFollowUp(qc, primary ?? ref, { due: due ? due.toISOString() : null })}
+          onDone={() => void setFollowUp(qc, primary ?? ref, { done: true })}
+        />
         <button className="icon-btn" title="Archive (e)" onClick={() => onAction([ref], { type: 'archive' })}>
           <Archive size={17} />
           <span className="tb-label">Archive</span>
@@ -725,6 +735,18 @@ function MessageCard({
           )}
           <ReadReceipt detail={d} />
 
+          {d.followUp && (
+            <div className="notice followup-notice">
+              <FlagTriangleRight size={16} />
+              <span className="grow">
+                {d.followUp.due ? `Follow up by ${formatSnoozeTime(d.followUp.due)}.` : 'Flagged for follow-up.'}
+                {d.followUp.due && Date.parse(d.followUp.due) < Date.now() && <strong className="overdue"> Overdue.</strong>}
+              </span>
+              <button className="btn" onClick={() => void setFollowUp(qcCard, msgRef, { done: true })}>
+                <Check size={14} /> Mark complete
+              </button>
+            </div>
+          )}
           {d.snoozedUntil && (
             <div className="notice">
               <AlarmClock size={16} />
@@ -792,4 +814,12 @@ function MessageCard({
       )}
     </article>
   );
+}
+
+/** Sets, changes or completes a message's follow-up flag, then refreshes the message and lists (DreyMail 10.1). */
+async function setFollowUp(qc: ReturnType<typeof useQueryClient>, ref: MessageRef, change: { due?: string | null; done?: boolean }) {
+  await fetchJson('PUT', '/api/followup', { ref, ...change });
+  void qc.invalidateQueries({ queryKey: ['message'] });
+  void qc.invalidateQueries({ queryKey: ['messages'] });
+  void qc.invalidateQueries({ queryKey: ['followups'] });
 }

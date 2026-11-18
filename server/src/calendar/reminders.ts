@@ -5,13 +5,15 @@
 // browsers) when an event's reminder time comes, and a reminder window in the app with Join,
 // Snooze and Dismiss. The server looks ahead in each user's visible calendars (DreyMail's own,
 // Google, Outlook and CalDAV) every few minutes and keeps the reminders due in calendar_alerts, so
-// they come on time also while no device has DreyMail open.
+// they come on time also while no device has DreyMail open. Follow-up flags with due dates (10.1)
+// come the same way.
 
 import crypto from 'node:crypto';
 import type { ReminderAlert } from '../../../shared/calendar.js';
 import type { ServerEvent } from '../../../shared/types.js';
 import type { Store } from '../db.js';
 import type { NotificationPayload } from '../push/notify.js';
+import type { Followups } from '../mail/followups.js';
 import type { CalendarService } from './service.js';
 
 const MIN = 60_000;
@@ -38,6 +40,17 @@ interface AlertRow {
   fire_at: number;
   notified: number;
   dismissed: number;
+  message_ref: string | null;
+}
+
+/** The app's address of a message (as notifications of new mail open it). */
+function messageUrl(refJson: string): string {
+  try {
+    const r = JSON.parse(refJson) as { accountId: string; folder: string; uid: number; uidValidity: string };
+    return `/mail/${encodeURIComponent(r.accountId)}/${encodeURIComponent(r.folder)}?open=${encodeURIComponent(r.accountId)}.${r.uidValidity}.${r.uid}`;
+  } catch {
+    return '/';
+  }
 }
 
 /** "In 15 minutes", "Now", "Started 5 minutes ago", "Tomorrow" … for a notification's text. */
@@ -58,6 +71,8 @@ export class Reminders {
     private readonly deps: {
       store: Store;
       calendars: CalendarService;
+      /** Follow-up flags with due dates (DreyMail 10.1). */
+      followups?: Followups;
       /** Web Push and the Android app. */
       push: (userId: string, payload: NotificationPayload) => Promise<number>;
       /** Open sessions (the desktop app shows a native notification; every app opens its reminder window). */
@@ -96,7 +111,7 @@ export class Reminders {
 
   private async run() {
     const now = this.now();
-    const users = this.db.prepare('SELECT DISTINCT owner_id AS id FROM calendars UNION SELECT DISTINCT user_id AS id FROM calendar_shares').all() as { id: string }[];
+    const users = this.db.prepare('SELECT DISTINCT owner_id AS id FROM calendars UNION SELECT DISTINCT user_id AS id FROM calendar_shares UNION SELECT DISTINCT user_id AS id FROM followups WHERE due_at IS NOT NULL').all() as { id: string }[];
     for (const { id } of users) {
       if (now - (this.scanned.get(id) ?? 0) < SCAN_EVERY) continue;
       this.scanned.set(id, now);
@@ -140,6 +155,19 @@ export class Reminders {
         this.db.prepare('UPDATE calendar_alerts SET title = ?, end_at = ?, all_day = ?, location = ?, join_url = ?, color = ? WHERE user_id = ? AND key = ?').run(...fields, userId, key);
       }
     }
+    // Follow-up flags due in the window: a reminder at the due time, about the message.
+    for (const f of this.deps.followups?.due(userId, now - KEEP_AFTER_END, now + AHEAD) ?? []) {
+      const key = `followup|${f.account_id}|${f.message_id}|${f.due_at}`;
+      seen.add(key);
+      const ref = JSON.stringify({ ...f.ref, messageId: f.message_id });
+      const cur = get.get(userId, key) as AlertRow | undefined;
+      const title = `Follow up: ${f.subject || '(no subject)'}`.slice(0, 300);
+      if (!cur)
+        this.db
+          .prepare('INSERT INTO calendar_alerts (user_id, key, event_id, calendar_id, title, start_at, end_at, all_day, location, join_url, color, base_fire, fire_at, message_ref) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?)')
+          .run(userId, key, f.message_id, 'followup', title, f.due_at!, f.due_at! + KEEP_AFTER_END, f.sender, '#dc2626', f.due_at!, f.due_at!, ref);
+      else this.db.prepare('UPDATE calendar_alerts SET title = ?, location = ?, message_ref = ? WHERE user_id = ? AND key = ?').run(title, f.sender, ref, userId, key);
+    }
     // Events that are gone (or moved: their key has the old start) take their reminders with them,
     // unless their calendar couldn't be read just now.
     const known = this.db.prepare('SELECT key, calendar_id FROM calendar_alerts WHERE user_id = ? AND start_at > ? AND dismissed = 0').all(userId, now) as { key: string; calendar_id: string }[];
@@ -156,8 +184,9 @@ export class Reminders {
       if (a.end_at < now) continue;
       const body = [whenText(a.start_at, now, a.all_day === 1), a.location].filter(Boolean).join(' · ');
       const tag = `reminder:${crypto.createHash('sha256').update(a.key).digest('base64url').slice(0, 16)}`;
-      this.deps.emit(a.user_id, { type: 'reminder', title: a.title, body, tag, url: '/calendar', joinUrl: a.join_url });
-      await this.deps.push(a.user_id, { title: a.title, body, tag, url: '/calendar', color: a.color || '#22d3ee' }).catch(() => 0);
+      const url = a.message_ref ? messageUrl(a.message_ref) : '/calendar';
+      this.deps.emit(a.user_id, { type: 'reminder', title: a.title, body, tag, url, joinUrl: a.join_url });
+      await this.deps.push(a.user_id, { title: a.title, body, tag, url, color: a.color || '#22d3ee' }).catch(() => 0);
     }
   }
 
@@ -176,6 +205,7 @@ export class Reminders {
       location: a.location,
       joinUrl: a.join_url,
       color: a.color,
+      message: a.message_ref ? (JSON.parse(a.message_ref) as ReminderAlert['message']) : null,
     }));
   }
 

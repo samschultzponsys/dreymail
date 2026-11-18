@@ -27,8 +27,9 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
-// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending.
+// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags.
 
+import type { Followups } from '../mail/followups.js';
 import { receiptAddressOf } from '../../../shared/importance.js';
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -216,6 +217,9 @@ export interface ApiDeps {
   config: Config;
   store: Store;
   sessions: Sessions;
+  /** Follow-up flags with due dates (DreyMail 10.1). */
+  followups?: Followups;
+  onFollowupsChanged?: (userId: string) => void;
   pool: ImapPool;
   mail: MailService;
   compose: ComposeService;
@@ -785,9 +789,12 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const limit = q.limit ?? req.user!.preferences.pageSize;
       const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1' });
       const until = snoozedUntil(userId);
+      const follow = deps.followups?.lookup(userId);
       for (const m of [...list.messages, ...list.related]) {
         const t = until(m);
         if (t) m.snoozedUntil = t;
+        const f = m.flagged ? follow?.(m.accountId, m.messageId) : undefined;
+        if (f) m.followUp = f;
       }
       return list;
     } catch (err) {
@@ -810,6 +817,35 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       senderHosted: prefs?.imagesSenderHosted === true,
     };
   };
+
+  /**
+   * Follow-up flag (DreyMail 10.1): `due` an ISO time, or null for a flag without a date; `done`
+   * marks it complete (unflagged). The message is flagged on the mail server too.
+   */
+  app.put('/api/followup', async (req, reply) => {
+    try {
+      const body = z.object({ ref: refSchema, due: z.string().datetime().nullable().optional(), done: z.boolean().optional() }).parse(req.body);
+      const userId = uid(req);
+      requireAccount(userId, body.ref.accountId);
+      const e = await mail.getParsed(userId, body.ref, config.maxMessageBytes);
+      const messageId = e.messageId ?? `<dm-${body.ref.accountId}-${body.ref.uidValidity}-${body.ref.uid}@local>`;
+      if (body.done) {
+        deps.followups?.clear(userId, body.ref.accountId, messageId);
+        await mail.applyAction(userId, body.ref.accountId, body.ref.folder, body.ref.uidValidity, [body.ref.uid], { type: 'flagged', value: false });
+      } else {
+        const sender = e.from?.name || e.from?.address || '';
+        deps.followups?.set(userId, body.ref, messageId, { subject: e.subject ?? '', sender }, body.due ? Date.parse(body.due) : null);
+        await mail.applyAction(userId, body.ref.accountId, body.ref.folder, body.ref.uidValidity, [body.ref.uid], { type: 'flagged', value: true });
+      }
+      deps.onFollowupsChanged?.(userId);
+      return { followUp: body.done ? null : { due: body.due ?? null } };
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
+
+  /** Everything flagged for follow-up (DreyMail 10.1). */
+  app.get('/api/followups', async (req) => deps.followups?.list(uid(req)) ?? []);
 
   /** A read-receipt request answered: sent, or declined (DreyMail). Either way it is not asked again. */
   app.post('/api/message/receipt', async (req, reply) => {
@@ -870,6 +906,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       });
       const until = snoozedUntil(uid(req))(q);
       if (until) detail.snoozedUntil = until;
+      const f = detail.flagged ? deps.followups?.lookup(uid(req))(q.accountId, detail.messageId) : undefined;
+      if (f) detail.followUp = f;
       // Where the time went (mail server, parsing, pictures): visible in the browser's developer
       // tools, and logged when a message took long.
       const total = Math.round(performance.now() - started);
@@ -993,6 +1031,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         // Read, moved or deleted from the inbox here: close its notifications on the user's devices
         // without waiting for the IDLE watcher, which not every IMAP server tells about it.
         if (ref.folder.toUpperCase() === 'INBOX' && action.type !== 'flagged') push.inboxChanged(userId, ref.accountId);
+        // Unflagged or deleted: no follow-up reminder for it any more (DreyMail 10.1).
+        if ((action.type === 'flagged' && !action.value) || action.type === 'delete') {
+          deps.followups?.clearRefs(userId, ref.accountId, ref.folder, ref.uidValidity, uids);
+          deps.onFollowupsChanged?.(userId);
+        }
         if (r.undo) result.undo.push(r.undo);
         if (r.permanent) result.permanent = true;
         if (r.createdFolder) result.createdFolders.push(r.createdFolder);
