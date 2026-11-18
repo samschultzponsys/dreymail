@@ -61,7 +61,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions).
      Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks).
      Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes).
-     Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail). -->
+     Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail).
+     Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -73,7 +74,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -365,6 +366,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   or another day. One occurrence of a repeating event moves on its own; guests get the update.
 - **Show as:** Busy, Free, Tentative, Away or Working elsewhere, as in Outlook (kept in Outlook,
   Google as busy/free, and CalDAV); free and tentative events look lighter in the calendar.
+- **Meeting rooms:** *Book a room* in the event editor lists the rooms you can book, each marked
+  free or busy at the meeting's time; picking one invites it as a room (it accepts or declines by
+  itself, shown as Booked or Not available) and fills in the location. Rooms come from Microsoft
+  365 (*Allow* rooms for an Outlook mailbox; an administrator approves that permission once for the
+  whole organization) and from the list an administrator keeps in Settings → Server → Meeting rooms
+  (any room calendar, Google Workspace's included). Rooms show in the scheduling assistant too.
 - **Scheduling assistant:** with guests on an event, *Show the scheduling assistant* lays the day
   out as a timeline with you and each guest on a row and busy times filled in: yours from your
   calendars, colleagues' from Outlook / Microsoft 365 (their free/busy) or Google (calendars shared

@@ -40,8 +40,10 @@ export const SCOPES = {
   contacts: 'https://graph.microsoft.com/Contacts.ReadWrite',
   /** Microsoft To Do (10.4). */
   tasks: 'https://graph.microsoft.com/Tasks.ReadWrite',
+  /** The organization's meeting rooms (10.7); an administrator approves it for everyone once. */
+  rooms: 'https://graph.microsoft.com/Place.Read.All',
 } as const;
-export type MicrosoftExtra = 'mail' | 'people' | 'contacts' | 'tasks';
+export type MicrosoftExtra = 'mail' | 'people' | 'contacts' | 'tasks' | 'rooms';
 /** Asked for at sign-in: both resources (consented at once), a refresh token, and who the user is. */
 const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph} ${SCOPES.calendar}`;
 

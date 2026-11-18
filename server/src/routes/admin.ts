@@ -21,6 +21,7 @@ import type { Store, User } from '../db.js';
 import type { MailService } from '../imap/mail.js';
 import type { ImapPool } from '../imap/pool.js';
 import { ServerSettingsError, type ServerSettings } from '../serverSettings.js';
+import type { Rooms } from '../calendar/rooms.js';
 import { LoginSettingsError, type LoginSettings } from '../loginSettings.js';
 import type { FirebaseConfig } from '../push/fcm.js';
 import type { MailCache } from '../cache/store.js';
@@ -34,6 +35,8 @@ export interface AdminDeps {
   login: LoginSettings;
   /** Server settings saved in the UI (DreyMail). */
   serverSettings?: ServerSettings;
+  /** The meeting rooms list (DreyMail 10.7). */
+  rooms?: Rooms;
   pool: ImapPool;
   mail: MailService;
   firebase: FirebaseConfig;
@@ -290,6 +293,18 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
       if (err instanceof ServerSettingsError) return bad(reply, err.message);
       throw err;
     }
+  });
+
+  // ---- meeting rooms list (DreyMail 10.7) ------------------------------------------------------
+
+  app.get('/api/admin/rooms', async (req, reply) => (may(req, reply, 'server.manage') ? (deps.rooms?.configured() ?? []) : reply));
+
+  app.put('/api/admin/rooms', async (req, reply) => {
+    if (!may(req, reply, 'server.manage')) return reply;
+    const body = z.object({ rooms: z.array(z.object({ email: z.string().max(320), name: z.string().max(200), capacity: z.number().int().min(0).max(100_000).nullable().optional(), building: z.string().max(200).optional() })).max(500) }).safeParse(req.body);
+    if (!body.success) return bad(reply, 'Check the rooms');
+    deps.rooms?.saveConfigured(body.data.rooms);
+    return deps.rooms?.configured() ?? [];
   });
 
   // ---- sign-in settings ------------------------------------------------------------

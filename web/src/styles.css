@@ -1394,3 +1394,17 @@ body.resizing iframe { pointer-events: none; }
 .smime-notice.warn svg { color: #ca8a04; }
 .smime-notice.bad { border-color: var(--danger); }
 .smime-notice.bad svg { color: var(--danger); }
+
+/* Meeting rooms (DreyMail 10.7). */
+.room-picker { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.room-head { display: flex; align-items: center; gap: 6px; }
+.room-head .grow { flex: 1; }
+.room-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
+.room-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; color: inherit; font: inherit; font-size: 13px; }
+.room-row:hover { background: var(--hover); }
+.room-row .grow { flex: 1; min-width: 0; }
+.room-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); flex: none; }
+.room-dot.free { background: #16a34a; }
+.room-dot.busy { background: var(--danger); }
+.room-admin-row { display: grid; grid-template-columns: 1.2fr 1.6fr 70px 1fr auto; gap: 6px; align-items: center; }
+@media (max-width: 600px) { .room-admin-row { grid-template-columns: 1fr 1fr; } }

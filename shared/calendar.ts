@@ -33,6 +33,17 @@ export interface Attendee {
   status: AttendeeStatus;
   /** Optional rather than required. */
   optional?: boolean;
+  /** A meeting room or other resource (DreyMail 10.7). */
+  resource?: boolean;
+}
+
+/** A meeting room that can be booked (DreyMail 10.7): from Microsoft 365, or the administrator's list. */
+export interface Room {
+  email: string;
+  name: string;
+  capacity?: number | null;
+  building?: string;
+  source: 'microsoft' | 'list';
 }
 
 /** How the event shows to others looking at your free/busy times (Outlook's "Show as") (DreyMail 10.2). */

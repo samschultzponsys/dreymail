@@ -13,6 +13,7 @@ import { findJoinUrl, mayOccur, type CalendarEvent, type CalendarView, type Even
 import { eventFromRow } from '../calendar/localEvents.js';
 import { RemoteCalendarError, type RemoteEvent } from '../calendar/remote.js';
 import type { Reminders } from '../calendar/reminders.js';
+import type { Rooms } from '../calendar/rooms.js';
 import type { CalendarRow, CalendarService } from '../calendar/service.js';
 import type { Store } from '../db.js';
 
@@ -23,6 +24,7 @@ const attendeeSchema = z.object({
   name: z.string().trim().max(200).default(''),
   status: z.enum(['needs-action', 'accepted', 'tentative', 'declined']).default('needs-action'),
   optional: z.boolean().optional(),
+  resource: z.boolean().optional(),
 });
 const eventSchema = z
   .object({
@@ -67,8 +69,8 @@ function parseRemoteId(id: string): { calendarId: string; remoteId: string } | n
   return { calendarId: id.slice(0, i), remoteId: Buffer.from(id.slice(i + 1), 'base64url').toString() };
 }
 
-export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Store; calendars: CalendarService; reminders?: Reminders }) {
-  const { store, calendars, reminders } = deps;
+export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Store; calendars: CalendarService; reminders?: Reminders; rooms?: Rooms }) {
+  const { store, calendars, reminders, rooms } = deps;
   const db = store.db;
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const fail = (reply: FastifyReply, err: unknown) => {
@@ -458,6 +460,10 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
     if (!body.success) return bad(reply, body.error.issues[0]?.message ?? 'Invalid request');
     return calendars.freeBusy(req.user!.id, body.data.calendarId, body.data.emails, Date.parse(body.data.from), Date.parse(body.data.to));
   });
+
+  // ---- meeting rooms (DreyMail 10.7) ------------------------------------------------------------
+
+  app.get('/api/rooms', async (req) => ({ rooms: (await rooms?.list(req.user!.id)) ?? [], microsoft: (await rooms?.microsoftAllowed(req.user!.id)) ?? [] }));
 
   // ---- reminders ------------------------------------------------------------------------
 

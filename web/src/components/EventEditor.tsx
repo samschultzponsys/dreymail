@@ -7,7 +7,8 @@
 // occurrence of a repeating event can be changed on its own, with the ones after it, or as the
 // whole series.
 
-import { Bell, MapPin, Repeat, Trash2, Users, Video, X } from 'lucide-react';
+import { Bell, DoorOpen, MapPin, Repeat, Trash2, Users, Video, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_REMINDER,
@@ -22,6 +23,7 @@ import {
   type EventOccurrence,
   type MonthlyBy,
   type Recurrence,
+  type Room,
   type SeriesScope,
   type ShowAs,
 } from '../../../shared/calendar';
@@ -581,9 +583,24 @@ function EventForm({
           </label>
           {guests.length > 0 && <GuestList guests={guests} organizer={base.organizer ?? null} onRemove={organizer ? (email) => setGuests((g) => g.filter((x) => x.email !== email)) : undefined} onOptional={organizer ? (email) => setGuests((g) => g.map((x) => (x.email === email ? { ...x, optional: !x.optional } : x))) : undefined} />}
           {organizer ? (
-            <div className="ev-guests-field">
-              <AddressField label="Invite" value={typed} onChange={setTyped} from={sendFrom || accounts[0]?.id || ''} />
-            </div>
+            <>
+              <div className="ev-guests-field">
+                <AddressField label="Invite" value={typed} onChange={setTyped} from={sendFrom || accounts[0]?.id || ''} />
+              </div>
+              {!allDay && validStart && (
+                <RoomPicker
+                  accounts={accounts}
+                  start={new Date(`${startDate}T${startTime}`)}
+                  end={new Date(`${endDate}T${endTime}`)}
+                  calendarId={calendarId || null}
+                  booked={guests.filter((g) => g.resource).map((g) => g.email)}
+                  onPick={(r) => {
+                    setGuests((g) => (g.some((x) => x.email === r.email) ? g : [...g, { email: r.email, name: r.name, status: 'needs-action', resource: true }]));
+                    if (!location.trim()) setLocation(r.name);
+                  }}
+                />
+              )}
+            </>
           ) : (
             base.organizer && <div className="hint">Organized by {base.organizer.name || base.organizer.email}; only they change the guest list.</div>
           )}
@@ -659,7 +676,8 @@ function EventForm({
 }
 
 function GuestList({ guests, organizer, onRemove, onOptional }: { guests: Attendee[]; organizer: { email: string; name: string } | null; onRemove?: (email: string) => void; onOptional?: (email: string) => void }) {
-  const answered = guests.filter((g) => g.status === 'accepted').length;
+  const answered = guests.filter((g) => g.status === 'accepted' && !g.resource).length;
+  const people = guests.filter((g) => !g.resource).length;
   return (
     <div className="ev-guest-list">
       {organizer && (
@@ -673,13 +691,13 @@ function GuestList({ guests, organizer, onRemove, onOptional }: { guests: Attend
         <div key={g.email} className="ev-guest">
           <span className={`ev-status ${g.status}`} title={STATUS_LABEL[g.status]} />
           <span className="ev-guest-name" title={g.email}>
-            {g.name || g.email}
+            {g.resource && <DoorOpen size={12} />} {g.name || g.email}
           </span>
           <span className="muted">
-            {STATUS_LABEL[g.status]}
+            {g.resource ? (g.status === 'accepted' ? 'Booked' : g.status === 'declined' ? 'Not available' : g.status === 'tentative' ? 'Tentative' : 'Waiting for the room') : STATUS_LABEL[g.status]}
             {g.optional ? ' · optional' : ''}
           </span>
-          {onOptional && (
+          {onOptional && !g.resource && (
             <button className="link-btn" onClick={() => onOptional(g.email)} title={g.optional ? 'Make required' : 'Make optional'}>
               {g.optional ? 'Required' : 'Optional'}
             </button>
@@ -692,8 +710,91 @@ function GuestList({ guests, organizer, onRemove, onOptional }: { guests: Attend
         </div>
       ))}
       <div className="hint">
-        {guests.length} guest{guests.length === 1 ? '' : 's'} · {answered} accepted
+        {people} guest{people === 1 ? '' : 's'} · {answered} accepted
+        {guests.length > people ? ` · ${guests.length - people} room${guests.length - people === 1 ? '' : 's'}` : ''}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Booking a meeting room (DreyMail 10.7): the rooms you can book, each marked free or busy at the
+ * meeting's time; a pick invites the room as a resource (it accepts or declines by itself).
+ */
+function RoomPicker({ accounts, start, end, calendarId, booked, onPick }: { accounts: AccountView[]; start: Date; end: Date; calendarId: string | null; booked: string[]; onPick: (r: Room) => void }) {
+  const [open, setOpen] = useState(false);
+  const rooms = useQuery({ queryKey: ['rooms'], queryFn: () => fetchJson<{ rooms: Room[]; microsoft: { accountId: string; allowed: boolean }[] }>('GET', '/api/rooms'), staleTime: 300_000, enabled: open });
+  const list = (rooms.data?.rooms ?? []).filter((r) => !booked.includes(r.email));
+  const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const fb = useQuery({
+    queryKey: ['freebusy', 'rooms', calendarId, list.slice(0, 50).map((r) => r.email).join(','), day.toISOString()],
+    queryFn: () => fetchJson<{ people: Record<string, { busy: { start: string; end: string }[]; error?: string }> }>('POST', '/api/freebusy', { calendarId, emails: list.slice(0, 50).map((r) => r.email), from: day.toISOString(), to: new Date(day.getTime() + 86_400_000).toISOString() }),
+    enabled: open && list.length > 0,
+    staleTime: 60_000,
+  });
+  const state = (r: Room) => {
+    const p = fb.data?.people[r.email];
+    if (!p || p.error) return 'unknown';
+    return p.busy.some((b) => Date.parse(b.start) < end.getTime() && Date.parse(b.end) > start.getTime()) ? 'busy' : 'free';
+  };
+  const notAllowed = (rooms.data?.microsoft ?? []).filter((m) => !m.allowed);
+  if (!open)
+    return (
+      <button type="button" className="link-btn" onClick={() => setOpen(true)}>
+        <DoorOpen size={13} /> Book a room
+      </button>
+    );
+  return (
+    <div className="room-picker">
+      <div className="room-head">
+        <strong>Rooms</strong>
+        <span className="grow" />
+        <button type="button" className="icon-btn" onClick={() => setOpen(false)} title="Close">
+          <X size={14} />
+        </button>
+      </div>
+      {rooms.isLoading && <div className="hint">Loading rooms…</div>}
+      {rooms.data && list.length === 0 && <div className="hint">No rooms to book yet.</div>}
+      <div className="room-list">
+        {[...list].sort((a, b) => Number(state(b) === 'free') - Number(state(a) === 'free')).map((r) => {
+          const st = state(r);
+          return (
+            <button key={r.email} type="button" className="room-row" onClick={() => onPick(r)} title={r.email}>
+              <span className={`room-dot ${st}`} />
+              <span className="grow">
+                {r.name}
+                <span className="muted">
+                  {r.capacity ? ` · ${r.capacity} seats` : ''}
+                  {r.building ? ` · ${r.building}` : ''}
+                </span>
+              </span>
+              <span className="muted">{st === 'free' ? 'Free' : st === 'busy' ? 'Busy' : ''}</span>
+            </button>
+          );
+        })}
+      </div>
+      {notAllowed.map((m) => {
+        const a = accounts.find((x) => x.id === m.accountId);
+        return a ? (
+          <div key={m.accountId} className="hint">
+            Show your organization&apos;s rooms from Microsoft 365 ({a.name})?{' '}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() =>
+                void fetchJson<{ url: string }>('POST', '/api/oauth/microsoft/start', { color: a.color, allow: ['rooms'] }).then(
+                  ({ url }) => (window.location.href = url),
+                  (e: Error) => window.alert(e.message),
+                )
+              }
+            >
+              Allow
+            </button>{' '}
+            (an administrator approves this once for everyone).
+          </div>
+        ) : null;
+      })}
+      <div className="hint">An administrator can also list rooms in Settings → Server → Meeting rooms.</div>
     </div>
   );
 }

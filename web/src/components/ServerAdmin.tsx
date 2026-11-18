@@ -125,6 +125,73 @@ export function ServerAdmin() {
         )}
         {saved && !dirty && <span className="muted">Saved.</span>}
       </div>
+      <RoomsAdmin />
     </>
+  );
+}
+
+type RoomRow = { email: string; name: string; capacity: number | null; building: string };
+
+/** Meeting rooms people can book (DreyMail 10.7), for calendars without a room list of their own. */
+function RoomsAdmin() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['admin', 'rooms'], queryFn: () => fetchJson<RoomRow[]>('GET', '/api/admin/rooms') });
+  const [rows, setRows] = useState<RoomRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const list = rows ?? q.data ?? [];
+  const edit = (i: number, change: Partial<RoomRow>) => {
+    setSaved(false);
+    setRows(list.map((r, j) => (j === i ? { ...r, ...change } : r)));
+  };
+  const save = async () => {
+    try {
+      const next = await fetchJson<RoomRow[]>('PUT', '/api/admin/rooms', { rooms: list.filter((r) => r.email.trim()) });
+      qc.setQueryData(['admin', 'rooms'], next);
+      setRows(null);
+      setError(null);
+      setSaved(true);
+      void qc.invalidateQueries({ queryKey: ['rooms'] });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  return (
+    <section className="server-group">
+      <h3>Meeting rooms</h3>
+      <div className="hint">
+        Rooms people can book from the event editor: each room&apos;s calendar address (a Microsoft 365 room mailbox, a Google Workspace room calendar like
+        …@resource.calendar.google.com, or any calendar that answers invitations). Microsoft 365 rooms also show by themselves once someone allows
+        &quot;rooms&quot; for an Outlook mailbox and an administrator approves it.
+      </div>
+      {list.map((r, i) => (
+        <div key={i} className="room-admin-row">
+          <input className="input" placeholder="Name (Boardroom)" value={r.name} onChange={(e) => edit(i, { name: e.target.value })} />
+          <input className="input" placeholder="Calendar address" value={r.email} onChange={(e) => edit(i, { email: e.target.value })} />
+          <input className="input" placeholder="Seats" inputMode="numeric" value={r.capacity ?? ''} onChange={(e) => edit(i, { capacity: Number(e.target.value) || null })} />
+          <input className="input" placeholder="Building / floor" value={r.building} onChange={(e) => edit(i, { building: e.target.value })} />
+          <button
+            className="icon-btn"
+            title="Remove"
+            onClick={() => {
+              setSaved(false);
+              setRows(list.filter((_, j) => j !== i));
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="cal-when-row">
+        <button className="btn" onClick={() => setRows([...list, { email: '', name: '', capacity: null, building: '' }])}>
+          Add a room
+        </button>
+        <button className="btn primary" disabled={!rows} onClick={() => void save()}>
+          Save rooms
+        </button>
+        {saved && !rows && <span className="muted">Saved.</span>}
+      </div>
+      {error && <div className="error-text">{error}</div>}
+    </section>
   );
 }

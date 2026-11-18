@@ -23,7 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
-// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME.
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +55,7 @@ import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
 import { Followups } from './mail/followups.js';
+import { Rooms } from './calendar/rooms.js';
 import { Directory } from './directory.js';
 import { People } from './people.js';
 import { SmimeStore } from './mail/smimeStore.js';
@@ -344,6 +345,8 @@ export async function buildApp(
   });
   // Event reminders: notifications on every device and the reminder window, sent by the server.
   const followups = new Followups(store);
+  // Meeting rooms: Microsoft 365's and the administrator's list (DreyMail 10.7).
+  const rooms = new Rooms({ store, microsoft });
   // Contacts and tasks: DreyMail's own, Outlook and Google (DreyMail 10.4).
   const people = new People({ store, microsoft, google });
   const reminders = new Reminders({
@@ -408,6 +411,7 @@ export async function buildApp(
     access,
     login,
     serverSettings,
+    rooms,
     pool,
     mail,
     firebase,
@@ -424,7 +428,7 @@ export async function buildApp(
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
-  registerCalendarRoutes(app, { store, calendars, reminders });
+  registerCalendarRoutes(app, { store, calendars, reminders, rooms });
   registerPeopleRoutes(app, { people });
   registerAutoReplyRoutes(app, { autoReplies, onChanged: (userId) => assistant.syncWatching(userId) });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });

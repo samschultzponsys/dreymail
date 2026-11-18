@@ -247,6 +247,7 @@ export interface IcalPerson {
   name: string;
   status: string;
   role?: string;
+  cutype?: string;
 }
 
 export interface IcalEvent {
@@ -272,6 +273,7 @@ const personOf = (p: IcalProp): IcalPerson => ({
   name: p.params.CN ?? '',
   status: (p.params.PARTSTAT ?? 'NEEDS-ACTION').toUpperCase(),
   ...(p.params.ROLE ? { role: p.params.ROLE.toUpperCase() } : {}),
+  ...(p.params.CUTYPE ? { cutype: p.params.CUTYPE.toUpperCase() } : {}),
 });
 
 /** The VEVENTs of a calendar file, with times resolved to UTC. */
@@ -496,7 +498,7 @@ function peopleProps(f: Pick<EventFields, 'attendees' | 'organizer'>, clientSche
   return [
     mk('ORGANIZER', `mailto:${f.organizer.email}`, { ...cn(f.organizer.name), ...agent }),
     ...f.attendees.map((a) =>
-      mk('ATTENDEE', `mailto:${a.email}`, { ...cn(a.name), ROLE: a.optional ? 'OPT-PARTICIPANT' : 'REQ-PARTICIPANT', PARTSTAT: PARTSTAT[a.status] ?? 'NEEDS-ACTION', RSVP: 'TRUE', ...agent }),
+      mk('ATTENDEE', `mailto:${a.email}`, { ...cn(a.name), ...(a.resource ? { CUTYPE: 'ROOM', ROLE: 'NON-PARTICIPANT' } : { ROLE: a.optional ? 'OPT-PARTICIPANT' : 'REQ-PARTICIPANT' }), PARTSTAT: PARTSTAT[a.status] ?? 'NEEDS-ACTION', RSVP: 'TRUE', ...agent }),
     ),
   ];
 }
@@ -714,7 +716,7 @@ export function fieldsOfIcs(existing: string): (EventFields & { uid: string; edi
     timeZone: zoneNameOf(prop(e.component, 'DTSTART')),
     reminder: reminderOf(e.component),
     ...(showAsOf(e.component) ? { showAs: showAsOf(e.component) } : {}),
-    attendees: e.attendees.filter((a) => a.email !== e.organizer?.email).map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), optional: a.role === 'OPT-PARTICIPANT' || undefined })),
+    attendees: e.attendees.filter((a) => a.email !== e.organizer?.email).map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), optional: a.role === 'OPT-PARTICIPANT' || undefined, resource: a.cutype === 'ROOM' || a.cutype === 'RESOURCE' || undefined })),
     organizer: e.organizer ? { email: e.organizer.email, name: e.organizer.name } : null,
     exdates: [...e.exdates].map((x) => new Date(x).toISOString()),
   };

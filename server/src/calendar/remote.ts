@@ -155,6 +155,7 @@ interface GPerson {
   organizer?: boolean;
   optional?: boolean;
   responseStatus?: string;
+  resource?: boolean;
 }
 interface GEvent {
   id: string;
@@ -231,7 +232,7 @@ export class GoogleCalendar implements CalendarProvider {
       readOnly: false,
       seriesId: e.recurringEventId,
       reminder: minutes.length ? Math.min(...minutes) : null,
-      attendees: people.map((a) => ({ email: a.email!.toLowerCase(), name: a.displayName ?? '', status: G_STATUS[a.responseStatus ?? ''] ?? 'needs-action', ...(a.optional ? { optional: true } : {}) })),
+      attendees: people.map((a) => ({ email: a.email!.toLowerCase(), name: a.displayName ?? '', status: G_STATUS[a.responseStatus ?? ''] ?? 'needs-action', ...(a.optional ? { optional: true } : {}), ...(a.resource ? { resource: true } : {}) })),
       organizer: e.organizer?.email ? { email: e.organizer.email.toLowerCase(), name: e.organizer.displayName ?? '' } : null,
       isOrganizer: !e.organizer || !!e.organizer.self,
       ...(e.transparency === 'transparent' ? { showAs: 'free' as const } : {}),
@@ -276,7 +277,7 @@ export class GoogleCalendar implements CalendarProvider {
       end: f.allDay ? { date: dateOf(f.end), dateTime: null } : { dateTime: f.end, timeZone: tz, date: null },
       ...(withRecurrence ? { recurrence: rule ? [`RRULE:${rule}`] : [] } : {}),
       ...(f.reminder !== undefined ? { reminders: { useDefault: false, overrides: f.reminder === null ? [] : [{ method: 'popup', minutes: f.reminder }] } } : {}),
-      ...(f.attendees ? { attendees: f.attendees.map((a) => ({ email: a.email, ...(a.name ? { displayName: a.name } : {}), ...(a.optional ? { optional: true } : {}), responseStatus: G_RESPONSE[a.status] ?? 'needsAction' })) } : {}),
+      ...(f.attendees ? { attendees: f.attendees.map((a) => ({ email: a.email, ...(a.name ? { displayName: a.name } : {}), ...(a.optional ? { optional: true } : {}), ...(a.resource ? { resource: true } : {}), responseStatus: G_RESPONSE[a.status] ?? 'needsAction' })) } : {}),
       ...(f.showAs ? { transparency: f.showAs === 'free' ? 'transparent' : 'opaque' } : {}),
       ...(f.meeting === 'meet' ? { conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } } } : {}),
     };
@@ -514,6 +515,7 @@ export class OutlookCalendar implements CalendarProvider {
         name: a.emailAddress!.name ?? '',
         status: GRAPH_STATUS[a.status?.response ?? ''] ?? 'needs-action',
         ...(a.type === 'optional' ? { optional: true } : {}),
+        ...(a.type === 'resource' ? { resource: true } : {}),
       })),
       organizer: people.length ? organizer : null,
       isOrganizer: e.isOrganizer !== false,
@@ -556,7 +558,7 @@ export class OutlookCalendar implements CalendarProvider {
       ...(withRecurrence ? { recurrence: graphRecurrence(f, localStart) } : {}),
       ...(f.reminder !== undefined ? { isReminderOn: f.reminder !== null, ...(f.reminder !== null ? { reminderMinutesBeforeStart: f.reminder } : {}) } : {}),
       ...(f.attendees
-        ? { attendees: f.attendees.map((a) => ({ emailAddress: { address: a.email, ...(a.name ? { name: a.name } : {}) }, type: a.optional ? 'optional' : 'required', status: { response: GRAPH_RESPONSE[a.status] ?? 'none' } })) }
+        ? { attendees: f.attendees.map((a) => ({ emailAddress: { address: a.email, ...(a.name ? { name: a.name } : {}) }, type: a.resource ? 'resource' : a.optional ? 'optional' : 'required', status: { response: GRAPH_RESPONSE[a.status] ?? 'none' } })) }
         : {}),
       ...(f.meeting === 'teams' ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' } : {}),
       ...(f.showAs ? { showAs: TO_GRAPH_SHOW[f.showAs] } : {}),
@@ -803,7 +805,7 @@ export class CalDavCalendar implements CalendarProvider {
           seriesId: o.repeating ? href : undefined,
           reminder: reminderOf(o.event.component),
           ...(showAsOf(o.event.component) ? { showAs: showAsOf(o.event.component) } : {}),
-          attendees: people.map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), ...(a.role === 'OPT-PARTICIPANT' ? { optional: true } : {}) })),
+          attendees: people.map((a) => ({ email: a.email, name: a.name, status: statusOfPartstat(a.status), ...(a.role === 'OPT-PARTICIPANT' ? { optional: true } : {}), ...(a.cutype === 'ROOM' || a.cutype === 'RESOURCE' ? { resource: true } : {}) })),
           organizer: people.length && o.event.organizer ? { email: o.event.organizer.email, name: o.event.organizer.name } : null,
           joinUrl: findJoinUrl(o.event.location, o.event.description),
         });

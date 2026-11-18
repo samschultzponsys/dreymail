@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.7): meeting rooms
+
+- **Rooms:** Microsoft 365 rooms (Graph `places/microsoft.graph.room`, Place.Read.All, allowed per
+  mailbox and approved by an administrator) merged with an administrator's list (Settings →
+  Server → Meeting rooms, `/api/admin/rooms`). The event editor's *Book a room* shows them with
+  free/busy at the meeting's time and invites the chosen one as a resource (Graph type `resource`,
+  Google `resource: true`, iCalendar `CUTYPE=ROOM`); guest lists show rooms as Booked / Not
+  available.
+- **Files:** `server/src/calendar/rooms.ts` (new), `server/src/calendar/remote.ts`,
+  `server/src/calendar/ical.ts`, `server/src/routes/calendar.ts`, `server/src/routes/admin.ts`,
+  `server/src/routes/microsoft.ts`, `server/src/oauth/microsoft.ts`, `server/src/app.ts`,
+  `shared/calendar.ts`, `web/src/components/EventEditor.tsx`, `web/src/components/ServerAdmin.tsx`,
+  `web/src/styles.css`, `server/test/rooms.test.ts` (new), `CHANGES.md`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.6): S/MIME signed and encrypted mail
 
 - **Reading:** multipart/signed and opaque signed mail is verified (digest over the exact signed
