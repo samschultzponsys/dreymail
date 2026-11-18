@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v11.2): no ⌄ line when every folder is pinned
+
+- With every folder of a mailbox pinned there is nothing more to show, so the ⌄ line under the
+  pinned folders goes away (and the mailbox shows its pinned list).
+- **Files:** `web/src/components/Sidebar.tsx`, `web/test/sidebar.test.ts`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v11.1): pinned folders your way; unread out of sight stands out
 
 - **Pinned folders** show as one flat list in the order they were pinned, wherever they sit in the

@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-17: room under Compose for the Sending list.
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
 // Modified by samschultzponsys, 2026-11-18: pinned folders flat in a dragged order; unread in folded or unpinned folders stands out and flashes when new mail arrives.
+// Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned.
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
@@ -333,7 +334,9 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                     (() => {
                       const pinned = acc.pinnedFolders ?? [];
                       // With folders pinned, only those show until "show all" is opened.
-                      const limited = pinned.length > 0 && !showAll[acc.id];
+                      // Every folder pinned: nothing else to show, so no ⌄ line (DreyMail 11.2).
+                      const allPinned = pinned.length > 0 && af.folders.every((f) => !f.selectable || pinned.includes(f.path));
+                      const limited = pinned.length > 0 && (allPinned || !showAll[acc.id]);
                       const countOf = (f: FolderView) => (f.unread && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' && f.specialUse !== 'snoozed' ? f.unread : 0);
                       // The folders as a tree (DreyMail): each under its parent, Inbox and Sent foldable
                       // like any folder; folded subfolders hidden, their unread mail counted on the folder.
@@ -436,7 +439,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                               </div>
                             );
                           })}
-                          {pinned.length > 0 && !rail && (
+                          {pinned.length > 0 && !allPinned && !rail && (
                             <button
                               className="nav-more"
                               onClick={() => setShowAll((m) => ({ ...m, [acc.id]: !m[acc.id] }))}

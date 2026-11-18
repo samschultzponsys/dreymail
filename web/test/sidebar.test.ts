@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: renders inside a QueryClientProvider (the sidebar shows the version).
 // Modified by samschultzponsys, 2026-11-15: saved searches props.
 // Modified by samschultzponsys, 2026-11-15: roles and permissions, profile pictures, grouped settings, empty mailbox screen.
+// Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned.
 // Modified by samschultzponsys, 2026-11-18: the unread bubble for folded or unpinned folders flashes on new mail.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,13 +20,13 @@ beforeAll(() => {
 const account = { id: 'a1', name: 'Work', color: '#3b82f6' } as AccountView;
 const noop = () => {};
 
-function render(folders: Parameters<typeof Sidebar>[0]['folders']) {
+function render(folders: Parameters<typeof Sidebar>[0]['folders'], accounts: AccountView[] = [account]) {
   return renderToStaticMarkup(
     createElement(
       QueryClientProvider,
       { client: new QueryClient() },
       createElement(Sidebar, {
-      accounts: [account],
+      accounts,
       showUnified: true,
       userFullName: 'me',
       folders,
@@ -70,5 +71,14 @@ describe('unread in folders out of sight (11.1)', () => {
     expect(bubble(4)).toContain('hidden-unread flash');
     // Keeps flashing for a while, also when drawn again.
     expect(bubble(4)).toContain('flash');
+  });
+});
+
+describe('the ⌄ line under pinned folders (11.2)', () => {
+  const fold = (path: string) => ({ path, name: path, delimiter: '/', parentPath: '', specialUse: null, selectable: true, unread: 0, total: 0 });
+  const folders = [{ accountId: 'a1', folders: [fold('Inbox'), fold('Work')] }] as never;
+  it('shows while some folders are not pinned, and goes away once all are', () => {
+    expect(render(folders, [{ ...account, pinnedFolders: ['Inbox'] } as AccountView])).toContain('nav-more');
+    expect(render(folders, [{ ...account, pinnedFolders: ['Work', 'Inbox'] } as AccountView])).not.toContain('nav-more');
   });
 });
