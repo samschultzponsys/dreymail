@@ -40,7 +40,7 @@ export class Directory {
 
   /** Mailboxes that can search a directory: signed in with Microsoft or Google. */
   private sources(userId: string) {
-    return this.deps.store.listAccounts(userId).filter((a) => (a.auth === 'microsoft' || a.auth === 'google') && !a.sharedOf);
+    return this.deps.store.listAccounts(userId).filter((a) => (a.auth === 'microsoft' || (a.auth === 'google' && !/@(gmail|googlemail)\.com$/i.test(a.email))) && !a.sharedOf);
   }
 
   /** Whether directory search works for this mailbox (the user allowed it). */

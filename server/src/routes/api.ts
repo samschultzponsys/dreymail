@@ -1207,7 +1207,9 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   /** Per mailbox: whether the company directory can be searched (the user allowed it) (DreyMail 10.3). */
   app.get('/api/directory', async (req) => {
     const userId = uid(req);
-    const list = store.listAccounts(userId).filter((a) => a.auth === 'microsoft' || a.auth === 'google');
+    // Personal Gmail has no company directory: only Google Workspace (your own domain) does.
+    const personal = (email: string) => /@(gmail|googlemail)\.com$/i.test(email);
+    const list = store.listAccounts(userId).filter((a) => (a.auth === 'microsoft' || (a.auth === 'google' && !personal(a.email))) && !a.sharedOf);
     return Promise.all(list.map(async (a) => ({ accountId: a.id, kind: a.auth, allowed: (await deps.directory?.available(userId, a.id).catch(() => false)) ?? false })));
   });
 }

@@ -151,6 +151,10 @@ export class GoogleAuth {
       refreshToken: t.refresh_token,
     });
     if (t.access_token) this.tokens.set(account.id, { value: t.access_token, expires: Date.now() + (t.expires_in ?? 3600) * 1000 });
+    // What this sign-in allowed (reconnecting to allow contacts, tasks or the directory): known at
+    // once, not after the old token runs out.
+    if (t.scope) this.scopes.set(account.id, t.scope.split(' '));
+    else this.scopes.delete(account.id);
     return account.id;
   }
 

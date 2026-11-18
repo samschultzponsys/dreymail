@@ -13,7 +13,7 @@ import type { FetchLike } from '../src/oauth/microsoft.js';
 const secret = crypto.randomBytes(48).toString('base64');
 const b64u = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
-function fakeGoogle() {
+function fakeGoogle(scope?: string) {
   const seen: URLSearchParams[] = [];
   let n = 0;
   const fetchImpl: FetchLike = async (_url, init) => {
@@ -21,7 +21,7 @@ function fakeGoogle() {
     seen.push(p);
     const json =
       p.get('grant_type') === 'authorization_code'
-        ? { access_token: 'g-at-0', refresh_token: 'g-rt-1', id_token: `x.${b64u({ email: 'sam@gmail.com', name: 'Sam Schultz' })}.y`, expires_in: 3600 }
+        ? { access_token: 'g-at-0', refresh_token: 'g-rt-1', id_token: `x.${b64u({ email: 'sam@gmail.com', name: 'Sam Schultz' })}.y`, expires_in: 3600, ...(scope ? { scope } : {}) }
         : { access_token: `g-at-${++n}`, expires_in: 3600 };
     return { ok: true, status: 200, json: async () => json, text: async () => '' };
   };
@@ -63,5 +63,27 @@ describe('Gmail with Sign in with Google', () => {
     expect(store.getAccountSecret(user.id, account!.id)!.smtp.oauth).toMatchObject({ provider: 'google' });
     // The sign-in token is reused while fresh, then refreshed.
     expect(await ctx.google.accessToken(user.id, account!.id)).toBe('g-at-0');
+  });
+
+  it('a reconnect that allows contacts and tasks takes effect at once (11.0)', async () => {
+    const g = fakeGoogle('openid email https://mail.google.com/ https://www.googleapis.com/auth/contacts https://www.googleapis.com/auth/tasks');
+    const store = new Store(':memory:', new Keyring(secret).credentialKey);
+    ctx = await buildApp(loadConfig({ DREYMAIL_SECRET_KEY: secret, DREYMAIL_BASE_URL: 'https://mail.example.com' }), { store, logger: false, cacheFile: null, googleFetch: g.fetchImpl });
+    const reg = await ctx.app.inject({ method: 'POST', url: '/auth/password/register', payload: { username: 'sam', password: 'a long password' }, headers: { 'x-dreymail': '1' } });
+    const cookie = `dm_session=${reg.cookies.find((c) => c.name === 'dm_session')!.value}`;
+    const call = async (method: 'GET' | 'POST' | 'PUT', url: string, payload?: unknown) =>
+      (await ctx!.app.inject({ method, url, payload: payload as object, headers: { cookie, 'x-dreymail': '1' } })).json() as Record<string, unknown>;
+    await call('PUT', '/api/admin/google', { clientId: 'cid.apps.googleusercontent.com', clientSecret: 'GOCSPX-shh' });
+    const url = new URL(String((await call('POST', '/api/oauth/google/start', { color: '#ef4444', allow: ['contacts', 'tasks'] })).url));
+    expect(url.searchParams.get('scope')).toContain('https://www.googleapis.com/auth/contacts');
+    await ctx.app.inject({ method: 'GET', url: `/oauth/google/callback?code=c&state=${url.searchParams.get('state')}`, headers: { cookie } });
+    const [account] = (await call('GET', '/api/accounts')) as unknown as AccountView[];
+    const user = store.listUsers()[0]!;
+    const before = g.seen.length;
+    expect(await ctx.google.allowed(user.id, account!.id, 'contacts')).toBe(true);
+    expect(await ctx.google.allowed(user.id, account!.id, 'tasks')).toBe(true);
+    expect(await ctx.google.allowed(user.id, account!.id, 'directory')).toBe(false);
+    // Known from the sign-in itself: no refresh needed.
+    expect(g.seen.length).toBe(before);
   });
 });

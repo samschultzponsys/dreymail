@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v11.0): Gmail "Allow" takes effect at once
+
+- **Fix:** allowing contacts, tasks or the directory for a Gmail mailbox (Settings → Allow) kept
+  using the permissions known from the mailbox's previous token, so the row stayed at "Allow" and
+  contacts and tasks didn't load until the token expired. The permissions granted by the sign-in
+  are now kept from its token answer right away.
+- **Directory** is no longer offered for personal @gmail.com mailboxes (only Google Workspace has
+  a company directory).
+- **Files:** `server/src/oauth/google.ts`, `server/src/routes/api.ts`, `server/src/directory.ts`,
+  `server/test/google.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.9): Gmail labels in the list; this and following for every calendar
 
 - **Gmail labels in lists:** on Gmail (X-GM-EXT-1) message lists are fetched with X-GM-LABELS

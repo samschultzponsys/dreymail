@@ -64,7 +64,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail).
      Modified by samschultzponsys, 2026-11-18: v10.7 (meeting rooms).
      Modified by samschultzponsys, 2026-11-18: v10.8 (proposing a new time).
-     Modified by samschultzponsys, 2026-11-18: v10.9 (Gmail labels in the list; this and following for every calendar). -->
+     Modified by samschultzponsys, 2026-11-18: v10.9 (Gmail labels in the list; this and following for every calendar).
+     Modified by samschultzponsys, 2026-11-18: v11.0 (Gmail "Allow" takes effect at once). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -76,7 +77,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
