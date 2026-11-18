@@ -27,6 +27,7 @@
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
 // Modified by samschultzponsys, 2026-11-18: the version as one short label (a red ! when the app is out of step).
+// Modified by samschultzponsys, 2026-11-18: Contacts and Tasks buttons under Calendar.
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -36,6 +37,8 @@ import {
   PinOff,
   BellOff,
   CalendarDays,
+  Contact,
+  ListTodo,
   Archive,
   ChevronDown,
   ChevronLeft,
@@ -117,6 +120,9 @@ interface Props {
   onToggleFolder?: (accountId: string, path: string) => void;
   /** The calendar page is showing (DreyMail). */
   calendarActive?: boolean;
+  /** The contacts or tasks page is open (DreyMail 10.4). */
+  pageActive?: 'contacts' | 'tasks' | null;
+  onPage?: (page: 'contacts' | 'tasks') => void;
   onAccounts: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -144,7 +150,7 @@ interface Props {
   onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false }: Props) {
+export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false, pageActive = null, onPage }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -425,6 +431,18 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           <CalendarDays size={17} />
           <span className="name">Calendar</span>
         </button>
+      )}
+      {onPage && (
+        <div className="page-btns">
+          <button className={`btn page-btn ${pageActive === 'contacts' ? 'active' : ''}`} onClick={() => onPage('contacts')} title="Contacts" aria-current={pageActive === 'contacts' ? 'page' : undefined}>
+            <Contact size={16} />
+            <span className="name">Contacts</span>
+          </button>
+          <button className={`btn page-btn ${pageActive === 'tasks' ? 'active' : ''}`} onClick={() => onPage('tasks')} title="Tasks" aria-current={pageActive === 'tasks' ? 'page' : undefined}>
+            <ListTodo size={16} />
+            <span className="name">Tasks</span>
+          </button>
+        </div>
       )}
       <nav
         className="nav"

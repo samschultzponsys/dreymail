@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.4): Contacts and Tasks
+
+- **Contacts page** (`/contacts`): DreyMail's own contacts (new `contacts` table) with Outlook
+  contacts (Graph `/me/contacts`, Contacts.ReadWrite) and Google Contacts (People API connections,
+  contacts scope) where allowed per mailbox; search, add, edit, delete, write to an address. Own
+  contacts join address suggestions.
+- **Tasks page** (`/tasks`): DreyMail's own lists and tasks (new `task_lists` and `tasks` tables)
+  with Microsoft To Do (Graph `/me/todo`, Tasks.ReadWrite) and Google Tasks; add, complete, due
+  day, notes, delete, new lists.
+- Provider data is read live (cached two minutes) and written straight back; the permissions are
+  asked for only with *Allow* on the page. Contacts and Tasks buttons sit under Calendar.
+- **Files:** `shared/people.ts` (new), `server/src/people.ts` (new), `server/src/routes/people.ts`
+  (new), `web/src/components/ContactsPage.tsx` (new), `web/src/components/TasksPage.tsx` (new),
+  `server/src/app.ts`, `server/src/db.ts`, `server/src/routes/api.ts`, `web/src/App.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/routing.ts`, `web/src/styles.css`,
+  `server/test/people.test.ts` (new), `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.3): the company directory in address suggestions
 
 - **Directory:** address suggestions add people from Microsoft 365 (Graph `/me/people`, People.Read)

@@ -31,6 +31,7 @@
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
+import type { People } from '../people.js';
 import { receiptAddressOf } from '../../../shared/importance.js';
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -223,6 +224,8 @@ export interface ApiDeps {
   followups?: Followups;
   /** Company directory search (DreyMail 10.3). */
   directory?: Directory;
+  /** Contacts (DreyMail 10.4). */
+  people?: People;
   onFollowupsChanged?: (userId: string) => void;
   pool: ImapPool;
   mail: MailService;
@@ -1126,6 +1129,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     if (out.length < 8 && (scope === 'all' || !book)) {
       const seen = new Set(out.map((s) => s.address));
       for (const r of store.searchRecipients(userId, q.q)) if (!seen.has(r.address) && out.length < 8) out.push(r);
+    }
+    // DreyMail's own contacts (10.4).
+    if (out.length < 8 && deps.people) {
+      const seen = new Set(out.map((s) => s.address));
+      for (const p of deps.people.suggest(userId, q.q)) if (!seen.has(p.address) && out.length < 8) out.push(p);
     }
     // The company directory (Microsoft 365, Google Workspace) where allowed (DreyMail 10.3).
     if (out.length < 8 && deps.directory && prefs?.suggestDirectory !== false) {

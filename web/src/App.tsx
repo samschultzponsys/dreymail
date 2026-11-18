@@ -33,7 +33,7 @@
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
 // Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
-// Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message.
+// Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message; contacts and tasks pages.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -59,6 +59,8 @@ import { AssistantDialog } from './components/AssistantDialog';
 import { ScheduledDialog, useScheduled } from './components/ScheduledDialog';
 import { CalendarDialog } from './components/CalendarDialog';
 import { ReminderWindow } from './components/ReminderWindow';
+import { ContactsPage } from './components/ContactsPage';
+import { TasksPage } from './components/TasksPage';
 import { AppLock } from './components/AppLock';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
@@ -685,7 +687,7 @@ export function App() {
   return (
     <div
       className={`app ${listWidth ? 'list-sized' : ''}`}
-      data-mode={route.calendar ? 'calendar' : 'mail'}
+      data-mode={route.calendar || route.page ? 'calendar' : 'mail'}
       style={{ ...(listWidth ? { ['--list-w' as string]: `${listWidth}px` } : {}), ...(sideWidth ? { ['--side-w' as string]: `${sideWidth}px` } : {}) } as React.CSSProperties} data-view={view} ref={appRef} data-run={run?.plan.kind} data-leaving={run?.from}>
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
@@ -744,7 +746,7 @@ export function App() {
         accounts={accounts}
         showUnified={unifiedInbox}
         folders={folders.data}
-        sel={route.calendar ? { accountId: '', folder: '' } : effectiveSel}
+        sel={route.calendar || route.page ? { accountId: '', folder: '' } : effectiveSel}
         onSelect={(s) => {
           setChecked(new Set());
           // From the phone drawer, the folder replaces the drawer entry: Back then returns to the
@@ -811,6 +813,12 @@ export function App() {
           else go(r);
         }}
         calendarActive={!!route.calendar}
+        pageActive={route.page ?? null}
+        onPage={(page) => {
+          const r: Route = { ...HOME, page };
+          if (overlay === 'nav') navigate(r, { replace: true });
+          else go(r);
+        }}
         onAssistant={assistantStatus.data?.allowed ? (id) => setAssistantFor({ id }) : undefined}
         onDeleteSearch={(s) => {
           if (!confirm(`Remove the saved search “${s.name}”?`)) return;
@@ -896,6 +904,8 @@ export function App() {
         onSwipe={(m, d) => void onSwipe(m, d)}
       />
       {route.calendar && <CalendarDialog accounts={accounts} onNav={() => openOverlay('nav')} />}
+      {route.page === 'contacts' && <ContactsPage accounts={accounts} onNav={() => openOverlay('nav')} onWrite={(to) => composeMailto(`mailto:${encodeURIComponent(to)}`)} />}
+      {route.page === 'tasks' && <TasksPage accounts={accounts} onNav={() => openOverlay('nav')} />}
       <Reader
         openRef={readerRef}
         conversation={readerRef ? rowOf(rows, readerRef) : undefined}

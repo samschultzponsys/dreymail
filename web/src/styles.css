@@ -1346,3 +1346,45 @@ body.resizing iframe { pointer-events: none; }
 
 /* Directory suggestions (DreyMail 10.3). */
 .suggest-tag { margin-left: 6px; font-size: 10.5px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+
+/* Contacts and Tasks pages (DreyMail 10.4); the buttons under Calendar. */
+.page-btns { display: flex; gap: 6px; margin: -6px 12px 12px; }
+.page-btn { flex: 1; height: 32px; justify-content: center; gap: 6px; border-radius: var(--radius); font-size: 13px; }
+.page-btn svg { color: var(--accent); }
+.page-btn.active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
+.page-btn.active svg { color: var(--accent-text); }
+.sidebar.rail .page-btns { flex-direction: column; margin: -6px 6px 10px; }
+.sidebar.rail .page-btn .name { display: none; }
+.allow-bar { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 6px 16px; font-size: 13px; background: var(--surface-2, var(--bg)); border-bottom: 1px solid var(--border); }
+.people-search { display: inline-flex; align-items: center; gap: 6px; flex: 1; max-width: 340px; margin-left: auto; }
+.people-search .input { height: 32px; }
+.people-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 320px) 1fr; }
+.people-list { list-style: none; margin: 0; padding: 4px; overflow-y: auto; border-right: 1px solid var(--border); }
+.people-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 0; background: none; border-radius: var(--radius-sm); cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.people-row:hover { background: var(--hover); }
+.people-row.on { background: var(--active); }
+.people-initial { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent-fill) 25%, var(--surface)); font-weight: 600; }
+.people-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.people-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-text .muted { font-size: 12px; }
+.people-detail { overflow-y: auto; padding: 16px 20px; }
+.contact-card { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.contact-card h3 { margin: 0; font-size: 20px; }
+.task-add { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.task-add .input { flex: 1; }
+.task-add .task-add-due { flex: 0 0 150px; }
+.task-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.task { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.task-check { width: 20px; height: 20px; margin-top: 2px; flex: none; border-radius: 50%; border: 2px solid var(--border-strong); background: none; display: grid; place-items: center; cursor: pointer; color: var(--accent-text); padding: 0; }
+.task-check.on { background: var(--accent-fill); border-color: var(--accent-fill); }
+.task-main { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; border: 0; background: none; text-align: left; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+.task.done .task-title { text-decoration: line-through; color: var(--muted); }
+.task-due { font-size: 12px; color: var(--text-2); }
+.task-due.overdue { color: var(--danger); font-weight: 600; }
+.task-notes-hint { font-size: 12px; flex-basis: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-edit { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding: 4px 0 6px 28px; }
+@media (max-width: 700px) {
+  .people-main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .people-list { border-right: 0; border-bottom: 1px solid var(--border); max-height: 40dvh; }
+  .people-search { max-width: none; }
+}

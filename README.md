@@ -58,7 +58,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.0 (one short version label; the plain slide transition).
      Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates).
      Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant).
-     Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions). -->
+     Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions).
+     Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -70,7 +71,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -214,6 +215,14 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   importance (shown in the message list and the reader for mail you get), and the ✓ envelope asks
   for a read receipt. A message that asks for one shows *Send receipt* / *Don't send*; nothing is
   sent unless you say so, and either answer is remembered on the message.
+- **Contacts** (button under Calendar, `/contacts`): DreyMail's own contacts together with Outlook
+  contacts and Google Contacts of mailboxes where you allow them (*Allow* at the top of the page;
+  it signs in to that mailbox again asking for the permission). Search, add (choosing where to save),
+  edit and delete; a click on an address writes to it. DreyMail's own contacts are also suggested
+  when you type an address.
+- **Tasks** (`/tasks`): DreyMail's own task lists next to Microsoft To Do and Google Tasks lists
+  where allowed. Type a task and press Enter (optionally with a due day), tick it off, open it for
+  its due day and notes; done tasks fold away. Overdue tasks are red.
 - **Company directory:** for Microsoft 365 and Google Workspace mailboxes, address suggestions can
   include the organization's people (Settings → General → *Allow* per mailbox, which signs in again
   asking for that permission). They are marked *Directory*; the server searches after two letters

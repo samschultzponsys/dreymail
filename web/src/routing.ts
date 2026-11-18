@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: search filters (f) and messages opened from another folder (of).
 // Modified by samschultzponsys, 2026-11-17: the calendar page (/calendar).
+// Modified by samschultzponsys, 2026-11-18: the contacts and tasks pages (/contacts, /tasks).
 
 import { decodeFilters, encodeFilters, type SearchFilters } from '../../shared/search';
 
@@ -41,6 +42,8 @@ export interface Route {
   open: OpenMessage | null;
   /** The calendar page instead of mail (DreyMail). */
   calendar?: boolean;
+  /** The contacts or tasks page instead of mail (DreyMail 10.4). */
+  page?: 'contacts' | 'tasks';
 }
 
 export type Overlay = 'compose' | 'settings' | 'accounts' | 'nav';
@@ -74,6 +77,7 @@ export function parseLocation(pathname: string, search: string): Route {
   const open = parseOpen(params.get('open'), params.get('of'));
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] === 'calendar') return { ...HOME, calendar: true };
+  if (parts[0] === 'contacts' || parts[0] === 'tasks') return { ...HOME, page: parts[0] };
   if (parts[0] === 'mail' && parts.length >= 3) {
     const accountId = parts[1]!;
     let folder: string;
@@ -94,6 +98,7 @@ export function parseLocation(pathname: string, search: string): Route {
 
 export function buildUrl(route: Route): string {
   if (route.calendar) return '/calendar';
+  if (route.page) return `/${route.page}`;
   const path = route.accountId ? `/mail/${encodeURIComponent(route.accountId)}/${encodeURIComponent(route.folder)}` : '/';
   const params = new URLSearchParams();
   if (route.q) params.set('q', route.q);

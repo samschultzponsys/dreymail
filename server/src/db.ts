@@ -34,7 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
-// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -567,6 +567,36 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     const has = (db.prepare('PRAGMA table_info(calendar_events)').all() as { name: string }[]).some((c) => c.name === 'show_as');
     if (!has) db.exec("ALTER TABLE calendar_events ADD COLUMN show_as TEXT NOT NULL DEFAULT 'busy'");
   },
+  // DreyMail 10.4: DreyMail's own contacts, task lists and tasks.
+  `CREATE TABLE IF NOT EXISTS contacts (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL DEFAULT '',
+     emails TEXT NOT NULL DEFAULT '[]',
+     phones TEXT NOT NULL DEFAULT '[]',
+     company TEXT NOT NULL DEFAULT '',
+     title TEXT NOT NULL DEFAULT '',
+     notes TEXT NOT NULL DEFAULT '',
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS contacts_user ON contacts(user_id);
+   CREATE TABLE IF NOT EXISTS task_lists (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS tasks (
+     id TEXT PRIMARY KEY,
+     list_id TEXT NOT NULL REFERENCES task_lists(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     notes TEXT NOT NULL DEFAULT '',
+     due_day TEXT,
+     done INTEGER NOT NULL DEFAULT 0,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS tasks_list ON tasks(list_id);`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

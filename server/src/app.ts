@@ -23,7 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
-// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags.
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,6 +56,8 @@ import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
 import { Followups } from './mail/followups.js';
 import { Directory } from './directory.js';
+import { People } from './people.js';
+import { registerPeopleRoutes } from './routes/people.js';
 import { ServerSettings, withStoredSettings } from './serverSettings.js';
 import { assistantOutgoing } from './ai/outgoing.js';
 import type { Http } from './calendar/remote.js';
@@ -337,6 +339,8 @@ export async function buildApp(
   });
   // Event reminders: notifications on every device and the reminder window, sent by the server.
   const followups = new Followups(store);
+  // Contacts and tasks: DreyMail's own, Outlook and Google (DreyMail 10.4).
+  const people = new People({ store, microsoft, google });
   const reminders = new Reminders({
     store,
     calendars,
@@ -373,6 +377,7 @@ export async function buildApp(
     followups,
     onFollowupsChanged: (userId) => reminders.changed(userId),
     directory: new Directory({ store, microsoft, google }),
+    people,
     pool,
     mail,
     compose,
@@ -414,6 +419,7 @@ export async function buildApp(
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
   registerCalendarRoutes(app, { store, calendars, reminders });
+  registerPeopleRoutes(app, { people });
   registerAutoReplyRoutes(app, { autoReplies, onChanged: (userId) => assistant.syncWatching(userId) });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();
