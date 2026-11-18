@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
+// Modified by samschultzponsys, 2026-11-18: the version as one short label (a red ! when the app is out of step).
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -512,11 +513,13 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
         )}
       </nav>
       <div className="sidebar-footer">
-        <button className={`footer-me shows-${footerIdentity}`} title={`${userFullName}: profile and settings`} onClick={onSettings}>
-          <UserAvatar src={userAvatar} name={userFullName} size={20} />
-          {footerIdentity !== 'photo' && <span className="who name">{userLabel}</span>}
-        </button>
-        {version.data && <VersionStack server={version.data.version} update={version.data.update?.version ?? null} onLog={() => setShowLog(true)} />}
+        <div className="footer-id">
+          <button className={`footer-me shows-${footerIdentity}`} title={`${userFullName}: profile and settings`} onClick={onSettings}>
+            <UserAvatar src={userAvatar} name={userFullName} size={20} />
+            {footerIdentity !== 'photo' && <span className="who name">{userLabel}</span>}
+          </button>
+          {version.data && <VersionStack server={version.data.version} update={version.data.update?.version ?? null} onLog={() => setShowLog(true)} />}
+        </div>
         {menu && <ContextMenu x={menu.x} y={menu.y} title={menu.acc.name} items={menuItems(menu.acc)} onClose={closeMenu} />}
         {blankMenu && <ContextMenu x={blankMenu.x} y={blankMenu.y} items={blankMenuItems} onClose={closeBlankMenu} />}
         {groupMenu && <ContextMenu x={groupMenu.x} y={groupMenu.y} title={groupMenu.group.name} items={groupMenuItems(groupMenu.group)} onClose={closeGroupMenu} />}
@@ -575,20 +578,18 @@ function VersionStack({ server, update, onLog }: { server: string; update: strin
     else onLog();
   };
   const shown = check.fix === 'reload' ? (WEB_VERSION ?? client.version) : client.version;
+  // One short label (DreyMail 10.0): the server's version. A newer DreyMail adds an accent dot; a
+  // client out of step with the server turns it red with a "!", and the tooltip and click say and
+  // do what to update.
+  const title = !check.ok
+    ? `${check.message} Click to ${check.fix === 'reload' ? 'reload' : check.fix === 'update-app' ? 'check for an update' : "see what's new"}.`
+    : update
+      ? `Server ${server}${client.kind === 'web' ? '' : `, ${client.label.toLowerCase()} ${shown}`}. DreyMail ${update} is available: click for what's new.`
+      : `${check.message}. Click for what's new.`;
   return (
-    <div className="version-stack name">
-      <button
-        className={`version-btn ${update ? 'has-update' : ''}`}
-        onClick={onLog}
-        title={update ? `Server ${server}. DreyMail ${update} is available: click for what's new.` : `Server ${server}: what's new`}
-      >
-        Server {server}
-        {update && <span className="update-dot" aria-label="Update available" />}
-      </button>
-      <button className={`version-btn client ${check.ok ? '' : 'warn'}`} onClick={check.ok ? onLog : fix} title={check.ok ? check.message : `${check.message} Click to ${check.fix === 'reload' ? 'reload' : check.fix === 'update-app' ? 'check for an update' : 'see what\'s new'}.`}>
-        {client.label} {shown}
-        {!check.ok && <TriangleAlert size={11} aria-label="Versions differ" />}
-      </button>
-    </div>
+    <button className={`version-btn name ${update ? 'has-update' : ''} ${check.ok ? '' : 'warn'}`} onClick={check.ok ? onLog : fix} title={title} aria-label={title}>
+      {server}
+      {!check.ok ? <span className="version-alert" aria-hidden="true">!</span> : update ? <span className="update-dot" aria-hidden="true" /> : null}
+    </button>
   );
 }

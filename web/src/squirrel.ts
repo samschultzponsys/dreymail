@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-18: a plain slide, DreyMail's own (the default); the squirrel is a choice.
+
 /**
  * Phone screen transitions where the logo squirrel runs across the screen and "drags" the new
  * view in behind it: along the bottom, left to right to open the folder drawer and right to left to
@@ -28,7 +32,7 @@ export const SPEED = 1600;
 export const MIN_MS = 240;
 export const MAX_MS = 450;
 
-export type RunSpeed = Exclude<TransitionSpeed, 'off'>;
+export type RunSpeed = Exclude<TransitionSpeed, 'off' | 'slide'>;
 /** How much longer each setting takes than "fast" (speed and time limits alike). */
 export const SLOWDOWN: Record<RunSpeed, number> = { fast: 1, medium: 1.6, slow: 2.5 };
 
@@ -97,6 +101,19 @@ export function squirrelKeyframes(plan: RunPlan): Keyframe[] {
  * the setting isn't off. Unset (older saved preferences) means the default, "fast".
  */
 export function runSpeed(pref: TransitionSpeed | undefined, phoneLayout: boolean, reducedMotion: boolean): RunSpeed | null {
-  if (pref === 'off' || !phoneLayout || reducedMotion) return null;
-  return pref ?? 'fast';
+  if (pref === 'off' || pref === 'slide' || pref === undefined || !phoneLayout || reducedMotion) return null;
+  return pref;
 }
+
+/**
+ * DreyMail's own phone transition (the default since 10.0): the incoming view slides in from the
+ * side it comes from, quickly. Keyframes for Element.animate, or null when there is no move.
+ */
+export function slideKeyframes(kind: RunKind): Keyframe[] {
+  const from = kind === 'navOpen' || kind === 'close' ? '-28%' : '28%';
+  return [
+    { transform: `translateX(${from})`, opacity: 0.4 },
+    { transform: 'translateX(0)', opacity: 1 },
+  ];
+}
+export const SLIDE_MS = 190;

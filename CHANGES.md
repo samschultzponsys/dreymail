@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.0): one short version label; the plain slide transition
+
+- **Version label:** the sidebar footer shows the server's version as one short label under your
+  name (room for two-digit majors), instead of "Server X.Y" over "Web/App X.Y". Out of step, it
+  turns red with a "!"; the tooltip says what to update and a click does it, as before. Your name
+  no longer gets squeezed by the version and the install button.
+- **Phone transitions:** a plain slide, DreyMail's own, is the default (`screenTransitions: 'slide'`);
+  the running squirrel (upstream art, kept) is a choice at three speeds, or Off.
+- **Files:** `web/src/components/Sidebar.tsx`, `web/src/squirrel.ts`, `web/src/App.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/styles.css`, `shared/types.ts`,
+  `server/src/db.ts`, `server/src/routes/api.ts`, `server/test/preferences.test.ts`,
+  `web/test/squirrel.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v9.9): importance, read receipts, printing
 
 - **Importance:** the composer sends high or low importance (Importance, X-Priority and Priority

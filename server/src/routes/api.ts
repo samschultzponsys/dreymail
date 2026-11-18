@@ -128,7 +128,7 @@ export const prefsSchema = z.object({
   swipeLeft: swipe,
   swipeRight: swipe,
   notificationContent: z.enum(['full', 'preview', 'minimal']).default('full'),
-  screenTransitions: z.enum(['off', 'fast', 'medium', 'slow']).default('fast'),
+  screenTransitions: z.enum(['off', 'slide', 'fast', 'medium', 'slow']).default('slide'),
   contactPhotos: z.boolean().default(true),
   unifiedInbox: z.boolean().default(true),
   showFullName: z.boolean().default(false),

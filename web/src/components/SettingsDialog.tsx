@@ -66,9 +66,10 @@ import { formatDelay } from '../util';
 
 const TRANSITION_OPTIONS: [TransitionSpeed, string][] = [
   ['off', 'Off'],
-  ['fast', 'Fast'],
-  ['medium', 'Medium'],
-  ['slow', 'Slow'],
+  ['slide', 'Slide'],
+  ['fast', 'Squirrel, fast'],
+  ['medium', 'Squirrel, medium'],
+  ['slow', 'Squirrel, slow'],
 ];
 
 const SWIPE_OPTIONS: [SwipeAction, string][] = [
@@ -230,7 +231,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
                     </option>
                   ))}
                 </select>
-                <div className="hint">On phones, the squirrel runs across the screen when you open the menu or a message.</div>
+                <div className="hint">On phones, when you open the menu or a message: the new view slides in, or a squirrel runs across the screen and pulls it in.</div>
               </div>
             </>
           )}

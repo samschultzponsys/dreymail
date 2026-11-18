@@ -26,9 +26,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [ ] Shared and delegated mailboxes (Microsoft 365), and signed or encrypted mail (S/MIME).
 - [ ] Contacts as a section of their own; tasks (Microsoft To Do, Google Tasks).
 
-### Branding
-- [ ] Decide whether the running-squirrel phone animation stays or gets its own DreyMail motion.
-
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
   which DreyMail already supports. It would mean a second mail engine next to IMAP.
@@ -84,7 +81,10 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Subfolders fold away in the sidebar, the same on every device (8.8); a real folder tree with
       Inbox and Sent foldable, Gmail's built-in mailboxes at the top, folding with pins (9.4).
 - [x] The calendar as a page of its own (`/calendar`) with a clear button under Compose (8.9).
-- [x] Server and client versions side by side at the bottom, with a warning that says what to update (9.1).
+- [x] Server and client versions side by side at the bottom, with a warning that says what to update (9.1);
+      one short label under your name, red with a "!" when out of step (10.0).
+- [x] Phone transitions: DreyMail's own plain slide by default; the running squirrel stays as a
+      choice (10.0).
 - [x] Attached pictures open in an image viewer; a download arrow on their chip (9.3).
 - [x] Conversations or single messages, per mailbox (5.1).
 - [x] Mailbox groups: sidebar sections that expand and collapse, with a shared color, icon and

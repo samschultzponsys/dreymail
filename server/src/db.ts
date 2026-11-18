@@ -34,6 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -554,7 +555,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   swipeLeft: 'delete',
   swipeRight: 'archive',
   notificationContent: 'full',
-  screenTransitions: 'fast',
+  screenTransitions: 'slide',
   contactPhotos: true,
   unifiedInbox: true,
   showFullName: false,

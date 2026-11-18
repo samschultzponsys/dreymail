@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-18: the plain slide is the default; the squirrel no longer runs unless chosen.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -105,8 +109,9 @@ describe('the new view following the squirrel', () => {
 });
 
 describe('the Screen Transitions setting', () => {
-  it('runs at Fast by default on phones', () => {
-    expect(runSpeed(undefined, true, false)).toBe('fast');
+  it('does not run by default (the plain slide is the default since 10.0)', () => {
+    expect(runSpeed(undefined, true, false)).toBeNull();
+    expect(runSpeed('slide', true, false)).toBeNull();
   });
   it('runs at the chosen speed', () => {
     expect(runSpeed('fast', true, false)).toBe('fast');

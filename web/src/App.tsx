@@ -33,6 +33,7 @@
 // Modified by samschultzponsys, 2026-11-17: folding subfolders (kept in preferences).
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
 // Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
+// Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default).
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -70,7 +71,7 @@ import { HOME, listRoute, openMessageFolder, parseLocation, viewKey, type OpenMe
 import { updateSticky, withSticky } from './sticky';
 import { removesFromList, swipeToAction, type Direction, type UndoStep } from './swipe';
 import { formatSnoozeTime } from './snooze';
-import { planRun, runFor, runSpeed, type PaneView } from './squirrel';
+import { planRun, runFor, runSpeed, SLIDE_MS, slideKeyframes, type PaneView } from './squirrel';
 import { refKey, toRef } from './util';
 
 /** Bottom-left name: the user's chosen name, else their login name with a capital first letter. */
@@ -155,7 +156,16 @@ export function App() {
     shownView.current = view;
     const kind = runFor(from, view);
     if (!kind) return;
-    const speed = runSpeed(transitionPref, matchMedia('(max-width: 640px)').matches, matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const phone = matchMedia('(max-width: 640px)').matches;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // DreyMail's own slide (the default), or the squirrel when chosen.
+    if ((transitionPref ?? 'slide') === 'slide' && phone && !still) {
+      const pane = appRef.current?.querySelector<HTMLElement>(view === 'nav' ? '.sidebar' : view === 'list' ? '.list' : '.reader');
+      pane?.animate(slideKeyframes(kind), { duration: SLIDE_MS, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      setRun(null);
+      return;
+    }
+    const speed = runSpeed(transitionPref, phone, still);
     setRun(speed ? { id: ++runId.current, plan: planRun(kind, window.innerWidth, window.innerHeight, speed), from, to: view } : null);
   }, [view, transitionPref]);
   // While running back to the folder, the message stays up underneath rather than the empty reader.

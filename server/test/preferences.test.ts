@@ -9,14 +9,14 @@ import { prefsSchema } from '../src/routes/api.js';
 const base = { theme: 'system', pageSize: 50, markReadOnOpen: true, swipeLeft: 'delete', swipeRight: 'archive', notificationContent: 'full' };
 
 describe('screen transitions preference', () => {
-  it('is Fast by default for new users', () => {
-    expect(DEFAULT_PREFERENCES.screenTransitions).toBe('fast');
+  it('is the plain slide by default for new users (10.0)', () => {
+    expect(DEFAULT_PREFERENCES.screenTransitions).toBe('slide');
   });
-  it('stays Fast when saved by a client that does not know about it yet', () => {
-    expect(prefsSchema.parse(base).screenTransitions).toBe('fast');
+  it('is the slide when saved by a client that does not know about it yet', () => {
+    expect(prefsSchema.parse(base).screenTransitions).toBe('slide');
   });
-  it('accepts Off, Fast, Medium and Slow and rejects anything else', () => {
-    for (const v of ['off', 'fast', 'medium', 'slow']) expect(prefsSchema.parse({ ...base, screenTransitions: v }).screenTransitions).toBe(v);
+  it('accepts Off, Slide, and the squirrel at Fast, Medium and Slow, and rejects anything else', () => {
+    for (const v of ['off', 'slide', 'fast', 'medium', 'slow']) expect(prefsSchema.parse({ ...base, screenTransitions: v }).screenTransitions).toBe(v);
     expect(prefsSchema.safeParse({ ...base, screenTransitions: 'ludicrous' }).success).toBe(false);
     expect(prefsSchema.safeParse({ ...base, screenTransitions: false }).success).toBe(false);
   });

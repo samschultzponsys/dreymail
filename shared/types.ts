@@ -29,7 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
-// Modified by samschultzponsys, 2026-11-18: importance and read receipts.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition.
 
 // Types shared between the server API and the web client.
 
@@ -348,8 +348,8 @@ export interface DraftResult {
 /** full: sender and subject in phone notifications; minimal: only "New message" and the account. */
 export type NotificationContent = 'full' | 'preview' | 'minimal';
 
-/** Phone screen transitions (the running squirrel): off, or how quickly it runs. */
-export type TransitionSpeed = 'off' | 'fast' | 'medium' | 'slow';
+/** Phone screen transitions: off, a plain slide (DreyMail's own, the default), or the running squirrel at a speed. */
+export type TransitionSpeed = 'off' | 'slide' | 'fast' | 'medium' | 'slow';
 
 export type FooterIdentity = 'both' | 'name' | 'photo';
 
