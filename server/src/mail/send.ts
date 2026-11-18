@@ -8,7 +8,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies.
 // Modified by samschultzponsys, 2026-11-17: sends calendar invitations, updates and cancellations (iTIP REQUEST/CANCEL).
 // Modified by samschultzponsys, 2026-11-17: no second copy in Sent when the server filed one itself.
-// Modified by samschultzponsys, 2026-11-18: importance, read receipts asked for and sent (RFC 8098).
+// Modified by samschultzponsys, 2026-11-18: importance, read receipts asked for and sent (RFC 8098); S/MIME.
 
 import type { ComposePayload, DraftResult, SendResult } from '../../../shared/types.js';
 import type { Store } from '../db.js';
@@ -32,6 +32,8 @@ export class ComposeService {
       graphSend?: (userId: string, accountId: string, raw: Buffer) => Promise<void>;
       /** OAuth access token for SMTP (Gmail signed in with Google). */
       smtpToken?: (userId: string, accountId: string) => Promise<string>;
+      /** S/MIME signing and encryption (DreyMail 10.6). */
+      smime?: { protect(userId: string, accountId: string, raw: Buffer, opts: { sign: boolean; encrypt: boolean; recipients: string[] }): Buffer };
       /** A message was sent from this mailbox to these people (address suggestions) (DreyMail). */
       onSent?: (userId: string, accountId: string, recipients: { name: string; address: string }[]) => void;
     },
@@ -85,7 +87,20 @@ export class ComposeService {
     // Graph takes the recipients from the headers, so Outlook messages keep Bcc (Exchange strips it
     // from what recipients get); SMTP gets them in the envelope instead.
     const viaGraph = account.auth === 'microsoft';
-    const { raw, messageId, envelope } = await buildRawMessage(message, { keepBcc: viaGraph, inlineImages: true });
+    const built = await buildRawMessage(message, { keepBcc: viaGraph, inlineImages: true });
+    const { messageId, envelope } = built;
+    // S/MIME (DreyMail 10.6): signed and/or encrypted to every recipient (and to you, for Sent).
+    const raw =
+      p.sign || p.encrypt
+        ? (() => {
+            if (!this.opts.smime) throw new ComposeError('Signed and encrypted mail is not available on this server');
+            try {
+              return this.opts.smime.protect(userId, account.id, built.raw, { sign: !!p.sign, encrypt: !!p.encrypt, recipients: recipients.map((r) => r.address) });
+            } catch (err) {
+              throw new ComposeError((err as Error).message);
+            }
+          })()
+        : built.raw;
     await this.deliver(userId, account, raw, envelope);
 
     // From here on the message is sent; failures are reported as warnings, not errors.

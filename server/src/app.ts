@@ -23,7 +23,7 @@
 // Modified by samschultzponsys, 2026-11-17: Settings → Storage (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
-// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks.
+// Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,6 +57,7 @@ import { Reminders } from './calendar/reminders.js';
 import { Followups } from './mail/followups.js';
 import { Directory } from './directory.js';
 import { People } from './people.js';
+import { SmimeStore } from './mail/smimeStore.js';
 import { registerPeopleRoutes } from './routes/people.js';
 import { ServerSettings, withStoredSettings } from './serverSettings.js';
 import { assistantOutgoing } from './ai/outgoing.js';
@@ -222,6 +223,9 @@ export async function buildApp(
       : null,
   );
   pool.onWatching = (userId, accountId) => mail.syncAccount(userId, accountId);
+  // S/MIME: encrypted mail opened and signatures checked when read; sent mail signed and encrypted (DreyMail 10.6).
+  const smime = new SmimeStore(store);
+  mail.smime = smime;
   pool.onInboxActivity = (userId, accountId) => mail.folderChanged(userId, accountId, 'INBOX');
   const vapid = vapidKeysFromSeed(keyring.vapidSeed);
   let live: LiveSessions = { isUserActive: () => false };
@@ -325,6 +329,7 @@ export async function buildApp(
     blockPrivateHosts: config.blockPrivateMailHosts,
     graphSend: (userId, accountId, raw) => microsoft.sendRaw(userId, accountId, raw),
     smtpToken: (userId, accountId) => google.accessToken(userId, accountId),
+    smime,
     onSent: (userId, accountId, recipients) => addressBook.sent(userId, accountId, recipients),
   });
   const calendars = new CalendarService({
@@ -378,6 +383,7 @@ export async function buildApp(
     onFollowupsChanged: (userId) => reminders.changed(userId),
     directory: new Directory({ store, microsoft, google }),
     people,
+    smime,
     pool,
     mail,
     compose,

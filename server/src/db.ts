@@ -34,7 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
-// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -602,6 +602,27 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
     const has = (db.prepare('PRAGMA table_info(accounts)').all() as { name: string }[]).some((c) => c.name === 'oauth_parent');
     if (!has) db.exec('ALTER TABLE accounts ADD COLUMN oauth_parent TEXT');
   },
+  // DreyMail 10.6: S/MIME certificates (your own, per mailbox, key sealed) and other people's
+  // certificates seen on signed mail (for encrypting to them).
+  `CREATE TABLE IF NOT EXISTS smime_keys (
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     key_sealed TEXT NOT NULL,
+     cert_pem TEXT NOT NULL,
+     chain TEXT NOT NULL DEFAULT '[]',
+     email TEXT NOT NULL DEFAULT '',
+     subject TEXT NOT NULL DEFAULT '',
+     not_after TEXT NOT NULL DEFAULT '',
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (user_id, account_id)
+   );
+   CREATE TABLE IF NOT EXISTS smime_certs (
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     email TEXT NOT NULL,
+     cert_pem TEXT NOT NULL,
+     seen_at INTEGER NOT NULL,
+     PRIMARY KEY (user_id, email)
+   );`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

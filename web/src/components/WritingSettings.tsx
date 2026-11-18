@@ -1,7 +1,8 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { fetchJson } from '../api';
 import { resolveAddressLine, setAddressLine, type AddressLine, type AddressLineLevel } from '../../../shared/addressLines';
 import type { AccountView, Preferences, SuggestScope } from '../../../shared/types';
@@ -82,6 +83,7 @@ export function WritingSettings({ prefs, save, accounts }: { prefs: Preferences;
         </div>
         <CompanyDirectory prefs={prefs} save={save} accounts={accounts} />
       </div>
+      <SmimeSettings accounts={accounts} />
 
       <div>
         <label className="label">Cc and Bcc lines</label>
@@ -184,6 +186,76 @@ function CompanyDirectory({ prefs, save, accounts }: { prefs: Preferences; save:
         {q.data.some((d) => d.kind === 'microsoft') && q.data.some((d) => d.kind === 'google') ? ' and ' : ''}
         {q.data.some((d) => d.kind === 'google') ? 'Google for the directory (an administrator turns on the People API in Google Cloud Console)' : ''}. Searching is done by
         the server, only after two letters.
+      </div>
+    </div>
+  );
+}
+
+/** Settings → General: S/MIME certificates per mailbox (DreyMail 10.6). */
+function SmimeSettings({ accounts }: { accounts: AccountView[] }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['smime'], queryFn: () => fetchJson<{ accountId: string; email: string; subject: string; notAfter: string }[]>('GET', '/api/smime') });
+  const [error, setError] = useState<string | null>(null);
+  const importFor = (a: AccountView) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.p12,.pfx,application/x-pkcs12';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const password = window.prompt(`Password of ${file.name}:`) ?? '';
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let bin = '';
+      for (const b of bytes) bin += String.fromCharCode(b);
+      try {
+        await fetchJson('PUT', `/api/smime/${encodeURIComponent(a.id)}`, { file: btoa(bin), password });
+        setError(null);
+        void qc.invalidateQueries({ queryKey: ['smime'] });
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    };
+    input.click();
+  };
+  const remove = (a: AccountView) => {
+    if (!window.confirm(`Remove the certificate of ${a.name}? Encrypted mail to it can't be read in DreyMail without it.`)) return;
+    void fetchJson('DELETE', `/api/smime/${encodeURIComponent(a.id)}`).then(() => qc.invalidateQueries({ queryKey: ['smime'] }), (e: Error) => setError(e.message));
+  };
+  return (
+    <div>
+      <label className="label">Signed and encrypted mail (S/MIME)</label>
+      <div className="check-list">
+        {accounts.map((a) => {
+          const c = q.data?.find((x) => x.accountId === a.id);
+          return (
+            <div key={a.id} className="cal-when-row">
+              <span className="grow">
+                {a.name}{' '}
+                {c ? (
+                  <span className="muted">
+                    · {c.email || c.subject} · until {new Date(c.notAfter).toLocaleDateString()}
+                  </span>
+                ) : (
+                  <span className="muted">· no certificate</span>
+                )}
+              </span>
+              <button className="btn" onClick={() => importFor(a)}>
+                {c ? 'Replace…' : 'Import…'}
+              </button>
+              {c && (
+                <button className="btn" onClick={() => remove(a)}>
+                  Remove
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {error && <div className="error-text">{error}</div>}
+      <div className="hint">
+        Import your certificate as a .p12 or .pfx file (with its private key) to read mail encrypted to you and to sign or encrypt what you send (the lock
+        and signature buttons in the composer). Signed mail you get is checked by itself, and the sender&apos;s certificate is kept so you can encrypt to them.
+        The key is stored encrypted on the server.
       </div>
     </div>
   );

@@ -27,11 +27,13 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
-// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes.
+// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes; S/MIME.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
 import type { People } from '../people.js';
+import type { SmimeStore } from '../mail/smimeStore.js';
+import { SmimeError } from '../mail/smime.js';
 import { receiptAddressOf } from '../../../shared/importance.js';
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -195,6 +197,8 @@ const composeSchema = z.object({
   answering: refSchema.nullable(),
   importance: z.enum(['high', 'low']).nullable().optional(),
   readReceipt: z.boolean().optional(),
+  sign: z.boolean().optional(),
+  encrypt: z.boolean().optional(),
 });
 
 // ---- helpers ------------------------------------------------------------------
@@ -226,6 +230,8 @@ export interface ApiDeps {
   directory?: Directory;
   /** Contacts (DreyMail 10.4). */
   people?: People;
+  /** S/MIME certificates (DreyMail 10.6). */
+  smime?: SmimeStore;
   onFollowupsChanged?: (userId: string) => void;
   pool: ImapPool;
   mail: MailService;
@@ -897,6 +903,34 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     } catch (err) {
       return sendError(reply, err);
     }
+  });
+
+  // ---- S/MIME certificates (DreyMail 10.6) ----------------------------------------------------
+
+  app.get('/api/smime', async (req) => deps.smime?.list(uid(req)) ?? []);
+
+  /** Imports a .p12 / .pfx for a mailbox: { file: base64, password }. */
+  app.put<{ Params: { accountId: string } }>('/api/smime/:accountId', async (req, reply) => {
+    const body = z.object({ file: z.string().max(200_000), password: z.string().max(500) }).safeParse(req.body);
+    if (!body.success || !deps.smime) return reply.code(400).send({ error: 'Choose a .p12 or .pfx file' });
+    try {
+      requireAccount(uid(req), req.params.accountId);
+      return deps.smime.save(uid(req), req.params.accountId, Buffer.from(body.data.file, 'base64'), body.data.password);
+    } catch (err) {
+      if (err instanceof SmimeError) return reply.code(400).send({ error: err.message });
+      return sendError(reply, err);
+    }
+  });
+
+  app.delete<{ Params: { accountId: string } }>('/api/smime/:accountId', async (req) => {
+    deps.smime?.remove(uid(req), req.params.accountId);
+    return deps.smime?.list(uid(req)) ?? [];
+  });
+
+  /** Which of these recipients can't get encrypted mail yet (no certificate known). */
+  app.post('/api/smime/missing', async (req) => {
+    const body = z.object({ addresses: z.array(z.string().max(320)).max(500) }).parse(req.body);
+    return { missing: deps.smime?.missing(uid(req), body.addresses) ?? body.addresses };
   });
 
   /** Gmail labels of a message (null for mailboxes without labels) (DreyMail). */

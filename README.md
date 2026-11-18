@@ -60,7 +60,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant).
      Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions).
      Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks).
-     Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes). -->
+     Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes).
+     Modified by samschultzponsys, 2026-11-18: v10.6 (S/MIME signed and encrypted mail). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -72,7 +73,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.5**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.6**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -216,6 +217,14 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   importance (shown in the message list and the reader for mail you get), and the ✓ envelope asks
   for a read receipt. A message that asks for one shows *Send receipt* / *Don't send*; nothing is
   sent unless you say so, and either answer is remembered on the message.
+- **Signed and encrypted mail (S/MIME):** Settings → General → *Import…* your certificate (.p12 /
+  .pfx with its key) per mailbox. Mail encrypted to you then opens like any other, and the
+  composer's signature and lock buttons sign and encrypt what you send (encrypted to every
+  recipient and to you, so the copy in Sent stays readable). Signed mail you receive is checked
+  by itself: the reader says whether the signature matches the message, whether the certificate is
+  from a known authority, in date and for the sender's address, or what is wrong. Senders'
+  certificates are kept from their signed mail, which is what lets you encrypt to them. Keys are
+  stored encrypted; RSA certificates (what S/MIME certificates use).
 - **Shared mailboxes (Microsoft 365):** under Accounts, an Outlook mailbox signed in with Microsoft
   has *Add a shared mailbox…*: type the shared mailbox's address (support@, info@…) and it opens as
   a mailbox of its own with your sign-in, with its own folders, color and notifications. Mail you

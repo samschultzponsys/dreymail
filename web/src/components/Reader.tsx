@@ -734,6 +734,7 @@ function MessageCard({
             </div>
           )}
           <ReadReceipt detail={d} />
+          {d.smime && <SmimeBanner info={d.smime} from={d.from[0]?.address ?? ''} />}
 
           {d.followUp && (
             <div className="notice followup-notice">
@@ -822,4 +823,23 @@ async function setFollowUp(qc: ReturnType<typeof useQueryClient>, ref: MessageRe
   void qc.invalidateQueries({ queryKey: ['message'] });
   void qc.invalidateQueries({ queryKey: ['messages'] });
   void qc.invalidateQueries({ queryKey: ['followups'] });
+}
+
+/** What S/MIME says about the open message (DreyMail 10.6). */
+function SmimeBanner({ info, from }: { info: NonNullable<MessageDetail['smime']>; from: string }) {
+  const ok = info.signed && info.valid && info.trusted && info.matchesSender;
+  const bad = info.undecryptable || (info.signed && info.valid === false);
+  const parts: string[] = [];
+  if (info.encrypted) parts.push(info.undecryptable ? 'Encrypted, and none of your certificates can open it.' : 'Encrypted.');
+  if (info.signed) {
+    if (info.valid === false) parts.push(`Signature not valid: ${info.problem ?? 'it doesn’t match the message'}.`);
+    else if (ok) parts.push(`Signed by ${info.signer?.name || info.signer?.email || from}${info.signer?.issuer ? ` (certificate from ${info.signer.issuer})` : ''}.`);
+    else parts.push(`Signed by ${info.signer?.email || 'someone'}, but ${(info.problem ?? 'it can’t be fully checked').replace(/^The /, 'the ')}.`);
+  }
+  return (
+    <div className={`notice smime-notice ${bad ? 'bad' : ok || (info.encrypted && !info.signed) ? 'good' : 'warn'}`}>
+      {bad ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}
+      <span className="grow">{parts.join(' ')}</span>
+    </div>
+  );
 }

@@ -29,7 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
-// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions; shared mailboxes.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions; shared mailboxes; S/MIME.
 
 // Types shared between the server API and the web client.
 
@@ -274,6 +274,17 @@ export interface MessageDetail {
   receiptTo?: string | null;
   /** Flagged for follow-up (DreyMail). */
   followUp?: FollowUp;
+  /** S/MIME: encrypted and/or signed, and what the signature check found (DreyMail 10.6). */
+  smime?: {
+    encrypted: boolean;
+    undecryptable?: boolean;
+    signed: boolean;
+    valid?: boolean;
+    trusted?: boolean;
+    matchesSender?: boolean;
+    signer?: { email: string; name: string; issuer: string };
+    problem?: string;
+  };
 }
 
 /** A domain in its stored ASCII (punycode) form and its human-readable form. */
@@ -344,6 +355,9 @@ export interface ComposePayload {
   importance?: Importance | null;
   /** Ask for a read receipt (DreyMail). */
   readReceipt?: boolean;
+  /** S/MIME: sign and/or encrypt (DreyMail 10.6). */
+  sign?: boolean;
+  encrypt?: boolean;
 }
 
 export interface SendResult {

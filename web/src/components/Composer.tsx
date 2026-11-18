@@ -6,10 +6,12 @@
 // Modified by samschultzponsys, 2026-11-17: Schedule button with more quick times; longer send delays.
 // Modified by samschultzponsys, 2026-11-17: single line spacing (lines as <div>s, not <p>s).
 // Modified by samschultzponsys, 2026-11-17: address bubbles; suggestions per mailbox; Cc/Bcc lines pinned per mailbox, group or all.
-// Modified by samschultzponsys, 2026-11-18: importance (high / low) and asking for a read receipt.
+// Modified by samschultzponsys, 2026-11-18: importance (high / low) and asking for a read receipt; S/MIME sign and encrypt.
 
 import {
   ArrowDown,
+  FileSignature,
+  Lock,
   CircleAlert,
   MailCheck,
   Bold,
@@ -30,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchJson } from '../api';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { resolveAddressLine, setAddressLine, type AddressLine } from '../../../shared/addressLines';
 import type { AccountView, AttachmentView, ComposePayload, MessageRef } from '../../../shared/types';
@@ -103,6 +106,11 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
   const [bcc, setBcc] = useState(init.bcc);
   const [importance, setImportance] = useState<'high' | 'low' | null>(init.importance ?? null);
   const [readReceipt, setReadReceipt] = useState(!!init.readReceipt);
+  // S/MIME (DreyMail 10.6): only offered for a mailbox with a certificate.
+  const smimeQ = useQuery({ queryKey: ['smime'], queryFn: () => fetchJson<{ accountId: string }[]>('GET', '/api/smime'), staleTime: 300_000 });
+  const hasCert = !!smimeQ.data?.some((c) => c.accountId === accountId);
+  const [sign, setSign] = useState(false);
+  const [encrypt, setEncrypt] = useState(false);
   // Cc and Bcc: shown when the settings say so for this mailbox (pinned), or opened for this message.
   const [openLines, setOpenLines] = useState<Record<AddressLine, boolean>>({ cc: !!init.cc, bcc: !!init.bcc });
   const qc = useQueryClient();
@@ -177,6 +185,8 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
     answering: init.answering,
     importance,
     readReceipt,
+    ...(hasCert && sign ? { sign: true } : {}),
+    ...(hasCert && encrypt ? { encrypt: true } : {}),
   });
 
   /** The composer as it is now, to reopen it after "undo send". */
@@ -488,6 +498,16 @@ export function Composer({ init, accounts, onClose, onToast, onSent, dirtyRef, u
         <button className={`icon-btn ${readReceipt ? 'on' : ''}`} title="Ask for a read receipt" aria-pressed={readReceipt} onClick={() => setReadReceipt((v) => !v)}>
           <MailCheck size={17} />
         </button>
+        {hasCert && (
+          <>
+            <button className={`icon-btn ${sign ? 'on' : ''}`} title="Sign with your certificate (S/MIME)" aria-pressed={sign} onClick={() => setSign((v) => !v)}>
+              <FileSignature size={17} />
+            </button>
+            <button className={`icon-btn ${encrypt ? 'on' : ''}`} title="Encrypt (S/MIME): only the recipients can read it" aria-pressed={encrypt} onClick={() => setEncrypt((v) => !v)}>
+              <Lock size={17} />
+            </button>
+          </>
+        )}
         <span className="grow error-text">{error}</span>
         <button className="icon-btn" title="Discard" onClick={close}>
           <Trash2 size={16} />

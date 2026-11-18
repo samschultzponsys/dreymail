@@ -1388,3 +1388,9 @@ body.resizing iframe { pointer-events: none; }
   .people-list { border-right: 0; border-bottom: 1px solid var(--border); max-height: 40dvh; }
   .people-search { max-width: none; }
 }
+
+/* S/MIME (DreyMail 10.6). */
+.smime-notice.good svg { color: #16a34a; }
+.smime-notice.warn svg { color: #ca8a04; }
+.smime-notice.bad { border-color: var(--danger); }
+.smime-notice.bad svg { color: var(--danger); }

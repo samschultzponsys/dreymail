@@ -11,8 +11,9 @@
 // Modified by samschultzponsys, 2026-11-17: Mark as spam (to Junk, made if missing, marked $Junk).
 // Modified by samschultzponsys, 2026-11-17: finds a message by Message-ID (sent mail the server filed itself).
 // Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
-// Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts).
+// Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading.
 
+import type { SmimeInfo } from '../mail/smime.js';
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
   AccountCursor,
@@ -242,6 +243,8 @@ export interface MailCacheDeps {
 
 export class MailService {
   private readonly relatedIndex = new RelatedIndex();
+  /** S/MIME: decrypts and checks signed mail before it is read (DreyMail 10.6). */
+  smime?: { open(userId: string, accountId: string, raw: Buffer): { raw: Buffer; info: SmimeInfo } | null };
 
   constructor(
     private readonly pool: ImapPool,
@@ -822,7 +825,10 @@ export class MailService {
       if (opts.timing) opts.timing[name] = Math.round(now - t);
       t = now;
     };
-    const { raw, flags, internalDate } = await this.fetchRaw(userId, ref, opts.maxBytes);
+    const fetched = await this.fetchRaw(userId, ref, opts.maxBytes);
+    const { flags, internalDate } = fetched;
+    const opened = this.smime?.open(userId, ref.accountId, fetched.raw) ?? null;
+    const raw = opened?.raw ?? fetched.raw;
     step('fetch');
     const email = await parseRaw(raw);
     step('parse');
@@ -838,7 +844,7 @@ export class MailService {
       });
       step('images');
     }
-    return buildMessageDetail(
+    const detail = buildMessageDetail(
       email,
       { ...ref, flags, internalDate },
       {
@@ -851,11 +857,14 @@ export class MailService {
         },
       },
     );
+    if (opened) detail.smime = opened.info;
+    return detail;
   }
 
   async getParsed(userId: string, ref: MessageRef, maxBytes: number): Promise<ParsedEmail> {
     const { raw } = await this.fetchRaw(userId, ref, maxBytes);
-    return parseRaw(raw);
+    // Replies, forwards and invitations see the decrypted message too.
+    return parseRaw(this.smime?.open(userId, ref.accountId, raw)?.raw ?? raw);
   }
 
   async getAttachment(userId: string, ref: MessageRef, index: number, maxBytes: number) {

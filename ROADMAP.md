@@ -19,7 +19,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Mail
 - [ ] Gmail: a conversation's labels in the message list.
-- [ ] Signed or encrypted mail (S/MIME).
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -103,6 +102,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Gmail: Archive moves to All Mail (no "Archive" label); a message's labels shown, added and
       removed (9.7).
 - [x] Shared Microsoft 365 mailboxes, opened with your own sign-in (10.5).
+- [x] S/MIME: signatures checked, encrypted mail opened, sending signed and encrypted (10.6).
 - [x] Contacts (DreyMail's own, Outlook, Google) and Tasks (DreyMail's own, Microsoft To Do, Google
       Tasks) as pages of their own (10.4).
 - [x] Follow-up flags with due dates, reminders and Mark complete (10.1).

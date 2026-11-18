@@ -13,6 +13,26 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.6): S/MIME signed and encrypted mail
+
+- **Reading:** multipart/signed and opaque signed mail is verified (digest over the exact signed
+  bytes, the signature over the signed attributes, the certificate's dates, its chain to Node's
+  public roots, its address against the sender); enveloped mail is decrypted with your
+  certificates' keys. The reader shows what was found; replies, forwards and invitations see the
+  decrypted message.
+- **Sending:** the composer signs (SHA-256, detached) and encrypts (AES-256-CBC to every recipient
+  and to you) for mailboxes with a certificate; encrypting needs each recipient's certificate,
+  which DreyMail keeps from their valid signed mail.
+- **Certificates:** .p12 / .pfx import per mailbox (Settings → General); the key is sealed with
+  the server's key (`smime_keys`, `smime_certs`: new migration).
+- **Dependency:** `node-forge` 1.4.0 (BSD-3-Clause) for PKCS #7 and PKCS #12.
+- **Files:** `server/src/mail/smime.ts` (new), `server/src/mail/smimeStore.ts` (new),
+  `server/src/imap/mail.ts`, `server/src/mail/send.ts`, `server/src/routes/api.ts`,
+  `server/src/app.ts`, `server/src/db.ts`, `shared/types.ts`, `web/src/components/Reader.tsx`,
+  `web/src/components/Composer.tsx`, `web/src/components/WritingSettings.tsx`, `web/src/styles.css`,
+  `server/test/smime.test.ts` (new), `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.5): shared Microsoft 365 mailboxes
 
 - **Shared mailboxes:** an Outlook mailbox signed in with Microsoft can open shared mailboxes
