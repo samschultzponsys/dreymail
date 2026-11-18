@@ -59,7 +59,8 @@
      Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates).
      Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant).
      Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions).
-     Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks). -->
+     Modified by samschultzponsys, 2026-11-18: v10.4 (Contacts and Tasks).
+     Modified by samschultzponsys, 2026-11-18: v10.5 (shared Microsoft 365 mailboxes). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -71,7 +72,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -215,6 +216,12 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   importance (shown in the message list and the reader for mail you get), and the ✓ envelope asks
   for a read receipt. A message that asks for one shows *Send receipt* / *Don't send*; nothing is
   sent unless you say so, and either answer is remembered on the message.
+- **Shared mailboxes (Microsoft 365):** under Accounts, an Outlook mailbox signed in with Microsoft
+  has *Add a shared mailbox…*: type the shared mailbox's address (support@, info@…) and it opens as
+  a mailbox of its own with your sign-in, with its own folders, color and notifications. Mail you
+  send from it goes out as the shared address. Your account needs Full Access to it, and Send As
+  (or Send on behalf) to send from it; an administrator gives both in the Exchange admin center.
+  Removing your mailbox removes its shared mailboxes from DreyMail.
 - **Contacts** (button under Calendar, `/contacts`): DreyMail's own contacts together with Outlook
   contacts and Google Contacts of mailboxes where you allow them (*Allow* at the top of the page;
   it signs in to that mailbox again asking for the permission). Search, add (choosing where to save),

@@ -5,6 +5,7 @@
 // mailbox and CalDAV connection is mirrored into the calendars table (so each keeps its checkbox
 // and color), while events are read live for the range on screen (cached for a minute) and changes
 // go straight to the provider. Also answers invitations found in mail.
+// Shared mailboxes (10.5) bring no calendars of their own.
 
 import crypto from 'node:crypto';
 import { findJoinUrl, occurrences, type CalendarEvent, type CalendarSourceView, type EventOccurrence, type InviteAnswer, type InviteState } from '../../../shared/calendar.js';
@@ -117,7 +118,8 @@ export class CalendarService {
   sources(userId: string): CalendarSourceView[] {
     const out: CalendarSourceView[] = [];
     for (const a of this.deps.store.listAccounts(userId))
-      if (a.auth === 'google' || a.auth === 'microsoft') {
+      // Shared mailboxes use their parent's sign-in: its calendars are already there.
+      if ((a.auth === 'google' || a.auth === 'microsoft') && !a.sharedOf) {
         const e = this.errors.get(a.id);
         out.push({ id: a.id, kind: a.auth, name: a.name, accountId: a.id, error: e?.message ?? null, reconnect: e?.reconnect ?? false });
       }

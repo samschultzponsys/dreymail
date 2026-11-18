@@ -29,7 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
-// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions; shared mailboxes.
 
 // Types shared between the server API and the web client.
 
@@ -72,6 +72,8 @@ export interface AccountView {
   appendSent: boolean;
   /** How DreyMail signs in (DreyMail): a password, or Microsoft / Google sign-in (OAuth). */
   auth: AccountAuth;
+  /** A shared Microsoft 365 mailbox opened with this mailbox's sign-in (DreyMail 10.5). */
+  sharedOf?: string | null;
   /** The mailbox group it belongs to, if any (DreyMail). */
   groupId?: string | null;
   /** Conversations shown as threads (true) or every message on its own (DreyMail). */

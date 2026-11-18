@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-16: clicking outside no longer closes it (it lost what was typed).
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-16: right-click the folder bar's empty space for New group….
+// Modified by samschultzponsys, 2026-11-18: shared Microsoft 365 mailboxes.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -24,7 +25,7 @@ import { DEFAULT_PORTS } from '../../../shared/mailPorts';
 import type { AccountDefaults, AccountInput, AccountView, MailboxGroupView, TlsMode } from '../../../shared/types';
 import { gmailAppPasswordInput, newAccountInput, usesDefaultPassword } from '../accountForm';
 import { MAIL_PROVIDERS, isMicrosoftAddress, providerForEmail, providerForServers, type MailProvider } from '../../../shared/mailProviders';
-import { api } from '../api';
+import { fetchJson, api } from '../api';
 import { ACCOUNT_COLORS } from '../util';
 import { labelOn } from '../accountTheme';
 import { MailboxIcon, MailboxIconPicker } from './MailboxIcon';
@@ -567,8 +568,26 @@ export function AccountsDialog({
                   <div className="grow">
                     <div style={{ fontWeight: 600 }}>{a.name}</div>
                     <div className="sub">
-                      {a.email} · {a.auth === 'microsoft' ? 'Microsoft sign-in' : a.auth === 'google' ? 'Google sign-in' : a.imap.host}
+                      {a.email} · {a.sharedOf ? `shared, through ${accounts.find((p) => p.id === a.sharedOf)?.email ?? 'another mailbox'}` : a.auth === 'microsoft' ? 'Microsoft sign-in' : a.auth === 'google' ? 'Google sign-in' : a.imap.host}
                     </div>
+                    {canEdit && a.auth === 'microsoft' && !a.sharedOf && (
+                      <button
+                        className="link-btn"
+                        style={{ fontSize: 12 }}
+                        onClick={async () => {
+                          const email = window.prompt(`Address of a shared mailbox you can open with ${a.email} (for example support@your-company.com):`);
+                          if (!email?.trim()) return;
+                          try {
+                            await fetchJson('POST', '/api/accounts/shared', { parentId: a.id, email: email.trim(), name: email.trim().split('@')[0], color: a.color });
+                            refresh();
+                          } catch (e) {
+                            window.alert((e as Error).message);
+                          }
+                        }}
+                      >
+                        Add a shared mailbox…
+                      </button>
+                    )}
                   </div>
                   {canEdit && (
                   <>

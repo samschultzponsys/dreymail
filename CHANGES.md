@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.5): shared Microsoft 365 mailboxes
+
+- **Shared mailboxes:** an Outlook mailbox signed in with Microsoft can open shared mailboxes
+  (Accounts → *Add a shared mailbox…*). Each is a mailbox of its own (`accounts.oauth_parent`, new
+  migration) reading IMAP as the shared address with the parent's OAuth token; tokens are stored
+  and rotated on the parent; sending goes through Graph from the shared address. Adding checks the
+  mailbox opens; removing the parent removes its shared mailboxes. Shared mailboxes don't bring
+  the parent's calendars, contacts, tasks or directory a second time.
+- **Files:** `server/src/db.ts`, `server/src/routes/api.ts`, `server/src/calendar/service.ts`,
+  `server/src/people.ts`, `server/src/directory.ts`, `shared/types.ts`,
+  `web/src/components/AccountsDialog.tsx`, `server/test/shared.test.ts` (new),
+  `server/test/migrations.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.4): Contacts and Tasks
 
 - **Contacts page** (`/contacts`): DreyMail's own contacts (new `contacts` table) with Outlook

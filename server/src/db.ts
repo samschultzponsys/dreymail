@@ -34,7 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: auto-replies tables.
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
-// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks.
+// Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -597,6 +597,11 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      updated_at INTEGER NOT NULL
    );
    CREATE INDEX IF NOT EXISTS tasks_list ON tasks(list_id);`,
+  // DreyMail 10.5: shared Microsoft 365 mailboxes, opened with another mailbox's sign-in.
+  (db) => {
+    const has = (db.prepare('PRAGMA table_info(accounts)').all() as { name: string }[]).some((c) => c.name === 'oauth_parent');
+    if (!has) db.exec('ALTER TABLE accounts ADD COLUMN oauth_parent TEXT');
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -700,6 +705,7 @@ interface AccountRow {
   group_id?: string | null;
   threaded?: number;
   pinned_folders?: string;
+  oauth_parent?: string | null;
 }
 
 function credAad(userId: string, accountId: string, kind: 'imap' | 'smtp'): string {
@@ -731,6 +737,7 @@ function toView(r: AccountRow): AccountView {
     smtp: { host: r.smtp_host, port: r.smtp_port, tls: r.smtp_tls as TlsMode, user: r.smtp_user },
     appendSent: r.append_sent === 1,
     auth: r.auth === 'microsoft' || r.auth === 'google' ? r.auth : 'password',
+    ...(r.oauth_parent ? { sharedOf: r.oauth_parent } : {}),
   };
 }
 
@@ -1316,7 +1323,14 @@ export class Store {
     return changed ? (this.listAccounts(userId).find((a) => a.id === accountId) ?? null) : null;
   }
 
+  /** The mailbox whose sign-in an account uses: its own, or for a shared mailbox, its parent's (DreyMail 10.5). */
+  private signInOf(userId: string, accountId: string): string {
+    const r = this.db.prepare('SELECT oauth_parent FROM accounts WHERE user_id = ? AND id = ?').get(userId, accountId) as { oauth_parent: string | null } | undefined;
+    return r?.oauth_parent ?? accountId;
+  }
+
   getOAuthToken(userId: string, accountId: string): string | null {
+    accountId = this.signInOf(userId, accountId);
     const r = this.db.prepare('SELECT oauth_token FROM accounts WHERE user_id = ? AND id = ?').get(userId, accountId) as { oauth_token: string } | undefined;
     if (!r?.oauth_token) return null;
     try {
@@ -1327,6 +1341,7 @@ export class Store {
   }
 
   setOAuthToken(userId: string, accountId: string, refreshToken: string) {
+    accountId = this.signInOf(userId, accountId);
     this.db
       .prepare('UPDATE accounts SET oauth_token = ? WHERE user_id = ? AND id = ?')
       .run(encrypt(this.credentialKey, refreshToken, `account-oauth:${userId}:${accountId}`), userId, accountId);
@@ -1409,7 +1424,37 @@ export class Store {
   }
 
   deleteAccount(userId: string, accountId: string): boolean {
+    // Shared mailboxes opened with this mailbox's sign-in go with it.
+    this.db.prepare('DELETE FROM accounts WHERE user_id = ? AND oauth_parent = ?').run(userId, accountId);
     return this.db.prepare('DELETE FROM accounts WHERE user_id = ? AND id = ?').run(userId, accountId).changes > 0;
+  }
+
+  /**
+   * A shared Microsoft 365 mailbox (DreyMail 10.5): IMAP with the shared address as the username and
+   * the parent mailbox's sign-in (Microsoft allows it for people with access to the mailbox);
+   * sending goes through Graph from the shared address (needs Send As or Send on behalf).
+   */
+  addSharedMailbox(userId: string, parentId: string, a: { email: string; name: string; color: string }): AccountView {
+    const parent = this.listAccounts(userId).find((x) => x.id === parentId);
+    if (!parent || parent.auth !== 'microsoft' || parent.sharedOf) throw new Error('Shared mailboxes are opened from an Outlook / Microsoft 365 mailbox signed in with Microsoft');
+    const exists = this.db.prepare('SELECT id FROM accounts WHERE user_id = ? AND oauth_parent = ? AND lower(email) = lower(?)').get(userId, parentId, a.email) as { id: string } | undefined;
+    if (exists) return this.listAccounts(userId).find((x) => x.id === exists.id)!;
+    const id = crypto.randomUUID();
+    this.createAccount(
+      userId,
+      {
+        name: a.name,
+        displayName: a.name,
+        email: a.email,
+        color: a.color,
+        imap: { host: parent.imap.host, port: parent.imap.port, tls: parent.imap.tls, user: a.email, password: '' },
+        smtp: { host: parent.smtp.host, port: parent.smtp.port, tls: parent.smtp.tls, user: a.email, password: '' },
+        appendSent: false,
+      },
+      id,
+    );
+    this.db.prepare("UPDATE accounts SET auth = 'microsoft', oauth_parent = ? WHERE id = ?").run(parentId, id);
+    return this.listAccounts(userId).find((x) => x.id === id)!;
   }
 
   // ---- signatures (DreyMail) ------------------------------------------------

@@ -114,7 +114,7 @@ export class People {
 
   /** Mailboxes that can bring contacts and tasks, and whether each is allowed. */
   async sources(userId: string): Promise<PeopleSourceView[]> {
-    const list = this.deps.store.listAccounts(userId).filter((a) => a.auth === 'microsoft' || a.auth === 'google');
+    const list = this.deps.store.listAccounts(userId).filter((a) => (a.auth === 'microsoft' || a.auth === 'google') && !a.sharedOf);
     return Promise.all(
       list.map(async (a) => ({
         accountId: a.id,
@@ -136,7 +136,7 @@ export class People {
     const remote = await Promise.all(
       this.deps.store
         .listAccounts(userId)
-        .filter((a) => a.auth === 'microsoft' || a.auth === 'google')
+        .filter((a) => (a.auth === 'microsoft' || a.auth === 'google') && !a.sharedOf)
         .map(async (a) => {
           const token = await this.token(userId, a.id, 'contacts');
           if (!token) return [];
@@ -257,7 +257,7 @@ export class People {
     const remote = await Promise.all(
       this.deps.store
         .listAccounts(userId)
-        .filter((a) => a.auth === 'microsoft' || a.auth === 'google')
+        .filter((a) => (a.auth === 'microsoft' || a.auth === 'google') && !a.sharedOf)
         .map(async (a) => {
           const token = await this.token(userId, a.id, 'tasks');
           if (!token) return [];

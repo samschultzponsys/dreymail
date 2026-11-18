@@ -27,7 +27,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
-// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions.
+// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -675,6 +675,33 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const created = store.createAccount(uid(req), input);
       store.setAccountIcon(uid(req), created.id, iconOf(input.icon));
       if (input.threaded === false) store.setAccountThreaded(uid(req), created.id, false);
+      pool.accountAdded(uid(req), created.id);
+      return store.listAccounts(uid(req)).find((a) => a.id === created.id) ?? created;
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
+
+  /**
+   * A shared Microsoft 365 mailbox, opened with an Outlook mailbox's sign-in (DreyMail 10.5). It is
+   * checked by opening it once; without access to it, nothing is added.
+   */
+  app.post('/api/accounts/shared', async (req, reply) => {
+    if (!access.require(req, reply, 'mail.accounts')) return reply;
+    try {
+      const body = z.object({ parentId: z.string().max(64), email: z.string().trim().toLowerCase().email().max(320), name: z.string().trim().max(100).default(''), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#0ea5e9') }).parse(req.body);
+      let created;
+      try {
+        created = store.addSharedMailbox(uid(req), body.parentId, { email: body.email, name: body.name || body.email, color: body.color });
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message });
+      }
+      try {
+        await pool.folders(uid(req), created.id, true);
+      } catch (err) {
+        store.deleteAccount(uid(req), created.id);
+        return reply.code(400).send({ error: `Couldn't open ${body.email}: ${(err as Error).message}. Your Microsoft 365 account needs Full Access to the shared mailbox (an administrator gives it in the Exchange admin center).` });
+      }
       pool.accountAdded(uid(req), created.id);
       return store.listAccounts(uid(req)).find((a) => a.id === created.id) ?? created;
     } catch (err) {
