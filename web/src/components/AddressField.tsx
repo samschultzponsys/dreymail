@@ -29,7 +29,7 @@ export function AddressField({
   /** The line's "always show" pin: whether it is pinned, what pinning applies to, and the toggle. */
   pin?: { pinned: boolean; scope: string; onToggle: () => void };
 }) {
-  const [suggestions, setSuggestions] = useState<{ name: string; address: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ name: string; address: string; directory?: boolean }[]>([]);
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -152,6 +152,7 @@ export function AddressField({
               ) : (
                 s.address
               )}
+              {s.directory && <span className="suggest-tag">Directory</span>}
             </button>
           ))}
         </div>

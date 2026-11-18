@@ -24,6 +24,8 @@ const RECEIVED_IN = new Set<SpecialUse | null>(['inbox', 'archive', null]);
 export interface Suggestion {
   name: string;
   address: string;
+  /** From the company directory (DreyMail 10.3). */
+  directory?: boolean;
 }
 
 export class AddressBook {

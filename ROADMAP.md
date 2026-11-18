@@ -19,7 +19,6 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ### Mail
 - [ ] Gmail: a conversation's labels in the message list.
-- [ ] The company directory (Microsoft 365 and Google Workspace) in address suggestions.
 - [ ] Shared and delegated mailboxes (Microsoft 365), and signed or encrypted mail (S/MIME).
 - [ ] Contacts as a section of their own; tasks (Microsoft To Do, Google Tasks).
 
@@ -105,6 +104,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 - [x] Gmail: Archive moves to All Mail (no "Archive" label); a message's labels shown, added and
       removed (9.7).
 - [x] Follow-up flags with due dates, reminders and Mark complete (10.1).
+- [x] The company directory (Microsoft 365, Google Workspace) in address suggestions, allowed per
+      mailbox (10.3).
 - [x] Importance (high / low) sent and shown; read receipts asked for and answered; printing (9.9).
 - [x] Search with a visual filter builder (accounts, where, from/to, subject, text, dates, size,
       attachments, starred, replied) and saved searches as smart folders (2.4).

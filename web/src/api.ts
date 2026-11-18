@@ -246,7 +246,7 @@ export const api = {
   deleteSearch: (id: string) => request<SavedSearch[]>('DELETE', `/api/searches/${encodeURIComponent(id)}`),
 
   recipients: (q: string, from?: string) =>
-    request<{ name: string; address: string }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}${from ? `&from=${encodeURIComponent(from)}` : ''}`),
+    request<{ name: string; address: string; directory?: boolean }[]>('GET', `/api/recipients?q=${encodeURIComponent(q)}${from ? `&from=${encodeURIComponent(from)}` : ''}`),
 };
 
 function composeForm(payload: ComposePayload, files: File[], sendAt?: Date): FormData {

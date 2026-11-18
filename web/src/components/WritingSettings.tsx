@@ -2,6 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '../api';
 import { resolveAddressLine, setAddressLine, type AddressLine, type AddressLineLevel } from '../../../shared/addressLines';
 import type { AccountView, Preferences, SuggestScope } from '../../../shared/types';
 import { api } from '../api';
@@ -79,6 +80,7 @@ export function WritingSettings({ prefs, save, accounts }: { prefs: Preferences;
           While you type an address, DreyMail suggests people you have written to and people who wrote to you (not newsletters or no-reply senders),
           those you write to most first.
         </div>
+        <CompanyDirectory prefs={prefs} save={save} accounts={accounts} />
       </div>
 
       <div>
@@ -136,5 +138,53 @@ export function WritingSettings({ prefs, save, accounts }: { prefs: Preferences;
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The company directory in suggestions (DreyMail 10.3): Microsoft 365 and Google Workspace
+ * mailboxes can add their organization's people, once the user allows it per mailbox.
+ */
+function CompanyDirectory({ prefs, save, accounts }: { prefs: Preferences; save: (p: Preferences) => void; accounts: AccountView[] }) {
+  const q = useQuery({ queryKey: ['directory'], queryFn: () => fetchJson<{ accountId: string; kind: 'microsoft' | 'google'; allowed: boolean }[]>('GET', '/api/directory'), staleTime: 60_000 });
+  if (!q.data?.length) return null;
+  const allow = (a: AccountView, kind: 'microsoft' | 'google') =>
+    void fetchJson<{ url: string }>('POST', `/api/oauth/${kind}/start`, { color: a.color, allow: [kind === 'microsoft' ? 'people' : 'directory'] }).then(
+      ({ url }) => (window.location.href = url),
+      (e: Error) => window.alert(e.message),
+    );
+  return (
+    <div style={{ marginTop: 10 }}>
+      <label className="check">
+        <input type="checkbox" checked={prefs.suggestDirectory !== false} onChange={(e) => save({ ...prefs, suggestDirectory: e.target.checked })} /> Also suggest people from the company
+        directory
+      </label>
+      <div className="check-list">
+        {q.data.map((d) => {
+          const a = accounts.find((x) => x.id === d.accountId);
+          if (!a) return null;
+          return (
+            <div key={d.accountId} className="cal-when-row">
+              <span className="grow">
+                {a.name} <span className="muted">({d.kind === 'microsoft' ? 'Microsoft 365' : 'Google Workspace'})</span>
+              </span>
+              {d.allowed ? (
+                <span className="muted">Allowed</span>
+              ) : (
+                <button className="btn" onClick={() => allow(a, d.kind)}>
+                  Allow
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hint">
+        Allow signs in to the mailbox again, asking {q.data.some((d) => d.kind === 'microsoft') ? 'Microsoft for "People.Read"' : ''}
+        {q.data.some((d) => d.kind === 'microsoft') && q.data.some((d) => d.kind === 'google') ? ' and ' : ''}
+        {q.data.some((d) => d.kind === 'google') ? 'Google for the directory (an administrator turns on the People API in Google Cloud Console)' : ''}. Searching is done by
+        the server, only after two letters.
+      </div>
+    </div>
   );
 }

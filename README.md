@@ -57,7 +57,8 @@
      Modified by samschultzponsys, 2026-11-18: v9.9 (importance, read receipts, printing).
      Modified by samschultzponsys, 2026-11-18: v10.0 (one short version label; the plain slide transition).
      Modified by samschultzponsys, 2026-11-18: v10.1 (follow-up flags with due dates).
-     Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant). -->
+     Modified by samschultzponsys, 2026-11-18: v10.2 (dragging events, show as, scheduling assistant).
+     Modified by samschultzponsys, 2026-11-18: v10.3 (the company directory in address suggestions). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -69,7 +70,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **10.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **10.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -213,6 +214,11 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   importance (shown in the message list and the reader for mail you get), and the ✓ envelope asks
   for a read receipt. A message that asks for one shows *Send receipt* / *Don't send*; nothing is
   sent unless you say so, and either answer is remembered on the message.
+- **Company directory:** for Microsoft 365 and Google Workspace mailboxes, address suggestions can
+  include the organization's people (Settings → General → *Allow* per mailbox, which signs in again
+  asking for that permission). They are marked *Directory*; the server searches after two letters
+  and never holds up the usual suggestions. Google needs the People API turned on in the Google
+  Cloud project.
 - **Follow up:** the flag-with-a-date button in the reading toolbar flags a message for follow-up
   Today, Tomorrow, This week, Next week, at a date and time, or with no date (Outlook's choices).
   The message list shows "Due …" (red once overdue), the message says "Follow up by …" with

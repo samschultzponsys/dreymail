@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-18 (v10.3): the company directory in address suggestions
+
+- **Directory:** address suggestions add people from Microsoft 365 (Graph `/me/people`, People.Read)
+  and Google Workspace (People API `searchDirectoryPeople`, directory.readonly) after the usual
+  ones, marked *Directory*, at most 1.5 s per lookup and cached for a minute.
+- **Extra permissions per mailbox:** Microsoft and Google sign-in can ask for more on request
+  (`allow` on the OAuth start: Microsoft `people`, `contacts`, `tasks`; Google `directory`,
+  `contacts`, `tasks`), never at the normal sign-in; Settings → General shows *Allow* per mailbox.
+- **Files:** `server/src/directory.ts` (new), `server/src/oauth/google.ts`,
+  `server/src/oauth/microsoft.ts`, `server/src/routes/google.ts`, `server/src/routes/microsoft.ts`,
+  `server/src/routes/api.ts`, `server/src/addressBook.ts`, `server/src/app.ts`, `shared/types.ts`,
+  `web/src/components/WritingSettings.tsx`, `web/src/components/AddressField.tsx`, `web/src/api.ts`,
+  `web/src/styles.css`, `server/test/directory.test.ts` (new), `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v10.2): dragging events, show as, scheduling assistant
 
 - **Drag to move:** week and day views move events by dragging (15-minute steps, across days);

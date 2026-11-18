@@ -22,6 +22,17 @@ export const GMAIL_SCOPE = 'https://mail.google.com/';
 /** Google Calendar, read and write (DreyMail's calendar shows and edits it). */
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
 
+/** Extra permissions a user can allow per mailbox (DreyMail 10.3–10.4). */
+export const GOOGLE_EXTRA_SCOPES = {
+  /** The Google Workspace directory, in address suggestions. */
+  directory: 'https://www.googleapis.com/auth/directory.readonly',
+  /** Google Contacts. */
+  contacts: 'https://www.googleapis.com/auth/contacts',
+  /** Google Tasks. */
+  tasks: 'https://www.googleapis.com/auth/tasks',
+} as const;
+export type GoogleExtra = keyof typeof GOOGLE_EXTRA_SCOPES;
+
 export class GoogleError extends Error {}
 
 export class GoogleConfig {
@@ -64,6 +75,8 @@ interface TokenResponse {
   refresh_token?: string;
   id_token?: string;
   expires_in?: number;
+  /** Granted scopes, space-separated (DreyMail). */
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -84,7 +97,7 @@ export class GoogleAuth {
     return new URL('/oauth/google/callback', this.baseUrl).toString();
   }
 
-  start(userId: string, color: string): string {
+  start(userId: string, color: string, extra: GoogleExtra[] = []): string {
     if (!this.settings.configured()) throw new GoogleError('Sign in with Google is not set up yet (Settings → Google)');
     const now = Date.now();
     for (const [k, p] of this.pending) if (p.expires < now) this.pending.delete(k);
@@ -96,7 +109,7 @@ export class GoogleAuth {
       client_id: this.settings.current().clientId,
       response_type: 'code',
       redirect_uri: this.redirectUri,
-      scope: `openid email profile ${GMAIL_SCOPE} ${CALENDAR_SCOPE}`,
+      scope: [`openid email profile ${GMAIL_SCOPE} ${CALENDAR_SCOPE}`, ...extra.map((x) => GOOGLE_EXTRA_SCOPES[x])].join(' '),
       state,
       code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
       code_challenge_method: 'S256',
@@ -142,6 +155,18 @@ export class GoogleAuth {
   }
 
   /** A current access token (IMAP and SMTP share it), refreshed when needed. */
+  /** Scopes the last token of each mailbox came with (DreyMail: extra permissions allowed or not). */
+  private readonly scopes = new Map<string, string[]>();
+
+  /** Whether the user allowed this extra permission for the mailbox (refreshing the token to know). */
+  async allowed(userId: string, accountId: string, extra: GoogleExtra): Promise<boolean> {
+    if (!this.scopes.has(accountId)) {
+      this.tokens.delete(accountId);
+      await this.accessToken(userId, accountId);
+    }
+    return (this.scopes.get(accountId) ?? []).includes(GOOGLE_EXTRA_SCOPES[extra]);
+  }
+
   async accessToken(userId: string, accountId: string): Promise<string> {
     const cached = this.tokens.get(accountId);
     if (cached && cached.expires > Date.now() + 120_000) return cached.value;
@@ -158,6 +183,7 @@ export class GoogleAuth {
         }
         if (t.refresh_token && t.refresh_token !== refreshToken) this.store.setOAuthToken(userId, accountId, t.refresh_token);
         this.tokens.set(accountId, { value: t.access_token!, expires: Date.now() + (t.expires_in ?? 3600) * 1000 });
+        if (t.scope) this.scopes.set(accountId, t.scope.split(' '));
         return t.access_token!;
       })().finally(() => this.refreshing.delete(accountId));
       this.refreshing.set(accountId, job);

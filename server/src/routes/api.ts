@@ -27,9 +27,10 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions per mailbox, group or all.
 // Modified by samschultzponsys, 2026-11-17: the idle app lock and trusted devices (sliding sessions).
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
-// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags.
+// Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions.
 
 import type { Followups } from '../mail/followups.js';
+import type { Directory } from '../directory.js';
 import { receiptAddressOf } from '../../../shared/importance.js';
 import { normaliseBlock, type Blocklist } from '../blocklist.js';
 import type { AddressBook } from '../addressBook.js';
@@ -143,6 +144,7 @@ export const prefsSchema = z.object({
   sidebarSearches: z.boolean().default(true),
   suggestScope: z.enum(['all', 'mailbox', 'group', 'chosen']).default('all'),
   suggestAccounts: z.array(z.string().max(64)).max(200).default([]),
+  suggestDirectory: z.boolean().optional(),
   addressLines: z
     .object({
       all: z.object({ cc: z.boolean(), bcc: z.boolean() }),
@@ -219,6 +221,8 @@ export interface ApiDeps {
   sessions: Sessions;
   /** Follow-up flags with due dates (DreyMail 10.1). */
   followups?: Followups;
+  /** Company directory search (DreyMail 10.3). */
+  directory?: Directory;
   onFollowupsChanged?: (userId: string) => void;
   pool: ImapPool;
   mail: MailService;
@@ -1123,6 +1127,18 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       const seen = new Set(out.map((s) => s.address));
       for (const r of store.searchRecipients(userId, q.q)) if (!seen.has(r.address) && out.length < 8) out.push(r);
     }
+    // The company directory (Microsoft 365, Google Workspace) where allowed (DreyMail 10.3).
+    if (out.length < 8 && deps.directory && prefs?.suggestDirectory !== false) {
+      const seen = new Set(out.map((s) => s.address));
+      for (const p of await deps.directory.search(userId, q.q).catch(() => [])) if (!seen.has(p.address) && out.length < 8) out.push({ ...p, directory: true });
+    }
     return out;
+  });
+
+  /** Per mailbox: whether the company directory can be searched (the user allowed it) (DreyMail 10.3). */
+  app.get('/api/directory', async (req) => {
+    const userId = uid(req);
+    const list = store.listAccounts(userId).filter((a) => a.auth === 'microsoft' || a.auth === 'google');
+    return Promise.all(list.map(async (a) => ({ accountId: a.id, kind: a.auth, allowed: (await deps.directory?.available(userId, a.id).catch(() => false)) ?? false })));
   });
 }

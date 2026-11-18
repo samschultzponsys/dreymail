@@ -1343,3 +1343,6 @@ body.resizing iframe { pointer-events: none; }
 .sched-busy.away { background: #7c3aed; }
 .sched-busy.elsewhere { background: #94a3b8; }
 .sched-meeting { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent-fill); border-radius: 4px; background: color-mix(in srgb, var(--accent-fill) 18%, transparent); pointer-events: none; }
+
+/* Directory suggestions (DreyMail 10.3). */
+.suggest-tag { margin-left: 6px; font-size: 10.5px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }

@@ -29,7 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam action.
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
-// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags.
+// Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions.
 
 // Types shared between the server API and the web client.
 
@@ -404,6 +404,8 @@ export interface Preferences {
   suggestScope: SuggestScope;
   /** The mailboxes for suggestScope 'chosen'. */
   suggestAccounts: string[];
+  /** Also suggest people from the company directory where allowed (DreyMail 10.3). */
+  suggestDirectory?: boolean;
   /** Whether the composer shows the Cc and Bcc lines by itself: for all, per group, per mailbox (DreyMail). */
   addressLines: AddressLines;
   /** Folders whose subfolders are folded away in the sidebar, per mailbox (DreyMail; follows the user to every device). */

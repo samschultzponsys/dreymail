@@ -55,6 +55,7 @@ import { registerCalendarRoutes } from './routes/calendar.js';
 import { CalendarService } from './calendar/service.js';
 import { Reminders } from './calendar/reminders.js';
 import { Followups } from './mail/followups.js';
+import { Directory } from './directory.js';
 import { ServerSettings, withStoredSettings } from './serverSettings.js';
 import { assistantOutgoing } from './ai/outgoing.js';
 import type { Http } from './calendar/remote.js';
@@ -371,6 +372,7 @@ export async function buildApp(
     sessions,
     followups,
     onFollowupsChanged: (userId) => reminders.changed(userId),
+    directory: new Directory({ store, microsoft, google }),
     pool,
     mail,
     compose,

@@ -27,7 +27,7 @@ export function registerMicrosoftRoutes(
 
   app.post('/api/oauth/microsoft/start', async (req, reply) => {
     if (!access.require(req, reply, 'mail.accounts')) return reply;
-    const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3b82f6'), allow: z.array(z.enum(['mail'])).max(1).default([]) }).safeParse(req.body ?? {});
+    const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3b82f6'), allow: z.array(z.enum(['mail', 'people', 'contacts', 'tasks'])).max(4).default([]) }).safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'Invalid color' });
     try {
       return { url: microsoft.start(req.user!.id, body.data.color, body.data.allow) };

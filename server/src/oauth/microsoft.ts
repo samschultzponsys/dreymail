@@ -34,7 +34,14 @@ export const SCOPES = {
   calendar: 'https://graph.microsoft.com/Calendars.ReadWrite',
   /** Changing mail (Outlook categories), asked for only when the user allows it (DreyMail 9.8). */
   mail: 'https://graph.microsoft.com/Mail.ReadWrite',
+  /** People you work with and the company directory, in address suggestions (10.3). */
+  people: 'https://graph.microsoft.com/People.Read',
+  /** Outlook contacts (10.4). */
+  contacts: 'https://graph.microsoft.com/Contacts.ReadWrite',
+  /** Microsoft To Do (10.4). */
+  tasks: 'https://graph.microsoft.com/Tasks.ReadWrite',
 } as const;
+export type MicrosoftExtra = 'mail' | 'people' | 'contacts' | 'tasks';
 /** Asked for at sign-in: both resources (consented at once), a refresh token, and who the user is. */
 const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph} ${SCOPES.calendar}`;
 
@@ -119,7 +126,7 @@ export class MicrosoftAuth {
   }
 
   /** Where to send the browser to sign in. */
-  start(userId: string, color: string, extra: 'mail'[] = []): string {
+  start(userId: string, color: string, extra: MicrosoftExtra[] = []): string {
     const c = this.settings.current();
     if (!this.settings.configured()) throw new MicrosoftError('Outlook sign-in is not set up yet (Settings → Outlook)');
     const now = Date.now();
