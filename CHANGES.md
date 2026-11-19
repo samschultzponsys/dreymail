@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-19 (v11.4): Android: the mailbox's icon on the left of notifications
+
+- **New setting** in the Android app (Settings → This device): "Show the mailbox's icon on
+  notifications". With it on, new mail is sent as an Android conversation: each mailbox gets a
+  long-lived shortcut whose icon (the mailbox's icon on a tile in its color, its picture, or the
+  envelope in its color) shows on the left instead of DreyMail's, the notification uses the
+  messaging style (sender, then subject and preview), and Android lists it in the Conversations
+  section above other apps. Turning it off removes the shortcuts. Off by default; older apps
+  don't show the setting.
+- **Files:** `android/app/src/main/java/io/github/samschultzponsys/dreymail/Notifier.kt`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/Prefs.kt`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/MainActivity.kt`,
+  `web/src/android.ts`, `web/src/components/SettingsDialog.tsx`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-18 (v11.3): mark a folder all read; the open mailbox at the top
 
 - **Mark all as read:** right-clicking a folder (long-press on a phone) opens a menu with Mark all

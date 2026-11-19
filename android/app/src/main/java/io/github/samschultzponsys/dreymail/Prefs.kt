@@ -1,5 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting.
 
 package io.github.samschultzponsys.dreymail
 
@@ -18,4 +19,9 @@ object Prefs {
     fun firebase(context: Context): JSONObject? = of(context).getString("firebase", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
 
     fun setFirebase(context: Context, json: String) = of(context).edit().putString("firebase", json).apply()
+
+    /** Notifications as conversations, with the mailbox's icon on the left (DreyMail 11.4). Off by default. */
+    fun conversations(context: Context): Boolean = of(context).getBoolean("conversations", false)
+
+    fun setConversations(context: Context, on: Boolean) = of(context).edit().putBoolean("conversations", on).apply()
 }

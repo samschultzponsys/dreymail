@@ -1,5 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting in the bridge.
 
 package io.github.samschultzponsys.dreymail
 
@@ -252,6 +253,17 @@ class MainActivity : Activity() {
                 .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                 .putExtra(Settings.EXTRA_CHANNEL_ID, Notifier.channelId(accountId))
             runOnUiThread { runCatching { startActivity(intent) } }
+        }
+
+        /** Whether notifications show as conversations with the mailbox's icon (DreyMail 11.4). */
+        @JavascriptInterface
+        fun conversations(): Boolean = Prefs.conversations(this@MainActivity)
+
+        @JavascriptInterface
+        fun setConversations(on: Boolean) {
+            if (!onServer()) return
+            Prefs.setConversations(this@MainActivity, on)
+            if (!on) runCatching { Notifier.dropConversations(this@MainActivity) }
         }
 
         @JavascriptInterface

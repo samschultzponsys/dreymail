@@ -1,5 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-19: notifications as conversations, with the mailbox's icon on the left.
 
 package io.github.samschultzponsys.dreymail
 
@@ -18,6 +19,9 @@ import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.RectF
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.PathParser
 import androidx.core.graphics.drawable.IconCompat
 import org.json.JSONArray
@@ -176,13 +180,22 @@ object Notifier {
         val tag = d["tag"] ?: "dreymail"
         val pending = PendingIntent.getActivity(context, tag.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val body = d["body"].orEmpty()
+        // As a conversation (the setting): the mailbox's icon on the left, in Android's Conversations section.
+        val conversation = if (Prefs.conversations(context) && accountId.isNotEmpty()) runCatching { mailboxShortcut(context, accountId, d["accountName"].orEmpty(), color, icon, pic, open) }.getOrNull() else null
         val n = NotificationCompat.Builder(context, channel)
             .apply { if (icon != null) setSmallIcon(smallIcon(icon)) else setSmallIcon(R.drawable.ic_notification) }
             .setColor(color)
             .setLargeIcon(pic ?: if (icon != null) largeIcon(color, icon) else largeIcon(color))
             .setContentTitle(d["title"] ?: "DreyMail")
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .apply {
+                if (conversation != null) {
+                    val sender = Person.Builder().setName(d["title"]?.takeIf { it.isNotEmpty() } ?: "DreyMail").setKey("sender:${d["title"]}").build()
+                    val me = Person.Builder().setName(d["accountName"]?.takeIf { it.isNotEmpty() } ?: "Me").setKey("me").build()
+                    setShortcutId(conversation)
+                    setStyle(NotificationCompat.MessagingStyle(me).setGroupConversation(false).addMessage(body.ifEmpty { " " }, System.currentTimeMillis(), sender))
+                } else setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            }
             .setSubText(d["accountName"]?.takeIf { it.isNotEmpty() })
             .setGroup("account_$accountId")
             .setCategory(NotificationCompat.CATEGORY_EMAIL)
@@ -192,6 +205,55 @@ object Notifier {
             .apply { d["badge"]?.toIntOrNull()?.let { setNumber(it) } }
             .build()
         m.notify(tag, 0, n)
+    }
+
+    private fun shortcutId(accountId: String) = "mailbox_$accountId"
+
+    /**
+     * A long-lived shortcut for the mailbox (what Android needs to show a notification as a
+     * conversation); its icon is the one on the left of the notification. Returns its id.
+     */
+    private fun mailboxShortcut(context: Context, accountId: String, name: String, color: Int, icon: Path?, pic: Bitmap?, open: Intent): String {
+        val id = shortcutId(accountId)
+        val label = name.ifEmpty { "Mail" }
+        val avatar = IconCompat.createWithAdaptiveBitmap(avatar(color, icon, pic))
+        val intent = Intent(open).setAction(Intent.ACTION_VIEW).putExtra(MainActivity.EXTRA_PATH, "/")
+        val shortcut = ShortcutInfoCompat.Builder(context, id)
+            .setShortLabel(label)
+            .setLongLived(true)
+            .setIcon(avatar)
+            .setIntent(intent)
+            .setPerson(Person.Builder().setName(label).setKey(id).setIcon(avatar).build())
+            .build()
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        return id
+    }
+
+    /** The conversation picture: full-bleed, with what matters inside the middle two-thirds (adaptive icon safe zone). */
+    private fun avatar(color: Int, icon: Path?, pic: Bitmap?): Bitmap {
+        val size = 216
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        if (pic != null) {
+            c.drawBitmap(Bitmap.createScaledBitmap(pic, size, size, true), 0f, 0f, null)
+            return bmp
+        }
+        if (icon != null) {
+            c.drawColor(color)
+            strokeIcon(c, size, icon, labelOn(color), 0.4f)
+            return bmp
+        }
+        c.drawColor(Color.parseColor("#141b34"))
+        val inner = largeIcon(color)
+        val pad = (size - 128) / 2f
+        c.drawBitmap(Bitmap.createScaledBitmap(inner, 128, 128, true), pad, pad, null)
+        return bmp
+    }
+
+    /** The setting turned off: the mailbox shortcuts go, and notifications are plain again. */
+    fun dropConversations(context: Context) {
+        val ids = ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id }.filter { it.startsWith("mailbox_") }
+        if (ids.isNotEmpty()) runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, ids) }
     }
 
     /** Mail read or moved elsewhere: its notifications go away here too. */

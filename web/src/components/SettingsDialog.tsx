@@ -35,6 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: stay signed in and the idle lock (This device); Server settings.
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
+// Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left).
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -750,6 +751,7 @@ function AndroidNotifications() {
         New mail arrives the moment it lands, as a notification in the account’s color. Each account has its own Android notification channel: pick a
         different sound, vibration or importance for each one.
       </div>
+      {bridge.setConversations && <ConversationSetting bridge={bridge} />}
       <ul className="user-list">
         {(accounts.data ?? []).map((a) => (
           <li key={a.id}>
@@ -765,6 +767,36 @@ function AndroidNotifications() {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Android: new-mail notifications as conversations, with the mailbox's icon on the left (DreyMail 11.4). */
+function ConversationSetting({ bridge }: { bridge: NonNullable<ReturnType<typeof androidBridge>> }) {
+  const [on, setOn] = useState(() => {
+    try {
+      return !!bridge.conversations?.();
+    } catch {
+      return false;
+    }
+  });
+  return (
+    <label className="check">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          bridge.setConversations!(e.target.checked);
+          setOn(e.target.checked);
+        }}
+      />
+      <span>
+        Show the mailbox&apos;s icon on notifications
+        <span className="hint" style={{ display: 'block' }}>
+          New mail shows as a conversation: the mailbox&apos;s icon on the left instead of DreyMail&apos;s, in Android&apos;s Conversations section above other
+          apps. Long-press one to make that mailbox a priority conversation. Applies to new notifications.
+        </span>
+      </span>
+    </label>
   );
 }
 

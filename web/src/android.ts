@@ -1,5 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting.
 
 // The DreyMail Android app (android/) loads this web app in a WebView and adds a bridge as
 // `window.DreyMailAndroid`. In a browser it is absent and none of this does anything.
@@ -22,6 +23,9 @@ interface AndroidBridge {
   /** Opens Android's settings for this account's channel (sound, vibration, importance). */
   openChannelSettings(accountId: string): void;
   checkForUpdates(): void;
+  /** Notifications as conversations, with the mailbox's icon on the left (app 11.4 and later). */
+  conversations?(): boolean;
+  setConversations?(on: boolean): void;
   /** Asks for a different DreyMail server address. */
   changeServer(): void;
 }
