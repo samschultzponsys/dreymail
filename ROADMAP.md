@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (11.5). New ideas go here.
+Everything planned so far is done (11.6). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -151,6 +151,7 @@ Everything planned so far is done (11.5). New ideas go here.
 ### Apps and notifications
 - [x] Android: optional conversation notifications with the mailbox's icon on the left, above
       other apps (11.4); the icon on each side chosen: mailbox, group, color (11.5).
+- [x] Android Back stays within the mailbox you are in; at an inbox it leaves the app (11.6).
 - [x] Desktop apps for Linux (deb, rpm, flatpak) and Windows, with per-account colored
       notifications and an updater that knows how it was installed (1.6).
 - [x] Android app with instant, end-to-end encrypted notifications (Firebase), a notification

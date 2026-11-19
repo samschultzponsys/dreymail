@@ -70,7 +70,8 @@
      Modified by samschultzponsys, 2026-11-18: v11.2 (no ⌄ line when every folder is pinned).
      Modified by samschultzponsys, 2026-11-18: v11.3 (mark a folder all read; the open mailbox at the top of the bar).
      Modified by samschultzponsys, 2026-11-19: v11.4 (Android: the mailbox's icon on the left of notifications, as conversations).
-     Modified by samschultzponsys, 2026-11-19: v11.5 (the icon on each side of Android notifications, group icons). -->
+     Modified by samschultzponsys, 2026-11-19: v11.5 (the icon on each side of Android notifications, group icons).
+     Modified by samschultzponsys, 2026-11-19: v11.6 (Android Back stays within the mailbox you are in). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -82,7 +83,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.5**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.6**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -752,6 +753,10 @@ browser to install apps when Android asks). It asks for your DreyMail server's a
   sound/vibration/importance settings. The status-bar icon is tinted in the account's color and
   the notification shows the envelope in that color. Notifications of the same account are
   grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
+- **Back stays in your mailbox.** The phone's Back button closes what is open (the folder list, a
+  dialog, the composer), goes from a message to its folder, and from another folder, a search, or
+  the calendar, contacts or tasks to the inbox of the mailbox you are in; never into another
+  mailbox. At an inbox, Back puts DreyMail in the background.
 - **Pick the icons (optional).** Settings → This device sets the icon on each side of a
   notification: on the left DreyMail's own, the mailbox's, its group's or its color; on the right
   the mailbox's (default), its group's, its color or none. Anything but DreyMail's own on the left

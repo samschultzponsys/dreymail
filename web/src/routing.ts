@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-15: search filters (f) and messages opened from another folder (of).
 // Modified by samschultzponsys, 2026-11-17: the calendar page (/calendar).
 // Modified by samschultzponsys, 2026-11-18: the contacts and tasks pages (/contacts, /tasks).
+// Modified by samschultzponsys, 2026-11-19: the Android Back button stays within the mailbox you are in.
 
 import { decodeFilters, encodeFilters, type SearchFilters } from '../../shared/search';
 
@@ -137,4 +138,17 @@ export function readHistoryState(state: unknown): HistoryState | null {
 /** Identity of a list view (what the list shows, ignoring which message is open). */
 export function viewKey(route: Route): string {
   return buildUrl(listRoute(route));
+}
+
+/**
+ * The Android Back button (DreyMail 11.6): where to go, staying in the mailbox you are in.
+ * 'overlay': close the overlay; a Route: go there (replacing the entry); null: at an inbox, leave
+ * the app. `lastMailbox` is the mailbox open before the calendar, contacts or tasks.
+ */
+export function androidBack(route: Route, overlay: Overlay | undefined, lastMailbox: string | null): 'overlay' | Route | null {
+  if (overlay) return 'overlay';
+  if (route.calendar || route.page) return { ...HOME, accountId: lastMailbox, folder: 'INBOX' };
+  if (route.open) return listRoute(route);
+  if (route.folder !== 'INBOX' || route.q || route.unread || Object.keys(route.filters).length > 0) return { ...HOME, accountId: route.accountId, folder: 'INBOX' };
+  return null;
 }

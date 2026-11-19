@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-19 (v11.6): Android Back stays within the mailbox you are in
+
+- **Back button in the Android app:** it no longer walks the browser history (which could land in
+  another mailbox picked earlier from the folder list). The app asks the web app: an open overlay
+  closes; a message goes back to its folder; another folder, a search, or the calendar, contacts
+  or tasks go to the inbox of the mailbox you are in; at an inbox the app goes to the background.
+  Older servers keep the old behavior.
+- **Files:** `android/app/src/main/java/io/github/samschultzponsys/dreymail/MainActivity.kt`,
+  `web/src/routing.ts`, `web/src/App.tsx`, `web/test/routing.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-19 (v11.5): the icon on each side of Android notifications
 
 - **Android, Settings → This device:** "Icon on the left" (DreyMail's, the mailbox's, the

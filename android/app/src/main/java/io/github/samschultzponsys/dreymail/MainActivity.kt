@@ -1,6 +1,7 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting in the bridge; which icon on each side (11.5).
+// Modified by samschultzponsys, 2026-11-19: Back asks the web app, so it stays within the mailbox you are in.
 
 package io.github.samschultzponsys.dreymail
 
@@ -203,6 +204,21 @@ class MainActivity : Activity() {
 
     @Deprecated("Back navigation inside the WebView")
     override fun onBackPressed() {
+        // DreyMail 11.6: on the server's pages the web app decides (a step back within the mailbox
+        // you are in, never into another one); at an inbox the app goes to the background. Older
+        // servers and other pages: the WebView's own history.
+        if (onServer()) {
+            web.evaluateJavascript("window.dreymailBack ? (window.dreymailBack() ? 'done' : 'leave') : 'old'") { r ->
+                when (r?.trim('"')) {
+                    "done" -> {}
+                    "leave" -> moveTaskToBack(true)
+                    else -> plainBack()
+                }
+            }
+        } else plainBack()
+    }
+
+    private fun plainBack() {
         if (web.canGoBack()) web.goBack() else @Suppress("DEPRECATION") super.onBackPressed()
     }
 

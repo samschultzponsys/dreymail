@@ -2,9 +2,10 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-15: routes carry search filters.
 // Modified by samschultzponsys, 2026-11-17: the calendar page.
+// Modified by samschultzponsys, 2026-11-19: the Android Back button.
 
 import { describe, expect, it } from 'vitest';
-import { buildUrl, HOME, listRoute, openMessageFolder, parseLocation, readHistoryState, sameRoute, viewKey, type Route } from '../src/routing';
+import { androidBack, buildUrl, HOME, listRoute, openMessageFolder, parseLocation, readHistoryState, sameRoute, viewKey, type Route } from '../src/routing';
 
 const ACC = '3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b';
 const parse = (url: string) => {
@@ -106,3 +107,19 @@ function splitUrl(url: string) {
   const i = url.indexOf('?');
   return i === -1 ? [url, ''] : [url.slice(0, i), url.slice(i)];
 }
+
+describe('the Android Back button (11.6)', () => {
+  const work = { ...HOME, accountId: 'work', folder: 'INBOX' };
+  it('stays within the mailbox you are in', () => {
+    expect(androidBack(work, 'nav', 'work')).toBe('overlay');
+    expect(androidBack({ ...work, open: { accountId: 'work', uidValidity: '1', uid: 5 } }, undefined, 'work')).toMatchObject({ accountId: 'work', folder: 'INBOX', open: null });
+    expect(androidBack({ ...work, folder: 'Archive' }, undefined, 'work')).toMatchObject({ accountId: 'work', folder: 'INBOX' });
+    expect(androidBack({ ...work, q: 'invoice' }, undefined, 'work')).toMatchObject({ accountId: 'work', folder: 'INBOX', q: '' });
+    const fromCalendar = androidBack({ ...HOME, calendar: true }, undefined, 'work') as Route;
+    expect(fromCalendar).toMatchObject({ accountId: 'work', folder: 'INBOX' });
+    expect(fromCalendar.calendar).toBeFalsy();
+    // At an inbox: leave the app rather than open another mailbox.
+    expect(androidBack(work, undefined, 'work')).toBeNull();
+    expect(androidBack(HOME, undefined, null)).toBeNull();
+  });
+});

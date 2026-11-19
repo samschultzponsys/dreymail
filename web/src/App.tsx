@@ -35,6 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
 // Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message; contacts and tasks pages.
 // Modified by samschultzponsys, 2026-11-19: the Android app gets the groups' icons for notifications.
+// Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -70,7 +71,7 @@ import { PENDING_MAILTO_KEY, parseMailto } from './mailto';
 import { blankComposer, composerFor, composerForMailto } from './replies';
 import { useRouter, type Location } from './router';
 import { disablePush, notificationTarget, registerServiceWorker, setAppBadge, syncPush } from './push';
-import { HOME, listRoute, openMessageFolder, parseLocation, viewKey, type OpenMessage, type Route } from './routing';
+import { androidBack, HOME, listRoute, openMessageFolder, parseLocation, viewKey, type OpenMessage, type Route } from './routing';
 import { updateSticky, withSticky } from './sticky';
 import { removesFromList, swipeToAction, type Direction, type UndoStep } from './swipe';
 import { formatSnoozeTime } from './snooze';
@@ -133,6 +134,28 @@ export function App() {
   router.current = { reopen: (o) => openOverlay(o), clear: clearOverlay };
 
   const route = loc.route;
+
+  // The Android app's Back button (DreyMail 11.6): a step back within the mailbox you are in, never
+  // into another mailbox. Closes an overlay; from a message, back to its folder; from another
+  // folder, a search, or the calendar, contacts or tasks, back to the mailbox's inbox. At an inbox it
+  // answers false and the app goes to the background.
+  const lastMailbox = useRef<string | null>(route.accountId);
+  if (!route.calendar && !route.page) lastMailbox.current = route.accountId;
+  const androidBackRef = useRef<() => boolean>(() => false);
+  androidBackRef.current = () => {
+    const to = androidBack(route, loc.state?.overlay, lastMailbox.current);
+    if (to === 'overlay') window.history.back();
+    else if (to) navigate(to, { replace: true });
+    return to !== null;
+  };
+  useEffect(() => {
+    if (!androidBridge()) return;
+    const w = window as { dreymailBack?: () => boolean };
+    w.dreymailBack = () => androidBackRef.current();
+    return () => {
+      delete w.dreymailBack;
+    };
+  }, []);
   const overlay = loc.state?.overlay;
   const sel: MailboxSel = useMemo(() => ({ accountId: route.accountId, folder: route.folder }), [route.accountId, route.folder]);
   const query = route.q;
