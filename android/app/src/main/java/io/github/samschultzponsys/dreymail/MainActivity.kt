@@ -1,6 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting in the bridge.
+// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting in the bridge; which icon on each side (11.5).
 
 package io.github.samschultzponsys.dreymail
 
@@ -264,6 +264,21 @@ class MainActivity : Activity() {
             if (!onServer()) return
             Prefs.setConversations(this@MainActivity, on)
             if (!on) runCatching { Notifier.dropConversations(this@MainActivity) }
+        }
+
+        /** JSON { left, right }: which icon notifications show on each side (DreyMail 11.5). */
+        @JavascriptInterface
+        fun notificationIcons(): String = JSONObject()
+            .put("left", Prefs.leftIcon(this@MainActivity))
+            .put("right", Prefs.rightIcon(this@MainActivity))
+            .toString()
+
+        @JavascriptInterface
+        fun setNotificationIcons(left: String, right: String) {
+            if (!onServer()) return
+            if (left in setOf("app", "mailbox", "group", "color")) Prefs.setLeftIcon(this@MainActivity, left)
+            if (right in setOf("mailbox", "group", "color", "none")) Prefs.setRightIcon(this@MainActivity, right)
+            if (left == "app") runCatching { Notifier.dropConversations(this@MainActivity) }
         }
 
         @JavascriptInterface

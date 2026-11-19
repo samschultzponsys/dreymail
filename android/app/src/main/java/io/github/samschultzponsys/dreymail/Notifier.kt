@@ -1,6 +1,7 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-19: notifications as conversations, with the mailbox's icon on the left.
+// Modified by samschultzponsys, 2026-11-19: which icon on each side: the mailbox's, its group's or its color (11.5).
 
 package io.github.samschultzponsys.dreymail
 
@@ -89,37 +90,53 @@ object Notifier {
         return bmp
     }
 
-    /** The mailbox icon's path (24x24 units) for this account, from the accounts the web app sent. */
-    private fun iconPath(context: Context, accountId: String): Path? {
+    /** What the web app sent about this account: [{ id, name, color, icon, image, groupIcon, groupImage, groupColor }]. */
+    private fun account(context: Context, accountId: String): org.json.JSONObject? {
         val json = Prefs.of(context).getString("accounts", null) ?: return null
         val accounts = runCatching { JSONArray(json) }.getOrNull() ?: return null
         for (i in 0 until accounts.length()) {
             val a = accounts.getJSONObject(i)
-            if (a.optString("id") != accountId) continue
-            val d = a.optString("icon")
-            if (d.isEmpty() || d.length > 4000) return null
-            return runCatching { PathParser.createPathFromPathData(d) }.getOrNull()
+            if (a.optString("id") == accountId) return a
         }
         return null
     }
 
-    /** The mailbox's uploaded picture, when that is its icon. */
-    private fun picture(context: Context, accountId: String): Bitmap? {
-        val json = Prefs.of(context).getString("accounts", null) ?: return null
-        val accounts = runCatching { JSONArray(json) }.getOrNull() ?: return null
-        for (i in 0 until accounts.length()) {
-            val a = accounts.getJSONObject(i)
-            if (a.optString("id") != accountId) continue
-            val data = a.optString("image")
-            val comma = data.indexOf(',')
-            if (!data.startsWith("data:image/") || comma < 0) return null
-            return runCatching {
-                val bytes = android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { Bitmap.createScaledBitmap(it, 192, 192, true) }
-            }.getOrNull()
-        }
-        return null
+    /** An icon's path (24x24 units, as the web app draws it). */
+    private fun pathOf(d: String?): Path? {
+        if (d.isNullOrEmpty() || d.length > 4000) return null
+        return runCatching { PathParser.createPathFromPathData(d) }.getOrNull()
     }
+
+    /** An uploaded picture sent as a data: URL. */
+    private fun pictureOf(data: String?): Bitmap? {
+        if (data == null) return null
+        val comma = data.indexOf(',')
+        if (!data.startsWith("data:image/") || comma < 0) return null
+        return runCatching {
+            val bytes = android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { Bitmap.createScaledBitmap(it, 192, 192, true) }
+        }.getOrNull()
+    }
+
+    /** What a notification shows on one side: a picture, an icon on a tile in `color`, or (neither) the envelope in `color`. */
+    private class Look(val pic: Bitmap?, val path: Path?, val color: Int)
+
+    /**
+     * The look for a choice (DreyMail 11.5): "mailbox" (its picture or icon, else its color),
+     * "group" (the group's picture or icon, else the mailbox's, else its color) or "color".
+     */
+    private fun look(a: org.json.JSONObject?, kind: String, color: Int): Look {
+        if (a == null || kind == "color") return Look(null, null, color)
+        val mailbox = pictureOf(a.optString("image"))?.let { Look(it, null, color) } ?: pathOf(a.optString("icon"))?.let { Look(null, it, color) }
+        if (kind == "group") {
+            val gColor = a.optString("groupColor").takeIf { it.isNotEmpty() }?.let { parseColor(it) } ?: color
+            val group = pictureOf(a.optString("groupImage"))?.let { Look(it, null, gColor) } ?: pathOf(a.optString("groupIcon"))?.let { Look(null, it, gColor) }
+            return group ?: mailbox ?: Look(null, null, color)
+        }
+        return mailbox ?: Look(null, null, color)
+    }
+
+    private fun largeIcon(l: Look): Bitmap = l.pic ?: l.path?.let { largeIcon(l.color, it) } ?: largeIcon(l.color)
 
     private fun luminance(color: Int): Double {
         fun ch(v: Int): Double { val c = v / 255.0; return if (c <= 0.03928) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4) }
@@ -170,8 +187,14 @@ object Notifier {
     fun show(context: Context, d: Map<String, String>) {
         val accountId = d["accountId"].orEmpty()
         val color = parseColor(d["color"])
-        val icon = iconPath(context, accountId)
-        val pic = picture(context, accountId)
+        val acc = if (accountId.isNotEmpty()) account(context, accountId) else null
+        // Which icon on each side (Settings → This device).
+        val left = Prefs.leftIcon(context)
+        val right = Prefs.rightIcon(context)
+        val rightLook = look(acc, if (right == "none") "mailbox" else right, color)
+        val leftLook = look(acc, left, color)
+        // The status-bar icon: the shape of the icon shown, else DreyMail's envelope.
+        val icon = rightLook.path ?: leftLook.path ?: look(acc, "mailbox", color).path
         val m = manager(context)
         val channel = channelId(accountId).takeIf { accountId.isNotEmpty() && m.getNotificationChannel(it) != null } ?: GENERAL
         val open = Intent(context, MainActivity::class.java)
@@ -181,11 +204,11 @@ object Notifier {
         val pending = PendingIntent.getActivity(context, tag.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val body = d["body"].orEmpty()
         // As a conversation (the setting): the mailbox's icon on the left, in Android's Conversations section.
-        val conversation = if (Prefs.conversations(context) && accountId.isNotEmpty()) runCatching { mailboxShortcut(context, accountId, d["accountName"].orEmpty(), color, icon, pic, open) }.getOrNull() else null
+        val conversation = if (left != "app" && accountId.isNotEmpty()) runCatching { mailboxShortcut(context, accountId, d["accountName"].orEmpty(), leftLook, open) }.getOrNull() else null
         val n = NotificationCompat.Builder(context, channel)
             .apply { if (icon != null) setSmallIcon(smallIcon(icon)) else setSmallIcon(R.drawable.ic_notification) }
             .setColor(color)
-            .setLargeIcon(pic ?: if (icon != null) largeIcon(color, icon) else largeIcon(color))
+            .apply { if (right != "none") setLargeIcon(largeIcon(rightLook)) }
             .setContentTitle(d["title"] ?: "DreyMail")
             .setContentText(body)
             .apply {
@@ -213,10 +236,10 @@ object Notifier {
      * A long-lived shortcut for the mailbox (what Android needs to show a notification as a
      * conversation); its icon is the one on the left of the notification. Returns its id.
      */
-    private fun mailboxShortcut(context: Context, accountId: String, name: String, color: Int, icon: Path?, pic: Bitmap?, open: Intent): String {
+    private fun mailboxShortcut(context: Context, accountId: String, name: String, look: Look, open: Intent): String {
         val id = shortcutId(accountId)
         val label = name.ifEmpty { "Mail" }
-        val avatar = IconCompat.createWithAdaptiveBitmap(avatar(color, icon, pic))
+        val avatar = IconCompat.createWithAdaptiveBitmap(avatar(look.color, look.path, look.pic))
         val intent = Intent(open).setAction(Intent.ACTION_VIEW).putExtra(MainActivity.EXTRA_PATH, "/")
         val shortcut = ShortcutInfoCompat.Builder(context, id)
             .setShortLabel(label)

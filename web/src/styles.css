@@ -43,7 +43,8 @@
    Modified by samschultzponsys, 2026-11-17: the receiving mailbox's name as a colored bubble.
    Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
    Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups; calendar dragging and show-as.
-   Modified by samschultzponsys, 2026-11-18: unread bubble for folders out of sight; dragged pinned folders; the open mailbox at the top of the bar. */
+   Modified by samschultzponsys, 2026-11-18: unread bubble for folders out of sight; dragged pinned folders; the open mailbox at the top of the bar.
+   Modified by samschultzponsys, 2026-11-19: no pin buttons over the counts on touch screens. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1209,7 +1210,8 @@ a.btn { text-decoration: none; }
 .nav-folder[draggable='true'] { cursor: grab; }
 .nav-folder.pin-drop::before { content: ''; position: absolute; left: 8px; right: 8px; top: -1px; height: 2px; border-radius: 1px; background: var(--accent-fill); }
 .nav-parent { color: var(--muted); font-weight: 400; font-size: 11px; }
-@media (hover: none) { .nav-folder .pin-btn { display: inline-flex; opacity: 0.55; background: none; } }
+/* Touch screens: no pin button over the counts; pin from the folder's long-press menu (DreyMail 11.5). */
+@media (hover: none) { .nav-folder .pin-btn { display: none; } }
 
 /* ---- settings tabs on phones: one full-width row per group, tabs scroll sideways ---------- */
 @media (max-width: 700px) {

@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-19 (v11.5): the icon on each side of Android notifications
+
+- **Android, Settings → This device:** "Icon on the left" (DreyMail's, the mailbox's, the
+  group's, the mailbox's color; anything but DreyMail's makes it a conversation) and "Icon on the
+  right" (the mailbox's, the group's, the mailbox's color, none) replace 11.4's single switch (an
+  earlier "on" carries over as the mailbox's icon). The group's icon falls back to the mailbox's,
+  and a mailbox with no icon of its own (a color dot) to the envelope in its color. The web app now
+  sends each mailbox's group icon, picture and color to the app.
+- **Top of the folder bar:** a mailbox that is only a color dot shows its group's icon.
+- **Phones:** no pin buttons over the unread counts in the folder bar; pin from a folder's
+  long-press menu.
+- **Files:** `android/app/src/main/java/io/github/samschultzponsys/dreymail/Notifier.kt`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/Prefs.kt`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/MainActivity.kt`,
+  `web/src/android.ts`, `web/src/App.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/styles.css`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-19 (v11.4): Android: the mailbox's icon on the left of notifications
 
 - **New setting** in the Android app (Settings → This device): "Show the mailbox's icon on

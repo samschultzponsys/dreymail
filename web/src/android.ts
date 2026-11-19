@@ -1,13 +1,13 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
-// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting.
+// Modified by samschultzponsys, 2026-11-19: the conversation-notifications setting; the group's icon and a choice per side (11.5).
 
 // The DreyMail Android app (android/) loads this web app in a WebView and adds a bridge as
 // `window.DreyMailAndroid`. In a browser it is absent and none of this does anything.
 
 import { MAILBOX_ICONS } from '../../shared/mailboxIcons';
 import { loadMailboxPicture } from './desktop';
-import type { AccountView } from '../../shared/types';
+import type { AccountView, MailboxGroupView } from '../../shared/types';
 import { api } from './api';
 
 interface AndroidBridge {
@@ -26,6 +26,9 @@ interface AndroidBridge {
   /** Notifications as conversations, with the mailbox's icon on the left (app 11.4 and later). */
   conversations?(): boolean;
   setConversations?(on: boolean): void;
+  /** JSON { left, right }: which icon notifications show on each side (app 11.5 and later). */
+  notificationIcons?(): string;
+  setNotificationIcons?(left: string, right: string): void;
   /** Asks for a different DreyMail server address. */
   changeServer(): void;
 }
@@ -45,19 +48,27 @@ export function androidInfo(): { version: string; installKind: string } | null {
 }
 
 /** Keeps the app's notification channels in step with the accounts. */
-export async function syncAndroidAccounts(accounts: AccountView[]) {
+export async function syncAndroidAccounts(accounts: AccountView[], groups: MailboxGroupView[] = []) {
   const bridge = androidBridge();
   if (!bridge) return;
   // icon: the mailbox icon's 24x24 SVG path (shared/mailboxIcons.ts); image: its uploaded picture as
-  // a data: URL. The app's notifications draw them.
+  // a data: URL. groupIcon / groupImage / groupColor: the same for the group it is in (DreyMail
+  // 11.5), so the app can show the group's icon on notifications instead. The app's notifications draw them.
+  const picture = async (icon: string, url: string | null | undefined) => (icon === 'image' && url ? ((await loadMailboxPicture(url)) ?? '') : '');
   const list = await Promise.all(
-    accounts.map(async (a) => ({
-      id: a.id,
-      name: a.name,
-      color: a.color,
-      icon: MAILBOX_ICONS[a.icon]?.path ?? '',
-      image: a.icon === 'image' && a.iconImage ? ((await loadMailboxPicture(a.iconImage)) ?? '') : '',
-    })),
+    accounts.map(async (a) => {
+      const g = groups.find((x) => x.accountIds.includes(a.id) || x.id === a.groupId);
+      return {
+        id: a.id,
+        name: a.name,
+        color: a.color,
+        icon: MAILBOX_ICONS[a.icon]?.path ?? '',
+        image: await picture(a.icon, a.iconImage),
+        groupIcon: g ? (MAILBOX_ICONS[g.icon]?.path ?? '') : '',
+        groupImage: g ? await picture(g.icon, g.iconImage) : '',
+        groupColor: g?.color ?? '',
+      };
+    }),
   );
   bridge.setAccounts(JSON.stringify(list));
 }

@@ -69,7 +69,8 @@
      Modified by samschultzponsys, 2026-11-18: v11.1 (pinned folders flat in your order; unread out of sight stands out and flashes).
      Modified by samschultzponsys, 2026-11-18: v11.2 (no ⌄ line when every folder is pinned).
      Modified by samschultzponsys, 2026-11-18: v11.3 (mark a folder all read; the open mailbox at the top of the bar).
-     Modified by samschultzponsys, 2026-11-19: v11.4 (Android: the mailbox's icon on the left of notifications, as conversations). -->
+     Modified by samschultzponsys, 2026-11-19: v11.4 (Android: the mailbox's icon on the left of notifications, as conversations).
+     Modified by samschultzponsys, 2026-11-19: v11.5 (the icon on each side of Android notifications, group icons). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -81,7 +82,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -187,8 +188,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   that line goes away.
 - **Folder menu:** right-click a folder (long-press on a phone) to mark everything in it read, or
   to pin or unpin it.
-- **The open mailbox at the top:** the top of the folder bar shows the open mailbox's icon and name
-  with the folder below it, changing as you move around (DreyMail's own mark in All inboxes).
+- **The open mailbox at the top:** the top of the folder bar shows the open mailbox's icon (its
+  group's, when the mailbox is just a color dot) and name with the folder below it, changing as you move around (DreyMail's own mark in All inboxes).
 - **Unread out of sight:** unread mail in folded or unpinned folders shows as a filled, accent-colored
   bubble on the folder it is folded under (or on the ⌄ line), and the bubble flashes for two minutes
   when new mail arrives there.
@@ -751,10 +752,12 @@ browser to install apps when Android asks). It asks for your DreyMail server's a
   sound/vibration/importance settings. The status-bar icon is tinted in the account's color and
   the notification shows the envelope in that color. Notifications of the same account are
   grouped, tapping one opens the message, and they disappear when the mail is read elsewhere.
-- **The mailbox's icon on the left (optional).** Settings → This device → "Show the mailbox's icon
-  on notifications" sends new mail as Android conversations: the mailbox's icon (or picture) takes
-  the place of DreyMail's on the left, and the notifications sit in Android's Conversations section
-  above other apps. Long-press one to make that mailbox a priority conversation.
+- **Pick the icons (optional).** Settings → This device sets the icon on each side of a
+  notification: on the left DreyMail's own, the mailbox's, its group's or its color; on the right
+  the mailbox's (default), its group's, its color or none. Anything but DreyMail's own on the left
+  sends new mail as Android conversations, in the Conversations section above other apps
+  (long-press one to make that mailbox a priority conversation). A mailbox that is just a color dot
+  shows an envelope in its color, and the group's icon falls back to the mailbox's.
 - **Private.** Notifications are end-to-end encrypted to the phone (Web Push encryption,
   RFC 8291): Google relays only ciphertext.
 - **Updates built in.** The app checks for a newer release when it starts, when you come back to it

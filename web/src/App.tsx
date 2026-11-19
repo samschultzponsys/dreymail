@@ -34,6 +34,7 @@
 // Modified by samschultzponsys, 2026-11-17: the calendar as a page of its own (/calendar), not a dialog.
 // Modified by samschultzponsys, 2026-11-17: the reminder window and desktop reminder notifications; the app lock.
 // Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message; contacts and tasks pages.
+// Modified by samschultzponsys, 2026-11-19: the Android app gets the groups' icons for notifications.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -294,9 +295,9 @@ export function App() {
   // Android app: a notification channel per account, and this phone registered for notifications.
   useEffect(() => {
     if (!androidBridge() || !accountsQ.data) return;
-    void syncAndroidAccounts(accountsQ.data);
+    void syncAndroidAccounts(accountsQ.data, groupsQ.data ?? []);
     void registerAndroidPush().catch(() => {});
-  }, [accountsQ.data]);
+  }, [accountsQ.data, groupsQ.data]);
   useEffect(() => {
     desktopBridge()?.onOpen((url) => {
       const target = notificationTarget(url, window.location.origin);

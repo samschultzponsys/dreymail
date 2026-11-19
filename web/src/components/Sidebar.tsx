@@ -25,6 +25,7 @@
 // Modified by samschultzponsys, 2026-11-17: subfolders fold away (collapse kept in preferences, on every device).
 // Modified by samschultzponsys, 2026-11-18: pinned folders flat in a dragged order; unread in folded or unpinned folders stands out and flashes when new mail arrives.
 // Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned; right-click a folder to mark it all read; the open mailbox's icon and name at the top.
+// Modified by samschultzponsys, 2026-11-19: a mailbox that is only a color dot shows its group's icon at the top.
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
@@ -86,6 +87,7 @@ import { WEB_VERSION } from '../buildInfo';
 import { desktopBridge } from '../desktop';
 import { androidBridge, androidInfo } from '../android';
 import { MailboxIcon } from './MailboxIcon';
+import { MAILBOX_ICONS } from '../../../shared/mailboxIcons';
 
 const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
   inbox: <Inbox size={16} />,
@@ -508,7 +510,12 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           // The open mailbox's icon and name, following what is selected (DreyMail 11.3).
           <span className="brand-mailbox" title={current.email ? `${current.name} (${current.email})` : current.name} style={{ ['--mb-color' as string]: current.color }}>
             <span className="brand-mailbox-icon">
-              <MailboxIcon icon={current.icon} image={current.iconImage} color={current.color} size={18} />
+              {/* A mailbox that is only a color dot shows its group's icon, if the group has one. */}
+              {(() => {
+                const own = (current.icon === 'image' && !!current.iconImage) || !!MAILBOX_ICONS[current.icon];
+                const g = own ? null : groups.find((x) => x.accountIds.includes(current.id) && ((x.icon === 'image' && !!x.iconImage) || !!MAILBOX_ICONS[x.icon]));
+                return g ? <MailboxIcon icon={g.icon} image={g.iconImage} color={g.color} size={18} /> : <MailboxIcon icon={current.icon} image={current.iconImage} color={current.color} size={18} />;
+              })()}
             </span>
             <span className="name brand-mailbox-text">
               <span className="brand-mailbox-name">{current.name}</span>

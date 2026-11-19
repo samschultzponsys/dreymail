@@ -35,7 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: stay signed in and the idle lock (This device); Server settings.
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
-// Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left).
+// Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left); which icon on each side.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -751,7 +751,7 @@ function AndroidNotifications() {
         New mail arrives the moment it lands, as a notification in the account’s color. Each account has its own Android notification channel: pick a
         different sound, vibration or importance for each one.
       </div>
-      {bridge.setConversations && <ConversationSetting bridge={bridge} />}
+      {bridge.setNotificationIcons ? <NotificationIcons bridge={bridge} /> : bridge.setConversations && <ConversationSetting bridge={bridge} />}
       <ul className="user-list">
         {(accounts.data ?? []).map((a) => (
           <li key={a.id}>
@@ -797,6 +797,55 @@ function ConversationSetting({ bridge }: { bridge: NonNullable<ReturnType<typeof
         </span>
       </span>
     </label>
+  );
+}
+
+/** Android: which icon new-mail notifications show on each side (DreyMail 11.5). */
+function NotificationIcons({ bridge }: { bridge: NonNullable<ReturnType<typeof androidBridge>> }) {
+  const [v, setV] = useState<{ left: string; right: string }>(() => {
+    try {
+      return JSON.parse(bridge.notificationIcons!()) as { left: string; right: string };
+    } catch {
+      return { left: 'app', right: 'mailbox' };
+    }
+  });
+  const set = (next: { left: string; right: string }) => {
+    bridge.setNotificationIcons!(next.left, next.right);
+    setV(next);
+  };
+  return (
+    <div className="stack">
+      <div>
+        <label className="label" htmlFor="notif-left">
+          Icon on the left
+        </label>
+        <select id="notif-left" className="select" value={v.left} onChange={(e) => set({ ...v, left: e.target.value })}>
+          <option value="app">DreyMail&apos;s icon</option>
+          <option value="mailbox">The mailbox&apos;s icon</option>
+          <option value="group">The group&apos;s icon</option>
+          <option value="color">The mailbox&apos;s color</option>
+        </select>
+        <div className="hint">
+          Anything but DreyMail&apos;s icon sends new mail as an Android conversation: it shows in the Conversations section above other apps, and a long-press
+          makes a mailbox a priority conversation.
+        </div>
+      </div>
+      <div>
+        <label className="label" htmlFor="notif-right">
+          Icon on the right
+        </label>
+        <select id="notif-right" className="select" value={v.right} onChange={(e) => set({ ...v, right: e.target.value })}>
+          <option value="mailbox">The mailbox&apos;s icon</option>
+          <option value="group">The group&apos;s icon</option>
+          <option value="color">The mailbox&apos;s color</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div className="hint">
+        A mailbox without an icon of its own (a color dot) shows an envelope in its color; the group&apos;s icon falls back to the mailbox&apos;s. Applies to new
+        notifications.
+      </div>
+    </div>
   );
 }
 
