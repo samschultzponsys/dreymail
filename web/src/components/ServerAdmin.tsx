@@ -3,6 +3,7 @@
 
 // Settings → Server: starting values for new mailboxes, the mail cache, limits and push. Saved in
 // the database; a value set in the environment (the compose file) wins and is shown locked.
+// DreyMail 11.9: the automatic backups, and one made now.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, RotateCcw } from 'lucide-react';
@@ -10,12 +11,14 @@ import { useEffect, useState } from 'react';
 import { SERVER_SETTINGS, type ServerSettingDef, type ServerSettingsView } from '../../../shared/serverSettings';
 import { fetchJson } from '../api';
 
-const GROUPS = ['New mailboxes', 'Mail cache', 'Limits and safety', 'Notifications and updates'] as const;
+const GROUPS = ['New mailboxes', 'Mail cache', 'Limits and safety', 'Notifications and updates', 'Backups'] as const;
 const GROUP_HINTS: Record<(typeof GROUPS)[number], string> = {
   'New mailboxes': 'What the "Add a mailbox" form starts with, for everyone on this server.',
   'Mail cache': 'An encrypted, disposable copy of recent mail, so folders open at once. Changes apply after DreyMail restarts.',
   'Limits and safety': 'Changes apply after DreyMail restarts.',
   'Notifications and updates': 'Changes apply after DreyMail restarts.',
+  Backups:
+    'A copy of the whole database (everyone’s settings and mailboxes, secrets still encrypted with the secret key) every day. Each user can restore their own data from one in Settings → Backup; to restore the whole server, stop DreyMail and put a copy in place of dreymail.db (same secret key).',
 };
 
 export function ServerAdmin() {
@@ -111,6 +114,7 @@ export function ServerAdmin() {
           <h3>{g}</h3>
           <div className="hint">{GROUP_HINTS[g]}</div>
           <div className="server-fields">{SERVER_SETTINGS.filter((d) => d.group === g).map(field)}</div>
+          {g === 'Backups' && <BackupsAdmin />}
         </section>
       ))}
       {error && <div className="error-text">{error}</div>}
@@ -193,5 +197,55 @@ function RoomsAdmin() {
       </div>
       {error && <div className="error-text">{error}</div>}
     </section>
+  );
+}
+
+type SnapshotRow = { name: string; createdAt: string; bytes: number };
+
+/** The automatic backups on the server, and one made now (DreyMail 11.9). */
+function BackupsAdmin() {
+  const q = useQuery({ queryKey: ['admin', 'backups'], queryFn: () => fetchJson<{ enabled: boolean; keepDays: number; backups: SnapshotRow[] }>('GET', '/api/admin/backups') });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!q.data) return null;
+  if (!q.data.enabled) return <div className="hint">Automatic backups need DreyMail&apos;s data folder (not available in this setup).</div>;
+  const now = async () => {
+    setBusy(true);
+    try {
+      await fetchJson('POST', '/api/admin/backups');
+      setError(null);
+      await q.refetch();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="stack">
+      {q.data.keepDays === 0 && <div className="warning-text">Automatic backups are off (kept for 0 days).</div>}
+      {q.data.backups.length === 0 ? (
+        <div className="hint">No backups yet; the first is made within an hour of starting.</div>
+      ) : (
+        <ul className="user-list">
+          {q.data.backups.map((b) => (
+            <li key={b.name}>
+              <div className="user-main">
+                <div className="user-name">{new Date(b.createdAt).toLocaleString()}</div>
+                <div className="muted user-meta">
+                  backups/{b.name} · {(b.bytes / 1048576).toFixed(1)} MB
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="cal-when-row">
+        <button className="btn" disabled={busy} onClick={() => void now()}>
+          {busy ? 'Backing up…' : 'Back up now'}
+        </button>
+      </div>
+      {error && <div className="error-text">{error}</div>}
+    </div>
   );
 }

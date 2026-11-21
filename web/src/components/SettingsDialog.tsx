@@ -36,6 +36,7 @@
 // Modified by samschultzponsys, 2026-11-17: Storage tab (space used per user).
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
 // Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left); which icon on each side.
+// Modified by samschultzponsys, 2026-11-21: the Backup tab.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -57,6 +58,7 @@ import { SourceLink } from './SourceLink';
 import { Passkeys } from './Passkeys';
 import { SingleSignOn } from './SingleSignOn';
 import { AutoRepliesSettings } from './AutoReplies';
+import { BackupSettings } from './BackupSettings';
 import { InstallDialog } from './InstallDialog';
 import { runningAsApp } from '../install';
 import { androidBridge, androidInfo } from '../android';
@@ -81,7 +83,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android' | 'backup';
 
 export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
   const qc = useQueryClient();
@@ -107,6 +109,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
         ['privacy', 'Images'] as [SettingsTab, string],
         ...(me.hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
         ...(aiStatus.data?.allowed ? [['ai', 'AI connections'] as [SettingsTab, string]] : []),
+        ['backup', 'Backup'] as [SettingsTab, string],
       ],
     },
     {
@@ -314,6 +317,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           {tab === 'autoreplies' && <AutoRepliesSettings />}
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'server' && <ServerAdmin />}
+          {tab === 'backup' && <BackupSettings />}
           {tab === 'privacy' && (
             <div>
               <label className="label">Load images by themselves</label>

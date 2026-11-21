@@ -73,7 +73,8 @@
      Modified by samschultzponsys, 2026-11-19: v11.5 (the icon on each side of Android notifications, group icons).
      Modified by samschultzponsys, 2026-11-19: v11.6 (Android Back stays within the mailbox you are in).
      Modified by samschultzponsys, 2026-11-21: v11.7 (HTML sent as plain text shows properly).
-     Modified by samschultzponsys, 2026-11-21: v11.8 (wide messages fit narrow screens). -->
+     Modified by samschultzponsys, 2026-11-21: v11.8 (wide messages fit narrow screens).
+     Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -85,7 +86,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.9**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1067,6 +1068,22 @@ matched through keyed hashes (HMAC) of the Message-IDs, not the IDs themselves. 
 are only what queries need: folder names, UIDs, arrival times, sizes and the read/flagged/answered/
 draft flags. An account's copy is deleted with the account, or when it is pointed at another server
 or login.
+
+### Backups
+
+- **Your own backup:** Settings → Backup → Download backup saves everything of yours (mailboxes
+  with their passwords and sign-ins, groups, signatures, settings, rules, auto-replies, blocked
+  senders, saved searches, follow-ups, contacts, tasks, calendars, S/MIME certificates, AI
+  connections) as one file, encrypted with a password you choose (scrypt + AES-256-GCM). Restore
+  from a file replaces your data with the backup's, on this server or on another DreyMail server
+  (another secret key is fine). Not included: passkeys, this device's notifications, and mail
+  itself (it stays on your mail servers).
+- **Automatic backups:** every day DreyMail writes a copy of `dreymail.db` to
+  `/data/backups` (kept 7 days by default; Settings → Server → Backups, or
+  `DREYMAIL_BACKUP_DAYS`, 0 turns them off). Anyone can restore their own data from one in
+  Settings → Backup. To restore the whole server, stop the container and copy a backup over
+  `/data/dreymail.db` (same `DREYMAIL_SECRET_KEY`). An administrator can also make one at any time
+  (Back up now).
 
 ## Security model
 

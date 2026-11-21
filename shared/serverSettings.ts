@@ -11,7 +11,7 @@ export type ServerSettingType = 'text' | 'number' | 'bool' | 'secret' | 'securit
 export interface ServerSettingDef {
   env: string;
   label: string;
-  group: 'New mailboxes' | 'Mail cache' | 'Limits and safety' | 'Notifications and updates';
+  group: 'New mailboxes' | 'Mail cache' | 'Limits and safety' | 'Notifications and updates' | 'Backups';
   type: ServerSettingType;
   /** What applies when nothing is set. */
   fallback: string;
@@ -42,6 +42,7 @@ export const SERVER_SETTINGS: ServerSettingDef[] = [
   { env: 'DREYMAIL_IMAP_IDLE_TIMEOUT', label: 'Close idle mail connections after (seconds)', group: 'Limits and safety', type: 'number', fallback: '300' },
   { env: 'DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS', label: 'Refuse mail and calendar servers on private networks', group: 'Limits and safety', type: 'bool', fallback: 'false', hint: 'On for a DreyMail open to people you don’t trust: they can’t make it connect to your LAN.' },
   { env: 'DREYMAIL_VAPID_SUBJECT', label: 'Contact for push services', group: 'Notifications and updates', type: 'text', fallback: 'this server’s address', hint: 'A mailto: or https: address that browser push services may contact.' },
+  { env: 'DREYMAIL_BACKUP_DAYS', label: 'Keep automatic backups for (days)', group: 'Backups', type: 'number', fallback: '7', live: true, hint: 'A copy of the database every day in the data folder’s backups folder; 0 turns automatic backups off.' },
   { env: 'DREYMAIL_UPDATE_CHECK', label: 'Check GitHub for new DreyMail versions', group: 'Notifications and updates', type: 'bool', fallback: 'true' },
 ];
 

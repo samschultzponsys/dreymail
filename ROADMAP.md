@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (11.6). New ideas go here.
+Everything planned so far is done (11.9). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -170,6 +170,8 @@ Everything planned so far is done (11.6). New ideas go here.
       ends (3.3).
 
 ### Administration and security
+- [x] Backups: your own password-protected file (restores here or on another server) and
+      automatic daily copies of the database, restorable per user (11.9).
 - [x] Stay signed in on trusted devices (sliding sessions) and the idle app lock unlocked with a
       passkey, kept by the server (9.6).
 - [x] One copy of sent mail in Sent: providers that file it themselves aren't given a second one

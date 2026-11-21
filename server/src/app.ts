@@ -24,6 +24,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions from sent and received mail.
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
 // Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
+// Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,7 +61,10 @@ import { Directory } from './directory.js';
 import { People } from './people.js';
 import { SmimeStore } from './mail/smimeStore.js';
 import { registerPeopleRoutes } from './routes/people.js';
-import { ServerSettings, withStoredSettings } from './serverSettings.js';
+import { ServerSettings, storedServerSettings, withStoredSettings } from './serverSettings.js';
+import { Snapshots } from './backup.js';
+import { registerBackupRoutes } from './routes/backup.js';
+import { serverVersion } from './version.js';
 import { assistantOutgoing } from './ai/outgoing.js';
 import type { Http } from './calendar/remote.js';
 import { Blocklist } from './blocklist.js';
@@ -430,6 +434,31 @@ export async function buildApp(
   registerPasskeyRoutes(app, { config, store, sessions });
   registerCalendarRoutes(app, { store, calendars, reminders, rooms });
   registerPeopleRoutes(app, { people });
+  // Backups (DreyMail 11.9): the user's own file, and daily copies of the database in <data>/backups.
+  const backupDays = () => {
+    const raw = process.env.DREYMAIL_BACKUP_DAYS ?? storedServerSettings(store).DREYMAIL_BACKUP_DAYS ?? '';
+    const n = raw === '' ? 7 : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.min(Math.floor(n), 365) : 7;
+  };
+  const snapshots = new Snapshots({ db: store.db, dir: opts.store ? null : path.join(config.dataDir, 'backups'), keepDays: backupDays, log: (m) => app.log.info(m) });
+  registerBackupRoutes(app, {
+    store,
+    credentialKey: keyring.credentialKey,
+    snapshots,
+    access,
+    version: serverVersion(),
+    keepDays: backupDays,
+    onRestored: (userId, summary) => {
+      for (const id of summary.accountIds) {
+        pool.invalidate(userId, id);
+        mail.forgetFolders(userId, id);
+      }
+    },
+  });
+  const backupTimer = setInterval(() => snapshots.tick(), 3600_000);
+  backupTimer.unref();
+  setTimeout(() => snapshots.tick(), 60_000).unref();
+  app.addHook('onClose', async () => clearInterval(backupTimer));
   registerAutoReplyRoutes(app, { autoReplies, onChanged: (userId) => assistant.syncWatching(userId) });
   registerAssistantRoutes(app, { store, ai: assistantStore, engine: assistant, client: aiClient, access });
   assistant.syncWatching();

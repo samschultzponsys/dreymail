@@ -13,6 +13,29 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-21 (v11.9): backups
+
+- **Settings → Backup (every user):** Download backup: the user's data (mailboxes with their
+  passwords and sign-ins, groups, signatures, preferences and picture, address book, blocked
+  senders, saved searches, follow-ups, snoozes, auto-replies, S/MIME keys and certificates,
+  contacts, tasks, calendars and their events and CalDAV sources, AI connections, rules and
+  history) as one file, gzipped and encrypted with a password of their choosing (scrypt +
+  AES-256-GCM). Secrets come out of the server's encryption and are sealed again on restore, so a
+  backup restores on another server with another secret key too. Prepared by the server and
+  fetched from a one-time link (5 minutes), so the Android app's downloader saves it as well.
+  Restore from a file replaces the user's data in one transaction (an id that belongs to another
+  user here stops it, changing nothing); scheduled sends and calendar shares are kept. Not in a
+  backup: passkeys, sign-in identities, push registrations, scheduled sends, and what DreyMail
+  rebuilds by itself.
+- **Automatic backups:** a copy of the whole database (`VACUUM INTO`) every day in
+  `<data>/backups`, kept `DREYMAIL_BACKUP_DAYS` days (new server setting in Settings → Server →
+  Backups; default 7, 0 = off). Users can restore their own data from one; administrators see
+  the list and can back up now.
+- **Files:** `server/src/backup.ts`, `server/src/routes/backup.ts`, `server/src/app.ts`,
+  `shared/serverSettings.ts`, `web/src/components/BackupSettings.tsx`,
+  `web/src/components/ServerAdmin.tsx`, `web/src/components/SettingsDialog.tsx`,
+  `server/test/backup.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-21 (v11.8): wide messages fit narrow screens
 
 - **Messages wider than the screen** (fixed-width tickets and newsletters on a phone) no longer
