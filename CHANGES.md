@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-21 (v11.7): HTML sent as plain text shows properly
+
+- **Fix:** some senders (ticket systems, mostly) put a whole HTML page in a part labeled
+  text/plain. Previews in the list and in notifications showed its markup (`<!DOCTYPE html …`).
+  Such a part is now recognized and read as HTML: previews show its text, and opening the message
+  shows it as HTML (sanitized like any other), with a plain-text version for replies. Previews
+  already cached update as the cache refreshes.
+- **Files:** `server/src/imap/snippet.ts`, `server/src/mail/parse.ts`, `server/test/mime.test.ts`,
+  `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-19 (v11.6): Android Back stays within the mailbox you are in
 
 - **Back button in the Android app:** it no longer walks the browser history (which could land in

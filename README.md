@@ -71,7 +71,8 @@
      Modified by samschultzponsys, 2026-11-18: v11.3 (mark a folder all read; the open mailbox at the top of the bar).
      Modified by samschultzponsys, 2026-11-19: v11.4 (Android: the mailbox's icon on the left of notifications, as conversations).
      Modified by samschultzponsys, 2026-11-19: v11.5 (the icon on each side of Android notifications, group icons).
-     Modified by samschultzponsys, 2026-11-19: v11.6 (Android Back stays within the mailbox you are in). -->
+     Modified by samschultzponsys, 2026-11-19: v11.6 (Android Back stays within the mailbox you are in).
+     Modified by samschultzponsys, 2026-11-21: v11.7 (HTML sent as plain text shows properly). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -83,7 +84,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **11.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end

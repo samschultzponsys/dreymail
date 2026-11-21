@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-16: longer notification previews.
+// Modified by samschultzponsys, 2026-11-21: HTML sent as text/plain.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import type { MessageStructureObject } from 'imapflow';
 import { describe, expect, it } from 'vitest';
 import { buildMessageDetail, flattenAddresses, parseRaw, parseReferences } from '../src/mail/parse.js';
 import { buildRawMessage, parseAddressList, sanitizeOutgoingHtml } from '../src/mail/compose.js';
-import { findTextPart, hasAttachments, snippetFromPart } from '../src/imap/snippet.js';
+import { findTextPart, hasAttachments, looksLikeHtml, snippetFromPart } from '../src/imap/snippet.js';
 
 const fixture = (name: string) => fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'mime', name));
 const meta = { accountId: 'a1', folder: 'INBOX', uid: 42, uidValidity: '7', flags: new Set(['\\Seen']), internalDate: null };
@@ -202,5 +203,37 @@ describe('composing', () => {
       { keepBcc: true },
     );
     expect((await parseRaw(raw)).bcc).toEqual([{ name: '', address: 'secret@example.com' }]);
+  });
+});
+
+describe('HTML sent as text/plain (11.7)', () => {
+  const plain = { part: '1', type: 'text/plain' as const, encoding: '7bit', charset: 'utf-8' };
+  it('is read as HTML in previews, not shown as markup', () => {
+    const raw = Buffer.from(
+      '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title></title><style>img { max-width: 568px; }</style></head><body contentEditable="false"><p>Your ticket has been updated.</p><p>Status: Open</p></body></html>',
+    );
+    const s = snippetFromPart(raw, plain, false, { length: 500, keepLines: true });
+    expect(s).not.toContain('<');
+    expect(s).not.toContain('max-width');
+    expect(s).toContain('Your ticket has been updated.');
+    expect(snippetFromPart(raw, plain)).toBe('Your ticket has been updated. Status: Open');
+  });
+  it('leaves plain text that mentions a tag alone', () => {
+    expect(looksLikeHtml('Use the <br> tag for a line break.')).toBe(false);
+    expect(snippetFromPart(Buffer.from('Use the <br> tag for a line break.'), plain)).toBe('Use the <br> tag for a line break.');
+  });
+});
+
+describe('opening a message whose text/plain part is HTML (11.7)', () => {
+  it('shows it as (sanitized) HTML, with a plain-text version for replies', async () => {
+    const raw = Buffer.from(
+      'From: Support <help@example.com>\r\nTo: sam@example.com\r\nSubject: Ticket updated\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><p>Your ticket has been updated.</p><script>alert(1)</script></body></html>\r\n',
+    );
+    const email = await parseRaw(raw);
+    const d = buildMessageDetail(email, meta, opts);
+    expect(d.html).toContain('Your ticket has been updated.');
+    expect(d.html).not.toContain('<script');
+    expect(d.text).toContain('Your ticket has been updated.');
+    expect(d.text).not.toContain('<');
   });
 });

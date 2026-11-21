@@ -3,7 +3,10 @@
 // Modified by samschultzponsys, 2026-11-15: unsubscribe options and verification codes in the message detail.
 // Modified by samschultzponsys, 2026-11-15: calendar invitations in the message detail.
 // Modified by samschultzponsys, 2026-11-18: importance and read-receipt requests of a message.
+// Modified by samschultzponsys, 2026-11-21: a text/plain part that is really HTML is shown as HTML.
 
+import { looksLikeHtml } from '../imap/snippet.js';
+import { convert } from 'html-to-text';
 import { importanceOf, receiptAddressOf } from '../../../shared/importance.js';
 import PostalMime from 'postal-mime';
 import type { Address as PmAddress, Attachment, Email } from 'postal-mime';
@@ -104,8 +107,13 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
   let css = '';
   let htmlStyle: MessageDetail['htmlStyle'] = null;
   let remoteContentBlocked = 0;
-  if (email.html) {
-    const s = sanitizeEmailHtml(email.html, { allowRemote: opts.allowRemote, resolveRemote: opts.resolveRemote, resolveCid });
+  // A text/plain part that is really HTML (some ticket systems send that) is shown as HTML, sanitized
+  // like any other (DreyMail 11.7).
+  const textIsHtml = !email.html && !!email.text && looksLikeHtml(email.text);
+  const sourceHtml = email.html || (textIsHtml ? email.text! : '');
+  const plainText = textIsHtml ? convert(email.text!, { wordwrap: false, selectors: [{ selector: 'img', format: 'skip' }, { selector: 'style', format: 'skip' }, { selector: 'head', format: 'skip' }] }) : (email.text ?? null);
+  if (sourceHtml) {
+    const s = sanitizeEmailHtml(sourceHtml, { allowRemote: opts.allowRemote, resolveRemote: opts.resolveRemote, resolveCid });
     html = s.html;
     css = s.css;
     htmlStyle = s.style;
@@ -147,7 +155,7 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     date: (date && !Number.isNaN(date.getTime()) ? date : new Date(0)).toISOString(),
     seen: meta.flags.has('\\Seen'),
     flagged: meta.flags.has('\\Flagged'),
-    text: email.text ?? null,
+    text: plainText,
     html,
     css,
     htmlStyle,
@@ -155,7 +163,7 @@ export function buildMessageDetail(email: ParsedEmail, meta: DetailMeta, opts: D
     remoteContentLoaded: opts.allowRemote,
     senderDomain: opts.allowlist?.senderDomain ?? null,
     unsubscribe: unsubscribeOf(email),
-    code: findCode(email.subject ?? '', email.text ?? ''),
+    code: findCode(email.subject ?? '', plainText ?? ''),
     invite: safeInvite(email),
     imagesAllowedBy: opts.allowlist?.allowedBy ?? null,
     allowlistSkipped: opts.allowlist?.skipped ?? null,

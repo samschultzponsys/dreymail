@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-16: longer previews that keep their paragraphs (notifications).
+// Modified by samschultzponsys, 2026-11-21: HTML sent as text/plain is read as HTML in previews.
 
 import type { MessageStructureObject } from 'imapflow';
 import { convert } from 'html-to-text';
@@ -87,6 +88,15 @@ function decodeCharset(bytes: Buffer, charset: string): string {
   }
 }
 
+/** Text that is really an HTML document or fragment, whatever its part says. */
+export function looksLikeHtml(text: string): boolean {
+  const head = text.slice(0, 2000).trimStart();
+  if (/^(<!doctype\s+html|<html[\s>]|<\?xml[^>]*>\s*<!doctype\s+html)/i.test(head)) return true;
+  // A fragment: several real block tags, opened and closed.
+  const tags = head.match(/<\/?(?:html|head|body|div|p|br|table|tr|td|span|style|meta)\b[^>]*>/gi) ?? [];
+  return tags.length >= 4 && tags.some((t) => t.startsWith('</'));
+}
+
 /**
  * Decode a (possibly truncated) body part fetched with a byte range into a short snippet.
  * Truncation may cut a base64 quantum, a QP escape or a multi-byte character, all of which are
@@ -103,7 +113,9 @@ export function snippetFromPart(raw: Buffer, part: TextPart, alreadyDecoded = fa
     }
   }
   let text = decodeCharset(bytes, part.charset);
-  if (part.type === 'text/html') {
+  // Some senders (ticket systems, mostly) put HTML in a part labeled text/plain: read it as HTML
+  // rather than showing the markup (DreyMail 11.7).
+  if (part.type === 'text/html' || looksLikeHtml(text)) {
     // Strip any trailing partial tag before converting.
     text = text.replace(/<[^>]*$/, '');
     text = convert(joinSurrogateReferences(text), {
