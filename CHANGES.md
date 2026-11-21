@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-21 (v11.8): wide messages fit narrow screens
+
+- **Messages wider than the screen** (fixed-width tickets and newsletters on a phone) no longer
+  run off the right edge. The viewer first lets the parts that are too wide give way (a too-wide
+  table fills the width, other boxes size to their content, every box is capped at the width), so
+  text wraps and columns keep their proportions; if the message is still too wide, it is shrunk
+  to fit (not below 40%). Less padding around messages on phones. Refits when the screen turns
+  or the pane is resized.
+- **Files:** `shared/srcdoc.ts`, `web/src/components/MessageFrame.tsx`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-21 (v11.7): HTML sent as plain text shows properly
 
 - **Fix:** some senders (ticket systems, mostly) put a whole HTML page in a part labeled

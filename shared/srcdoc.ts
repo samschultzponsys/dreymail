@@ -1,3 +1,7 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-21: wide messages wrap, then shrink to fit, on narrow screens.
+
 /**
  * Builds the document loaded into the sandboxed message iframe (via srcdoc).
  *
@@ -57,7 +61,14 @@ img { max-width: 100%; height: auto; }
 img:not([src]) { display: inline-block; min-width: 1px; min-height: 1px; background: rgba(128, 128, 128, 0.12); }
 pre { white-space: pre-wrap; }
 blockquote { margin: 0.5em 0 0.5em 0.25em; padding-left: 0.9em; border-left: 3px solid ${color(p.border)}; }
-table { max-width: 100%; }`;
+table { max-width: 100%; }
+/* Phones: less padding around the message. */
+@media (max-width: 520px) { body { padding: 14px 12px; } }
+/* Wider than the screen (DreyMail 11.8): the viewer first lets fixed widths give way, so text
+   wraps; only if it is still too wide does it shrink the message to fit. */
+html.dm-reflow body * { max-width: 100% !important; box-sizing: border-box; }
+html.dm-reflow td, html.dm-reflow th { overflow-wrap: break-word; white-space: normal !important; }
+html.dm-reflow pre, html.dm-reflow code { white-space: pre-wrap !important; }`;
 }
 
 function modeCss(mode: RenderMode, p: RenderPalette): string {
