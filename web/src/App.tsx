@@ -466,7 +466,9 @@ export function App() {
   const title = accountsQ.isSuccess && accounts.length === 0
     ? 'No mailboxes yet'
     : route.filters.where === 'all'
-    ? 'All mail'
+    ? route.filters.accounts?.length === 1
+      ? `${accountMap.get(route.filters.accounts[0]!)?.name ?? 'Mailbox'} · all folders`
+      : 'All mailboxes'
     : route.filters.where === 'inboxes'
       ? 'All inboxes'
       : effectiveSel.accountId
@@ -923,6 +925,7 @@ export function App() {
         onResize={(w, done) => setListWidth(w, done)}
         title={title}
         unified={effectiveSel.accountId === null}
+        manyMailboxes={effectiveSel.accountId === null || (route.filters.where === 'all' && route.filters.accounts?.length !== 1) || route.filters.where === 'inboxes'}
         isSentLike={isSentLike}
         inboxTabs={(me.data?.preferences.inboxTabs ?? false) && !route.q && !Object.keys(route.filters).length && (effectiveSel.accountId === null || folderInfo?.specialUse === 'inbox')}
         accounts={accountMap}

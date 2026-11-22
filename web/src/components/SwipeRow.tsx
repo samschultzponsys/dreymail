@@ -1,5 +1,9 @@
+// Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
+// Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-23: rows take an inline style (the mailbox color).
+
 import { Archive, Flag, Mail, MailOpen, Trash2 } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { SwipeAction } from '../../../shared/types';
 import { dragOffset, isArmed, lockAxis, releaseOutcome, type Axis, type Direction } from '../swipe';
 
@@ -39,6 +43,8 @@ interface Props {
   confirm: (dir: Direction) => boolean;
   onSwipe: (dir: Direction) => void;
   className: string;
+  /** Inline style for the row (DreyMail 12.2: the mailbox's color). */
+  style?: CSSProperties;
   onClick: (e: React.MouseEvent) => void;
   children: ReactNode;
 }
@@ -57,7 +63,7 @@ interface Gesture {
  * A list row that can be swiped left/right. The browser keeps vertical scrolling (touch-action:
  * pan-y); a gesture only becomes a swipe once horizontal movement clearly dominates.
  */
-export function SwipeRow({ left, right, seen, flagged, removes, confirm, onSwipe, className, onClick, children }: Props) {
+export function SwipeRow({ left, right, seen, flagged, removes, confirm, onSwipe, className, style, onClick, children }: Props) {
   const outer = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const g = useRef<Gesture | null>(null);
@@ -174,7 +180,7 @@ export function SwipeRow({ left, right, seen, flagged, removes, confirm, onSwipe
           <span>{(dir === 'right' ? rightLook : leftLook)!.label}</span>
         </div>
       )}
-      <div ref={content} className={className} onClick={onClick}>
+      <div ref={content} className={className} style={style} onClick={onClick}>
         {children}
       </div>
     </div>

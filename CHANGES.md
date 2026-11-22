@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.2): which mailbox each result is from
+
+- **Lists of several mailboxes** (All inboxes, searching every mailbox, or any list that holds
+  mail of more than one mailbox) show each row's mailbox: a full-height bar and a faint tint in
+  its color, and a small tag with its icon and name before the subject. Before, only the All
+  inboxes view showed a thin bar, and not at all when "All inboxes" was turned off.
+- **Titles:** a search of every mailbox reads "All mailboxes"; of one whole mailbox, "<name> ·
+  all folders".
+- **Files:** `web/src/components/MessageList.tsx`, `web/src/components/SwipeRow.tsx`,
+  `web/src/App.tsx`, `web/src/styles.css`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-22 (v12.1): search everywhere; folders pinned to the top; fewer blocked images
 
 - **Search everywhere:** a box under Contacts and Tasks searches all mail in every mailbox; icons

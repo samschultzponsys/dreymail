@@ -9,7 +9,9 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk; Spam elsewhere.
 // Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates; Gmail labels.
 // Modified by samschultzponsys, 2026-11-22: search the whole mailbox by default, or the folder, or all mail.
+// Modified by samschultzponsys, 2026-11-23: rows show their mailbox wherever the list holds several.
 
+import { MailboxIcon } from './MailboxIcon';
 import { PaneResizer } from './PaneResizer';
 import { AlarmClock, ArrowDown, CircleAlert, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -31,6 +33,8 @@ interface Props {
   onResize?: (width: number | null, done: boolean) => void;
   title: string;
   unified: boolean;
+  /** Results from several mailboxes (All inboxes, searching every mailbox): each row shows its mailbox (DreyMail 12.2). */
+  manyMailboxes?: boolean;
   isSentLike: boolean;
   accounts: Map<string, AccountView>;
   folders: AccountFolders[] | undefined;
@@ -165,6 +169,8 @@ export function MessageList(p: Props) {
   const sameAccount = checkedMsgs.length > 0 && checkedMsgs.every((m) => m.accountId === checkedMsgs[0]!.accountId);
   const anyUnread = checkedMsgs.some((m) => !m.seen);
   const anyUnflagged = checkedMsgs.some((m) => !m.flagged);
+  // Which mailbox each row is from, wherever the list holds several (DreyMail 12.2).
+  const marked = !!p.manyMailboxes || p.unified || new Set(p.messages.map((m) => m.accountId)).size > 1;
 
   return (
     <section className="pane list">
@@ -413,13 +419,14 @@ export function MessageList(p: Props) {
               removes={(d) => p.swipeRemoves(m, d)}
               confirm={(d) => p.confirmSwipe(m, d)}
               onSwipe={(d) => p.onSwipe(m, d)}
-              className={`row ${m.seen ? '' : 'unread'} ${isOpen ? 'selected' : ''} ${has(p.lastOpenKey) && !isOpen ? 'recent' : ''} ${p.checked.has(key) ? 'checked' : ''} ${p.unreadOnly && m.seen ? 'read-in-filter' : ''}`}
+              style={marked && acc ? ({ ['--acct-color' as string]: acc.color } as React.CSSProperties) : undefined}
+              className={`row ${marked && acc ? 'mailbox-marked' : ''} ${m.seen ? '' : 'unread'} ${isOpen ? 'selected' : ''} ${has(p.lastOpenKey) && !isOpen ? 'recent' : ''} ${p.checked.has(key) ? 'checked' : ''} ${p.unreadOnly && m.seen ? 'read-in-filter' : ''}`}
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey) p.onCheck(m, !p.checked.has(key));
                 else p.onOpen(m);
               }}
             >
-              {p.unified && acc && <span className="acct-bar" style={{ background: acc.color }} title={acc.name} />}
+              {marked && acc && <span className="acct-bar" style={{ background: acc.color }} title={acc.name} />}
               <div className="row-check" onClick={(e) => e.stopPropagation()}>
                 <input type="checkbox" checked={p.checked.has(key)} onChange={(e) => p.onCheck(m, e.target.checked)} aria-label="Select" />
               </div>
@@ -462,6 +469,12 @@ export function MessageList(p: Props) {
                   )}
                 </div>
                 <div className="row-subject">
+                  {marked && acc && (
+                    <span className="row-mailbox" title={`In ${acc.name}`}>
+                      <MailboxIcon icon={acc.icon} image={acc.iconImage} color={acc.color} size={12} />
+                      {acc.name}
+                    </span>
+                  )}
                   <span>{m.subject || '(no subject)'}</span>
                 </div>
                 {m.snippet && <div className="row-snippet">{m.snippet}</div>}

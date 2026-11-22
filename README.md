@@ -76,7 +76,8 @@
      Modified by samschultzponsys, 2026-11-21: v11.8 (wide messages fit narrow screens).
      Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies).
      Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand).
-     Modified by samschultzponsys, 2026-11-22: v12.1 (search everywhere; folders pinned to the top; inbox tabs off by default; images from everyone you know). -->
+     Modified by samschultzponsys, 2026-11-22: v12.1 (search everywhere; folders pinned to the top; inbox tabs off by default; images from everyone you know).
+     Modified by samschultzponsys, 2026-11-23: v12.2 (results from several mailboxes show their mailbox). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -88,7 +89,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -334,6 +335,8 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   task, event or settings page. Each mailbox has its own search box (the magnifier on its heading;
   pin it to keep it shown). The search box above the message list searches the whole mailbox by
   default; "Search in" under it switches to this folder or all mailboxes.
+  Wherever a list holds mail from several mailboxes (All inboxes, a search of every mailbox), each
+  row shows its mailbox: a bar and a faint tint in its color, and its icon and name.
 - **Folders pinned to the top:** right-click (or long-press) a folder → Pin to the top bar puts it
   above the message list, with its unread count; drag them into any order (on a phone: hold, then
   drag; hold and let go to show the × buttons).
