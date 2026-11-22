@@ -20,7 +20,9 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   96 KB of it, read in the background on the background connection, never marking it read) after.
   A word search (with or without "unread only") of a folder whose copy holds all its mail and is
   all indexed is answered from the index without asking the mail server; other folders, and
-  searches with other filters, still go to the mail server. Words are lowercased, without
+  searches with other filters, still go to the mail server. Like a listing, such a search first
+  brings the folder's copy up to date (mail that just arrived or moved is found; a message not
+  indexed yet sends the search to the mail server). Words are lowercased, without
   accents, with simple English endings taken off. The cache format changes (version 3), so the
   copy is filled again after updating.
 - **Space per user:** new server setting `DREYMAIL_CACHE_USER_MB` (1024 by default) for each

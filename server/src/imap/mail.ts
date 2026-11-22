@@ -90,6 +90,8 @@ export const NO_FILTER: ListFilter = { text: '', unread: false };
 /** Filtering the IMAP server must do (the cache only answers plain and unread-only listings). */
 export const needsSearch = (f: ListFilter) => f.text !== '' || (!!f.filters && filterCount(f.filters) > 0);
 export const isFiltered = (f: ListFilter) => f.unread || needsSearch(f);
+/** A plain word search (unread only allowed) that the cache's search index can answer (DreyMail 12.3). */
+export const indexable = (f: ListFilter) => !!f.text && !(f.filters && filterCount(f.filters) > 0) && queryTerms(f.text).length > 0;
 
 /** A message of a listing, fetched from the IMAP server (`msg`, no snippet yet) or from the cache (`summary`). */
 interface FetchedItem {
@@ -531,14 +533,14 @@ export class MailService {
    * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
    * searches). Only plain word searches (and unread only) are answered here.
    */
-  private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
-    if (!this.cached || !filter.text || (filter.filters && filterCount(filter.filters) > 0)) return null;
+  private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter, since: number): SourcePage | null {
+    if (!this.cached || !indexable(filter)) return null;
     const terms = queryTerms(filter.text);
-    if (!terms.length) return null;
     const { accountId, folder } = source;
     return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
       const f = sync.ready(userId, accountId, folder);
-      if (!f || !f.complete) return null;
+      // All of the folder's mail, and known to be current (watched, or brought up to date for this search).
+      if (!f || !f.complete || !(sync.isCurrent(userId, accountId, folder) || f.syncedAt >= since)) return null;
       const state = cache.indexState(f);
       if (state.messages === 0 || state.indexed < state.messages) return null;
       let reset = false;
@@ -673,7 +675,8 @@ export class MailService {
    * from) are up to date, unless they are known to be. See CacheSync.beforeListing.
    */
   private async prepareCached(userId: string, sources: ListSource[], filter: ListFilter, fresh: boolean) {
-    if (!this.cached || needsSearch(filter)) return;
+    // A word search the index can answer needs the copy brought up to date first, like a listing.
+    if (!this.cached || (needsSearch(filter) && !indexable(filter))) return;
     const { cache, sync } = this.cached;
     await Promise.all(
       sources.map(async ({ accountId, folder }) => {
@@ -747,13 +750,14 @@ export class MailService {
   ): Promise<MessageListResponse> {
     const previous = decodeCursor(rawCursor);
     const errors: MessageListResponse['errors'] = [];
+    const started = Date.now();
     await this.prepareCached(userId, sources, filter, !!opts.fresh);
     const pages = (
       await Promise.all(
         sources.map(async (s) => {
           try {
             return (
-              this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
+              this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, started) ??
               this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
               (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter))
             );
