@@ -20,6 +20,7 @@ const ORDER = [
   'auth', 'display_name', 'saved_searches', 'roles', 'icon', 'icon_image', 'ai_connections', 'learning_from', 'blocked_senders',
   'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth', 'mailbox_groups', 'threaded', 'pinned_folders',
   'icon_image', 'users', 'auto_replies', 'address_book', 'calendar_alerts', 'followups', 'show_as', 'contacts', 'oauth_parent', 'smime_keys',
+  'device_backups',
 ];
 
 const marker = (m: (typeof MIGRATIONS)[number]) => {

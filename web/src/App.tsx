@@ -36,6 +36,7 @@
 // Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message; contacts and tasks pages.
 // Modified by samschultzponsys, 2026-11-19: the Android app gets the groups' icons for notifications.
 // Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
+// Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,6 +50,7 @@ import { api, ApiError, type MailboxSel } from './api';
 import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme';
 import { accountIcon, desktopBridge, loadMailboxPicture, mailboxNotificationIcon } from './desktop';
 import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
+import { startDeviceBackups } from './deviceBackup';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
@@ -310,6 +312,8 @@ export function App() {
     desktopBridge()?.notify({ title: ev.title, body: ev.body, tag: ev.tag, url: ev.url, icon: accountIcon(BRAND_CYAN, 'bell') });
   }, []);
   useLiveUpdates(loggedIn && accounts.length > 0, onSnoozeEnded, onNotify, onReminder);
+  // This device's own settings saved to the server on its schedule (DreyMail 12.0).
+  useEffect(() => (loggedIn ? startDeviceBackups() : undefined), [loggedIn]);
   // Desktop app: have uploaded mailbox pictures ready for notifications.
   useEffect(() => {
     if (!desktopBridge()) return;

@@ -1,7 +1,7 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-// Backups API (DreyMail 11.9). /api's preHandler has authenticated the user.
+// Backups API (DreyMail 11.9; device settings since 12.0). /api's preHandler has authenticated the user.
 
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
@@ -96,6 +96,53 @@ export function registerBackupRoutes(
     } finally {
       db?.close();
     }
+  });
+
+  // Each device's own settings (DreyMail 12.0): saved by the device on its schedule or by hand,
+  // listed so another device (or the same one after a reinstall) can take them.
+  const deviceId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
+  app.get('/api/device-backups', async (req) =>
+    (store.db.prepare('SELECT device_id, name, kind, updated_at, length(data) AS bytes FROM device_backups WHERE user_id = ? ORDER BY updated_at DESC').all(req.user!.id) as { device_id: string; name: string; kind: string; updated_at: number; bytes: number }[]).map((r) => ({
+      deviceId: r.device_id,
+      name: r.name,
+      kind: r.kind,
+      savedAt: new Date(r.updated_at).toISOString(),
+      bytes: r.bytes,
+    })),
+  );
+  app.put<{ Params: { id: string } }>('/api/device-backups/:id', { bodyLimit: 4 * 1024 * 1024 }, async (req, reply) => {
+    const id = deviceId.safeParse(req.params.id);
+    const body = z.object({ name: z.string().trim().max(100).default(''), kind: z.enum(['browser', 'desktop', 'android']), data: z.record(z.string(), z.unknown()) }).safeParse(req.body);
+    if (!id.success || !body.success) return reply.code(400).send({ error: 'Check the device settings' });
+    const data = JSON.stringify(body.data.data);
+    if (data.length > 3 * 1024 * 1024) return reply.code(400).send({ error: 'These device settings are too large' });
+    const count = (store.db.prepare('SELECT COUNT(*) AS n FROM device_backups WHERE user_id = ? AND device_id != ?').get(req.user!.id, id.data) as { n: number }).n;
+    if (count >= 50) return reply.code(400).send({ error: 'Remove some saved devices first' });
+    store.db
+      .prepare('INSERT INTO device_backups (user_id, device_id, name, kind, data, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, device_id) DO UPDATE SET name = excluded.name, kind = excluded.kind, data = excluded.data, updated_at = excluded.updated_at')
+      .run(req.user!.id, id.data, body.data.name, body.data.kind, data, Date.now());
+    return { ok: true, savedAt: new Date().toISOString() };
+  });
+  const deviceRow = (userId: string, id: string) => store.db.prepare('SELECT name, kind, data, updated_at FROM device_backups WHERE user_id = ? AND device_id = ?').get(userId, id) as { name: string; kind: string; data: string; updated_at: number } | undefined;
+  app.get<{ Params: { id: string } }>('/api/device-backups/:id', async (req, reply) => {
+    const r = deviceRow(req.user!.id, req.params.id);
+    if (!r) return reply.code(404).send({ error: 'No such saved device' });
+    return { name: r.name, kind: r.kind, savedAt: new Date(r.updated_at).toISOString(), data: JSON.parse(r.data) as unknown };
+  });
+  // As a file (a plain GET, so the Android app's downloader saves it too).
+  app.get<{ Params: { id: string } }>('/api/device-backups/:id/file', async (req, reply) => {
+    const r = deviceRow(req.user!.id, req.params.id);
+    if (!r) return reply.code(404).send({ error: 'No such saved device' });
+    const name = `dreymail-device-${(r.name || r.kind).replace(/[^A-Za-z0-9._-]+/g, '_')}-${new Date(r.updated_at).toISOString().slice(0, 10)}.json`;
+    return reply
+      .header('content-type', 'application/json')
+      .header('content-disposition', `attachment; filename="${name}"`)
+      .header('cache-control', 'no-store')
+      .send(r.data);
+  });
+  app.delete<{ Params: { id: string } }>('/api/device-backups/:id', async (req) => {
+    store.db.prepare('DELETE FROM device_backups WHERE user_id = ? AND device_id = ?').run(req.user!.id, req.params.id);
+    return { ok: true };
   });
 
   // Administrators: every automatic backup, and one made now.

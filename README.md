@@ -74,7 +74,8 @@
      Modified by samschultzponsys, 2026-11-19: v11.6 (Android Back stays within the mailbox you are in).
      Modified by samschultzponsys, 2026-11-21: v11.7 (HTML sent as plain text shows properly).
      Modified by samschultzponsys, 2026-11-21: v11.8 (wide messages fit narrow screens).
-     Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies). -->
+     Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies).
+     Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -86,7 +87,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **11.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1078,6 +1079,11 @@ or login.
   from a file replaces your data with the backup's, on this server or on another DreyMail server
   (another secret key is fine). Not included: passkeys, this device's notifications, and mail
   itself (it stays on your mail servers).
+- **This device's settings:** Settings → Backup → This device saves what a device keeps for
+  itself (interface size, layout, the folder bar, the Android app's notification icons, the desktop
+  app's tray setting) to the server, by hand or every day or week while DreyMail is open. After
+  reinstalling the app, or on a new phone or computer, pick a saved device and Use here. They can
+  also be downloaded and restored as a file, and they are part of your account backup.
 - **Automatic backups:** every day DreyMail writes a copy of `dreymail.db` to
   `/data/backups` (kept 7 days by default; Settings → Server → Backups, or
   `DREYMAIL_BACKUP_DAYS`, 0 turns them off). Anyone can restore their own data from one in

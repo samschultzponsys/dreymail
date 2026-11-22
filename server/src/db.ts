@@ -35,6 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 // Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
+// Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -622,6 +623,17 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      cert_pem TEXT NOT NULL,
      seen_at INTEGER NOT NULL,
      PRIMARY KEY (user_id, email)
+   );`,
+  // DreyMail 12.0: each device's own settings (this browser's, the Android app's), saved on a
+  // schedule or by hand, to restore on that device or another one.
+  `CREATE TABLE IF NOT EXISTS device_backups (
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     device_id TEXT NOT NULL,
+     name TEXT NOT NULL DEFAULT '',
+     kind TEXT NOT NULL DEFAULT 'browser',
+     data TEXT NOT NULL,
+     updated_at INTEGER NOT NULL,
+     PRIMARY KEY (user_id, device_id)
    );`,
 ];
 

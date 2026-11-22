@@ -1,7 +1,7 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-// Backups (DreyMail 11.9).
+// Backups (DreyMail 11.9; each device's saved settings too since 12.0).
 //
 // - A user's own backup: everything of theirs in dreymail.db (mailboxes with their passwords and
 //   sign-ins, groups, signatures, settings, rules, contacts, tasks, calendars, …) as one file,
@@ -60,6 +60,7 @@ const TABLES: TableSpec[] = [
   { table: 'ai_rules', owner: 'user_id' },
   { table: 'ai_history', owner: 'user_id' },
   { table: 'ai_observations', owner: 'user_id' },
+  { table: 'device_backups', owner: 'user_id' },
 ];
 // Left out on purpose: sign-in (passkeys, identities), this device's push registrations, scheduled
 // sends (restoring an old one could send it again), and what DreyMail works out again by itself

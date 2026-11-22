@@ -13,6 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-22 (v12.0): this device's settings, saved on a schedule
+
+- **Settings → Backup → This device:** what a browser, the desktop app or the Android app keeps
+  for itself (its local storage: interface size, layout, folder bar, toolbar; the Android app's
+  notification icons; the desktop app's tray setting) is saved to the server by hand or every day
+  or week (checked while DreyMail is open), under a device name that can be changed. Saved devices
+  are listed: restore this device, use another device's settings here (after a reinstall or on a
+  new phone), download as a file (a plain GET, so the Android app saves it too), restore from a
+  file, or forget one. Who the device is, its schedule and one-off state are left out. Device
+  settings are part of the account backup.
+- **Server:** new table `device_backups` (migration at the end), `GET/PUT/DELETE
+  /api/device-backups/:id`, `GET /api/device-backups`, `GET /api/device-backups/:id/file`.
+- **Files:** `server/src/db.ts`, `server/src/backup.ts`, `server/src/routes/backup.ts`,
+  `web/src/deviceBackup.ts`, `web/src/components/BackupSettings.tsx`, `web/src/App.tsx`,
+  `server/test/backup.test.ts`, `server/test/migrations.test.ts`, `web/test/deviceBackup.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-21 (v11.9): backups
 
 - **Settings → Backup (every user):** Download backup: the user's data (mailboxes with their

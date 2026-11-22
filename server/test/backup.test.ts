@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
 // Backups (11.9): a user's data out and back in (also on another server with another key), the
-// password-protected file, and the automatic daily copies.
+// password-protected file, and the automatic daily copies; each device's own settings (12.0).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -135,6 +135,18 @@ describe('backups over the API', () => {
       expect(bad.statusCode).toBe(400);
       const ok = await ctx.app.inject({ method: 'POST', url: '/api/backup/restore', payload: { file: file.rawPayload.toString('base64'), password: 'backup password' }, headers: h });
       expect(ok.json()).toMatchObject({ ok: true, summary: { restored: { contacts: 1 } } });
+      // A device's own settings (12.0): saved, listed, fetched, as a file, and in the account backup.
+      const dev = 'abcdef1234567890';
+      expect((await ctx.app.inject({ method: 'PUT', url: `/api/device-backups/${dev}`, payload: { name: 'Android app', kind: 'android', data: { format: 'dreymail-device', local: { navRail: '1' } } }, headers: h })).statusCode).toBe(200);
+      expect((await ctx.app.inject({ method: 'GET', url: '/api/device-backups', headers: h })).json()).toMatchObject([{ deviceId: dev, name: 'Android app', kind: 'android' }]);
+      expect((await ctx.app.inject({ method: 'GET', url: `/api/device-backups/${dev}`, headers: h })).json()).toMatchObject({ data: { local: { navRail: '1' } } });
+      expect((await ctx.app.inject({ method: 'GET', url: `/api/device-backups/${dev}/file`, headers: { cookie } })).headers['content-disposition']).toMatch(/dreymail-device-Android_app-/);
+      expect((await ctx.app.inject({ method: 'PUT', url: '/api/device-backups/../x', payload: { kind: 'android', data: {} }, headers: h })).statusCode).not.toBe(200);
+      const p2 = (await ctx.app.inject({ method: 'POST', url: '/api/backup/prepare', payload: { password: 'backup password' }, headers: h })).json() as { url: string };
+      const f2 = await ctx.app.inject({ method: 'GET', url: p2.url, headers: { cookie } });
+      store.db.prepare('DELETE FROM device_backups').run();
+      await ctx.app.inject({ method: 'POST', url: '/api/backup/restore', payload: { file: f2.rawPayload.toString('base64'), password: 'backup password' }, headers: h });
+      expect((await ctx.app.inject({ method: 'GET', url: '/api/device-backups', headers: h })).json()).toHaveLength(1);
       // No data folder in this test: no automatic backups.
       expect((await ctx.app.inject({ method: 'GET', url: '/api/backup/automatic', headers: h })).json()).toEqual({ keepDays: 0, backups: [] });
     } finally {
