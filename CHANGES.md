@@ -13,6 +13,31 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.3): a search index in the mail cache; space per user
+
+- **Search index:** the mail cache indexes every cached message's words, as keyed hashes per
+  mailbox (8 bytes each; no words stored): headers when a message is cached, its content (at most
+  96 KB of it, read in the background on the background connection, never marking it read) after.
+  A word search (with or without "unread only") of a folder whose copy holds all its mail and is
+  all indexed is answered from the index without asking the mail server; other folders, and
+  searches with other filters, still go to the mail server. Words are lowercased, without
+  accents, with simple English endings taken off. The cache format changes (version 3), so the
+  copy is filled again after updating.
+- **Space per user:** new server setting `DREYMAIL_CACHE_USER_MB` (1024 by default) for each
+  user's copy, index and stored messages, split across their mailboxes evenly (default) or by the
+  shares they choose; it replaces `DREYMAIL_CACHE_ACCOUNT_MB`. Stored content gives way first;
+  the index stops growing when a mailbox's share is full. Bigger copies by default: 20000
+  messages of Inbox and Sent, 5000 of other folders.
+- **Settings → Search and storage:** the space used of the allowance, each mailbox's space, message
+  count and how far it is indexed (live), and the split (evenly / by my choice, with percents).
+- **Files:** `server/src/cache/searchTerms.ts`, `server/src/cache/store.ts`,
+  `server/src/cache/sync.ts`, `server/src/cacheBudget.ts`, `server/src/imap/mail.ts`,
+  `server/src/app.ts`, `server/src/config.ts`, `server/src/routes/api.ts`, `shared/types.ts`,
+  `shared/serverSettings.ts`, `web/src/components/CacheSettings.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/globalSearch.ts`, `web/src/styles.css`,
+  `server/test/searchIndex.test.ts`, `server/test/cache.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.2): which mailbox each result is from
 
 - **Lists of several mailboxes** (All inboxes, searching every mailbox, or any list that holds

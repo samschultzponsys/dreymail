@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-15: automatic single sign-on, with /login to get to the sign-in page.
 // Modified by samschultzponsys, 2026-11-17: DREYMAIL_CACHE_FOLDER_MESSAGES (every folder cached).
 // Modified by samschultzponsys, 2026-11-17: keeps the environment it was read from (server settings saved in the UI).
+// Modified by samschultzponsys, 2026-11-23: more messages kept per folder by default (searched from the index).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -189,8 +190,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // Server-wide limits, never per user: one user must not be able to fill the disk.
   const cache: CacheConfig | null = bool(env.DREYMAIL_CACHE, true)
     ? {
-        messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 2000),
-        messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 500),
+        messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 20000),
+        messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 5000),
         maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 1) * 1024 * 1024),
         bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
       }

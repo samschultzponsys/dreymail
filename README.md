@@ -77,7 +77,8 @@
      Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies).
      Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand).
      Modified by samschultzponsys, 2026-11-22: v12.1 (search everywhere; folders pinned to the top; inbox tabs off by default; images from everyone you know).
-     Modified by samschultzponsys, 2026-11-23: v12.2 (results from several mailboxes show their mailbox). -->
+     Modified by samschultzponsys, 2026-11-23: v12.2 (results from several mailboxes show their mailbox).
+     Modified by samschultzponsys, 2026-11-23: v12.3 (search index in the mail cache; space per user, split across mailboxes). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -89,7 +90,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -843,10 +844,10 @@ environment.
 | `DREYMAIL_MAX_MESSAGE_MB` | no | `50` | Largest message the server downloads for display. |
 | `DREYMAIL_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
 | `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
-| `DREYMAIL_CACHE_MESSAGES` | no | `2000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
-| `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `500` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
+| `DREYMAIL_CACHE_MESSAGES` | no | `20000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
+| `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `5000` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
 | `DREYMAIL_CACHE_MAX_BODY_MB` | no | `1` | Largest message whose content is kept (`0`: keep no message content). |
-| `DREYMAIL_CACHE_ACCOUNT_MB` | no | `200` | Message content kept per account; the least recently read goes first. |
+| `DREYMAIL_CACHE_USER_MB` | no | `1024` | Space per user for their copy of mail, search index and stored messages, split across their mailboxes (12.3). |
 | `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
 | `DREYMAIL_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
 | `LOG_LEVEL` | no | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -1046,8 +1047,8 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
 Asking the mail server for everything on every click is slow: one page of a folder takes several
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
 searches that some servers are slow at. So DreyMail keeps a copy of the newest messages
-(`DREYMAIL_CACHE_MESSAGES`, 2000 by default) of each account's **INBOX** and **Sent** folder, and of
-the newest messages of **every other folder** (`DREYMAIL_CACHE_FOLDER_MESSAGES`, 500 by default):
+(`DREYMAIL_CACHE_MESSAGES`, 20000 by default) of each account's **INBOX** and **Sent** folder, and of
+the newest messages of **every other folder** (`DREYMAIL_CACHE_FOLDER_MESSAGES`, 5000 by default):
 sender, subject, snippet, flags and the headers that tie conversations together.
 
 The other folders are filled in the background, one at a time, as soon as a mailbox is added and
@@ -1055,8 +1056,19 @@ again whenever a session opens (folders not checked in the last 10 minutes; up t
 mailbox, Drafts, Archive, Junk and Trash first). This runs on a connection of its own, so it never
 holds up what you are doing. A folder you open before its turn starts filling right away. It also keeps the
 content of messages you have opened, and loads the newest unread ones ahead, up to
-`DREYMAIL_CACHE_MAX_BODY_MB` per message and `DREYMAIL_CACHE_ACCOUNT_MB` per account. The limits
-are server settings; users can't change them.
+`DREYMAIL_CACHE_MAX_BODY_MB` per message.
+
+**Search index (12.3).** In the background DreyMail also reads each cached message once (at most
+96 KB of it, without marking it read) and indexes its words: keyed hashes of them (per mailbox), so
+the index holds no words either. A word search of a folder whose copy holds all its mail and is
+all indexed is answered from the index at once; other folders are searched by the mail server as
+before. Searches match whole words, with simple English endings ("printer" finds "printers").
+
+**Space.** Each user has `DREYMAIL_CACHE_USER_MB` (1024 by default; Settings → Server) for their
+copy, index and stored messages, split across their mailboxes evenly, or by the shares they choose
+in Settings → Search and storage, which also shows each mailbox's space and how far it is indexed.
+Stored message content gives way first (the least recently read); the index stops growing when a
+mailbox's share is full.
 
 The mail server stays the source of truth:
 
@@ -1070,7 +1082,8 @@ The mail server stays the source of truth:
   always checks with the server first. Changes are fetched incrementally: new messages, changed
   flags (only those since the last check where the server supports CONDSTORE) and messages that are
   gone. A new UIDVALIDITY starts the folder over.
-- Searches, scrolling past the copy, attachments and folder counts always go to the mail server.
+- Searches of folders not all copied and indexed, scrolling past the copy, attachments and folder
+  counts go to the mail server.
   Folders removed on the server are dropped from the copy.
 - The copy is disposable. It is a separate file (`cache.db`), and anything wrong with it (a damaged
   file, an entry that doesn't decrypt, another secret key, a new format) just empties it, or the

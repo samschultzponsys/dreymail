@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (12.1). New ideas go here.
+Everything planned so far is done (12.3). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -97,6 +97,8 @@ Everything planned so far is done (12.1). New ideas go here.
 - [x] "Add a mailbox to get started" screen (2.5).
 
 ### Providers and mail
+- [x] Search index in the mail cache (keyed word hashes): word searches of fully copied folders
+      answered at once; space per user split across mailboxes evenly or by share (12.3).
 - [x] Outlook.com, Hotmail and Microsoft 365 with Microsoft sign-in (2.2).
 - [x] Gmail with Sign in with Google, next to app passwords (2.3); both offered side by side with
       what each gives and costs (4.2).

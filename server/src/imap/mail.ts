@@ -13,7 +13,9 @@
 // Modified by samschultzponsys, 2026-11-17: Gmail: archive to All Mail; a message's labels, added and removed.
 // Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading; Gmail labels in lists.
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
+// Modified by samschultzponsys, 2026-11-23: word searches answered from the search index where a folder is all cached and indexed.
 
+import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
@@ -524,6 +526,32 @@ export class MailService {
    * cached (or not filled yet), there is a text search (always done by the IMAP server), or the
    * page reaches below the oldest cached message. Also makes a background sync check for news.
    */
+  /**
+   * A text search answered from the search index (DreyMail 12.3), at once, when the folder's copy
+   * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
+   * searches). Only plain word searches (and unread only) are answered here.
+   */
+  private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
+    if (!this.cached || !filter.text || (filter.filters && filterCount(filter.filters) > 0)) return null;
+    const terms = queryTerms(filter.text);
+    if (!terms.length) return null;
+    const { accountId, folder } = source;
+    return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
+      const f = sync.ready(userId, accountId, folder);
+      if (!f || !f.complete) return null;
+      const state = cache.indexState(f);
+      if (state.messages === 0 || state.indexed < state.messages) return null;
+      let reset = false;
+      if (cursor && cursor.uidValidity !== f.uidValidity) {
+        reset = true;
+        cursor = undefined;
+      }
+      if (cursor?.done) return { source, uidValidity: f.uidValidity, items: [], exhausted: true, reset };
+      const rows = cache.search(f, terms, cursor?.beforeUid ?? null, limit, filter.unread);
+      return { source, uidValidity: f.uidValidity, items: rows.map((m) => cachedItem(source, f.uidValidity, m)), exhausted: rows.length < limit, reset };
+    });
+  }
+
   private cachedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
     if (!this.cached || needsSearch(filter)) return null;
     const { accountId, folder } = source;
@@ -724,7 +752,11 @@ export class MailService {
       await Promise.all(
         sources.map(async (s) => {
           try {
-            return this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ?? (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter));
+            return (
+              this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
+              this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
+              (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter))
+            );
           } catch (err) {
             errors.push({ accountId: s.accountId, error: describeError(err, 'IMAP').message });
             return null;
@@ -779,11 +811,11 @@ export class MailService {
       if (hit) return hit;
     }
     const res = await this.fetchRawLive(userId, ref, maxBytes);
-    if (f && this.cached && res.raw.length <= this.cached.maxBodyBytes && this.cached.bodyBytesPerAccount > 0) {
-      const { bodyBytesPerAccount } = this.cached;
-      this.fromCache(userId, ref.accountId, ref.folder, undefined, ({ cache }) => {
+    if (f && this.cached && res.raw.length <= this.cached.maxBodyBytes) {
+      this.fromCache(userId, ref.accountId, ref.folder, undefined, ({ cache, sync }) => {
+        if (sync.budgetOf(userId, ref.accountId) <= 0) return;
         cache.putBody(f, ref.uid, res.raw);
-        cache.enforceBodyBudget(userId, ref.accountId, bodyBytesPerAccount);
+        sync.enforceBudget(userId, ref.accountId);
       });
     }
     return res;

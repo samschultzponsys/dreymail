@@ -38,6 +38,7 @@
 // Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left); which icon on each side.
 // Modified by samschultzponsys, 2026-11-21: the Backup tab.
 // Modified by samschultzponsys, 2026-11-22: opens on a given tab (the search at the top); images in all mail, or from everyone you know.
+// Modified by samschultzponsys, 2026-11-23: the Search and storage tab.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -60,6 +61,7 @@ import { Passkeys } from './Passkeys';
 import { SingleSignOn } from './SingleSignOn';
 import { AutoRepliesSettings } from './AutoReplies';
 import { BackupSettings } from './BackupSettings';
+import { CacheSettings } from './CacheSettings';
 import { InstallDialog } from './InstallDialog';
 import { runningAsApp } from '../install';
 import { androidBridge, androidInfo } from '../android';
@@ -84,7 +86,7 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
   ['toggleFlag', 'Flag / unflag'],
 ];
 
-type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android' | 'backup';
+type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android' | 'backup' | 'cache';
 
 /** The Settings tabs this user has (DreyMail 12.1: the search at the top only offers these). */
 export function settingTabsFor(me: Me): string[] {
@@ -97,6 +99,7 @@ export function settingTabsFor(me: Me): string[] {
     'autoreplies',
     'privacy',
     'backup',
+    'cache',
     ...(me.hasPassword ? ['password'] : []),
     ...(can('ai.assistant') ? ['ai'] : []),
     ...(can('users.manage') || can('users.pictures') || can('roles.manage') ? ['users'] : []),
@@ -133,6 +136,7 @@ export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onC
         ['privacy', 'Images'] as [SettingsTab, string],
         ...(me.hasPassword ? [['password', 'Password'] as [SettingsTab, string]] : []),
         ...(aiStatus.data?.allowed ? [['ai', 'AI connections'] as [SettingsTab, string]] : []),
+        ['cache', 'Search and storage'] as [SettingsTab, string],
         ['backup', 'Backup'] as [SettingsTab, string],
       ],
     },
@@ -342,6 +346,7 @@ export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onC
           {tab === 'device' && <ThisDevice prefs={v} save={save} />}
           {tab === 'server' && <ServerAdmin />}
           {tab === 'backup' && <BackupSettings />}
+          {tab === 'cache' && <CacheSettings prefs={v} save={save} />}
           {tab === 'privacy' && (
             <div>
               <label className="label">Load images by themselves</label>

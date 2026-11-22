@@ -142,6 +142,7 @@ export const prefsSchema = z.object({
   footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
   inboxTabs: z.boolean().default(false),
   topFolders: z.array(z.object({ accountId: z.string().min(1).max(64), folder: z.string().min(1).max(1000) })).max(30).default([]),
+  cacheSplit: z.object({ mode: z.enum(['even', 'custom']), shares: z.record(z.string().max(64), z.number().min(0).max(100)) }).optional(),
   imagesOwnDomains: z.boolean().default(true),
   imagesContacts: z.boolean().default(true),
   imagesSenderHosted: z.boolean().default(false),

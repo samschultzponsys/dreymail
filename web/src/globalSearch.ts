@@ -94,6 +94,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Auto-replies', tab: 'autoreplies', words: 'out of office vacation away automatic reply' },
   { label: 'Images', tab: 'privacy', words: 'remote images tracking pictures load privacy' },
   { label: 'Password', tab: 'password', words: 'change password' },
+  { label: 'Search and storage', tab: 'cache', words: 'cache space storage index search split mailbox share' },
   { label: 'Backup', tab: 'backup', words: 'backup restore export import device settings schedule' },
   { label: 'AI connections', tab: 'ai', words: 'ai assistant openai claude model' },
   { label: 'Users', tab: 'users', words: 'users accounts people admin' },

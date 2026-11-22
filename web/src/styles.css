@@ -1484,3 +1484,12 @@ body.resizing iframe { pointer-events: none; }
 
 /* Gmail labels in the message list (DreyMail 10.9). */
 .row-label { font-size: 10.5px; line-height: 16px; padding: 0 6px; border-radius: 999px; background: var(--surface-2, var(--bg)); border: 1px solid var(--border); color: var(--text-2); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Settings → Search and storage (DreyMail 12.3). */
+.cache-total { display: grid; gap: 6px; }
+.cache-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
+.cache-bar.small { height: 5px; margin-top: 5px; }
+.cache-bar > span { display: block; height: 100%; background: var(--accent-fill); border-radius: inherit; }
+.cache-list li { align-items: center; }
+.cache-share { display: inline-flex; align-items: center; gap: 4px; }
+.cache-share .input { width: 64px; text-align: right; }

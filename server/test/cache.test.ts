@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-17: other folders cached ('folder' role, DREYMAIL_CACHE_FOLDER_MESSAGES).
+// Modified by samschultzponsys, 2026-11-23: bigger default copies (searched from the index).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -263,8 +264,8 @@ describe('mail cache storage', () => {
 describe('mail cache settings', () => {
   const base = { DREYMAIL_SECRET_KEY: secret(), DREYMAIL_DEV_LOGIN: 'true' };
 
-  it('is on by default with 2000 messages per folder, 1 MB per message and 200 MB per account', () => {
-    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 2000, messagesPerOtherFolder: 500, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
+  it('is on by default with 20000 messages per folder (12.3), 1 MB per message and 200 MB per account', () => {
+    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 20000, messagesPerOtherFolder: 5000, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
   });
 
   it('can be switched off or sized by the administrator', () => {

@@ -385,6 +385,12 @@ export type MessageButton = 'reply' | 'replyAll' | 'forward' | 'archive' | 'dele
 export const MESSAGE_BUTTONS: readonly MessageButton[] = ['reply', 'replyAll', 'forward', 'archive', 'delete', 'flag', 'seen'];
 export const DEFAULT_MESSAGE_BUTTONS: MessageButton[] = ['reply', 'replyAll', 'forward', 'delete'];
 
+/** How a user's cache space is split across their mailboxes (DreyMail 12.3): evenly, or by shares (percent). */
+export interface CacheSplit {
+  mode: 'even' | 'custom';
+  shares: Record<string, number>;
+}
+
 /** A folder pinned to the bar above the message list (DreyMail 12.1). */
 export interface TopFolder {
   accountId: string;
@@ -414,6 +420,8 @@ export interface Preferences {
   inboxTabs: boolean;
   /** Folders pinned to the bar above the message list, in their order (DreyMail 12.1). */
   topFolders?: TopFolder[];
+  /** How the cache space is split across mailboxes (DreyMail 12.3; default evenly). */
+  cacheSplit?: CacheSplit;
   /** Load images by themselves in mail from your own mailboxes' domains (DreyMail). */
   imagesOwnDomains: boolean;
   /** … from people you know: written to, had mail from, or in your contacts (DreyMail; wider since 12.1). */

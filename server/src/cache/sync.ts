@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-17: listings of other folders always check with the server first, ahead of the filling.
 // Modified by samschultzponsys, 2026-11-17: tells about new messages and filled folders (address suggestions).
 // Modified by samschultzponsys, 2026-11-18: Gmail labels fetched with message lists.
+// Modified by samschultzponsys, 2026-11-23: the search index filled in the background; space per mailbox from the user's share.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -24,6 +25,9 @@ const DEBOUNCE_MS = 300;
 export const WARM_MAX_AGE_MS = 10 * 60_000;
 /** At most this many other folders per mailbox are cached (the special ones first). */
 export const WARM_MAX_FOLDERS = 100;
+/** Messages read per round when filling the search index, and how much of each (DreyMail 12.3). */
+const INDEX_BATCH = 25;
+export const INDEX_BYTES = 96 * 1024;
 /** SQLite result codes for a damaged database file: SQLITE_IOERR, SQLITE_CORRUPT, SQLITE_NOTADB. */
 const DAMAGED = new Set([10, 11, 26]);
 
@@ -55,6 +59,10 @@ export interface CacheSyncDeps {
   /** The cached copy of a folder changed (new, removed or re-flagged messages). */
   onChanged: (userId: string, accountId: string, folder: string) => void;
   log?: (msg: string, extra?: Record<string, unknown>) => void;
+  /** Space (bytes) the account's cached mail may take: summaries, content and index (DreyMail 12.3). Default: bodyBytesPerAccount. */
+  budget?: (userId: string, accountId: string) => number;
+  /** Plain text of a message (for the search index); null when it can't be read. */
+  textOf?: (raw: Buffer) => Promise<string | null>;
 }
 
 const sleep = (ms: number) =>
@@ -92,6 +100,8 @@ export class CacheSync {
   private readonly dirty = new Set<string>();
   /** Accounts whose other folders are being filled (warmAccount), and whether to go round again. */
   private readonly warming = new Map<string, { again: boolean }>();
+  /** Accounts whose search index is being filled, and whether to go round again (DreyMail 12.3). */
+  private readonly indexing = new Map<string, { again: boolean }>();
   private stopped = false;
 
   constructor(private readonly deps: CacheSyncDeps) {}
@@ -293,6 +303,7 @@ export class CacheSync {
         try {
           if (role === 'inbox') await this.prefetch(userId, accountId, path, interrupted);
           await this.fill(userId, accountId, path, interrupted);
+          this.indexAccount(userId, accountId);
           const f = this.cache.folder(userId, accountId, path);
           if (f && f.syncedAt > 0 && (f.complete || this.cache.count(f) >= this.limit(f.role))) {
             try {
@@ -483,7 +494,7 @@ export class CacheSync {
   /** Load the content of the newest unread messages ahead, so opening them doesn't wait for IMAP. */
   private async prefetch(userId: string, accountId: string, path: string, interrupted: () => boolean) {
     const { cache, pool, config } = this.deps;
-    if (config.maxBodyBytes <= 0 || config.bodyBytesPerAccount <= 0) return;
+    if (config.maxBodyBytes <= 0 || this.budgetOf(userId, accountId) <= 0) return;
     const f = cache.folder(userId, accountId, path);
     if (!f) return;
     for (const uid of cache.prefetchCandidates(f, PREFETCH_AMONG, config.maxBodyBytes, PREFETCH_COUNT)) {
@@ -497,6 +508,87 @@ export class CacheSync {
       });
       if (raw && raw.length <= config.maxBodyBytes) cache.putBody(f, uid, raw);
     }
-    cache.enforceBodyBudget(userId, accountId, config.bodyBytesPerAccount);
+    this.enforceBudget(userId, accountId);
+  }
+
+  // ---- space and the search index (DreyMail 12.3) ----------------------------------------------
+
+  /** Space the account's cached mail may take (bytes). */
+  budgetOf(userId: string, accountId: string): number {
+    return this.deps.budget ? this.deps.budget(userId, accountId) : this.deps.config.bodyBytesPerAccount;
+  }
+
+  /** Stored content gives way (least recently read first) so the account stays within its space. */
+  enforceBudget(userId: string, accountId: string) {
+    const used = this.cache.accountBytes(userId, accountId);
+    const forBodies = Math.max(0, this.budgetOf(userId, accountId) - used.messages - used.index);
+    this.cache.enforceBodyBudget(userId, accountId, forBodies);
+  }
+
+  /**
+   * Fill the search index of an account in the background: read the content of cached messages not
+   * indexed yet (newest first, at most INDEX_BYTES of each, without marking anything read) and index
+   * their words, until all are indexed or the account's space is used up. Never rejects.
+   */
+  indexAccount(userId: string, accountId: string) {
+    if (this.stopped || !this.deps.textOf) return;
+    const k = `${userId}\u0000${accountId}`;
+    const running = this.indexing.get(k);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const state = { again: false };
+    this.indexing.set(k, state);
+    void (async () => {
+      do {
+        state.again = false;
+        for (;;) {
+          if (this.stopped) return;
+          // The index has room as long as stored content can give way for it.
+          const used = this.cache.accountBytes(userId, accountId);
+          if (used.messages + used.index >= this.budgetOf(userId, accountId)) return;
+          const batch = this.cache.unindexed(userId, accountId, INDEX_BATCH);
+          if (!batch.length) break;
+          for (const { folder: f, uids } of batch) {
+            if (this.stopped) return;
+            const got = await this.deps.pool
+              .withMailbox(
+                userId,
+                accountId,
+                f.path,
+                async (client, selected) => {
+                  const mailbox = (client.mailbox || selected) as MailboxObject;
+                  if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
+                  const out = new Map<number, Buffer>();
+                  for (const m of await client.fetchAll(uids.join(','), { uid: true, source: { start: 0, maxLength: INDEX_BYTES } } as never, { uid: true })) if (m.source) out.set(m.uid, m.source);
+                  return out;
+                },
+                'sync',
+              )
+              .catch(() => null);
+            // The folder can't be read now (or changed): try again after its next sync.
+            if (!got) return;
+            for (const uid of uids) {
+              const raw = got.get(uid);
+              const text = raw ? await this.deps.textOf!(raw).catch(() => null) : null;
+              if (text === null) this.cache.markUnindexable(f, uid);
+              else this.cache.indexBody(f, uid, text);
+            }
+          }
+          this.enforceBudget(userId, accountId);
+          await sleep(50);
+        }
+      } while (state.again && !this.stopped);
+    })()
+      .catch((err: unknown) => {
+        this.deps.log?.('search index filling failed', { accountId, error: (err as Error).message });
+      })
+      .finally(() => this.indexing.delete(k));
+  }
+
+  /** Whether an account's search index is being filled right now. */
+  isIndexing(userId: string, accountId: string): boolean {
+    return this.indexing.has(`${userId}\u0000${accountId}`);
   }
 }

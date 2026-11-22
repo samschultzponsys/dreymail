@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-16: each mailbox's folder list, kept encrypted.
 // Modified by samschultzponsys, 2026-11-17: every other folder cached too (role 'folder').
 // Modified by samschultzponsys, 2026-11-17: space used per mailbox (Settings → Storage).
+// Modified by samschultzponsys, 2026-11-23: a search index (keyed hashes of words) for searching the cached mail.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,6 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { MessageSummary } from '../../../shared/types.js';
 import { decryptBytes, encryptBytes } from '../crypto.js';
 import { matchesTerm, type LookupField, type LookupTerm } from '../imap/related.js';
+import { MAX_BODY_TERMS, termsOf } from './searchTerms.js';
 
 /**
  * Local copies of the newest messages of each folder (INBOX and Sent, and since DreyMail 8.1 a
@@ -26,11 +28,13 @@ import { matchesTerm, type LookupField, type LookupTerm } from '../imap/related.
  * Mail content is encrypted (AES-256-GCM, bound to user, account, folder, UIDVALIDITY and UID):
  * subjects, addresses, snippets, Message-IDs and message bodies. Readable are only what queries
  * need: folder paths, UIDs, arrival times, flags (read, flagged, answered, draft) and sizes.
- * Conversations are matched through keyed hashes of the Message-IDs.
+ * Conversations are matched through keyed hashes of the Message-IDs, and searches (DreyMail 12.3)
+ * through keyed hashes of the words (per mailbox), so the index doesn't hold the words either.
  */
 
 // 2 (DreyMail): summaries carry the automatic inbox tab.
-const SCHEMA_VERSION = '2';
+// 3 (DreyMail 12.3): the search index (terms) and each message's indexing state.
+const SCHEMA_VERSION = '3';
 
 /** Each mailbox's folder list with unread counts (DreyMail), so the sidebar shows at once. */
 const FOLDER_LISTS = `CREATE TABLE IF NOT EXISTS folder_lists (
@@ -69,8 +73,20 @@ const SCHEMA = `
     flags INTEGER NOT NULL,
     size INTEGER NOT NULL,
     data BLOB NOT NULL,
+    -- Search index (DreyMail 12.3): 0 headers only, 1 content too, 2 content couldn't be read.
+    indexed INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (folder_id, uid)
   ) WITHOUT ROWID;
+  CREATE INDEX messages_unindexed ON messages(indexed, folder_id, sort_time);
+  -- The search index (DreyMail 12.3): keyed hashes of each message's words (see searchTerms.ts).
+  CREATE TABLE terms (
+    folder_id INTEGER NOT NULL,
+    term BLOB NOT NULL,
+    uid INTEGER NOT NULL,
+    PRIMARY KEY (folder_id, term, uid),
+    FOREIGN KEY (folder_id, uid) REFERENCES messages(folder_id, uid) ON DELETE CASCADE
+  ) WITHOUT ROWID;
+  CREATE INDEX terms_message ON terms(folder_id, uid);
   CREATE TABLE thread_keys (
     folder_id INTEGER NOT NULL,
     uid INTEGER NOT NULL,
@@ -426,6 +442,7 @@ export class MailCache {
     const del = this.db.prepare('DELETE FROM messages WHERE folder_id = ? AND uid = ?');
     const ins = this.db.prepare('INSERT INTO messages (folder_id, uid, sort_time, flags, size, data) VALUES (?, ?, ?, ?, ?, ?)');
     const key = this.db.prepare('INSERT OR IGNORE INTO thread_keys (folder_id, uid, hash) VALUES (?, ?, ?)');
+    const term = this.db.prepare('INSERT OR IGNORE INTO terms (folder_id, term, uid) VALUES (?, ?, ?)');
     this.tx(() => {
       for (const { summary: s, sortTime, internalDate } of entries) {
         const sealed: SealedSummary = {
@@ -444,6 +461,10 @@ export class MailCache {
         const data = encryptBytes(this.keys.cacheKey, Buffer.from(JSON.stringify(sealed)), this.aad(f, s.uid, 'summary'));
         del.run(f.id, s.uid);
         ins.run(f.id, s.uid, sortTime, toBits(s), s.size, data);
+        // Headers go into the search index at once; the content follows (indexBody).
+        const people = [...(Array.isArray(s.from) ? s.from : []), ...(Array.isArray(s.to) ? s.to : [])];
+        const head = [s.subject ?? '', ...people.flatMap((a) => [a?.name ?? '', a?.address ?? '']), s.snippet ?? ''].join(' ');
+        for (const t of termsOf(head)) term.run(f.id, this.termHash(f, t), s.uid);
         if (s.messageId) key.run(f.id, s.uid, this.threadHash(f, 'message-id', s.messageId));
         if (s.inReplyTo) key.run(f.id, s.uid, this.threadHash(f, 'in-reply-to', s.inReplyTo));
         for (const r of s.references) key.run(f.id, s.uid, this.threadHash(f, 'references', r));
@@ -639,5 +660,83 @@ export class MailCache {
         total -= r.size;
       }
     });
+  }
+
+  // ---- search index (DreyMail 12.3) -------------------------------------------------------------
+
+  /** A word's keyed hash for this mailbox (8 bytes: no words in the file, and small). */
+  private termHash(f: CachedFolder, term: string): Buffer {
+    return crypto.createHmac('sha256', this.keys.indexKey).update(`search\u0000${f.userId}\u0000${f.accountId}\u0000${term}`).digest().subarray(0, 8);
+  }
+
+  /** Index a message's content (its text), and mark it indexed. */
+  indexBody(f: CachedFolder, uid: number, text: string) {
+    if (!this.db.prepare('SELECT 1 FROM messages WHERE folder_id = ? AND uid = ?').get(f.id, uid)) return;
+    const term = this.db.prepare('INSERT OR IGNORE INTO terms (folder_id, term, uid) VALUES (?, ?, ?)');
+    this.tx(() => {
+      for (const t of termsOf(text, MAX_BODY_TERMS)) term.run(f.id, this.termHash(f, t), uid);
+      this.db.prepare('UPDATE messages SET indexed = 1 WHERE folder_id = ? AND uid = ?').run(f.id, uid);
+    });
+  }
+
+  /** A message whose content couldn't be read: searched by its headers only, not tried again. */
+  markUnindexable(f: CachedFolder, uid: number) {
+    this.db.prepare('UPDATE messages SET indexed = 2 WHERE folder_id = ? AND uid = ?').run(f.id, uid);
+  }
+
+  /** Messages of the account whose content isn't indexed yet, newest first. */
+  unindexed(userId: string, accountId: string, limit: number): { folder: CachedFolder; uids: number[] }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.folder_id, m.uid FROM messages m JOIN folders f ON f.id = m.folder_id
+         WHERE f.user_id = ? AND f.account_id = ? AND m.indexed = 0 ORDER BY m.sort_time DESC LIMIT ?`,
+      )
+      .all(userId, accountId, limit) as { folder_id: number; uid: number }[];
+    const byFolder = new Map<number, number[]>();
+    for (const r of rows) byFolder.set(r.folder_id, [...(byFolder.get(r.folder_id) ?? []), r.uid]);
+    const out: { folder: CachedFolder; uids: number[] }[] = [];
+    for (const [id, uids] of byFolder) {
+      const r = this.db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as FolderRow | undefined;
+      if (r) out.push({ folder: toFolder(r), uids });
+    }
+    return out;
+  }
+
+  /** How much of a folder's cached mail is searchable by content. */
+  indexState(f: CachedFolder): { messages: number; indexed: number } {
+    const r = this.db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN indexed > 0 THEN 1 ELSE 0 END), 0) AS i FROM messages WHERE folder_id = ?').get(f.id) as { n: number; i: number };
+    return { messages: r.n, indexed: r.i };
+  }
+
+  /**
+   * Cached messages that have every term, newest first (below `beforeUid`), as a list page would
+   * return them. Only meaningful when the folder is all cached and indexed (see MailService).
+   */
+  search(f: CachedFolder, terms: string[], beforeUid: number | null, limit: number, unreadOnly = false): CachedMessage[] {
+    if (!terms.length) return [];
+    const sub = terms.map(() => 'SELECT uid FROM terms WHERE folder_id = ? AND term = ?').join(' INTERSECT ');
+    const rows = this.db
+      .prepare(
+        `SELECT uid, sort_time, flags, size, data FROM messages
+         WHERE folder_id = ? AND uid < ? AND uid >= ? ${unreadOnly ? `AND (flags & ${SEEN}) = 0` : ''} AND uid IN (${sub})
+         ORDER BY uid DESC LIMIT ?`,
+      )
+      .all(f.id, beforeUid ?? Number.MAX_SAFE_INTEGER, f.lowUid, ...terms.flatMap((t) => [f.id, this.termHash(f, t)]), limit) as unknown as MessageRow[];
+    return rows.map((r) => this.decode(f, r));
+  }
+
+  /** Space an account takes (bytes): message summaries, stored content, and the index (estimated). */
+  accountBytes(userId: string, accountId: string): { messages: number; bodies: number; index: number; total: number; count: number; indexed: number } {
+    const m = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(length(m.data)), 0) AS bytes, COALESCE(SUM(CASE WHEN m.indexed > 0 THEN 1 ELSE 0 END), 0) AS i
+         FROM messages m JOIN folders f ON f.id = m.folder_id WHERE f.user_id = ? AND f.account_id = ?`,
+      )
+      .get(userId, accountId) as { n: number; bytes: number; i: number };
+    const t = this.db.prepare('SELECT COUNT(*) AS n FROM terms t JOIN folders f ON f.id = t.folder_id WHERE f.user_id = ? AND f.account_id = ?').get(userId, accountId) as { n: number };
+    const bodies = this.bodyBytes(userId, accountId);
+    // A term row: 8-byte hash, two integers and SQLite's overhead, twice (table and its index).
+    const index = t.n * 40;
+    return { messages: m.bytes, bodies, index, total: m.bytes + bodies + index, count: m.n, indexed: m.i };
   }
 }

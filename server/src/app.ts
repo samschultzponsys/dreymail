@@ -25,6 +25,7 @@
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
 // Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
 // Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
+// Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,6 +64,9 @@ import { SmimeStore } from './mail/smimeStore.js';
 import { registerPeopleRoutes } from './routes/people.js';
 import { ServerSettings, storedServerSettings, withStoredSettings } from './serverSettings.js';
 import { Snapshots } from './backup.js';
+import { CacheBudget, cacheShares } from './cacheBudget.js';
+import { parseRaw } from './mail/parse.js';
+import { convert as htmlToText } from 'html-to-text';
 import { registerBackupRoutes } from './routes/backup.js';
 import { serverVersion } from './version.js';
 import { assistantOutgoing } from './ai/outgoing.js';
@@ -188,6 +192,7 @@ export async function buildApp(
   const harvesting = new Set<string>();
   const useOf = async (userId: string, accountId: string, folder: string, role: CachedRole) =>
     role === 'inbox' ? 'inbox' : role === 'sent' ? 'sent' : await mail.folderUse(userId, accountId, folder);
+  const cacheBudget = new CacheBudget(store);
   const cacheSync =
     cache && config.cache
       ? new CacheSync({
@@ -198,6 +203,13 @@ export async function buildApp(
           sentFolder: (userId, accountId) => mail.specialFolder(userId, accountId, 'sent'),
           cacheableFolders: (userId, accountId) => mail.cacheableFolders(userId, accountId),
           isWatched: (userId, accountId) => pool.isWatching(userId, accountId),
+          // Space and the search index (DreyMail 12.3).
+          budget: (userId, accountId) => cacheBudget.accountBytes(userId, accountId),
+          textOf: async (raw) => {
+            const e = await parseRaw(raw);
+            const parts = [e.text || (e.html ? htmlToText(e.html, { wordwrap: false, selectors: [{ selector: 'img', format: 'skip' }, { selector: 'a', options: { ignoreHref: true } }] }) : ''), ...e.attachments.map((a) => a.filename ?? '')];
+            return parts.join(' ');
+          },
           onChanged: (userId, accountId, folder) => pool.onEvent(userId, { type: 'mailbox', accountId, folder }),
           onNewMessages: (userId, accountId, folder, role, messages) => {
             if (!addressBook.filled(accountId, folder)) return; // counted with the rest once the folder has filled
@@ -434,6 +446,35 @@ export async function buildApp(
   registerPasskeyRoutes(app, { config, store, sessions });
   registerCalendarRoutes(app, { store, calendars, reminders, rooms });
   registerPeopleRoutes(app, { people });
+  // Search and storage (DreyMail 12.3): each mailbox's share of the user's cache space, what it
+  // uses, and how far its search index has got.
+  app.get('/api/cache/usage', async (req) => {
+    const userId = req.user!.id;
+    const accounts = store.listAccounts(userId);
+    const shares = cacheShares(accounts.map((a) => a.id), req.user!.preferences.cacheSplit);
+    return {
+      enabled: !!(cache && cacheSync),
+      userMb: cacheBudget.userMb(),
+      split: req.user!.preferences.cacheSplit ?? { mode: 'even', shares: {} },
+      accounts: accounts.map((a) => ({
+        accountId: a.id,
+        share: shares.get(a.id) ?? 0,
+        budget: cacheBudget.accountBytes(userId, a.id),
+        used: cache ? cache.accountBytes(userId, a.id) : { messages: 0, bodies: 0, index: 0, total: 0, count: 0, indexed: 0 },
+        indexing: !!cacheSync?.isIndexing(userId, a.id),
+      })),
+    };
+  });
+  // Shares changed: shrink what is over, and fill the index where there is room now.
+  app.post('/api/cache/rebalance', async (req) => {
+    const userId = req.user!.id;
+    for (const a of store.listAccounts(userId)) {
+      cacheSync?.enforceBudget(userId, a.id);
+      cacheSync?.indexAccount(userId, a.id);
+    }
+    return { ok: true };
+  });
+
   // Backups (DreyMail 11.9): the user's own file, and daily copies of the database in <data>/backups.
   const backupDays = () => {
     const raw = process.env.DREYMAIL_BACKUP_DAYS ?? storedServerSettings(store).DREYMAIL_BACKUP_DAYS ?? '';
