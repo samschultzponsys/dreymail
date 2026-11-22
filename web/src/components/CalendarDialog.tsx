@@ -6,6 +6,7 @@
 // editors. Repeating events are expanded here, in the browser's time zone. Shown as a page of its
 // own (/calendar), filling the space of the message list and reader.
 // Modified by samschultzponsys, 2026-11-17: the event editor moved to EventEditor.tsx (repeats, reminders, guests, meetings).
+// Modified by samschultzponsys, 2026-11-22: opens on an event found by the search at the top.
 // Modified by samschultzponsys, 2026-11-18: drag events to another time or day in the week and day views; show-as.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,11 +52,12 @@ const calendarsApi = {
 };
 
 /** The calendar page; `onNav` opens the folder drawer (phones and tablets). */
-export function CalendarDialog({ accounts, onNav }: { accounts: AccountView[]; onNav: () => void }) {
+export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountView[]; onNav: () => void; focus?: CalendarEvent }) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>(() => (window.matchMedia('(max-width: 700px)').matches ? 'agenda' : 'month'));
-  const [cursor, setCursor] = useState(() => startOfDay(new Date()));
-  const [editing, setEditing] = useState<{ event: Partial<CalendarEvent> } | null>(null);
+  // Opened from the search at the top (DreyMail 12.1): on that event's day, with the event open.
+  const [cursor, setCursor] = useState(() => startOfDay(focus ? new Date(focus.allDay ? `${focus.start.slice(0, 10)}T12:00:00` : focus.start) : new Date()));
+  const [editing, setEditing] = useState<{ event: Partial<CalendarEvent> } | null>(() => (focus ? { event: focus } : null));
   const [calEditing, setCalEditing] = useState<CalendarView | 'new' | null>(null);
   const [showList, setShowList] = useState(false);
   const [error, setError] = useState<string | null>(null);

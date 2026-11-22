@@ -29,6 +29,7 @@
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of a message.
 // Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes; S/MIME.
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
+// Modified by samschultzponsys, 2026-11-22: inbox tabs off by default; folders pinned to the top bar (preference).
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -139,10 +140,12 @@ export const prefsSchema = z.object({
   unifiedInbox: z.boolean().default(true),
   showFullName: z.boolean().default(false),
   footerIdentity: z.enum(['both', 'name', 'photo']).default('both'),
-  inboxTabs: z.boolean().default(true),
+  inboxTabs: z.boolean().default(false),
+  topFolders: z.array(z.object({ accountId: z.string().min(1).max(64), folder: z.string().min(1).max(1000) })).max(30).default([]),
   imagesOwnDomains: z.boolean().default(true),
   imagesContacts: z.boolean().default(true),
   imagesSenderHosted: z.boolean().default(false),
+  imagesEveryone: z.boolean().default(false),
   sidebarCalendar: z.boolean().default(true),
   sidebarScheduled: z.boolean().default(true),
   sidebarSearches: z.boolean().default(true),
@@ -846,15 +849,18 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   // ---- single message -----------------------------------------------------------
 
   /** Settings → Images: automatic loading beyond the "always load from" list. */
-  const autoImagesFor = (userId: string) => {
+  const autoImagesFor = (userId: string, folder = '') => {
     const prefs = store.getUser(userId)?.preferences;
+    // Junk keeps images blocked unless asked (DreyMail 12.1).
+    const junk = /(^|[/.])(junk|spam|bulk)/i.test(folder);
     return {
+      everyone: prefs?.imagesEveryone === true && !junk,
       // Public mail domains (gmail.com, outlook.com…) are everyone's, not "your own".
       ownDomains:
         prefs?.imagesOwnDomains === false
           ? []
           : [...new Set(store.listAccounts(userId).map((a) => normaliseDomain(a.email)).filter((d): d is string => !!d && !isPublicMailDomain(d)))],
-      contacts: prefs?.imagesContacts === false ? new Set<string>() : store.recipientAddresses(userId),
+      contacts: prefs?.imagesContacts === false || junk ? new Set<string>() : store.knownAddresses(userId),
       senderHosted: prefs?.imagesSenderHosted === true,
     };
   };
@@ -968,7 +974,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         timing,
         allowRemote: q.remote === undefined ? undefined : q.remote === '1',
         imageDomains: q.remote === undefined ? store.listImageDomains(uid(req)) : [],
-        autoImages: q.remote === undefined ? autoImagesFor(uid(req)) : undefined,
+        autoImages: q.remote === undefined ? autoImagesFor(uid(req), q.folder) : undefined,
         imageCache,
         fetchImage,
         maxBytes: config.maxMessageBytes,

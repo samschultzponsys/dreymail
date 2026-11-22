@@ -385,6 +385,12 @@ export type MessageButton = 'reply' | 'replyAll' | 'forward' | 'archive' | 'dele
 export const MESSAGE_BUTTONS: readonly MessageButton[] = ['reply', 'replyAll', 'forward', 'archive', 'delete', 'flag', 'seen'];
 export const DEFAULT_MESSAGE_BUTTONS: MessageButton[] = ['reply', 'replyAll', 'forward', 'delete'];
 
+/** A folder pinned to the bar above the message list (DreyMail 12.1). */
+export interface TopFolder {
+  accountId: string;
+  folder: string;
+}
+
 export interface Preferences {
   theme: 'system' | 'light' | 'dark';
   pageSize: number;
@@ -404,12 +410,16 @@ export interface Preferences {
   footerIdentity: FooterIdentity;
   /** Seconds a sent message waits so it can be undone (0 = send at once, at most 600) (DreyMail). */
   undoSendSeconds: number;
-  /** Inbox split into Personal / Updates / Newsletters tabs (DreyMail). */
+  /** Inbox split into Personal / Updates / Newsletters tabs (DreyMail; off by default since 12.1). */
   inboxTabs: boolean;
+  /** Folders pinned to the bar above the message list, in their order (DreyMail 12.1). */
+  topFolders?: TopFolder[];
   /** Load images by themselves in mail from your own mailboxes' domains (DreyMail). */
   imagesOwnDomains: boolean;
-  /** … from people you have written to (DreyMail). */
+  /** … from people you know: written to, had mail from, or in your contacts (DreyMail; wider since 12.1). */
   imagesContacts: boolean;
+  /** Load images in all mail, except Junk (DreyMail 12.1). */
+  imagesEveryone?: boolean;
   /** … when every image is on the sender's own domain (DreyMail; they can see you opened it). */
   imagesSenderHosted: boolean;
   /** Sidebar entries shown: Calendar, Scheduled, Saved searches (DreyMail). */

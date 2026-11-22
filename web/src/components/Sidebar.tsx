@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-18: pinned folders flat in a dragged order; unread in folded or unpinned folders stands out and flashes when new mail arrives.
 // Modified by samschultzponsys, 2026-11-18: no ⌄ line when every folder is pinned; right-click a folder to mark it all read; the open mailbox's icon and name at the top.
 // Modified by samschultzponsys, 2026-11-19: a mailbox that is only a color dot shows its group's icon at the top.
+// Modified by samschultzponsys, 2026-11-22: the search at the top, and a search box per mailbox.
 // Modified by samschultzponsys, 2026-11-17: folders as a real tree (Inbox, Sent… fold like any folder; folding works with pins); collapsed mailboxes and groups remembered per device.
 // Modified by samschultzponsys, 2026-11-17: Calendar as a prominent button under Compose, marked while open.
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
@@ -37,6 +38,7 @@ import {
   AlarmClock,
   ChevronUp,
   MailOpen,
+  PanelTop,
   Pin,
   PinOff,
   BellOff,
@@ -71,6 +73,7 @@ import {
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { SavedSearch } from '../../../shared/search';
 import { PaneResizer } from './PaneResizer';
+import { MailboxSearch, pinnedMailboxSearches, setPinnedMailboxSearches } from './SidebarSearch';
 import { ContextMenu, type MenuItem } from './MailboxMenu';
 import { applyDrop, currentOrder, type DropTarget, type Dragged, type SidebarOrder } from '../sidebarOrder';
 import { folderRows, movePinned, pinnedRows, type FolderRow as TreeRow } from '../folderTree';
@@ -103,6 +106,13 @@ const SPECIAL_ICON: Record<SpecialUse, ReactNode> = {
 interface Props {
   /** PCs: dragging the right edge sets the folder bar's width (null: back to the default). */
   onResize?: (width: number | null, done: boolean) => void;
+  /** Folders pinned to the bar above the message list, and pinning one there (DreyMail 12.1). */
+  topFolders?: { accountId: string; folder: string }[];
+  onTopFolder?: (accountId: string, folder: string, on: boolean) => void;
+  /** The search at the top (DreyMail 12.1), under the Contacts and Tasks buttons. */
+  globalSearch?: ReactNode;
+  /** Search a whole mailbox (DreyMail 12.1). */
+  onMailboxSearch?: (accountId: string, q: string) => void;
   /** Pin or unpin folders of a mailbox (the new list of pinned paths). */
   onPin?: (accountId: string, folders: string[]) => void;
   /** Mailbox groups: sidebar sections that expand and collapse. */
@@ -157,7 +167,7 @@ interface Props {
   onNewGroup?: () => void;
 }
 
-export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false, pageActive = null, onPage }: Props) {
+export function Sidebar({ onResize, topFolders = [], onTopFolder, globalSearch, onMailboxSearch, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false, pageActive = null, onPage }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
   const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
   const [showLog, setShowLog] = useState(false);
@@ -190,6 +200,9 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
       }
       return next;
     });
+  // Search boxes per mailbox (DreyMail 12.1): opened from the heading, or pinned to stay.
+  const [mbSearchPinned, setMbSearchPinned] = useState<string[]>(pinnedMailboxSearches);
+  const [mbSearchOpen, setMbSearchOpen] = useState<Record<string, boolean>>({});
   // A pinned folder being dragged into another place among the pinned ones.
   const [pinDragging, setPinDrag] = useState<{ accountId: string; path: string } | null>(null);
   const [pinOver, setPinOver] = useState<string | null>(null);
@@ -272,6 +285,14 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
             .catch((e: Error) => window.alert(`Couldn't mark ${f.name} as read: ${e.message}`));
         },
       });
+    if (onTopFolder && f.selectable) {
+      const onTop = topFolders.some((t) => t.accountId === acc.id && t.folder === f.path);
+      items.push({
+        label: onTop ? 'Remove from the top bar' : 'Pin to the top bar',
+        icon: <PanelTop size={14} />,
+        onClick: () => onTopFolder(acc.id, f.path, !onTop),
+      });
+    }
     if (onPin)
       items.push({
         label: isPinned ? 'Unpin' : 'Pin: always shown',
@@ -345,12 +366,38 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
                     </span>
                   )}
                 </button>
+                {onMailboxSearch && !rail && !mbSearchPinned.includes(acc.id) && (
+                  <button
+                    className="nav-assistant name"
+                    title={`Search ${acc.name}`}
+                    aria-label={`Search ${acc.name}`}
+                    aria-expanded={!!mbSearchOpen[acc.id]}
+                    onClick={() => setMbSearchOpen((o) => ({ ...o, [acc.id]: !o[acc.id] }))}
+                  >
+                    <Search size={13} />
+                  </button>
+                )}
                 {onAssistant && (
                   <button className="nav-assistant name" title={`AI assistant for ${acc.name}`} aria-label={`AI assistant for ${acc.name}`} onClick={() => onAssistant(acc.id)}>
                     <Sparkles size={13} />
                   </button>
                 )}
               </div>
+              {!isCollapsed && onMailboxSearch && !rail && (mbSearchPinned.includes(acc.id) || mbSearchOpen[acc.id]) && (
+                <MailboxSearch
+                  name={acc.name}
+                  pinned={mbSearchPinned.includes(acc.id)}
+                  autoFocus={!mbSearchPinned.includes(acc.id)}
+                  onPin={(on) => {
+                    const next = on ? [...mbSearchPinned.filter((x) => x !== acc.id), acc.id] : mbSearchPinned.filter((x) => x !== acc.id);
+                    setPinnedMailboxSearches(next);
+                    setMbSearchPinned(next);
+                    if (!on) setMbSearchOpen((o) => ({ ...o, [acc.id]: false }));
+                  }}
+                  onClose={() => setMbSearchOpen((o) => ({ ...o, [acc.id]: false }))}
+                  onSearch={(q) => onMailboxSearch(acc.id, q)}
+                />
+              )}
               {!isCollapsed && (
                 <>
                   {!af && (
@@ -564,6 +611,7 @@ export function Sidebar({ onResize, onPin, groups = [], accounts, showUnified, u
           </button>
         </div>
       )}
+      {!rail && globalSearch}
       <nav
         className="nav"
         onContextMenu={(e) => {

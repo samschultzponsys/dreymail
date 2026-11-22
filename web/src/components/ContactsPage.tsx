@@ -46,12 +46,13 @@ export function AllowBar({ accounts, what }: { accounts: AccountView[]; what: 'c
 
 const empty: ContactInput = { name: '', emails: [''], phones: [''], company: '', title: '', notes: '', source: 'local', accountId: null };
 
-export function ContactsPage({ accounts, onNav, onWrite }: { accounts: AccountView[]; onNav: () => void; onWrite: (to: string) => void }) {
+export function ContactsPage({ accounts, onNav, onWrite, focus }: { accounts: AccountView[]; onNav: () => void; onWrite: (to: string) => void; focus?: { id: string; search: string } }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['contacts'], queryFn: () => fetchJson<{ contacts: Contact[]; errors: { accountId: string; message: string }[] }>('GET', '/api/contacts') });
   const sources = useQuery({ queryKey: ['people-sources'], queryFn: () => fetchJson<PeopleSourceView[]>('GET', '/api/people/sources'), staleTime: 60_000 });
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
+  // Opened from the search at the top (DreyMail 12.1): that search, that contact.
+  const [search, setSearch] = useState(focus?.search ?? '');
+  const [selected, setSelected] = useState<string | null>(focus?.id ?? null);
   const [editing, setEditing] = useState<{ id: string | null; c: ContactInput } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const list = useMemo(() => {

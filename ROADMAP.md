@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (12.0). New ideas go here.
+Everything planned so far is done (12.1). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -22,6 +22,9 @@ Everything planned so far is done (12.0). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Search everywhere (all mailboxes, plus contacts, tasks, calendar and settings), a search box
+      per mailbox, whole-mailbox search by default; folders pinned to a bar above the list, dragged
+      into order; inbox tabs off by default; images from everyone you know or from all mail (12.1).
 - [x] Right-click a folder: mark all as read, pin or unpin; the open mailbox's icon, name and folder
       at the top of the folder bar (11.3).
 - [x] Pinned folders as one flat list in a dragged order, wherever they sit in the tree; unread in

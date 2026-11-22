@@ -20,7 +20,7 @@ const ORDER = [
   'auth', 'display_name', 'saved_searches', 'roles', 'icon', 'icon_image', 'ai_connections', 'learning_from', 'blocked_senders',
   'scheduled_sends', 'passkeys', 'calendars', 'source', 'user_identities', 'auth', 'mailbox_groups', 'threaded', 'pinned_folders',
   'icon_image', 'users', 'auto_replies', 'address_book', 'calendar_alerts', 'followups', 'show_as', 'contacts', 'oauth_parent', 'smime_keys',
-  'device_backups',
+  'device_backups', 'users',
 ];
 
 const marker = (m: (typeof MIGRATIONS)[number]) => {
@@ -68,9 +68,21 @@ describe('database migrations', () => {
     const linked = store.createPasswordUser('local', 'sam', 'hash1')!;
     const plain = store.createPasswordUser('local', 'eve', 'hash2')!;
     store.connectIdentity(linked.id, 'https://idp.example', 'sub-sam');
-    store.db.exec(MIGRATIONS[ORDER.lastIndexOf('users')] as string);
+    store.db.exec(MIGRATIONS[ORDER.lastIndexOf('users', ORDER.indexOf('auto_replies'))] as string);
     expect(store.getUser(linked.id)!.hasPassword).toBe(false);
     expect(store.getUser(plain.id)!.hasPassword).toBe(true);
+    store.db.close();
+  });
+});
+
+describe('12.1', () => {
+  it('turns the inbox tabs off for everyone, keeping their other settings', () => {
+    const store = new Store(':memory:', new Keyring(crypto.randomBytes(48).toString('base64')).credentialKey);
+    const user = store.upsertUser('local', 'sam', '', 'Sam', 'sam');
+    store.setPreferences(user.id, { ...store.getUser(user.id)!.preferences, inboxTabs: true, undoSendSeconds: 30 });
+    store.db.exec(MIGRATIONS[ORDER.lastIndexOf('users')] as string);
+    store.db.exec(MIGRATIONS[ORDER.lastIndexOf('users')] as string); // safe twice
+    expect(store.getUser(user.id)!.preferences).toMatchObject({ inboxTabs: false, undoSendSeconds: 30 });
     store.db.close();
   });
 });

@@ -44,7 +44,8 @@
    Modified by samschultzponsys, 2026-11-17: image viewer and picture attachment chips.
    Modified by samschultzponsys, 2026-11-17: event editor (repeats, guests, meetings) and the reminder window; the app lock; Gmail labels; server settings; importance; one-line version label; follow-ups; calendar dragging and show-as.
    Modified by samschultzponsys, 2026-11-18: unread bubble for folders out of sight; dragged pinned folders; the open mailbox at the top of the bar.
-   Modified by samschultzponsys, 2026-11-19: no pin buttons over the counts on touch screens. */
+   Modified by samschultzponsys, 2026-11-19: no pin buttons over the counts on touch screens.
+   Modified by samschultzponsys, 2026-11-22: search scope, mailbox search boxes, the search at the top. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -271,6 +272,10 @@ svg { flex-shrink: 0; }
 .search svg { position: absolute; left: 10px; top: 9px; color: var(--muted); }
 .search .input { padding-left: 32px; background: var(--surface-2); border-color: var(--border); }
 .search .input { padding-right: 40px; }
+/* Where to search (DreyMail 12.1): labeled choices under the box while typing or searching. */
+.search-scopes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; }
+.search-scopes .scope-chip { font-size: 12px; cursor: pointer; }
+.search-scopes .scope-chip.on { background: var(--accent-fill); color: var(--accent-text); border-color: transparent; font-weight: 600; }
 .search .filter-btn { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; }
 .search .filter-btn svg { position: static; color: inherit; }
 .search .filter-btn.on { color: var(--accent); }
@@ -966,6 +971,19 @@ img.account-mark { object-fit: cover; }
 .inbox-tab.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent-fill); }
 .inbox-tab .count { font-size: 11px; font-weight: 700; color: var(--accent); }
 
+/* Folders pinned above the message list (DreyMail 12.1): drag to reorder. */
+.top-folders { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 8px; border-bottom: 1px solid var(--border); flex: none; }
+.top-folder { position: relative; display: inline-flex; align-items: center; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); transition: transform 120ms; }
+.top-folder.on { background: var(--accent-soft); border-color: var(--accent); }
+.top-folder.dragging { transform: scale(1.06); box-shadow: var(--shadow); z-index: 2; opacity: 0.9; }
+.top-folder-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--text); font: inherit; font-size: 13px; padding: 4px 10px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.top-folder-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.top-folder-btn .count { font-size: 11px; font-weight: 700; color: var(--accent); }
+.top-folder-x { display: none; border: 0; background: none; color: var(--muted); padding: 0 8px 0 0; cursor: pointer; line-height: 0; }
+.top-folder:hover .top-folder-x, .top-folders.editing .top-folder-x { display: inline-flex; }
+@media (hover: none) { .top-folder:hover .top-folder-x { display: none; } .top-folders.editing .top-folder:hover .top-folder-x { display: inline-flex; } }
+.top-folders-done { cursor: pointer; }
+
 /* ---- calendar ---------------------------------------------------------------------------- */
 .cal-page { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface); }
 /* The calendar page fills the space of the message list and reader (DreyMail). */
@@ -1373,6 +1391,28 @@ body.resizing iframe { pointer-events: none; }
 .page-btns { display: flex; gap: 6px; margin: -6px 12px 12px; }
 .page-btn { flex: 1; height: 32px; justify-content: center; gap: 6px; border-radius: var(--radius); font-size: 13px; }
 .page-btn svg { color: var(--accent); }
+/* Search in the folder bar (DreyMail 12.1): at the top (everything) and per mailbox. */
+.global-search { position: relative; margin: -4px 12px 10px; }
+.nav-search { position: relative; display: flex; align-items: center; }
+.nav-search > svg { position: absolute; left: 9px; color: var(--muted); pointer-events: none; }
+.nav-search .input { height: 32px; padding-left: 29px; background: var(--surface-2); border-color: var(--border); font-size: 13px; }
+.global-search .nav-search .input { padding-right: 112px; }
+.global-search-sources { position: absolute; right: 3px; display: flex; gap: 1px; }
+.global-search-sources .icon-btn { width: 26px; height: 26px; color: var(--muted); opacity: 0.55; border-radius: 6px; }
+.global-search-sources .icon-btn.on { color: var(--accent); opacity: 1; background: var(--hover); }
+.global-search-results { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); max-height: min(70vh, 480px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 4px; }
+.gs-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 8px 8px 4px; }
+.gs-row { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; color: var(--text); text-align: left; padding: 7px 8px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
+.gs-row:hover, .gs-row:focus-visible { background: var(--hover); }
+.gs-row > svg { flex: none; color: var(--muted); }
+.gs-row .gs-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-row .gs-sub { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.gs-row.gs-done .gs-main { text-decoration: line-through; color: var(--muted); }
+.gs-mail span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-mail kbd { font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.mailbox-search { margin: 2px 8px 6px 18px; gap: 2px; }
+.mailbox-search .input { height: 28px; padding-right: 4px; }
+.mailbox-search .icon-btn { width: 26px; height: 26px; flex: none; color: var(--muted); }
 .page-btn.active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
 .page-btn.active svg { color: var(--accent-text); }
 .sidebar.rail .page-btns { flex-direction: column; margin: -6px 6px 10px; }

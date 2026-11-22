@@ -8,13 +8,14 @@
 // Modified by samschultzponsys, 2026-11-16: the list's width can be dragged (tablets and PCs).
 // Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk; Spam elsewhere.
 // Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates; Gmail labels.
+// Modified by samschultzponsys, 2026-11-22: search the whole mailbox by default, or the folder, or all mail.
 
 import { PaneResizer } from './PaneResizer';
 import { AlarmClock, ArrowDown, CircleAlert, Archive, Bookmark, Check, Copy, Inbox, Plus, Flag, FolderInput, Mail, MailCheck, MailOpen, Menu, Paperclip, PenSquare, RefreshCw, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, Star, Trash2, X, Reply } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { findCode } from '../../../shared/codes';
 import { CATEGORY_TABS, type MailCategory } from '../../../shared/categories';
-import { filterChips, filterCount, hasFilters, withoutFilter, type SearchFilters } from '../../../shared/search';
+import { filterChips, filterCount, hasFilters, scopeOf, withoutFilter, withoutScope, withScope, type SearchFilters, type SearchScope } from '../../../shared/search';
 import { participants, type ConversationRow } from '../../../shared/threads';
 import type { AccountFolders, AccountView, MessageAction, MessageSummary, SwipeAction } from '../../../shared/types';
 import type { Direction } from '../swipe';
@@ -52,6 +53,10 @@ interface Props {
   onSaveSearch: (name: string) => Promise<boolean>;
   /** The open view is one account's folder. */
   inFolder: boolean;
+  /** Folders pinned above the list (DreyMail 12.1). */
+  topBar?: React.ReactNode;
+  /** The open mailbox (null: the unified view), for searching the whole mailbox (DreyMail 12.1). */
+  mailboxId?: string | null;
   /** Show the automatic Personal / Updates / Newsletters tabs (inbox views, setting on). */
   inboxTabs?: boolean;
   /** Set when the user has no mailboxes yet: the list shows how to add one instead. */
@@ -105,6 +110,35 @@ export function MessageList(p: Props) {
   const { hasMore, fetchingMore, onLoadMore } = p;
 
   useEffect(() => setQ(p.query), [p.query]);
+  // Where the search box looks (DreyMail 12.1): the whole mailbox unless chosen otherwise.
+  const mailboxId = p.mailboxId ?? null;
+  const defaultScope: SearchScope = mailboxId ? 'mailbox' : 'all';
+  const [scope, setScope] = useState<SearchScope>(() => (p.query || p.filters.where ? scopeOf(p.filters, mailboxId) : defaultScope));
+  useEffect(() => {
+    setScope(p.query || p.filters.where ? scopeOf(p.filters, mailboxId) : defaultScope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mailboxId, p.query, p.filters.where, p.filters.accounts?.join(',')]);
+  const runSearch = (text: string, sc: SearchScope) => {
+    if (!text) {
+      if (p.filters.where) p.onFilters(withoutScope(p.filters), '');
+      else p.onQuery('');
+      return;
+    }
+    p.onFilters(withScope(p.filters, sc, mailboxId), text);
+  };
+  const scopes: [SearchScope, string][] = mailboxId
+    ? [
+        ['mailbox', 'This mailbox'],
+        ['folder', 'This folder'],
+        ['all', 'All mailboxes'],
+      ]
+    : [
+        ['all', 'All mail'],
+        ['inboxes', 'Inboxes only'],
+      ];
+  // The choice shows while typing or searching, so the list stays plain otherwise.
+  const [typing, setTyping] = useState(false);
+  const showScopes = typing || !!q || !!p.query;
   const accountList = [...p.accounts.values()];
   const chips = filterChips(p.filters, (id) => p.accounts.get(id)?.name ?? 'Account');
   const searching = !!p.query || hasFilters(p.filters);
@@ -151,24 +185,26 @@ export function MessageList(p: Props) {
           className="search"
           onSubmit={(e) => {
             e.preventDefault();
-            p.onQuery(q.trim());
+            runSearch(q.trim(), scope);
           }}
         >
           <Search size={15} />
           <input
             className="input"
-            placeholder={p.filters.where === 'all' ? 'Search all mail' : p.filters.where === 'inboxes' || p.unified ? 'Search all inboxes' : 'Search this folder'}
+            placeholder={scope === 'mailbox' ? 'Search this mailbox' : scope === 'folder' ? 'Search this folder' : scope === 'inboxes' ? 'Search all inboxes' : 'Search all mail'}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
-              if (!e.target.value) p.onQuery('');
+              if (!e.target.value) runSearch('', scope);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 setQ('');
-                p.onQuery('');
+                runSearch('', scope);
               }
             }}
+            onFocus={() => setTyping(true)}
+            onBlur={() => setTyping(false)}
           />
           <button
             type="button"
@@ -182,6 +218,27 @@ export function MessageList(p: Props) {
             {nFilters > 0 && <span className="filter-count">{nFilters}</span>}
           </button>
         </form>
+        {showScopes && !panel && (
+          <div className="search-scopes" role="radiogroup" aria-label="Search in">
+            <span className="muted">Search in</span>
+            {scopes.map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={scope === k}
+                className={`chip scope-chip ${scope === k ? 'on' : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setScope(k);
+                  if (q.trim()) runSearch(q.trim(), k);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {panel && (
           <SearchPanel
             filters={p.filters}
@@ -232,6 +289,7 @@ export function MessageList(p: Props) {
         )}
       </div>
 
+      {!p.noMailboxes && p.topBar}
       {tabsOn && (
         <div className="inbox-tabs" role="tablist" aria-label="Inbox tabs">
           {([{ key: 'all' as const, label: 'All' }, ...CATEGORY_TABS]).map((t) => {

@@ -24,10 +24,11 @@ const dueLabel = (due: string) => {
   return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : diff === -1 ? 'Yesterday' : date.toLocaleDateString([], { weekday: diff > 0 && diff < 7 ? 'long' : undefined, month: 'short', day: 'numeric' });
 };
 
-export function TasksPage({ accounts, onNav }: { accounts: AccountView[]; onNav: () => void }) {
+export function TasksPage({ accounts, onNav, focus }: { accounts: AccountView[]; onNav: () => void; focus?: { listId: string; taskId: string } }) {
   const qc = useQueryClient();
   const lists = useQuery({ queryKey: ['tasklists'], queryFn: () => fetchJson<{ lists: TaskList[]; errors: { accountId: string; message: string }[] }>('GET', '/api/tasklists') });
-  const [listId, setListId] = useState<string | null>(null);
+  // Opened from the search at the top (DreyMail 12.1): that list, that task open.
+  const [listId, setListId] = useState<string | null>(focus?.listId ?? null);
   useEffect(() => {
     if (!listId && lists.data?.lists[0]) setListId(lists.data.lists[0].id);
   }, [lists.data, listId]);
@@ -35,7 +36,7 @@ export function TasksPage({ accounts, onNav }: { accounts: AccountView[]; onNav:
   const tasks = useQuery({ queryKey: ['tasks', listId], queryFn: () => fetchJson<Task[]>('GET', `/api/tasklists/${encodeURIComponent(listId!)}/tasks`), enabled: !!listId });
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(focus?.taskId ?? null);
   const [showDone, setShowDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

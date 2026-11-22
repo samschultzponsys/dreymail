@@ -35,7 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 // Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
-// Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups).
+// Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups); inbox tabs off by default; folders pinned to the top bar; images from everyone you know, or from all mail.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -635,6 +635,9 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
      updated_at INTEGER NOT NULL,
      PRIMARY KEY (user_id, device_id)
    );`,
+  // DreyMail 12.1: the Personal / Updates / Newsletters tabs are off by default, for everyone
+  // (the setting stays, to turn them back on).
+  `UPDATE users SET preferences = json_set(CASE WHEN json_valid(preferences) THEN preferences ELSE '{}' END, '$.inboxTabs', json('false'));`,
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */
@@ -653,7 +656,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showFullName: false,
   footerIdentity: 'both',
   undoSendSeconds: 10,
-  inboxTabs: true,
+  inboxTabs: false,
+  topFolders: [],
+  imagesEveryone: false,
   imagesOwnDomains: true,
   imagesContacts: true,
   imagesSenderHosted: false,
@@ -1588,6 +1593,23 @@ export class Store {
   // ---- recent recipients (address autocomplete) ----------------------------
 
   /** Addresses the user has written to (lowercase), for "load images from people you write to". */
+  /**
+   * Everyone the user knows (DreyMail 12.1): people they have written to, people whose mail is in
+   * their address book (sent to or received from), and their own contacts.
+   */
+  knownAddresses(userId: string): Set<string> {
+    const out = this.recipientAddresses(userId);
+    for (const r of this.db.prepare('SELECT address FROM address_book WHERE user_id = ? AND (sent > 0 OR received > 0)').all(userId) as { address: string }[]) out.add(r.address.trim().toLowerCase());
+    for (const r of this.db.prepare('SELECT emails FROM contacts WHERE user_id = ?').all(userId) as { emails: string }[]) {
+      try {
+        for (const e of JSON.parse(r.emails) as string[]) if (typeof e === 'string') out.add(e.trim().toLowerCase());
+      } catch {
+        /* not a list */
+      }
+    }
+    return out;
+  }
+
   recipientAddresses(userId: string): Set<string> {
     return new Set((this.db.prepare('SELECT address FROM recent_recipients WHERE user_id = ?').all(userId) as { address: string }[]).map((r) => r.address.trim().toLowerCase()));
   }

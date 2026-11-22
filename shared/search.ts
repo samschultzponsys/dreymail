@@ -176,3 +176,30 @@ export function withoutFilter(f: SearchFilters, key: keyof SearchFilters): Searc
   }
   return next;
 }
+
+/**
+ * Where a search looks (DreyMail 12.1): the open folder, the whole mailbox (the default in a
+ * mailbox), every inbox, or all mail in every mailbox.
+ */
+export type SearchScope = 'folder' | 'mailbox' | 'inboxes' | 'all';
+
+export function scopeOf(f: SearchFilters, accountId: string | null): SearchScope {
+  if (f.where === 'all') return f.accounts?.length === 1 && f.accounts[0] === accountId ? 'mailbox' : 'all';
+  if (f.where === 'inboxes') return 'inboxes';
+  return accountId ? 'folder' : 'inboxes';
+}
+
+/** The filters with `scope` in place of where they looked before (other choices kept). */
+export function withScope(f: SearchFilters, scope: SearchScope, accountId: string | null): SearchFilters {
+  const { where: _w, accounts: _a, ...rest } = f;
+  if (scope === 'mailbox' && accountId) return { ...rest, where: 'all', accounts: [accountId] };
+  if (scope === 'all') return { ...rest, where: 'all' };
+  if (scope === 'inboxes') return accountId ? { ...rest, where: 'inboxes' } : rest;
+  return rest;
+}
+
+/** The filters without a scope (back to the folder's own list). */
+export function withoutScope(f: SearchFilters): SearchFilters {
+  const { where: _w, accounts: _a, ...rest } = f;
+  return rest;
+}

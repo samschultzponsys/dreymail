@@ -37,6 +37,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions and Cc/Bcc lines in General.
 // Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left); which icon on each side.
 // Modified by samschultzponsys, 2026-11-21: the Backup tab.
+// Modified by samschultzponsys, 2026-11-22: opens on a given tab (the search at the top); images in all mail, or from everyone you know.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -85,7 +86,30 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
 
 type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android' | 'backup';
 
-export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void }) {
+/** The Settings tabs this user has (DreyMail 12.1: the search at the top only offers these). */
+export function settingTabsFor(me: Me): string[] {
+  const can = (p: Permission) => me.permissions.includes(p);
+  return [
+    'device',
+    'profile',
+    'general',
+    'signatures',
+    'autoreplies',
+    'privacy',
+    'backup',
+    ...(me.hasPassword ? ['password'] : []),
+    ...(can('ai.assistant') ? ['ai'] : []),
+    ...(can('users.manage') || can('users.pictures') || can('roles.manage') ? ['users'] : []),
+    ...(can('users.manage') ? ['storage'] : []),
+    ...(can('roles.manage') ? ['roles'] : []),
+    ...(can('signin.manage') ? ['signin'] : []),
+    ...(can('server.manage') ? ['server'] : []),
+    ...(can('providers.manage') ? ['outlook', 'google'] : []),
+    ...(can('android.manage') ? ['android'] : []),
+  ];
+}
+
+export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onClose: () => void; initialTab?: string | null }) {
   const qc = useQueryClient();
   const prefs = me.preferences;
   const can = (p: Permission) => me.permissions.includes(p);
@@ -125,7 +149,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
       ],
     },
   ] as TabGroup[]).filter((g) => g.tabs.length > 0);
-  const [tab, setTab] = useState<SettingsTab>('device');
+  const [tab, setTab] = useState<SettingsTab>(() => (initialTab && groups.some((g) => g.tabs.some(([k]) => k === initialTab)) ? (initialTab as SettingsTab) : 'device'));
 
   const save = async (next: Preferences) => {
     setV(next);
@@ -303,7 +327,7 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
           )}
           {tab === 'general' && (
             <label className="check">
-              <input type="checkbox" checked={v.inboxTabs ?? true} onChange={(e) => void save({ ...v, inboxTabs: e.target.checked })} />
+              <input type="checkbox" checked={v.inboxTabs ?? false} onChange={(e) => void save({ ...v, inboxTabs: e.target.checked })} />
               Split the inbox into Personal, Updates and Newsletters tabs
             </label>
           )}
@@ -323,12 +347,16 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
               <label className="label">Load images by themselves</label>
               <div className="check-list">
                 <label className="check">
+                  <input type="checkbox" checked={v.imagesEveryone ?? false} onChange={(e) => void save({ ...v, imagesEveryone: e.target.checked })} />
+                  In all mail <span className="muted">(not in Junk)</span>
+                </label>
+                <label className="check">
                   <input type="checkbox" checked={v.imagesOwnDomains ?? true} onChange={(e) => void save({ ...v, imagesOwnDomains: e.target.checked })} />
                   In mail from your own domains <span className="muted">(the domains of your mailboxes)</span>
                 </label>
                 <label className="check">
                   <input type="checkbox" checked={v.imagesContacts ?? true} onChange={(e) => void save({ ...v, imagesContacts: e.target.checked })} />
-                  In mail from people you have written to
+                  In mail from people you know <span className="muted">(you wrote to them, they wrote to you, or they are in your contacts)</span>
                 </label>
                 <label className="check">
                   <input type="checkbox" checked={v.imagesSenderHosted ?? false} onChange={(e) => void save({ ...v, imagesSenderHosted: e.target.checked })} />
@@ -336,8 +364,9 @@ export function SettingsDialog({ me, onClose }: { me: Me; onClose: () => void })
                 </label>
               </div>
               <div className="hint">
-                DreyMail fetches images itself, so senders never see your address, but loading them does let a sender see that you opened the mail (the reason
-                the last option is off by default). Mail that fails the sender check (DMARC) never loads images by itself.
+                Images are never a danger to your device: DreyMail fetches and checks them itself, so senders never see your address. Loading them only lets a
+                sender see that you opened the mail (tracking pixels), which is why &quot;In all mail&quot; is off unless you turn it on. Mail in Junk, and mail that
+                fails the sender check (DMARC), never loads images by itself.
               </div>
             </div>
           )}

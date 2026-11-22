@@ -36,12 +36,12 @@
 // Modified by samschultzponsys, 2026-11-18: the plain slide phone transition (default); follow-up reminders open their message; contacts and tasks pages.
 // Modified by samschultzponsys, 2026-11-19: the Android app gets the groups' icons for notifications.
 // Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
-// Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule.
+// Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule; search everything, per mailbox.
 
 import { encodeFilters, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { AccountView, AttachmentView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary } from '../../shared/types';
+import type { AccountView, AttachmentView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary, TopFolder } from '../../shared/types';
 import { composerFromPayload, filesFrom, isSending } from './sending';
 import { SendingBox } from './components/SendingBox';
 import { groupConversations, rowOf } from '../../shared/threads';
@@ -51,6 +51,10 @@ import { accountPalette, ACCOUNT_PALETTE_VARS, BRAND_CYAN } from './accountTheme
 import { accountIcon, desktopBridge, loadMailboxPicture, mailboxNotificationIcon } from './desktop';
 import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
 import { startDeviceBackups } from './deviceBackup';
+import { GlobalSearch } from './components/SidebarSearch';
+import { TopFolderBar, type TopFolderItem } from './components/TopFolderBar';
+import { settingTabsFor } from './components/SettingsDialog';
+import type { CalendarEvent } from '../../shared/calendar';
 import { applyThemeColor } from './themeColor';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Composer, type ComposerInit } from './components/Composer';
@@ -210,6 +214,26 @@ export function App() {
     [navigate],
   );
 
+  // Folders pinned to the bar above the message list (DreyMail 12.1), saved with the account.
+  const topFolders = me.data?.preferences.topFolders ?? [];
+  const saveTopFolders = (list: TopFolder[]) => {
+    const prefs = me.data?.preferences;
+    if (!prefs) return;
+    const next = { ...prefs, topFolders: list };
+    qc.setQueryData(['me'], { ...me.data, preferences: next });
+    void api.savePreferences(next).catch((err: Error) => {
+      push(err.message, true);
+      void qc.invalidateQueries({ queryKey: ['me'] });
+    });
+  };
+  const topKey = (t: TopFolder) => `${t.accountId}\u0000${t.folder}`;
+
+  /** From the phone's folder drawer a new view replaces the drawer's entry (Back then skips it). */
+  const fromNav = (r: Route) => {
+    if (loc.state?.overlay === 'nav') navigate(r, { replace: true });
+    else go(r);
+  };
+
   // With a single account, or with "All inboxes" turned off in Settings, the unified view is the
   // first account's inbox.
   const unifiedInbox = me.data?.preferences.unifiedInbox !== false;
@@ -220,12 +244,26 @@ export function App() {
         : sel,
     [sel, accounts, unifiedInbox],
   );
+  const topItems: TopFolderItem[] = (() => {
+    const many = new Set(topFolders.map((t) => t.accountId)).size > 1;
+    return topFolders.flatMap((t) => {
+      const acc = accounts.find((a) => a.id === t.accountId);
+      if (!acc) return [];
+      const f = folders.data?.find((x) => x.accountId === t.accountId)?.folders.find((x) => x.path === t.folder);
+      const label = f ? (f.specialUse === 'inbox' ? 'Inbox' : f.name) : (t.folder.split(/[/.]/).pop() ?? t.folder);
+      const unread = f && f.specialUse !== 'sent' && f.specialUse !== 'drafts' && f.specialUse !== 'trash' ? (f.unread ?? 0) : 0;
+      return [{ key: topKey(t), label, color: many ? acc.color : null, unread, active: !route.q && !route.calendar && !route.page && effectiveSel.accountId === t.accountId && effectiveSel.folder === t.folder }];
+    });
+  })();
   const filterParam = encodeFilters(route.filters);
   const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0, filterParam);
   const savedSearches = useSavedSearches(loggedIn);
   const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
   const scheduledQ = useScheduled(loggedIn);
   const [showScheduled, setShowScheduled] = useState(false);
+  // Where the search at the top sends you (DreyMail 12.1): a contact, a task, an event, a settings tab.
+  const [pageFocus, setPageFocus] = useState<{ n: number; contact?: { id: string; search: string }; task?: { listId: string; taskId: string }; event?: CalendarEvent } | null>(null);
+  const [settingsTab, setSettingsTab] = useState<string | null>(null);
   const [assistantFor, setAssistantFor] = useState<{ id: string; tab?: 'learning' } | null>(null);
   /** Mailbox to open straight into when Accounts opens (right-click on its name). */
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
@@ -720,6 +758,34 @@ export function App() {
       {/* Tablets and foldables: tapping beside the folder drawer closes it. */}
       <div className="drawer-backdrop" onClick={() => closeOverlay('nav')} aria-hidden="true" />
       <Sidebar
+        globalSearch={
+          <GlobalSearch
+            settingTabs={settingTabsFor(me.data!)}
+            onMail={(q) => fromNav({ ...HOME, q, filters: { where: 'all' } })}
+            onContact={(c, q) => {
+              setPageFocus({ n: Date.now(), contact: { id: c.id, search: q } });
+              fromNav({ ...HOME, page: 'contacts' });
+            }}
+            onTask={(t) => {
+              setPageFocus({ n: Date.now(), task: { listId: t.listId, taskId: t.id } });
+              fromNav({ ...HOME, page: 'tasks' });
+            }}
+            onEvent={(e) => {
+              setPageFocus({ n: Date.now(), event: e });
+              fromNav({ ...HOME, calendar: true });
+            }}
+            onSetting={(tab) => {
+              setSettingsTab(tab);
+              openOverlay('settings');
+            }}
+          />
+        }
+        topFolders={topFolders}
+        onTopFolder={(accountId, folder, on) => saveTopFolders(on ? [...topFolders.filter((x) => !(x.accountId === accountId && x.folder === folder)), { accountId, folder }] : topFolders.filter((x) => !(x.accountId === accountId && x.folder === folder)))}
+        onMailboxSearch={(accountId, q) => {
+          setChecked(new Set());
+          fromNav({ ...HOME, accountId, folder: 'INBOX', q, filters: { where: 'all', accounts: [accountId] } });
+        }}
         onResize={(w, done) => setSideWidth(w, done)}
         onReorder={
           me.data?.permissions.includes('mail.accounts')
@@ -858,7 +924,7 @@ export function App() {
         title={title}
         unified={effectiveSel.accountId === null}
         isSentLike={isSentLike}
-        inboxTabs={(me.data?.preferences.inboxTabs ?? true) && !route.q && !Object.keys(route.filters).length && (effectiveSel.accountId === null || folderInfo?.specialUse === 'inbox')}
+        inboxTabs={(me.data?.preferences.inboxTabs ?? false) && !route.q && !Object.keys(route.filters).length && (effectiveSel.accountId === null || folderInfo?.specialUse === 'inbox')}
         accounts={accountMap}
         folders={folders.data}
         messages={rows}
@@ -881,6 +947,21 @@ export function App() {
           go({ ...route, filters, q: q ?? route.q, open: null });
         }}
         inFolder={sel.accountId !== null}
+        mailboxId={route.accountId ?? (effectiveSel.accountId || null)}
+        topBar={
+          <TopFolderBar
+            items={topItems}
+            onOpen={(key) => {
+              const t = topFolders.find((x) => topKey(x) === key);
+              if (t) {
+                setChecked(new Set());
+                go({ ...HOME, accountId: t.accountId, folder: t.folder });
+              }
+            }}
+            onReorder={(keys) => saveTopFolders(keys.map((k) => topFolders.find((x) => topKey(x) === k)).filter((x): x is TopFolder => !!x))}
+            onRemove={(key) => saveTopFolders(topFolders.filter((x) => topKey(x) !== key))}
+          />
+        }
         noMailboxes={accountsQ.isSuccess && accounts.length === 0 ? { canAdd: !!me.data?.permissions.includes('mail.accounts'), onAdd: () => openOverlay('accounts') } : undefined}
         onSaveSearch={(name) =>
           api.saveSearch({ name, q: route.q, unread: route.unread, filters: route.filters, accountId: sel.accountId, folder: sel.folder }).then(
@@ -931,9 +1012,9 @@ export function App() {
         confirmSwipe={(m, d) => swipeFor(d) !== 'delete' || !isTrash(m) || window.confirm('Delete this message permanently?')}
         onSwipe={(m, d) => void onSwipe(m, d)}
       />
-      {route.calendar && <CalendarDialog accounts={accounts} onNav={() => openOverlay('nav')} />}
-      {route.page === 'contacts' && <ContactsPage accounts={accounts} onNav={() => openOverlay('nav')} onWrite={(to) => composeMailto(`mailto:${encodeURIComponent(to)}`)} />}
-      {route.page === 'tasks' && <TasksPage accounts={accounts} onNav={() => openOverlay('nav')} />}
+      {route.calendar && <CalendarDialog key={pageFocus?.event ? pageFocus.n : 'cal'} focus={pageFocus?.event} accounts={accounts} onNav={() => openOverlay('nav')} />}
+      {route.page === 'contacts' && <ContactsPage key={pageFocus?.contact ? pageFocus.n : 'contacts'} focus={pageFocus?.contact} accounts={accounts} onNav={() => openOverlay('nav')} onWrite={(to) => composeMailto(`mailto:${encodeURIComponent(to)}`)} />}
+      {route.page === 'tasks' && <TasksPage key={pageFocus?.task ? pageFocus.n : 'tasks'} focus={pageFocus?.task} accounts={accounts} onNav={() => openOverlay('nav')} />}
       <Reader
         openRef={readerRef}
         conversation={readerRef ? rowOf(rows, readerRef) : undefined}
@@ -982,7 +1063,16 @@ export function App() {
           onClose={() => setAssistantFor(null)}
         />
       )}
-      {dialog === 'settings' && <SettingsDialog me={me.data!} onClose={() => closeOverlay('settings')} />}
+      {dialog === 'settings' && (
+        <SettingsDialog
+          me={me.data!}
+          initialTab={settingsTab}
+          onClose={() => {
+            setSettingsTab(null);
+            closeOverlay('settings');
+          }}
+        />
+      )}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       <ReminderWindow
         enabled={loggedIn && accounts.length > 0}

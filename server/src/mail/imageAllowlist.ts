@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-16: automatic image loading for your own domains, people you
 // write to, and images on the sender's own domain.
+// Modified by samschultzponsys, 2026-11-21: images from everyone you know, or from all mail (not Junk).
 
 import { domainToASCII, domainToUnicode } from 'node:url';
 import type { DomainName } from '../../../shared/types.js';
@@ -94,15 +95,17 @@ export interface RemoteDecision {
   /** The sender is allowlisted but the message failed DMARC, so nothing loaded automatically. */
   skipped: 'dmarc-fail' | null;
   /** Why images loaded by themselves (DreyMail): the list, your own domain, someone you wrote to, or the sender's own server. */
-  reason?: 'list' | 'own' | 'contact' | 'sender' | null;
+  reason?: 'list' | 'own' | 'contact' | 'sender' | 'everyone' | null;
 }
 
 /** Automatic loading beyond the "always load from" list (Settings → Images). */
 export interface AutoImages {
   /** Domains of the user's own mailboxes ("your own domains"), without public ones like gmail.com; empty when switched off. */
   ownDomains: readonly string[];
-  /** Addresses the user has written to; empty when switched off. */
+  /** Addresses the user knows (wrote to, had mail from, contacts); empty when switched off. */
   contacts: ReadonlySet<string>;
+  /** Load images in all mail (DreyMail 12.1; never in Junk, nor for a forged sender). */
+  everyone?: boolean;
   /** Load when every remote image is on the sender's own domain. */
   senderHosted: boolean;
   /** The message's remote image URLs (for senderHosted). */
@@ -134,6 +137,7 @@ export function decideRemoteImages(email: ParsedEmail, explicit: boolean | undef
     const from = flattenAddresses(email.from)[0]?.address?.trim().toLowerCase() ?? '';
     if (own) [reason, allowedBy] = ['own', own];
     else if (from && auto.contacts.has(from)) [reason, allowedBy] = ['contact', domain];
+    else if (auto.everyone) [reason, allowedBy] = ['everyone', domain];
     else if (auto.senderHosted && auto.imageUrls.length > 0) {
       const org = organisationDomain(domain);
       if (auto.imageUrls.every((u) => { const h = hostOf(u); return !!h && domainMatches(h, org); })) [reason, allowedBy] = ['sender', org];

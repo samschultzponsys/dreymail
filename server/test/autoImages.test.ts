@@ -34,3 +34,24 @@ describe('loading images by themselves', () => {
     expect(decideRemoteImages(await mail('N <n@news.example>'), undefined, ['news.example'], auto())).toMatchObject({ load: true, reason: 'list' });
   });
 });
+
+describe('12.1: images from everyone you know, or from all mail', () => {
+  it('in all mail when switched on, but never for a forged sender', async () => {
+    expect(decideRemoteImages(await mail('Stranger <x@example.net>'), undefined, [], auto({ everyone: true }))).toMatchObject({ load: true, reason: 'everyone' });
+    const forged = await mail('Bank <a@bank.example>', 'Authentication-Results: mx.spazcat.test; dmarc=fail header.from=bank.example\r\n');
+    expect(decideRemoteImages(forged, undefined, [], auto({ everyone: true })).load).toBe(false);
+  });
+
+  it('knows people you wrote to, people who wrote to you, and your contacts', async () => {
+    const crypto = await import('node:crypto');
+    const { Keyring } = await import('../src/crypto.js');
+    const { Store } = await import('../src/db.js');
+    const store = new Store(':memory:', new Keyring(crypto.randomBytes(48).toString('base64')).credentialKey);
+    const u = store.upsertUser('local', 'sam', '', 'Sam', 'sam');
+    const acc = store.createAccount(u.id, { name: 'W', displayName: 'S', email: 'sam@x.test', color: '#000000', imap: { host: 'i', port: 993, tls: 'tls', user: 'a', password: 'p' }, smtp: { host: 's', port: 465, tls: 'tls', user: 'a', password: 'p' }, appendSent: true } as never);
+    store.rememberRecipients(u.id, [{ name: 'Wrote', address: 'Wrote@Example.org' }]);
+    store.db.prepare("INSERT INTO address_book (user_id, account_id, address, name, sent, received, last_seen) VALUES (?, ?, 'heard@example.org', 'Heard', 0, 3, 1)").run(u.id, acc.id);
+    store.db.prepare("INSERT INTO contacts (id, user_id, name, emails, phones, company, title, notes, updated_at) VALUES ('c', ?, 'C', '[\"Card@Example.org\"]', '[]', '', '', '', 1)").run(u.id);
+    expect([...store.knownAddresses(u.id)].sort()).toEqual(['card@example.org', 'heard@example.org', 'wrote@example.org']);
+  });
+});

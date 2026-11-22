@@ -13,6 +13,35 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-22 (v12.1): search everywhere; folders pinned to the top; fewer blocked images
+
+- **Search everywhere:** a box under Contacts and Tasks searches all mail in every mailbox; icons
+  at its end switch on searching contacts, tasks, the calendar (half a year back, seven months
+  ahead) and settings too (remembered on the device), with matches listed as you type; picking
+  one opens that contact, task (its list, opened), event (its day, opened) or settings tab.
+- **A search box per mailbox:** the magnifier on a mailbox's heading opens a box that searches the
+  whole mailbox; its pin keeps it shown (per device).
+- **Search scope:** the search above the message list searches the whole mailbox by default;
+  "Search in: This mailbox / This folder / All mailboxes" (or "All mail / Inboxes only" in the
+  unified view) shows under it while typing or searching.
+- **Folders pinned to the top bar:** a folder's menu → Pin to the top bar; the bar above the list
+  shows them with unread counts (and mailbox colors when from several mailboxes), dragged into
+  order with a mouse, or held then dragged on touch screens; × removes one. Saved with the
+  account (`topFolders` preference).
+- **Inbox tabs** (Personal / Updates / Newsletters) are off by default, and switched off for
+  existing accounts (migration); the setting stays.
+- **Images:** "people you know" now means people you wrote to, people who wrote to you (address
+  book) and your contacts; new option to load images in all mail. Junk never loads images by
+  itself.
+- **Files:** `shared/search.ts`, `shared/types.ts`, `server/src/db.ts`, `server/src/routes/api.ts`,
+  `server/src/mail/imageAllowlist.ts`, `web/src/globalSearch.ts`,
+  `web/src/components/SidebarSearch.tsx`, `web/src/components/TopFolderBar.tsx`,
+  `web/src/components/Sidebar.tsx`, `web/src/components/MessageList.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/components/ContactsPage.tsx`,
+  `web/src/components/TasksPage.tsx`, `web/src/components/CalendarDialog.tsx`, `web/src/App.tsx`,
+  `web/src/styles.css`, `server/test/migrations.test.ts`, `server/test/autoImages.test.ts`,
+  `web/test/search12.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-22 (v12.0): this device's settings, saved on a schedule
 
 - **Settings → Backup → This device:** what a browser, the desktop app or the Android app keeps

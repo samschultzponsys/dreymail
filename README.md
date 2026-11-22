@@ -75,7 +75,8 @@
      Modified by samschultzponsys, 2026-11-21: v11.7 (HTML sent as plain text shows properly).
      Modified by samschultzponsys, 2026-11-21: v11.8 (wide messages fit narrow screens).
      Modified by samschultzponsys, 2026-11-21: v11.9 (backups: your own file, automatic daily copies).
-     Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand). -->
+     Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand).
+     Modified by samschultzponsys, 2026-11-22: v12.1 (search everywhere; folders pinned to the top; inbox tabs off by default; images from everyone you know). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -87,7 +88,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -226,8 +227,10 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   message, so the sender never sees your IP address. "Always load from example.com" adds the
   sender's domain (and its subdomains) to a per-user list whose mail loads images automatically;
   manage the list in Settings. Settings → Images also loads images by themselves in mail from your own
-  domains (exactly them; public ones like gmail.com don't count) and from people you have written to (both on by default), and, if you switch it on, when
-  every image is on the sender's own domain. Mail that fails the sender check (DMARC) never does.
+  domains (exactly them; public ones like gmail.com don't count) and from people you know (you wrote
+  to them, they wrote to you, or they are in your contacts; both on by default), and, if you switch
+  them on, in all mail (not Junk) or when every image is on the sender's own domain. Mail in Junk,
+  and mail that fails the sender check (DMARC), never does.
 - Contact pictures instead of initials, from Gravatar, Libravatar (including a domain's own
   federated server) or, for senders at a company rather than a free mail provider, the icon of
   their website. Like remote images, the server fetches them, so these services never see your
@@ -325,8 +328,17 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   keeps the search in the sidebar as a smart folder that is re-run each time you open it, so
   "past week" always means the past week. The IMAP server does the searching; DreyMail keeps no
   index of your mail.
-- **Inbox tabs:** Personal, Updates and Newsletters, sorted automatically from the mail's own
-  headers without AI, each with an unread count. Switch them off in Settings → General.
+- **Search everywhere (12.1):** the box under Contacts and Tasks searches all mail in every
+  mailbox; the icons at its end also search contacts, tasks, the calendar and settings (each
+  switched on or off with a click), showing matches as you type: pick one to open that contact,
+  task, event or settings page. Each mailbox has its own search box (the magnifier on its heading;
+  pin it to keep it shown). The search box above the message list searches the whole mailbox by
+  default; "Search in" under it switches to this folder or all mailboxes.
+- **Folders pinned to the top:** right-click (or long-press) a folder → Pin to the top bar puts it
+  above the message list, with its unread count; drag them into any order (on a phone: hold, then
+  drag; hold and let go to show the × buttons).
+- **Inbox tabs** (off by default): Personal, Updates and Newsletters, sorted automatically from the
+  mail's own headers without AI. Turn them on in Settings → General.
 - **One-time codes:** sign-in and verification codes get a copy button, on the message row and in
   the open message.
 - **Unsubscribe** with one click on mailing-list mail (DreyMail does it for you where the sender
