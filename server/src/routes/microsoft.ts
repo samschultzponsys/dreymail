@@ -19,7 +19,16 @@ const SECRET_EXPIRES = 'microsoft.secretExpires';
 
 export function registerMicrosoftRoutes(
   app: FastifyInstance,
-  deps: { config: Config; store: Store; sessions: Sessions; access: Access; microsoft: MicrosoftAuth; microsoftConfig: MicrosoftConfig },
+  deps: {
+    config: Config;
+    store: Store;
+    sessions: Sessions;
+    access: Access;
+    microsoft: MicrosoftAuth;
+    microsoftConfig: MicrosoftConfig;
+    /** A mailbox signed in again (maybe allowing more): forget what was refused (DreyMail 12.5). */
+    onSignedIn?: (userId: string, accountId: string) => void;
+  },
 ) {
   const { config, store, sessions, access, microsoft, microsoftConfig } = deps;
 
@@ -27,7 +36,7 @@ export function registerMicrosoftRoutes(
 
   app.post('/api/oauth/microsoft/start', async (req, reply) => {
     if (!access.require(req, reply, 'mail.accounts')) return reply;
-    const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3b82f6'), allow: z.array(z.enum(['mail', 'people', 'contacts', 'tasks', 'rooms'])).max(5).default([]) }).safeParse(req.body ?? {});
+    const body = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3b82f6'), allow: z.array(z.enum(['mail', 'people', 'contacts', 'tasks', 'rooms', 'groups'])).max(6).default([]) }).safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'Invalid color' });
     try {
       return { url: microsoft.start(req.user!.id, body.data.color, body.data.allow) };
@@ -49,6 +58,7 @@ export function registerMicrosoftRoutes(
     if (!code || !state) return back({ outlook: 'error', message: 'Microsoft sent an incomplete answer. Please try again.' });
     try {
       const accountId = await microsoft.finish(user.id, state, code);
+      deps.onSignedIn?.(user.id, accountId);
       return back({ outlook: 'added', account: accountId });
     } catch (err) {
       req.log.warn({ err: (err as Error).message }, 'Microsoft sign-in failed');

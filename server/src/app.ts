@@ -25,7 +25,7 @@
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
 // Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
 // Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
-// Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space.
+// Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -441,7 +441,7 @@ export async function buildApp(
     onAiAccess: (id) => assistant.syncWatching(id),
   });
   registerAndroidPushRoutes(app, { store, pool, firebase });
-  registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig });
+  registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig, onSignedIn: (userId, accountId) => calendars.signedIn(userId, accountId) });
   registerGoogleRoutes(app, { config, store, sessions, access, google, googleConfig });
   registerPasskeyRoutes(app, { config, store, sessions });
   registerCalendarRoutes(app, { store, calendars, reminders, rooms });

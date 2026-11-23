@@ -45,6 +45,8 @@ export interface RemoteCalendar {
   visibleByDefault: boolean;
   /** Online meetings the provider makes for events in this calendar. */
   meetings?: MeetingKind[];
+  /** A Microsoft 365 group's calendar (DreyMail 12.5). */
+  group?: boolean;
 }
 
 export interface RemoteEvent {
@@ -459,16 +461,34 @@ export function repeatFromGraph(r: GraphRecurrence, localStart: Date): RepeatFie
   }
 }
 
+/** Microsoft 365 group calendars (DreyMail 12.5) are listed with this prefix on their group's id. */
+const GROUP = 'group:';
+
 export class OutlookCalendar implements CalendarProvider {
   private readonly base = 'https://graph.microsoft.com/v1.0';
   constructor(
     private readonly token: () => Promise<string>,
     private readonly http: Http,
+    /** A token with the group permission, or null when it isn't allowed (DreyMail 12.5). */
+    private readonly groupToken?: () => Promise<string | null>,
   ) {}
+
+  /** Where a calendar's events live: your mailbox, or a Microsoft 365 group's. */
+  private where(calendar: string): { events: string; create: string; group: boolean } {
+    if (calendar.startsWith(GROUP)) {
+      const g = encodeURIComponent(calendar.slice(GROUP.length));
+      return { events: `/groups/${g}/events`, create: `/groups/${g}/calendar/events`, group: true };
+    }
+    return { events: '/me/events', create: `/me/calendars/${encodeURIComponent(calendar)}/events`, group: false };
+  }
 
   private async req<T>(method: string, pathOrUrl: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
     try {
-      return await call<T>(this.http, pathOrUrl.startsWith('https://') ? pathOrUrl : `${this.base}${pathOrUrl}`, method, await this.token(), body, headers);
+      // Group calendars need the group permission's token.
+      const group = /^(?:https:\/\/graph\.microsoft\.com\/v1\.0)?\/groups\//.test(pathOrUrl) || pathOrUrl.includes('/memberOf/');
+      const token = group ? await this.groupToken?.() : await this.token();
+      if (!token) throw new RemoteCalendarError('Group calendars need the group calendars permission (allow it in the calendar list)', 403);
+      return await call<T>(this.http, pathOrUrl.startsWith('https://') ? pathOrUrl : `${this.base}${pathOrUrl}`, method, token, body, headers);
     } catch (err) {
       if (err instanceof RemoteCalendarError && /onlineMeeting|teamsForBusiness|OnlineMeetingProvider/i.test(err.message))
         throw new RemoteCalendarError('Outlook could not make a Teams meeting for this calendar. Teams meetings need a work or school Microsoft 365 account with Teams.', err.status);
@@ -492,7 +512,7 @@ export class OutlookCalendar implements CalendarProvider {
     const list = await this.all<{ id: string; name: string; hexColor?: string; color?: string; canEdit?: boolean; isDefaultCalendar?: boolean; allowedOnlineMeetingProviders?: string[] }>(
       '/me/calendars?$top=100&$select=id,name,hexColor,color,canEdit,isDefaultCalendar,allowedOnlineMeetingProviders',
     );
-    return list.map((c) => ({
+    const own = list.map((c) => ({
       remoteId: c.id,
       name: c.name,
       color: /^#[0-9a-f]{6}$/i.test(c.hexColor ?? '') ? c.hexColor! : GRAPH_COLORS[c.color ?? ''] ?? '#0078d4',
@@ -500,6 +520,17 @@ export class OutlookCalendar implements CalendarProvider {
       visibleByDefault: !!c.isDefaultCalendar || c.canEdit !== false,
       ...(c.allowedOnlineMeetingProviders?.includes('teamsForBusiness') ? { meetings: ['teams' as const] } : {}),
     }));
+    return [...own, ...(await this.groupCalendars())];
+  }
+
+  /** The Microsoft 365 groups you are in, each with its calendar, where allowed (DreyMail 12.5). */
+  private async groupCalendars(): Promise<RemoteCalendar[]> {
+    if (!this.groupToken || !(await this.groupToken())) return [];
+    const groups = await this.all<{ id: string; displayName?: string; groupTypes?: string[] }>('/me/memberOf/microsoft.graph.group?$select=id,displayName,groupTypes&$top=100').catch(() => []);
+    return groups
+      .filter((g) => g.groupTypes?.includes('Unified'))
+      .sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? ''))
+      .map((g) => ({ remoteId: `${GROUP}${g.id}`, name: g.displayName || 'Group', color: '#0078d4', writable: true, visibleByDefault: false, group: true }));
   }
 
   private toEvent(e: GraphEvent): RemoteEvent {
@@ -535,12 +566,13 @@ export class OutlookCalendar implements CalendarProvider {
 
   async events(calendar: string, from: number, to: number): Promise<RemoteEvent[]> {
     const q = new URLSearchParams({ startDateTime: new Date(from).toISOString(), endDateTime: new Date(to).toISOString(), $top: '250', $select: SELECT });
-    const list = await this.all<GraphEvent>(`/me/calendars/${encodeURIComponent(calendar)}/calendarView?${q}`, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
+    const view = calendar.startsWith(GROUP) ? `/groups/${encodeURIComponent(calendar.slice(GROUP.length))}/calendar/calendarView` : `/me/calendars/${encodeURIComponent(calendar)}/calendarView`;
+    const list = await this.all<GraphEvent>(`${view}?${q}`, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
     return list.filter((e) => !e.isCancelled && e.start && e.end).map((e) => this.toEvent(e));
   }
 
-  async get(_calendar: string, eventId: string): Promise<RemoteSeries> {
-    const e = await this.req<GraphEvent>('GET', `/me/events/${encodeURIComponent(eventId)}?$select=${SELECT},recurrence,originalStartTimeZone`, undefined, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
+  async get(calendar: string, eventId: string): Promise<RemoteSeries> {
+    const e = await this.req<GraphEvent>('GET', `${this.where(calendar).events}/${encodeURIComponent(eventId)}?$select=${SELECT},recurrence,originalStartTimeZone`, undefined, { prefer: 'outlook.timezone="UTC", outlook.body-content-type="text"' });
     if (!e.start || !e.end) throw new RemoteCalendarError('This event is no longer in the calendar', 404);
     const base = this.toEvent(e);
     const zoneName = e.originalStartTimeZone && validTimeZone(e.originalStartTimeZone) ? e.originalStartTimeZone : (e.originalStartTimeZone ? windowsZone(e.originalStartTimeZone) : undefined);
@@ -577,16 +609,17 @@ export class OutlookCalendar implements CalendarProvider {
 
   // Outlook sends the invitations, updates and cancellations to the guests itself.
   async create(calendar: string, f: EventFields): Promise<string> {
-    return (await this.req<{ id: string }>('POST', `/me/calendars/${encodeURIComponent(calendar)}/events`, this.body(f, true))).id;
+    return (await this.req<{ id: string }>('POST', this.where(calendar).create, this.body(f, true))).id;
   }
-  async update(_calendar: string, eventId: string, f: EventFields, instance: boolean) {
-    await this.req('PATCH', `/me/events/${encodeURIComponent(eventId)}`, this.body(f, !instance));
+  async update(calendar: string, eventId: string, f: EventFields, instance: boolean) {
+    await this.req('PATCH', `${this.where(calendar).events}/${encodeURIComponent(eventId)}`, this.body(f, !instance));
   }
-  async remove(_calendar: string, eventId: string) {
+  async remove(calendar: string, eventId: string) {
+    const events = this.where(calendar).events;
     try {
       // The organizer's cancel tells the guests; anyone else's is a plain delete.
-      await this.req('POST', `/me/events/${encodeURIComponent(eventId)}/cancel`, { comment: '' }).catch(async (err: unknown) => {
-        if (err instanceof RemoteCalendarError && (err.status === 400 || err.status === 403)) await this.req('DELETE', `/me/events/${encodeURIComponent(eventId)}`);
+      await this.req('POST', `${events}/${encodeURIComponent(eventId)}/cancel`, { comment: '' }).catch(async (err: unknown) => {
+        if (err instanceof RemoteCalendarError && (err.status === 400 || err.status === 403 || err.status === 404)) await this.req('DELETE', `${events}/${encodeURIComponent(eventId)}`);
         else throw err;
       });
     } catch (err) {

@@ -145,6 +145,43 @@ describe('Outlook calendar (Microsoft Graph)', () => {
   });
 });
 
+describe('Microsoft 365 group calendars (12.5)', () => {
+  it('lists the groups you are in, where allowed, and reads and writes their events with the group token', async () => {
+    const api = fakeApi({
+      'GET /v1.0/me/calendars': () => ({ value: [{ id: 'c1', name: 'Calendar', canEdit: true, isDefaultCalendar: true }] }),
+      'GET /v1.0/me/memberOf/microsoft.graph.group': () => ({
+        value: [
+          { id: 'g2', displayName: 'Support', groupTypes: ['Unified'] },
+          { id: 'g1', displayName: 'Pontchartrain Systems', groupTypes: ['Unified'] },
+          { id: 'sec', displayName: 'Security group', groupTypes: [] },
+        ],
+      }),
+      'GET /v1.0/groups/g1/calendar/calendarView': () => ({ value: [{ id: 'ge1', subject: 'Install at the Gulf', start: { dateTime: '2026-11-24T14:00:00' }, end: { dateTime: '2026-11-24T15:00:00' } }] }),
+      'POST /v1.0/groups/g1/calendar/events': () => ({ id: 'ge2' }),
+      'PATCH /v1.0/groups/g1/events/ge1': () => ({}),
+      'POST /v1.0/groups/g1/events/ge1/cancel': () => new Response('{}', { status: 400 }),
+      'DELETE /v1.0/groups/g1/events/ge1': () => undefined,
+    });
+    // Not allowed: just your own calendars.
+    expect((await new OutlookCalendar(async () => 'tok', api.http, async () => null).listCalendars()).map((c) => c.name)).toEqual(['Calendar']);
+    const o = new OutlookCalendar(async () => 'tok', api.http, async () => 'group-tok');
+    const cals = await o.listCalendars();
+    expect(cals.map((c) => [c.name, c.remoteId, c.group ?? false, c.visibleByDefault])).toEqual([
+      ['Calendar', 'c1', false, true],
+      ['Pontchartrain Systems', 'group:g1', true, false],
+      ['Support', 'group:g2', true, false],
+    ]);
+    const events = await o.events('group:g1', Date.parse('2026-11-23T00:00:00Z'), Date.parse('2026-11-30T00:00:00Z'));
+    expect(events.map((e) => e.title)).toEqual(['Install at the Gulf']);
+    expect(api.seen.at(-1)!.headers.authorization).toBe('Bearer group-tok');
+    expect(await o.create('group:g1', { title: 'Team lunch', location: '', notes: '', start: '2026-11-25T17:00:00.000Z', end: '2026-11-25T18:00:00.000Z', allDay: false, recurrence: 'none', until: null, timeZone: 'UTC' })).toBe('ge2');
+    await o.update('group:g1', 'ge1', { title: 'Install (moved)', location: '', notes: '', start: '2026-11-24T15:00:00.000Z', end: '2026-11-24T16:00:00.000Z', allDay: false, recurrence: 'none', until: null, timeZone: 'UTC' }, false);
+    expect(api.seen.at(-1)!.url.pathname).toBe('/v1.0/groups/g1/events/ge1');
+    await o.remove('group:g1', 'ge1');
+    expect(api.seen.at(-1)).toMatchObject({ method: 'DELETE' });
+  });
+});
+
 // ---- through the app ---------------------------------------------------------------------------
 
 let ctx: App | null = null;

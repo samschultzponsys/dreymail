@@ -126,6 +126,7 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
         ...(nickname ? { nickname, officialName: r.name } : {}),
         color: followsMailbox ? mailboxColors.get(r.account_id!)! : r.color,
         mailboxColor: followsMailbox,
+        ...(String((r as { remote_id?: string | null }).remote_id ?? '').startsWith('group:') ? { group: true } : {}),
         accountId: owner ? r.account_id : null,
         access: owner ? (r.source === 'local' || r.writable ? 'owner' : 'view') : r.can_edit ? 'edit' : 'view',
         ownerName: nameOf(r.owner_id),

@@ -12,7 +12,7 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (12.4). New ideas go here.
+Everything planned so far is done (12.5). New ideas go here.
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -145,6 +145,7 @@ Everything planned so far is done (12.4). New ideas go here.
       meeting links (9.5).
 - [x] Names of your own for calendars (the provider's shown on hover); a mailbox's calendars in its
       color; the event editor's calendar list grouped by mailbox (12.4).
+- [x] Microsoft 365 group calendars (read and write), where allowed (12.5).
 - [x] This and following for Google, Outlook and CalDAV series too (10.9).
 - [x] Propose a new time when answering; accept or decline guests' proposals (10.8).
 - [x] Meeting rooms from Microsoft 365 and an administrator's list, booked with their availability (10.7).

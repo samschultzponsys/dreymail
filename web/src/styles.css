@@ -1500,3 +1500,5 @@ body.resizing iframe { pointer-events: none; }
 .cal-pick-dot { position: absolute; left: 11px; width: 10px; height: 10px; border-radius: 50%; pointer-events: none; }
 .cal-mailbox-color { cursor: pointer; }
 .cal-mailbox-color .cal-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.cal-sub-label { font-size: 11px; color: var(--muted); padding: 6px 0 2px 26px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cal-allow { padding: 4px 0 2px 4px; }

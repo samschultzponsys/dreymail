@@ -78,6 +78,8 @@ export interface CalendarView {
   color: string;
   /** The color follows its mailbox's (DreyMail 12.4). */
   mailboxColor?: boolean;
+  /** A Microsoft 365 group's calendar (DreyMail 12.5). */
+  group?: boolean;
   /** Mailbox it is grouped under in the calendar list (null = "My calendars"). */
   accountId: string | null;
   /** 'owner' for your own, else how it was shared with you. */
@@ -101,6 +103,8 @@ export type CalendarSource = 'local' | 'google' | 'microsoft' | 'caldav';
 export interface CalendarSourceView {
   id: string;
   kind: 'google' | 'microsoft' | 'caldav';
+  /** Outlook: whether the calendars of your Microsoft 365 groups are allowed (unknown until first checked) (DreyMail 12.5). */
+  groups?: boolean;
   /** Mailbox name, or the CalDAV connection's name. */
   name: string;
   /** Mailbox it is grouped under (Google/Outlook: itself; CalDAV: chosen, or null). */

@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.5): Microsoft 365 group calendars
+
+- **Group calendars:** an Outlook mailbox's calendar list offers "Calendars of your Microsoft 365
+  groups? Allow", which signs in again asking for `Group.ReadWrite.All` (an administrator usually
+  approves it once for the organization). Then the calendars of the Microsoft 365 groups you are in
+  show under the mailbox, under "Groups" (hidden at first, like in Outlook), and their events can
+  be read, created, changed and deleted (`/groups/{id}/calendar`). A refusal is remembered for two
+  minutes; signing in again checks at once.
+- **Files:** `server/src/calendar/remote.ts`, `server/src/calendar/service.ts`,
+  `server/src/oauth/microsoft.ts`, `server/src/routes/microsoft.ts`, `server/src/routes/calendar.ts`,
+  `server/src/app.ts`, `shared/calendar.ts`, `web/src/components/CalendarDialog.tsx`,
+  `web/src/styles.css`, `server/test/calendar-sync.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.4): calendar nicknames and mailbox colors
 
 - **A name of your own for any calendar** (the pencil → Name in DreyMail): shown everywhere in

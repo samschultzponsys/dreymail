@@ -100,7 +100,7 @@ export class CalendarService {
   private provider(userId: string, source: CalendarRow['source'], sourceId: string | null): CalendarProvider | null {
     if (!sourceId) return null;
     if (source === 'google') return new GoogleCalendar(() => this.deps.google.accessToken(userId, sourceId), this.deps.http);
-    if (source === 'microsoft') return new OutlookCalendar(() => this.deps.microsoft.accessToken(userId, sourceId, 'calendar'), this.deps.http);
+    if (source === 'microsoft') return new OutlookCalendar(() => this.deps.microsoft.accessToken(userId, sourceId, 'calendar'), this.deps.http, () => this.groupToken(userId, sourceId));
     if (source === 'caldav') return this.caldav(userId, sourceId);
     return null;
   }
@@ -116,13 +116,35 @@ export class CalendarService {
 
   // ---- sources and the calendar list --------------------------------------------------------------
 
+  /** Outlook mailboxes and whether their group calendars are allowed; a refusal is remembered a little while (DreyMail 12.5). */
+  private readonly groups = new Map<string, { allowed: boolean; until: number }>();
+
+  /** The mailbox was signed in again (maybe allowing its group calendars): check again, and list again. */
+  signedIn(userId: string, accountId: string) {
+    this.groups.delete(accountId);
+    this.lastSync.delete(userId);
+  }
+
+  private async groupToken(userId: string, accountId: string): Promise<string | null> {
+    const known = this.groups.get(accountId);
+    if (known && !known.allowed && known.until > Date.now()) return null;
+    try {
+      const token = await this.deps.microsoft.accessToken(userId, accountId, 'groups');
+      this.groups.set(accountId, { allowed: true, until: 0 });
+      return token;
+    } catch {
+      this.groups.set(accountId, { allowed: false, until: Date.now() + 2 * 60_000 });
+      return null;
+    }
+  }
+
   sources(userId: string): CalendarSourceView[] {
     const out: CalendarSourceView[] = [];
     for (const a of this.deps.store.listAccounts(userId))
       // Shared mailboxes use their parent's sign-in: its calendars are already there.
       if ((a.auth === 'google' || a.auth === 'microsoft') && !a.sharedOf) {
         const e = this.errors.get(a.id);
-        out.push({ id: a.id, kind: a.auth, name: a.name, accountId: a.id, error: e?.message ?? null, reconnect: e?.reconnect ?? false });
+        out.push({ id: a.id, kind: a.auth, name: a.name, accountId: a.id, error: e?.message ?? null, reconnect: e?.reconnect ?? false, ...(a.auth === 'microsoft' && this.groups.has(a.id) ? { groups: this.groups.get(a.id)!.allowed } : {}) });
       }
     for (const s of this.db.prepare('SELECT id, name, url, username, account_id FROM calendar_sources WHERE owner_id = ? ORDER BY created_at').all(userId) as { id: string; name: string; url: string; username: string; account_id: string | null }[]) {
       const e = this.errors.get(s.id);
@@ -133,6 +155,8 @@ export class CalendarService {
 
   /** Mirrors the provider calendar lists (at most every 5 minutes unless forced). */
   async sync(userId: string, force = false): Promise<void> {
+    // Asked to refresh (e.g. just after allowing group calendars): ask Microsoft again.
+    if (force) for (const [k, v] of this.groups) if (!v.allowed) this.groups.delete(k);
     if (!force && Date.now() - (this.lastSync.get(userId) ?? 0) < SYNC_EVERY) return;
     let job = this.syncing.get(userId);
     if (!job) {

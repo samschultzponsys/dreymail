@@ -7,12 +7,12 @@
 // own (/calendar), filling the space of the message list and reader.
 // Modified by samschultzponsys, 2026-11-17: the event editor moved to EventEditor.tsx (repeats, reminders, guests, meetings).
 // Modified by samschultzponsys, 2026-11-22: opens on an event found by the search at the top.
-// Modified by samschultzponsys, 2026-11-23: names of your own for calendars; colors that follow the mailbox.
+// Modified by samschultzponsys, 2026-11-23: names of your own for calendars; colors that follow the mailbox; Microsoft 365 group calendars.
 // Modified by samschultzponsys, 2026-11-18: drag events to another time or day in the week and day views; show-as.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Link2, MapPin, Menu, Pencil, Plus, RefreshCw, Repeat, Trash2, Video, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, Fragment } from 'react';
 import { occurrences, type CalendarEvent, type CalendarSourceView, type CalendarView, type EventOccurrence } from '../../../shared/calendar';
 import type { AccountView } from '../../../shared/types';
 import { fetchJson } from '../api';
@@ -151,6 +151,16 @@ export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountVi
       setError((e as Error).message);
     }
   };
+  /** Sign in to the Outlook mailbox again, allowing its group calendars (DreyMail 12.5). */
+  const allowGroupCalendars = async (src: CalendarSourceView) => {
+    const acc = accounts.find((a) => a.id === src.id);
+    try {
+      const { url } = await fetchJson<{ url: string }>('POST', '/api/oauth/microsoft/start', { color: acc?.color ?? '#3b82f6', allow: ['groups'] });
+      window.location.href = url;
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
   const setCals = (l: CalendarView[]) => {
     qc.setQueryData(['calendars'], l);
     refresh();
@@ -203,14 +213,17 @@ export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountVi
   // accounts shown under it), then CalDAV accounts of their own, then calendars shared with me.
   const all = cals.data ?? [];
   const srcs = sources.data ?? [];
-  const groups: { key: string; label: string; items: CalendarView[]; problems: CalendarSourceView[]; caldav: CalendarSourceView[] }[] = [];
+  const groups: { key: string; label: string; items: CalendarView[]; problems: CalendarSourceView[]; caldav: CalendarSourceView[]; allowGroups?: CalendarSourceView }[] = [];
   const isMine = (c: CalendarView) => c.source !== 'local' || c.access === 'owner';
   const known = (id: string | null) => !!id && accounts.some((a) => a.id === id);
   groups.push({ key: 'mine', label: 'My calendars', items: all.filter((c) => c.source === 'local' && c.access === 'owner' && !known(c.accountId)), problems: [], caldav: [] });
   for (const a of accounts) {
     const items = all.filter((c) => isMine(c) && c.accountId === a.id);
     const here = srcs.filter((x) => x.accountId === a.id);
-    if (items.length || here.some((x) => x.error)) groups.push({ key: a.id, label: a.name, items, problems: here.filter((x) => x.error), caldav: here.filter((x) => x.kind === 'caldav') });
+    // Group calendars after the mailbox's own (DreyMail 12.5).
+    items.sort((x, y) => Number(!!x.group) - Number(!!y.group));
+    const allowGroups = here.find((x) => x.kind === 'microsoft' && x.groups === false);
+    if (items.length || here.some((x) => x.error)) groups.push({ key: a.id, label: a.name, items, problems: here.filter((x) => x.error), caldav: here.filter((x) => x.kind === 'caldav'), allowGroups });
   }
   for (const x of srcs.filter((x) => x.kind === 'caldav' && !known(x.accountId)))
     groups.push({ key: x.id, label: x.name, items: all.filter((c) => c.source === 'caldav' && c.sourceId === x.id), problems: x.error ? [x] : [], caldav: [x] });
@@ -222,8 +235,10 @@ export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountVi
       {groups.map((g) => (
         <div key={g.key} className="cal-group">
           <div className="cal-group-label">{g.label}</div>
-          {g.items.map((c) => (
-            <div key={c.id} className="cal-item">
+          {g.items.map((c, i) => (
+            <Fragment key={c.id}>
+            {c.group && !g.items[i - 1]?.group && <div className="cal-sub-label">Groups</div>}
+            <div className="cal-item">
               <label className="check" title={c.visible ? 'Hide this calendar' : 'Show this calendar'}>
                 <input type="checkbox" checked={c.visible} onChange={() => toggle(c)} style={{ accentColor: c.color }} />
                 <span className="cal-dot" style={{ background: c.color }} />
@@ -236,7 +251,16 @@ export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountVi
                 <Pencil size={13} />
               </button>
             </div>
+            </Fragment>
           ))}
+          {g.allowGroups && (
+            <div className="cal-allow hint">
+              Calendars of your Microsoft 365 groups?{' '}
+              <button className="link-btn" onClick={() => void allowGroupCalendars(g.allowGroups!)}>
+                Allow
+              </button>
+            </div>
+          )}
           {g.problems.map((x) => (
             <div key={x.id} className="cal-problem">
               <AlertTriangle size={13} />

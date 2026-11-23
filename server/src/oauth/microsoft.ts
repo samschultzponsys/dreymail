@@ -42,8 +42,10 @@ export const SCOPES = {
   tasks: 'https://graph.microsoft.com/Tasks.ReadWrite',
   /** The organization's meeting rooms (10.7); an administrator approves it for everyone once. */
   rooms: 'https://graph.microsoft.com/Place.Read.All',
+  /** Calendars of the Microsoft 365 groups you are in (12.5); usually an administrator approves it once. */
+  groups: 'https://graph.microsoft.com/Group.ReadWrite.All',
 } as const;
-export type MicrosoftExtra = 'mail' | 'people' | 'contacts' | 'tasks' | 'rooms';
+export type MicrosoftExtra = 'mail' | 'people' | 'contacts' | 'tasks' | 'rooms' | 'groups';
 /** Asked for at sign-in: both resources (consented at once), a refresh token, and who the user is. */
 const SIGN_IN_SCOPES = `offline_access openid email profile ${SCOPES.imap} ${SCOPES.graph} ${SCOPES.calendar}`;
 
