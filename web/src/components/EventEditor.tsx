@@ -389,14 +389,32 @@ function EventForm({
           <label className="label" htmlFor="ev-cal">
             Calendar
           </label>
-          <select id="ev-cal" className="select" value={calendarId} disabled={fromProvider} onChange={(e) => setCalendarId(e.target.value)}>
-            {writable.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.access === 'edit' ? ` (${c.ownerName})` : ''}
-              </option>
-            ))}
-          </select>
+          {/* Grouped by mailbox, in the calendar's color, your own names first (DreyMail 12.4). */}
+          <div className="cal-pick">
+            <span className="cal-pick-dot" style={{ background: writable.find((c) => c.id === calendarId)?.color }} aria-hidden="true" />
+            <select
+              id="ev-cal"
+              className="select"
+              value={calendarId}
+              disabled={fromProvider}
+              title={(() => {
+                const c = writable.find((x) => x.id === calendarId);
+                return c?.officialName ? `${c.name} (${c.officialName})` : c?.name;
+              })()}
+              onChange={(e) => setCalendarId(e.target.value)}
+            >
+              {calendarGroups(writable, accounts).map((g) => (
+                <optgroup key={g.key} label={g.label}>
+                  {g.calendars.map((c) => (
+                    <option key={c.id} value={c.id} title={c.officialName ? `${c.officialName} at the provider` : undefined}>
+                      {c.name}
+                      {c.access === 'edit' ? ` (${c.ownerName})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
         </div>
         <label className="check">
           <input
@@ -814,3 +832,15 @@ function RoomPicker({ accounts, start, end, calendarId, booked, onPick }: { acco
     </div>
   );
 }
+
+/** Calendars grouped as the calendar list shows them: yours, then each mailbox's, then shared ones (DreyMail 12.4). */
+export function calendarGroups(cals: CalendarView[], accounts: AccountView[]): { key: string; label: string; calendars: CalendarView[] }[] {
+  const out: { key: string; label: string; calendars: CalendarView[] }[] = [];
+  const add = (key: string, label: string, list: CalendarView[]) => list.length && out.push({ key, label, calendars: list });
+  add('mine', 'My calendars', cals.filter((c) => c.access !== 'edit' && !c.accountId));
+  for (const a of accounts) add(a.id, a.name, cals.filter((c) => c.access !== 'edit' && c.accountId === a.id));
+  const placed = new Set(out.flatMap((g) => g.calendars.map((c) => c.id)));
+  add('shared', 'Shared with you', cals.filter((c) => !placed.has(c.id)));
+  return out;
+}
+

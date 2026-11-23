@@ -18,7 +18,14 @@ import type { CalendarRow, CalendarService } from '../calendar/service.js';
 import type { Store } from '../db.js';
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-const calendarSchema = z.object({ name: z.string().trim().min(1).max(80), color: colorSchema, accountId: z.string().max(64).nullable().default(null) });
+const calendarSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  color: colorSchema,
+  accountId: z.string().max(64).nullable().default(null),
+  // DreyMail 12.4: your own name for a provider's calendar, and whether the color follows the mailbox.
+  nickname: z.string().trim().max(80).optional(),
+  mailboxColor: z.boolean().optional(),
+});
 const attendeeSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(320),
   name: z.string().trim().max(200).default(''),
@@ -106,12 +113,19 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
           ORDER BY c.owner_id != ?, c.source != 'local', c.created_at`,
       )
       .all(userId, userId, userId, userId) as unknown as (CalendarRow & { can_edit: number | null; hidden: number })[];
+    const mailboxColors = new Map(store.listAccounts(userId).map((a) => [a.id, a.color]));
     return rows.map((r) => {
       const owner = r.owner_id === userId;
+      const x = r as CalendarRow & { nickname?: string; color_set?: number };
+      const nickname = owner ? (x.nickname ?? '') : '';
+      // A mailbox's calendar shows in the mailbox's color unless one was picked for it (DreyMail 12.4).
+      const followsMailbox = owner && !!r.account_id && !x.color_set && mailboxColors.has(r.account_id);
       return {
         id: r.id,
-        name: r.name,
-        color: r.color,
+        name: nickname || r.name,
+        ...(nickname ? { nickname, officialName: r.name } : {}),
+        color: followsMailbox ? mailboxColors.get(r.account_id!)! : r.color,
+        mailboxColor: followsMailbox,
         accountId: owner ? r.account_id : null,
         access: owner ? (r.source === 'local' || r.writable ? 'owner' : 'view') : r.can_edit ? 'edit' : 'view',
         ownerName: nameOf(r.owner_id),
@@ -156,11 +170,13 @@ export function registerCalendarRoutes(app: FastifyInstance, deps: { store: Stor
     if (!r || r.owner_id !== req.user!.id) return bad(reply, 'Only the owner can change this calendar', 403);
     const body = calendarSchema.safeParse(req.body);
     if (!body.success) return bad(reply, 'Give the calendar a name');
-    // Provider calendars: only the color is DreyMail's (name and mailbox come from the provider).
-    if (r.source !== 'local') db.prepare('UPDATE calendars SET color = ? WHERE id = ?').run(body.data.color, r.id);
+    // Following the mailbox's color, or the one picked (DreyMail 12.4).
+    const colorSet = body.data.mailboxColor === true ? 0 : 1;
+    // Provider calendars: the name there stays theirs; DreyMail keeps a name of your own and the color.
+    if (r.source !== 'local') db.prepare('UPDATE calendars SET color = ?, color_set = ?, nickname = ? WHERE id = ?').run(body.data.color, colorSet, body.data.nickname ?? '', r.id);
     else {
       if (!ownsAccount(req.user!.id, body.data.accountId)) return bad(reply, 'Mailbox not found', 404);
-      db.prepare('UPDATE calendars SET name = ?, color = ?, account_id = ? WHERE id = ?').run(body.data.name, body.data.color, body.data.accountId, r.id);
+      db.prepare('UPDATE calendars SET name = ?, color = ?, account_id = ?, color_set = ? WHERE id = ?').run(body.data.name, body.data.color, body.data.accountId, colorSet, r.id);
     }
     return list(req.user!.id);
   });

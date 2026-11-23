@@ -7,6 +7,7 @@
 // own (/calendar), filling the space of the message list and reader.
 // Modified by samschultzponsys, 2026-11-17: the event editor moved to EventEditor.tsx (repeats, reminders, guests, meetings).
 // Modified by samschultzponsys, 2026-11-22: opens on an event found by the search at the top.
+// Modified by samschultzponsys, 2026-11-23: names of your own for calendars; colors that follow the mailbox.
 // Modified by samschultzponsys, 2026-11-18: drag events to another time or day in the week and day views; show-as.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -226,7 +227,9 @@ export function CalendarDialog({ accounts, onNav, focus }: { accounts: AccountVi
               <label className="check" title={c.visible ? 'Hide this calendar' : 'Show this calendar'}>
                 <input type="checkbox" checked={c.visible} onChange={() => toggle(c)} style={{ accentColor: c.color }} />
                 <span className="cal-dot" style={{ background: c.color }} />
-                <span className="cal-name">{c.name}</span>
+                <span className="cal-name" title={c.officialName ? `${c.name} (${c.officialName})` : c.name}>
+                  {c.name}
+                </span>
               </label>
               {c.source === 'local' && c.access !== 'owner' && <span className="muted cal-owner">{c.ownerName}</span>}
               <button className="icon-btn" title={c.source === 'local' && c.access === 'owner' ? 'Edit and share' : 'Details'} onClick={() => setCalEditing(c)}>
@@ -590,20 +593,24 @@ function CalendarEditor({
   onClose: () => void;
   onSaved: (l: CalendarView[]) => void;
 }) {
-  if (calendar && calendar.source !== 'local') return <ProviderCalendarEditor calendar={calendar} source={source} onClose={onClose} onSaved={onSaved} />;
+  if (calendar && calendar.source !== 'local') return <ProviderCalendarEditor calendar={calendar} source={source} accounts={accounts} onClose={onClose} onSaved={onSaved} />;
   return <OwnCalendarEditor calendar={calendar} accounts={accounts} onClose={onClose} onSaved={onSaved} />;
 }
 
 const PROVIDER_NAMES = { google: 'Google Calendar', microsoft: 'Outlook', caldav: 'CalDAV' } as const;
 
 /** A Google / Outlook / CalDAV calendar: its color here, and disconnecting a CalDAV account. */
-function ProviderCalendarEditor({ calendar, source, onClose, onSaved }: { calendar: CalendarView; source: CalendarSourceView | null; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
+function ProviderCalendarEditor({ calendar, source, accounts, onClose, onSaved }: { calendar: CalendarView; source: CalendarSourceView | null; accounts: AccountView[]; onClose: () => void; onSaved: (l: CalendarView[]) => void }) {
   const [color, setColor] = useState(calendar.color);
+  const [follows, setFollows] = useState(!!calendar.mailboxColor);
+  const [nickname, setNickname] = useState(calendar.nickname ?? '');
   const [error, setError] = useState<string | null>(null);
   const kind = calendar.source as keyof typeof PROVIDER_NAMES;
+  const official = calendar.officialName ?? calendar.name;
+  const mailbox = accounts.find((a) => a.id === calendar.accountId) ?? null;
   const save = async () => {
     try {
-      onSaved(await fetchJson<CalendarView[]>('PUT', `/api/calendars/${encodeURIComponent(calendar.id)}`, { name: calendar.name, color, accountId: null }));
+      onSaved(await fetchJson<CalendarView[]>('PUT', `/api/calendars/${encodeURIComponent(calendar.id)}`, { name: official, color, accountId: null, nickname: nickname.trim(), mailboxColor: follows }));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -620,7 +627,7 @@ function ProviderCalendarEditor({ calendar, source, onClose, onSaved }: { calend
     <div className="overlay" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
       <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(460px, 100%)' }}>
         <div className="dialog-head">
-          <h2>{calendar.name}</h2>
+          <h2 title={calendar.officialName}>{calendar.name}</h2>
           <button className="icon-btn" onClick={onClose} title="Close">
             <X size={17} />
           </button>
@@ -637,14 +644,15 @@ function ProviderCalendarEditor({ calendar, source, onClose, onSaved }: { calend
             </div>
           )}
           <div>
-            <label className="label">Color in DreyMail</label>
-            <div className="cal-colors">
-              {ACCOUNT_COLORS.map((c) => (
-                <button key={c} className={`cal-swatch ${c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor(c)} title={c} aria-label={`Color ${c}`} />
-              ))}
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title="Any color" aria-label="Any color" />
+            <label className="label" htmlFor="cal-nick">
+              Name in DreyMail
+            </label>
+            <input id="cal-nick" className="input" value={nickname} placeholder={official} maxLength={80} onChange={(e) => setNickname(e.target.value)} />
+            <div className="hint">
+              Only in DreyMail; at {PROVIDER_NAMES[kind]} it stays “{official}” (shown when you point at the name). Leave empty to use that.
             </div>
           </div>
+          <ColorChoice label="Color in DreyMail" color={color} setColor={setColor} mailbox={mailbox} follows={follows} setFollows={setFollows} />
           {error && <div className="error-text">{error}</div>}
         </div>
         <div className="dialog-foot">
@@ -763,6 +771,7 @@ function OwnCalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar:
   const owner = !calendar || calendar.access === 'owner';
   const [name, setName] = useState(calendar?.name ?? '');
   const [color, setColor] = useState(calendar?.color ?? ACCOUNT_COLORS[1]!);
+  const [follows, setFollows] = useState(!!calendar?.mailboxColor);
   const [accountId, setAccountId] = useState<string | null>(calendar?.accountId ?? null);
   const [shares, setShares] = useState(calendar?.shares ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -771,7 +780,7 @@ function OwnCalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar:
 
   const save = async () => {
     try {
-      const body = { name, color, accountId };
+      const body = { name, color, accountId, mailboxColor: !!accountId && follows };
       let l = calendar
         ? await fetchJson<CalendarView[]>('PUT', `/api/calendars/${encodeURIComponent(calendar.id)}`, body)
         : await fetchJson<CalendarView[]>('POST', '/api/calendars', body);
@@ -811,15 +820,7 @@ function OwnCalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar:
                 </label>
                 <input id="cal-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />
               </div>
-              <div>
-                <label className="label">Color</label>
-                <div className="cal-colors">
-                  {ACCOUNT_COLORS.map((c) => (
-                    <button key={c} className={`cal-swatch ${c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor(c)} title={c} aria-label={`Color ${c}`} />
-                  ))}
-                  <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title="Any color" aria-label="Any color" />
-                </div>
-              </div>
+              <ColorChoice label="Color" color={color} setColor={setColor} mailbox={accounts.find((a) => a.id === accountId) ?? null} follows={follows} setFollows={setFollows} />
               {accounts.length > 0 && (
                 <div>
                   <label className="label" htmlFor="cal-acct">
@@ -902,3 +903,32 @@ function OwnCalendarEditor({ calendar, accounts, onClose, onSaved }: { calendar:
     </div>
   );
 }
+
+/**
+ * A calendar's color (DreyMail 12.4): its mailbox's (and following it when that changes), or any
+ * other. Without a mailbox, just the color.
+ */
+function ColorChoice({ label, color, setColor, mailbox, follows, setFollows }: { label: string; color: string; setColor: (c: string) => void; mailbox: AccountView | null; follows: boolean; setFollows: (on: boolean) => void }) {
+  const on = !!mailbox && follows;
+  const pick = (c: string) => {
+    setFollows(false);
+    setColor(c);
+  };
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="cal-colors">
+        {mailbox && (
+          <button className={`chip cal-mailbox-color ${on ? 'on' : ''}`} onClick={() => setFollows(true)} title={`Always ${mailbox.name}'s color, also when it changes`}>
+            <span className="cal-dot" style={{ background: mailbox.color }} /> {mailbox.name}&apos;s color
+          </button>
+        )}
+        {ACCOUNT_COLORS.map((c) => (
+          <button key={c} className={`cal-swatch ${!on && c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => pick(c)} title={c} aria-label={`Color ${c}`} />
+        ))}
+        <input type="color" value={on && mailbox ? mailbox.color : color} onChange={(e) => pick(e.target.value)} title="Any color" aria-label="Any color" />
+      </div>
+    </div>
+  );
+}
+

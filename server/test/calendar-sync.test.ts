@@ -205,7 +205,15 @@ describe('provider calendars in the calendar', () => {
     expect((await ctx.app.inject({ method: 'PUT', url: `/api/calendars/${cals[1]!.id}/shares`, headers, payload: { shares: [] } })).statusCode).toBe(400);
     expect((await ctx.app.inject({ method: 'DELETE', url: `/api/calendars/${cals[1]!.id}`, headers })).statusCode).toBe(400);
     const recolored = (await ctx.app.inject({ method: 'PUT', url: `/api/calendars/${cals[1]!.id}`, headers, payload: { name: 'ignored', color: '#123456' } })).json() as CalendarView[];
-    expect(recolored[1]).toMatchObject({ name: 'Sam', color: '#123456' });
+    expect(recolored[1]).toMatchObject({ name: 'Sam', color: '#123456', mailboxColor: false });
+    // 12.4: a mailbox's calendar starts in the mailbox's color; a name of your own, the provider's kept.
+    expect(cals[1]).toMatchObject({ color: '#ef4444', mailboxColor: true });
+    const named = (await ctx.app.inject({ method: 'PUT', url: `/api/calendars/${cals[1]!.id}`, headers, payload: { name: 'Sam', color: '#123456', nickname: 'Gmail · Sam', mailboxColor: true } })).json() as CalendarView[];
+    expect(named[1]).toMatchObject({ name: 'Gmail · Sam', nickname: 'Gmail · Sam', officialName: 'Sam', color: '#ef4444', mailboxColor: true });
+    await ctx.app.inject({ method: 'GET', url: '/api/calendars?refresh=1', headers }); // the provider's name comes back; yours stays
+    const after = (await ctx.app.inject({ method: 'GET', url: '/api/calendars', headers })).json() as CalendarView[];
+    expect(after[1]).toMatchObject({ name: 'Gmail · Sam', officialName: 'Sam' });
+    expect(after[0]).toMatchObject({ name: 'Personal', mailboxColor: false });
     expect((await ctx.app.inject({ method: 'DELETE', url: `/api/events/${ev.id}`, headers })).statusCode).toBe(200);
 
     const sources = (await ctx.app.inject({ method: 'GET', url: '/api/calendar-sources', headers })).json();

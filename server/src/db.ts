@@ -35,7 +35,7 @@
 // Modified by samschultzponsys, 2026-11-17: address suggestions (address_book) and their scope preference.
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 // Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
-// Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups); inbox tabs off by default; folders pinned to the top bar; images from everyone you know, or from all mail.
+// Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups); inbox tabs off by default; folders pinned to the top bar; images from everyone you know, or from all mail; calendar nicknames and mailbox colors.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -638,6 +638,16 @@ export const MIGRATIONS: (string | ((db: DatabaseSync) => void))[] = [
   // DreyMail 12.1: the Personal / Updates / Newsletters tabs are off by default, for everyone
   // (the setting stays, to turn them back on).
   `UPDATE users SET preferences = json_set(CASE WHEN json_valid(preferences) THEN preferences ELSE '{}' END, '$.inboxTabs', json('false'));`,
+  // DreyMail 12.4: a name of your own for any calendar (the provider's stays), and calendars of a
+  // mailbox in the mailbox's color unless one was picked (your own calendars keep theirs).
+  (db) => {
+    const cols = (db.prepare('PRAGMA table_info(calendars)').all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes('nickname')) db.exec("ALTER TABLE calendars ADD COLUMN nickname TEXT NOT NULL DEFAULT ''");
+    if (!cols.includes('color_set')) {
+      db.exec('ALTER TABLE calendars ADD COLUMN color_set INTEGER NOT NULL DEFAULT 0');
+      db.exec("UPDATE calendars SET color_set = 1 WHERE source = 'local'");
+    }
+  },
 ];
 
 /** Most devices one user can have notifications on; the oldest subscription is dropped beyond that. */

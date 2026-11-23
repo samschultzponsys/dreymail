@@ -1493,3 +1493,10 @@ body.resizing iframe { pointer-events: none; }
 .cache-list li { align-items: center; }
 .cache-share { display: inline-flex; align-items: center; gap: 4px; }
 .cache-share .input { width: 64px; text-align: right; }
+
+/* Calendars (DreyMail 12.4): the picked calendar's color by the event editor's list; the mailbox's color choice. */
+.cal-pick { position: relative; display: flex; align-items: center; }
+.cal-pick .select { padding-left: 28px; }
+.cal-pick-dot { position: absolute; left: 11px; width: 10px; height: 10px; border-radius: 50%; pointer-events: none; }
+.cal-mailbox-color { cursor: pointer; }
+.cal-mailbox-color .cal-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }

@@ -68,8 +68,16 @@ export function reminderLabel(min: number | null | undefined): string {
 
 export interface CalendarView {
   id: string;
+  /** The name shown: your own name for it if you gave one (DreyMail 12.4), else its own. */
   name: string;
+  /** Its name at the provider (or its own), when you gave it another (DreyMail 12.4). */
+  officialName?: string;
+  /** Your own name for it ('' = none) (DreyMail 12.4). */
+  nickname?: string;
+  /** The color shown: the mailbox's, unless one was picked (DreyMail 12.4). */
   color: string;
+  /** The color follows its mailbox's (DreyMail 12.4). */
+  mailboxColor?: boolean;
   /** Mailbox it is grouped under in the calendar list (null = "My calendars"). */
   accountId: string | null;
   /** 'owner' for your own, else how it was shared with you. */

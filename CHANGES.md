@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.4): calendar nicknames and mailbox colors
+
+- **A name of your own for any calendar** (the pencil → Name in DreyMail): shown everywhere in
+  DreyMail; the provider's name stays there and shows when you point at it. Empty: the provider's.
+- **Colors:** a mailbox's calendars show in the mailbox's color and follow it when it changes,
+  unless you pick another color for one ("<mailbox>'s color" brings it back). Your own calendars
+  keep their colors. New columns `calendars.nickname` and `color_set` (migration at the end).
+- **Event editor:** the calendar list is grouped by mailbox (My calendars, each mailbox, Shared
+  with you), with the chosen calendar's color beside it.
+- **Files:** `server/src/db.ts`, `server/src/routes/calendar.ts`, `shared/calendar.ts`,
+  `web/src/components/CalendarDialog.tsx`, `web/src/components/EventEditor.tsx`,
+  `web/src/styles.css`, `server/test/calendar-sync.test.ts`, `server/test/migrations.test.ts`,
+  `web/test/calendarGroups.test.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-23 (v12.3): a search index in the mail cache; space per user
 
 - **Search index:** the mail cache indexes every cached message's words, as keyed hashes per

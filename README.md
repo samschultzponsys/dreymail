@@ -78,7 +78,8 @@
      Modified by samschultzponsys, 2026-11-22: v12.0 (this device's settings saved on a schedule or by hand).
      Modified by samschultzponsys, 2026-11-22: v12.1 (search everywhere; folders pinned to the top; inbox tabs off by default; images from everyone you know).
      Modified by samschultzponsys, 2026-11-23: v12.2 (results from several mailboxes show their mailbox).
-     Modified by samschultzponsys, 2026-11-23: v12.3 (search index in the mail cache; space per user, split across mailboxes). -->
+     Modified by samschultzponsys, 2026-11-23: v12.3 (search index in the mail cache; space per user, split across mailboxes).
+     Modified by samschultzponsys, 2026-11-23: v12.4 (calendar nicknames; calendars in their mailbox's color). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -90,7 +91,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
