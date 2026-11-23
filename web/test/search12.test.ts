@@ -53,3 +53,14 @@ describe('folders pinned above the list', () => {
     expect(moveKey(['a', 'b', 'c'], 'b', 9)).toEqual(['a', 'c', 'b']);
   });
 });
+
+describe('errors of a search of many folders (12.6)', async () => {
+  const { groupErrors } = await import('../src/components/MessageList');
+  it('one line per mailbox, naming a few folders', () => {
+    const errs = ['Brasa', 'Cafe Beignet', 'Cavan', 'Coaches Corner'].map((f) => ({ accountId: 'p', folder: `INBOX/Clients/${f}`, error: `Cannot open folder "INBOX/Clients/${f}": Timed out waiting for mailbox lock` }));
+    expect(groupErrors([...errs, { accountId: 'g', error: 'Login failed' }])).toEqual([
+      { accountId: 'p', text: "4 folders couldn't be searched (Brasa, Cafe Beignet, Cavan and 1 more). Timed out waiting for mailbox lock" },
+      { accountId: 'g', text: 'Login failed' },
+    ]);
+  });
+});

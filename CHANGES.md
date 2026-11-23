@@ -13,6 +13,18 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.6): searching a whole mailbox without timeouts
+
+- **Fix:** a search of a whole mailbox (or all mail) queued every folder's search on the mailbox's
+  one connection at once, so with many folders on a slow server the later ones gave up ("Timed out
+  waiting for mailbox lock"). Folders are now searched a few at a time, each on a connection of its
+  own (up to four per mailbox), and up to 150 folders per mailbox are searched (was 40).
+- **Errors** of a search of many folders show as one line per mailbox (how many folders, a few
+  named, the reason) with Try again, instead of a banner per folder.
+- **Files:** `server/src/imap/mail.ts`, `server/src/imap/pool.ts`, `shared/types.ts`,
+  `web/src/components/MessageList.tsx`, `server/test/integration/mail.test.ts`,
+  `web/test/search12.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.5): Microsoft 365 group calendars
 
 - **Group calendars:** an Outlook mailbox's calendar list offers "Calendars of your Microsoft 365

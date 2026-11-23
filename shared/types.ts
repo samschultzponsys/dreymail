@@ -200,7 +200,8 @@ export interface ListResponse {
   /** Opaque cursor for the next page, or null when every source is exhausted. */
   cursor: string | null;
   /** Accounts that could not be queried, with a human-readable reason. */
-  errors: { accountId: string; error: string }[];
+  /** Mailboxes (and, for searches of many folders, the folder: DreyMail 12.6) that couldn't be read. */
+  errors: { accountId: string; folder?: string; error: string }[];
   /** True if the server noticed a UIDVALIDITY change and the client should reload. */
   reset: boolean;
 }

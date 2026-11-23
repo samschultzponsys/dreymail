@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-18: keywords on a message ($MDNSent for read receipts); S/MIME on reading; Gmail labels in lists.
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 // Modified by samschultzponsys, 2026-11-23: word searches answered from the search index where a folder is all cached and indexed.
+// Modified by samschultzponsys, 2026-11-23: many folders searched a few at a time on connections of their own.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -40,7 +41,7 @@ import { attachmentBytes, buildMessageDetail, parseRaw, type ParsedEmail } from 
 import { collectRemoteImageUrls } from '../mail/sanitize.js';
 import { inlineRemoteImages, type InlineOptions, type RemoteImageCache } from '../net/remoteImages.js';
 import { MailServerError, describeError } from './connect.js';
-import type { ImapPool } from './pool.js';
+import type { ImapPool, Lane } from './pool.js';
 import { lookupTerms, matchesTerm, RelatedIndex, searchFor, termKey, type LookupTerm } from './related.js';
 import { addresses, fetchSnippets, listFetch, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
 
@@ -89,6 +90,8 @@ export interface ListFilter {
 export const NO_FILTER: ListFilter = { text: '', unread: false };
 /** Filtering the IMAP server must do (the cache only answers plain and unread-only listings). */
 export const needsSearch = (f: ListFilter) => f.text !== '' || (!!f.filters && filterCount(f.filters) > 0);
+/** Connections a search of many folders of one mailbox uses at once (DreyMail 12.6). */
+const SEARCH_LANES: Lane[] = ['main', 'search1', 'search2', 'search3'];
 export const isFiltered = (f: ListFilter) => f.unread || needsSearch(f);
 /** A plain word search (unread only allowed) that the cache's search index can answer (DreyMail 12.3). */
 export const indexable = (f: ListFilter) => !!f.text && !(f.filters && filterCount(f.filters) > 0) && queryTerms(f.text).length > 0;
@@ -429,7 +432,7 @@ export class MailService {
     return list
       .filter((f) => !f.flags.has('\\Noselect') && !f.flags.has('\\NonExistent') && !skip.has(MailService.specialUse(f)))
       .map((f) => f.path)
-      .slice(0, 40);
+      .slice(0, 150);
   }
 
   /**
@@ -469,6 +472,7 @@ export class MailService {
     cursor: AccountCursor | undefined,
     limit: number,
     filter: ListFilter,
+    lane: Lane = 'main',
   ): Promise<SourcePage> {
     return this.pool.withMailbox(userId, source.accountId, source.folder, async (client, selected) => {
       // The pooled connection may have had this folder selected for a while. Not every server
@@ -520,7 +524,7 @@ export class MailService {
         .sort((a, b) => b.uid - a.uid)
         .map((msg) => fetchedItem(source, uidValidity, msg));
       return { source, uidValidity, items, exhausted, reset };
-    });
+    }, lane);
   }
 
   /**
@@ -752,22 +756,39 @@ export class MailService {
     const errors: MessageListResponse['errors'] = [];
     const started = Date.now();
     await this.prepareCached(userId, sources, filter, !!opts.fresh);
+    const one = async (s: ListSource, lane: Lane): Promise<SourcePage | null> => {
+      try {
+        return (
+          this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, started) ??
+          this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
+          (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter, lane))
+        );
+      } catch (err) {
+        errors.push({ accountId: s.accountId, folder: s.folder, error: describeError(err, 'IMAP').message });
+        return null;
+      }
+    };
+    // Searching many folders of a mailbox (DreyMail 12.6): a few at a time, each on a connection of
+    // its own, instead of all queued on one connection (where the last ones gave up waiting).
+    const byAccount = new Map<string, ListSource[]>();
+    for (const s of sources) byAccount.set(s.accountId, [...(byAccount.get(s.accountId) ?? []), s]);
     const pages = (
       await Promise.all(
-        sources.map(async (s) => {
-          try {
-            return (
-              this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, started) ??
-              this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
-              (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter))
-            );
-          } catch (err) {
-            errors.push({ accountId: s.accountId, error: describeError(err, 'IMAP').message });
-            return null;
-          }
+        [...byAccount.values()].map(async (list) => {
+          if (list.length === 1) return [await one(list[0]!, 'main')];
+          const out: (SourcePage | null)[] = new Array(list.length).fill(null);
+          let next = 0;
+          await Promise.all(
+            SEARCH_LANES.slice(0, Math.min(SEARCH_LANES.length, list.length)).map(async (lane) => {
+              for (let i = next++; i < list.length; i = next++) out[i] = await one(list[i]!, lane);
+            }),
+          );
+          return out;
         }),
       )
-    ).filter((p): p is SourcePage => p !== null);
+    )
+      .flat()
+      .filter((p): p is SourcePage => p !== null);
 
     const reset = pages.some((p) => p.reset) && rawCursor !== null;
     const { picked, cursor, more } = mergePages(pages, limit, previous);

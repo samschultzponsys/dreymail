@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-17: Not spam, Mark as spam and address suggestions.
+// Modified by samschultzponsys, 2026-11-23: searching a whole mailbox of many folders.
 
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
@@ -618,6 +619,27 @@ describe('undo and the Archive fallback', () => {
     expect((await api<{ preferences: Record<string, unknown> }>('GET', '/api/me')).json.preferences).toMatchObject({ swipeLeft: 'toggleRead', swipeRight: 'none' });
     const bad = await api('PUT', '/api/preferences', { theme: 'dark', pageSize: 50, markReadOnOpen: true, swipeLeft: 'explode', swipeRight: 'none' });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('searching a whole mailbox (12.6)', () => {
+  it('searches many folders, a few at a time, without any of them giving up', async () => {
+    const id = accounts.bob!.id;
+    const c = imapClient(BOB);
+    await c.connect();
+    for (let i = 0; i < 25; i++) {
+      const path = `Clients/Client ${String(i).padStart(2, '0')}`;
+      await c.mailboxCreate(path).catch(() => undefined);
+      await c.append(path, rawMessage({ from: 'tickets@vendor.example', to: BOB, subject: `Ticket 237640 update ${i}`, date: new Date(Date.UTC(2026, 0, 1, i)), id: `t237640-${i}` }));
+    }
+    await c.logout();
+    // The folder list is kept a minute: the new folders show once it is fetched again.
+    await api('GET', `/api/folders?accountId=${id}`);
+    const f = encodeURIComponent(JSON.stringify({ where: 'all', accounts: [id] }));
+    const res = await api<ListResponse>('GET', `/api/messages?accountId=${id}&folder=INBOX&q=237640&filter=${f}&limit=100`);
+    expect(res.json.errors).toEqual([]);
+    const all = await listAll(`accountId=${id}&folder=INBOX&q=237640&filter=${f}&limit=100`);
+    expect(new Set(all.map((m) => m.folder)).size).toBe(25);
   });
 });
 

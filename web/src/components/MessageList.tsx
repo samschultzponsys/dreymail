@@ -43,7 +43,7 @@ interface Props {
   loading: boolean;
   fetchingMore: boolean;
   hasMore: boolean;
-  errors: { accountId: string; error: string }[];
+  errors: { accountId: string; folder?: string; error: string }[];
   listError: string | null;
   openKey: string | null;
   checked: Set<string>;
@@ -357,9 +357,12 @@ export function MessageList(p: Props) {
 
       <div className="rows">
         {p.listError && <div className="banner error">{p.listError}</div>}
-        {p.errors.map((e) => (
+        {groupErrors(p.errors).map((e) => (
           <div className="banner error" key={e.accountId}>
-            {p.accounts.get(e.accountId)?.name ?? 'Account'}: {e.error}
+            {p.accounts.get(e.accountId)?.name ?? 'Account'}: {e.text}{' '}
+            <button className="link-btn" onClick={p.onRefresh}>
+              Try again
+            </button>
           </div>
         ))}
         {p.loading && (
@@ -499,3 +502,19 @@ export function MessageList(p: Props) {
     </section>
   );
 }
+
+/**
+ * One line per mailbox (DreyMail 12.6): a search of many folders can miss several; they're named
+ * (a few) and counted instead of one banner each.
+ */
+export function groupErrors(errors: { accountId: string; folder?: string; error: string }[]): { accountId: string; text: string }[] {
+  const by = new Map<string, { folder?: string; error: string }[]>();
+  for (const e of errors) by.set(e.accountId, [...(by.get(e.accountId) ?? []), e]);
+  return [...by].map(([accountId, list]) => {
+    if (list.length === 1) return { accountId, text: list[0]!.error };
+    const names = list.map((e) => (e.folder ?? '').split(/[/.]/).pop()).filter(Boolean);
+    const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '');
+    return { accountId, text: `${list.length} folders couldn't be searched${shown ? ` (${shown})` : ''}. ${list[0]!.error.replace(/^Cannot open folder "[^"]*": /, '')}` };
+  });
+}
+
