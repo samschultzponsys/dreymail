@@ -462,6 +462,7 @@ export async function buildApp(
         budget: cacheBudget.accountBytes(userId, a.id),
         used: cache ? cache.accountBytes(userId, a.id) : { messages: 0, bodies: 0, index: 0, total: 0, count: 0, indexed: 0 },
         indexing: !!cacheSync?.isIndexing(userId, a.id),
+        coverage: cache ? cache.searchCoverage(userId, a.id) : { folders: 0, instant: 0 },
       })),
     };
   });

@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.7): the search index actually used for whole-mailbox searches
+
+- **Fix:** before answering a folder from the search index, 12.3 synced every searched folder
+  (giving each 1.5 s, all on one connection), so a search of a whole mailbox's many folders almost
+  never used the index. Now one folder list with STATUS per mailbox (newest UID and message count,
+  now asked for too) is compared with the copy: unchanged folders are answered from the index at
+  once; changed ones are searched on the server this time and synced in the background.
+- **Settings → Search and storage** shows, per mailbox, how many folders are searched instantly
+  (all copied and indexed), and says when a mailbox's share is full.
+- **Files:** `server/src/imap/mail.ts`, `server/src/imap/pool.ts`, `server/src/cache/store.ts`,
+  `server/src/app.ts`, `web/src/components/CacheSettings.tsx`, `server/test/searchIndex.test.ts`,
+  `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.6): searching a whole mailbox without timeouts
 
 - **Fix:** a search of a whole mailbox (or all mail) queued every folder's search on the mailbox's

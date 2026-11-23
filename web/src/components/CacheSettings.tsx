@@ -12,7 +12,7 @@ import { useAccounts } from '../hooks';
 import { MailboxIcon } from './MailboxIcon';
 
 type Used = { messages: number; bodies: number; index: number; total: number; count: number; indexed: number };
-type Usage = { enabled: boolean; userMb: number; split: CacheSplit; accounts: { accountId: string; share: number; budget: number; used: Used; indexing: boolean }[] };
+type Usage = { enabled: boolean; userMb: number; split: CacheSplit; accounts: { accountId: string; share: number; budget: number; used: Used; indexing: boolean; coverage?: { folders: number; instant: number } }[] };
 
 const mb = (b: number) => (b >= 1024 * 1024 * 1024 ? `${(b / 1024 / 1024 / 1024).toFixed(2)} GB` : `${Math.round(b / 1024 / 1024)} MB`);
 
@@ -97,6 +97,8 @@ export function CacheSettings({ prefs, save }: { prefs: Preferences; save: (p: P
                     <>
                       {mb(row.used.total)} of {mb(row.budget)} · {row.used.count.toLocaleString()} messages · {pct}% indexed
                       {row.indexing ? ' (indexing…)' : ''}
+                      {row.coverage && row.coverage.folders > 0 ? ` · ${row.coverage.instant} of ${row.coverage.folders} folders searched instantly` : ''}
+                      {row.used.total >= row.budget * 0.97 ? ' · full: give it a bigger share for more' : ''}
                     </>
                   ) : (
                     '…'

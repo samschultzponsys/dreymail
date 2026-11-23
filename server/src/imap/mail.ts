@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 // Modified by samschultzponsys, 2026-11-23: word searches answered from the search index where a folder is all cached and indexed.
 // Modified by samschultzponsys, 2026-11-23: many folders searched a few at a time on connections of their own.
+// Modified by samschultzponsys, 2026-11-23: an unchanged folder (one STATUS list per mailbox) is searched from the index without syncing it first.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -537,14 +538,41 @@ export class MailService {
    * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
    * searches). Only plain word searches (and unread only) are answered here.
    */
-  private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter, since: number): SourcePage | null {
+  /**
+   * The searched folders whose copy matches the server (DreyMail 12.7): one folder list with STATUS
+   * per mailbox (newest UID and message count) compared with the cache, instead of syncing every
+   * folder first. Changed folders are synced in the background; this search asks the server.
+   */
+  private async unchangedFolders(userId: string, sources: ListSource[]): Promise<Set<string>> {
+    const out = new Set<string>();
+    if (!this.cached) return out;
+    const { sync } = this.cached;
+    const accounts = [...new Set(sources.map((s) => s.accountId))];
+    await Promise.all(
+      accounts.map(async (accountId) => {
+        const list = await this.pool.folders(userId, accountId, true).catch(() => null);
+        if (!list) return;
+        const byPath = new Map(list.map((f) => [f.path, f.status]));
+        for (const s of sources.filter((x) => x.accountId === accountId)) {
+          const f = sync.ready(userId, accountId, s.folder);
+          if (!f) continue;
+          const st = byPath.get(s.folder);
+          if (sync.isCurrent(userId, accountId, s.folder) || (st && Number(st.uidNext) === f.uidNext && Number(st.messages) === f.exists)) out.add(sourceKey(s));
+          else sync.syncSoon(userId, accountId, s.folder);
+        }
+      }),
+    );
+    return out;
+  }
+
+  private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter, current: Set<string>): SourcePage | null {
     if (!this.cached || !indexable(filter)) return null;
     const terms = queryTerms(filter.text);
     const { accountId, folder } = source;
     return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
       const f = sync.ready(userId, accountId, folder);
-      // All of the folder's mail, and known to be current (watched, or brought up to date for this search).
-      if (!f || !f.complete || !(sync.isCurrent(userId, accountId, folder) || f.syncedAt >= since)) return null;
+      // All of the folder's mail, and known to match the server (see unchangedFolders).
+      if (!f || !f.complete || !current.has(sourceKey(source))) return null;
       const state = cache.indexState(f);
       if (state.messages === 0 || state.indexed < state.messages) return null;
       let reset = false;
@@ -679,8 +707,7 @@ export class MailService {
    * from) are up to date, unless they are known to be. See CacheSync.beforeListing.
    */
   private async prepareCached(userId: string, sources: ListSource[], filter: ListFilter, fresh: boolean) {
-    // A word search the index can answer needs the copy brought up to date first, like a listing.
-    if (!this.cached || (needsSearch(filter) && !indexable(filter))) return;
+    if (!this.cached || needsSearch(filter)) return;
     const { cache, sync } = this.cached;
     await Promise.all(
       sources.map(async ({ accountId, folder }) => {
@@ -754,12 +781,12 @@ export class MailService {
   ): Promise<MessageListResponse> {
     const previous = decodeCursor(rawCursor);
     const errors: MessageListResponse['errors'] = [];
-    const started = Date.now();
     await this.prepareCached(userId, sources, filter, !!opts.fresh);
+    const current = indexable(filter) ? await this.unchangedFolders(userId, sources) : new Set<string>();
     const one = async (s: ListSource, lane: Lane): Promise<SourcePage | null> => {
       try {
         return (
-          this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, started) ??
+          this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, current) ??
           this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
           (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter, lane))
         );

@@ -6,7 +6,7 @@
 // Modified by samschultzponsys, 2026-11-16: start of new messages fetched for notification previews.
 // Modified by samschultzponsys, 2026-11-16: folder lists on their own connection, so opening a message never waits behind them.
 // Modified by samschultzponsys, 2026-11-17: a third command connection for filling the cache of other folders in the background.
-// Modified by samschultzponsys, 2026-11-23: three more connections for searching many folders of a mailbox at once.
+// Modified by samschultzponsys, 2026-11-23: three more connections for searching many folders of a mailbox at once; UIDNEXT in folder lists.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -173,7 +173,7 @@ export class ImapPool {
     const key = this.key(userId, accountId);
     const known = this.folderLists.get(key);
     if (!fresh && known && Date.now() - known.at < FOLDER_CACHE_MS) return known.list;
-    const list = await this.withClient(userId, accountId, (c) => c.list({ statusQuery: { unseen: true, messages: true } }), 'folders');
+    const list = await this.withClient(userId, accountId, (c) => c.list({ statusQuery: { unseen: true, messages: true, uidNext: true } }), 'folders');
     this.folderLists.set(key, { at: Date.now(), list });
     return list;
   }

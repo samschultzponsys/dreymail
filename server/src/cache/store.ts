@@ -702,6 +702,17 @@ export class MailCache {
     return out;
   }
 
+  /** An account's cached folders and how many are searched from the index: all copied and all indexed (DreyMail 12.7). */
+  searchCoverage(userId: string, accountId: string): { folders: number; instant: number } {
+    const rows = this.db
+      .prepare(
+        `SELECT f.complete AS complete, COUNT(m.uid) AS n, COALESCE(SUM(CASE WHEN m.indexed > 0 THEN 1 ELSE 0 END), 0) AS i
+         FROM folders f LEFT JOIN messages m ON m.folder_id = f.id WHERE f.user_id = ? AND f.account_id = ? GROUP BY f.id`,
+      )
+      .all(userId, accountId) as { complete: number; n: number; i: number }[];
+    return { folders: rows.length, instant: rows.filter((r) => r.complete === 1 && r.i === r.n).length };
+  }
+
   /** How much of a folder's cached mail is searchable by content. */
   indexState(f: CachedFolder): { messages: number; indexed: number } {
     const r = this.db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN indexed > 0 THEN 1 ELSE 0 END), 0) AS i FROM messages WHERE folder_id = ?').get(f.id) as { n: number; i: number };

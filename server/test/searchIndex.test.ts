@@ -100,6 +100,10 @@ describe('filling the index', () => {
     const cache = new MailCache(':memory:', keys());
     const body = (uid: number) => Buffer.from(`Subject: Message ${uid}\r\n\r\nBody word${uid} and the common word quarterly.\r\n`);
     const pool = {
+      // The folder list with STATUS (12.7): unchanged folders are searched from the index.
+      async folders() {
+        return [{ path: 'INBOX', name: 'INBOX', delimiter: '/', flags: new Set<string>(), specialUse: '\\Inbox', status: { messages: n, uidNext: n + 1, unseen: 0 } }];
+      },
       async withMailbox<T>(_u: string, _a: string, p: string, fn: (client: unknown, mailbox: unknown) => Promise<T>): Promise<T> {
         const mailbox = { path: p, exists: n, uidNext: n + 1, uidValidity: 7n, noModseq: true };
         const msg = (uid: number) => ({ uid, seq: uid, flags: new Set<string>(), envelope: { subject: `Message ${uid}`, from: [{ name: 'A', address: 'a@example.com' }], to: [], date: new Date(2026, 0, 1, 0, uid) }, internalDate: new Date(2026, 0, 1, 0, uid), size: 100 });

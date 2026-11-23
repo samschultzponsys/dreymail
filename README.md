@@ -81,7 +81,8 @@
      Modified by samschultzponsys, 2026-11-23: v12.3 (search index in the mail cache; space per user, split across mailboxes).
      Modified by samschultzponsys, 2026-11-23: v12.4 (calendar nicknames; calendars in their mailbox's color).
      Modified by samschultzponsys, 2026-11-23: v12.5 (Microsoft 365 group calendars).
-     Modified by samschultzponsys, 2026-11-23: v12.6 (searching a whole mailbox: folders a few at a time, on connections of their own). -->
+     Modified by samschultzponsys, 2026-11-23: v12.6 (searching a whole mailbox: folders a few at a time, on connections of their own).
+     Modified by samschultzponsys, 2026-11-23: v12.7 (unchanged folders searched from the index without syncing each first). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -93,7 +94,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.6**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.7**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1064,8 +1065,10 @@ content of messages you have opened, and loads the newest unread ones ahead, up 
 **Search index (12.3).** In the background DreyMail also reads each cached message once (at most
 96 KB of it, without marking it read) and indexes its words: keyed hashes of them (per mailbox), so
 the index holds no words either. A word search of a folder whose copy holds all its mail and is
-all indexed is answered from the index at once; other folders are searched by the mail server as
-before. Searches match whole words, with simple English endings ("printer" finds "printers").
+all indexed, and unchanged on the server (one folder list with each folder's newest UID and
+message count tells), is answered from the index at once; other folders are searched by the mail
+server as before, and changed ones are brought up to date in the background. Settings → Search
+and storage shows how many folders of each mailbox are searched instantly. Searches match whole words, with simple English endings ("printer" finds "printers").
 
 **Space.** Each user has `DREYMAIL_CACHE_USER_MB` (1024 by default; Settings → Server) for their
 copy, index and stored messages, split across their mailboxes evenly, or by the shares they choose
