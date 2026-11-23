@@ -5,12 +5,14 @@
 // Modified by samschultzponsys, 2026-11-17: tells about new messages and filled folders (address suggestions).
 // Modified by samschultzponsys, 2026-11-18: Gmail labels fetched with message lists.
 // Modified by samschultzponsys, 2026-11-23: the search index filled in the background; space per mailbox from the user's share.
+// Modified by samschultzponsys, 2026-11-23: messages for the index read in worker threads, in parallel; requests of people using DreyMail go first.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
 import type { CacheConfig } from '../config.js';
 import type { ImapPool, Lane } from '../imap/pool.js';
 import { fetchSnippets, listFetch, sortTime, summaryOf, toDate } from '../imap/summary.js';
+import { MAX_BODY_TERMS, termsOf } from './searchTerms.js';
 import { CacheCorruptError, flagsOf, type CachedFolder, type CachedRole, type MailCache, type MessageEntry } from './store.js';
 
 /** Messages fetched per IMAP command while filling a folder, so other requests get their turn in between. */
@@ -26,7 +28,7 @@ export const WARM_MAX_AGE_MS = 10 * 60_000;
 /** At most this many other folders per mailbox are cached (the special ones first). */
 export const WARM_MAX_FOLDERS = 100;
 /** Messages read per round when filling the search index, and how much of each (DreyMail 12.3). */
-const INDEX_BATCH = 50;
+const INDEX_BATCH = 80;
 export const INDEX_BYTES = 96 * 1024;
 /** SQLite result codes for a damaged database file: SQLITE_IOERR, SQLITE_CORRUPT, SQLITE_NOTADB. */
 const DAMAGED = new Set([10, 11, 26]);
@@ -61,8 +63,12 @@ export interface CacheSyncDeps {
   log?: (msg: string, extra?: Record<string, unknown>) => void;
   /** Space (bytes) the account's cached mail may take: summaries, content and index (DreyMail 12.3). Default: bodyBytesPerAccount. */
   budget?: (userId: string, accountId: string) => number;
+  /** Someone is using DreyMail right now: the search index waits (DreyMail 12.10). */
+  busy?: () => boolean;
   /** Plain text of a message (for the search index); null when it can't be read. */
   textOf?: (raw: Buffer) => Promise<string | null>;
+  /** A message's words, read in a worker thread (DreyMail 12.10); preferred over textOf. */
+  termsOf?: (raw: Buffer) => Promise<string[] | null>;
 }
 
 const sleep = (ms: number) =>
@@ -531,7 +537,7 @@ export class CacheSync {
    * their words, until all are indexed or the account's space is used up. Never rejects.
    */
   indexAccount(userId: string, accountId: string) {
-    if (this.stopped || !this.deps.textOf) return;
+    if (this.stopped || (!this.deps.textOf && !this.deps.termsOf)) return;
     const k = `${userId}\u0000${accountId}`;
     const running = this.indexing.get(k);
     if (running) {
@@ -548,6 +554,9 @@ export class CacheSync {
           // The index has room as long as stored content can give way for it.
           const used = this.cache.accountBytes(userId, accountId);
           if (used.messages + used.index >= this.budgetOf(userId, accountId)) return;
+          // Messages are read in worker threads, in parallel; between rounds, requests of people using
+          // DreyMail go first.
+          if (this.deps.busy?.()) await sleep(300);
           const batch = this.cache.unindexed(userId, accountId, INDEX_BATCH);
           if (!batch.length) break;
           for (const { folder: f, uids } of batch) {
@@ -569,15 +578,23 @@ export class CacheSync {
               .catch(() => null);
             // The folder can't be read now (or changed): try again after its next sync.
             if (!got) return;
-            for (const uid of uids) {
-              const raw = got.get(uid);
-              const text = raw ? await this.deps.textOf!(raw).catch(() => null) : null;
-              if (text === null) this.cache.markUnindexable(f, uid);
-              else this.cache.indexBody(f, uid, text);
+            const read = await Promise.all(
+              uids.map(async (uid) => {
+                const raw = got.get(uid);
+                if (!raw) return { uid, terms: null };
+                if (this.deps.termsOf) return { uid, terms: await this.deps.termsOf(raw).catch(() => null) };
+                const text = await this.deps.textOf!(raw).catch(() => null);
+                return { uid, terms: text === null ? null : [...termsOf(text, MAX_BODY_TERMS)] };
+              }),
+            );
+            for (const { uid, terms } of read) {
+              if (terms === null) this.cache.markUnindexable(f, uid);
+              else this.cache.indexTerms(f, uid, terms);
+              await new Promise<void>((r) => setImmediate(r));
             }
           }
           this.enforceBudget(userId, accountId);
-          await sleep(20);
+          await sleep(50);
         }
       } while (state.again && !this.stopped);
     })()

@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v13.0): indexing in parallel, out of the app's way
+
+- **Fix:** filling the search index read and parsed messages (MIME, HTML) on the server's one
+  JavaScript thread, so while it worked through a big mailbox everything else (opening a
+  composer, sending, lists) waited. Messages are now read in worker threads (every CPU thread
+  the server has but one: at least two, at most eight), 80 fetched at a time; the server's own thread only files
+  their words. Between rounds, requests of people using DreyMail go first.
+- **Files:** `server/src/cache/textWorker.ts` (new), `server/src/cache/textPool.ts` (new),
+  `server/src/cache/sync.ts`, `server/src/cache/store.ts`, `server/src/app.ts`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.9): each message's buttons, your way
 
 - **Settings → General → Buttons on each message:** tick the buttons (Reply, Reply all, Forward,

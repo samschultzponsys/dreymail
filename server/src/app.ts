@@ -25,7 +25,7 @@
 // Modified by samschultzponsys, 2026-11-17: event reminders (notifications and the reminder window).
 // Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
 // Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
-// Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars.
+// Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars; background indexing waits while DreyMail is in use.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,8 +65,7 @@ import { registerPeopleRoutes } from './routes/people.js';
 import { ServerSettings, storedServerSettings, withStoredSettings } from './serverSettings.js';
 import { Snapshots } from './backup.js';
 import { CacheBudget, cacheShares } from './cacheBudget.js';
-import { parseRaw } from './mail/parse.js';
-import { convert as htmlToText } from 'html-to-text';
+import { TextPool } from './cache/textPool.js';
 import { registerBackupRoutes } from './routes/backup.js';
 import { serverVersion } from './version.js';
 import { assistantOutgoing } from './ai/outgoing.js';
@@ -193,6 +192,28 @@ export async function buildApp(
   const useOf = async (userId: string, accountId: string, folder: string, role: CachedRole) =>
     role === 'inbox' ? 'inbox' : role === 'sent' ? 'sent' : await mail.folderUse(userId, accountId, folder);
   const cacheBudget = new CacheBudget(store);
+  // Worker threads that read messages for the search index (DreyMail 12.10).
+  const textPool = new TextPool();
+  app.addHook('onClose', async () => textPool.close());
+  // Someone is using DreyMail (a request under way, or one in the last few seconds): background
+  // work that takes the server's time, like filling the search index, waits (DreyMail 12.10).
+  let inFlight = 0;
+  let lastUse = 0;
+  const QUIET = new Set(['/api/cache/usage']);
+  app.addHook('onRequest', async (req) => {
+    const path = req.url.split('?')[0] ?? '';
+    if (!path.startsWith('/api/') || QUIET.has(path)) return;
+    inFlight++;
+    lastUse = Date.now();
+    (req as { countsAsUse?: boolean }).countsAsUse = true;
+  });
+  app.addHook('onResponse', async (req) => {
+    if ((req as { countsAsUse?: boolean }).countsAsUse) {
+      inFlight = Math.max(0, inFlight - 1);
+      lastUse = Date.now();
+    }
+  });
+  const busy = () => inFlight > 0 || Date.now() - lastUse < 4000;
   const cacheSync =
     cache && config.cache
       ? new CacheSync({
@@ -205,11 +226,8 @@ export async function buildApp(
           isWatched: (userId, accountId) => pool.isWatching(userId, accountId),
           // Space and the search index (DreyMail 12.3).
           budget: (userId, accountId) => cacheBudget.accountBytes(userId, accountId),
-          textOf: async (raw) => {
-            const e = await parseRaw(raw);
-            const parts = [e.text || (e.html ? htmlToText(e.html, { wordwrap: false, selectors: [{ selector: 'img', format: 'skip' }, { selector: 'a', options: { ignoreHref: true } }] }) : ''), ...e.attachments.map((a) => a.filename ?? '')];
-            return parts.join(' ');
-          },
+          busy,
+          termsOf: (raw) => textPool.terms(raw),
           onChanged: (userId, accountId, folder) => pool.onEvent(userId, { type: 'mailbox', accountId, folder }),
           onNewMessages: (userId, accountId, folder, role, messages) => {
             if (!addressBook.filled(accountId, folder)) return; // counted with the rest once the folder has filled

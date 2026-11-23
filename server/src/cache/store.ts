@@ -671,10 +671,15 @@ export class MailCache {
 
   /** Index a message's content (its text), and mark it indexed. */
   indexBody(f: CachedFolder, uid: number, text: string) {
+    this.indexTerms(f, uid, [...termsOf(text, MAX_BODY_TERMS)]);
+  }
+
+  /** Index a message's content from its words (read in a worker thread, DreyMail 12.10), and mark it indexed. */
+  indexTerms(f: CachedFolder, uid: number, terms: string[]) {
     if (!this.db.prepare('SELECT 1 FROM messages WHERE folder_id = ? AND uid = ?').get(f.id, uid)) return;
     const term = this.db.prepare('INSERT OR IGNORE INTO terms (folder_id, term, uid) VALUES (?, ?, ?)');
     this.tx(() => {
-      for (const t of termsOf(text, MAX_BODY_TERMS)) term.run(f.id, this.termHash(f, t), uid);
+      for (const t of terms.slice(0, MAX_BODY_TERMS)) term.run(f.id, this.termHash(f, t), uid);
       this.db.prepare('UPDATE messages SET indexed = 1 WHERE folder_id = ? AND uid = ?').run(f.id, uid);
     });
   }
