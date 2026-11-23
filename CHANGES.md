@@ -13,6 +13,24 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.8): instant search results; more space
+
+- **Quick results:** every word search (no other filters) first asks the search index alone
+  (`quick=1`), which answers at once from whatever DreyMail's copy holds, newest mail first; the
+  list shows that with "Found on this server so far; still searching all your mail…" until the
+  full search (which asks the mail servers for anything not in the copy) has its first page.
+- **Fix: a search slowing everything else down.** A whole-mailbox search used the mailbox's main
+  connection as one of its four, so opening a message (or another folder) waited behind it, even
+  after leaving the search. Searches now use four connections of their own, and a search the
+  browser has left (another folder opened, the box cleared) stops after the folders under way.
+- **More space by default:** 4096 MB per user (was 1024), 10000 messages of other folders (was
+  5000); the index fills twice as fast (50 messages a round).
+- **Files:** `server/src/imap/mail.ts`, `server/src/routes/api.ts`, `server/src/cache/sync.ts`,
+  `server/src/cacheBudget.ts`, `server/src/config.ts`, `server/src/imap/pool.ts`, `shared/types.ts`,
+  `shared/serverSettings.ts`, `web/src/api.ts`, `web/src/hooks.ts`, `web/src/App.tsx`,
+  `web/src/components/MessageList.tsx`, `web/src/styles.css`, `server/test/searchIndex.test.ts`,
+  `server/test/cache.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.7): the search index actually used for whole-mailbox searches
 
 - **Fix:** before answering a folder from the search index, 12.3 synced every searched folder

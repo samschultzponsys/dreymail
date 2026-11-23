@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-16: folders asked for per mailbox.
 // Modified by samschultzponsys, 2026-11-17: preferences changed on another device are fetched again.
 // Modified by samschultzponsys, 2026-11-17: event reminders over the WebSocket.
+// Modified by samschultzponsys, 2026-11-23: quick searches from the search index while the full one runs.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,13 +53,26 @@ export function useMessages(sel: MailboxSel, q: string, unread: boolean, enabled
   const qc = useQueryClient();
   return useInfiniteQuery({
     queryKey: ['messages', sel.accountId, sel.accountId ? sel.folder : '', q, unread, filter],
-    queryFn: ({ pageParam }) => fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread, filter)),
+    queryFn: ({ pageParam, signal }) => fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread, filter, false, q || filter ? signal : undefined)),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.cursor,
     enabled,
     staleTime: 20_000,
     // INBOX changes arrive via IDLE; this also catches changes in other folders.
     refetchInterval: 120_000,
+  });
+}
+
+/**
+ * A word search answered at once from DreyMail's search index (DreyMail 12.8), shown while the full
+ * search (which asks the mail servers) runs.
+ */
+export function useQuickSearch(sel: MailboxSel, q: string, unread: boolean, enabled: boolean, filter = '') {
+  return useQuery({
+    queryKey: ['messages-quick', sel.accountId, sel.accountId ? sel.folder : '', q, unread, filter],
+    queryFn: () => api.messages(sel, null, q, unread, filter, true),
+    enabled: enabled && !!q.trim(),
+    staleTime: 20_000,
   });
 }
 

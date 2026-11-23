@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-23: word searches answered from the search index where a folder is all cached and indexed.
 // Modified by samschultzponsys, 2026-11-23: many folders searched a few at a time on connections of their own.
 // Modified by samschultzponsys, 2026-11-23: an unchanged folder (one STATUS list per mailbox) is searched from the index without syncing it first.
+// Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -91,8 +92,11 @@ export interface ListFilter {
 export const NO_FILTER: ListFilter = { text: '', unread: false };
 /** Filtering the IMAP server must do (the cache only answers plain and unread-only listings). */
 export const needsSearch = (f: ListFilter) => f.text !== '' || (!!f.filters && filterCount(f.filters) > 0);
-/** Connections a search of many folders of one mailbox uses at once (DreyMail 12.6). */
-const SEARCH_LANES: Lane[] = ['main', 'search1', 'search2', 'search3'];
+/**
+ * Connections a search of many folders of one mailbox uses at once (DreyMail 12.6); never the main
+ * one (12.8), so opening a message or another folder doesn't wait behind a long search.
+ */
+const SEARCH_LANES: Lane[] = ['search1', 'search2', 'search3', 'search4'];
 export const isFiltered = (f: ListFilter) => f.unread || needsSearch(f);
 /** A plain word search (unread only allowed) that the cache's search index can answer (DreyMail 12.3). */
 export const indexable = (f: ListFilter) => !!f.text && !(f.filters && filterCount(f.filters) > 0) && queryTerms(f.text).length > 0;
@@ -538,6 +542,27 @@ export class MailService {
    * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
    * searches). Only plain word searches (and unread only) are answered here.
    */
+  /** A word search from the search index alone (see listMessages' `quick`): never asks a mail server. */
+  private async quickSearch(userId: string, sources: ListSource[], previous: Record<string, AccountCursor>, limit: number, filter: ListFilter): Promise<MessageListResponse> {
+    const none: MessageListResponse = { messages: [], related: [], cursor: null, errors: [], reset: false, partial: true };
+    if (!this.cached || !indexable(filter)) return none;
+    const terms = queryTerms(filter.text);
+    const pages = sources
+      .map((source) =>
+        this.fromCache(userId, source.accountId, source.folder, null, ({ cache, sync }): SourcePage | null => {
+          const f = sync.ready(userId, source.accountId, source.folder);
+          if (!f) return null;
+          const cursor = previous[sourceKey(source)];
+          if (cursor?.done || (cursor && cursor.uidValidity !== f.uidValidity)) return { source, uidValidity: f.uidValidity, items: [], exhausted: true, reset: false };
+          const rows = cache.search(f, terms, cursor?.beforeUid ?? null, limit, filter.unread);
+          return { source, uidValidity: f.uidValidity, items: rows.map((m) => cachedItem(source, f.uidValidity, m)), exhausted: rows.length < limit, reset: false };
+        }),
+      )
+      .filter((p): p is SourcePage => p !== null);
+    const { picked, cursor, more } = mergePages(pages, limit, previous);
+    return { messages: picked.map((it) => this.toSummary(it, '')), related: [], cursor: more ? encodeCursor(cursor) : null, errors: [], reset: false, partial: true };
+  }
+
   /**
    * The searched folders whose copy matches the server (DreyMail 12.7): one folder list with STATUS
    * per mailbox (newest UID and message count) compared with the cache, instead of syncing every
@@ -776,11 +801,16 @@ export class MailService {
     rawCursor: string | null,
     limit: number,
     filter: ListFilter = NO_FILTER,
-    /** fresh: the user asked to refresh, so cached folders are checked with the server first (see prepareCached). */
-    opts: { fresh?: boolean } = {},
+    /**
+     * fresh: the user asked to refresh, so cached folders are checked with the server first (see
+     * prepareCached). quick (DreyMail 12.8): a word search answered only from the search index, at
+     * once, from whatever the cache holds (the client shows it while the full search runs).
+     */
+    opts: { fresh?: boolean; quick?: boolean; signal?: AbortSignal } = {},
   ): Promise<MessageListResponse> {
     const previous = decodeCursor(rawCursor);
     const errors: MessageListResponse['errors'] = [];
+    if (opts.quick) return this.quickSearch(userId, sources, previous, limit, filter);
     await this.prepareCached(userId, sources, filter, !!opts.fresh);
     const current = indexable(filter) ? await this.unchangedFolders(userId, sources) : new Set<string>();
     const one = async (s: ListSource, lane: Lane): Promise<SourcePage | null> => {
@@ -807,7 +837,8 @@ export class MailService {
           let next = 0;
           await Promise.all(
             SEARCH_LANES.slice(0, Math.min(SEARCH_LANES.length, list.length)).map(async (lane) => {
-              for (let i = next++; i < list.length; i = next++) out[i] = await one(list[i]!, lane);
+              // A search the browser has given up on stops after the folders already under way.
+              for (let i = next++; i < list.length && !opts.signal?.aborted; i = next++) out[i] = await one(list[i]!, lane);
             }),
           );
           return out;

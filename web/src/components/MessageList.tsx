@@ -9,7 +9,7 @@
 // Modified by samschultzponsys, 2026-11-17: Not spam for selected messages in Junk; Spam elsewhere.
 // Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates; Gmail labels.
 // Modified by samschultzponsys, 2026-11-22: search the whole mailbox by default, or the folder, or all mail.
-// Modified by samschultzponsys, 2026-11-23: rows show their mailbox wherever the list holds several.
+// Modified by samschultzponsys, 2026-11-23: rows show their mailbox wherever the list holds several; quick results while searching.
 
 import { MailboxIcon } from './MailboxIcon';
 import { PaneResizer } from './PaneResizer';
@@ -41,6 +41,8 @@ interface Props {
   /** One row per conversation. */
   messages: ConversationRow[];
   loading: boolean;
+  /** Showing DreyMail's quick results while the full search runs (DreyMail 12.8). */
+  searchingMore?: boolean;
   fetchingMore: boolean;
   hasMore: boolean;
   errors: { accountId: string; folder?: string; error: string }[];
@@ -357,6 +359,11 @@ export function MessageList(p: Props) {
 
       <div className="rows">
         {p.listError && <div className="banner error">{p.listError}</div>}
+        {p.searchingMore && (
+          <div className="banner searching-more">
+            <div className="spinner small" /> Found on this server so far; still searching all your mail…
+          </div>
+        )}
         {groupErrors(p.errors).map((e) => (
           <div className="banner error" key={e.accountId}>
             {p.accounts.get(e.accountId)?.name ?? 'Account'}: {e.text}{' '}

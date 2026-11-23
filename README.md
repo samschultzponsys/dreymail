@@ -82,7 +82,8 @@
      Modified by samschultzponsys, 2026-11-23: v12.4 (calendar nicknames; calendars in their mailbox's color).
      Modified by samschultzponsys, 2026-11-23: v12.5 (Microsoft 365 group calendars).
      Modified by samschultzponsys, 2026-11-23: v12.6 (searching a whole mailbox: folders a few at a time, on connections of their own).
-     Modified by samschultzponsys, 2026-11-23: v12.7 (unchanged folders searched from the index without syncing each first). -->
+     Modified by samschultzponsys, 2026-11-23: v12.7 (unchanged folders searched from the index without syncing each first).
+     Modified by samschultzponsys, 2026-11-23: v12.8 (instant results from the index while the full search runs; 4 GB per user). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -94,7 +95,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **12.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **12.8**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -849,9 +850,9 @@ environment.
 | `DREYMAIL_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
 | `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
 | `DREYMAIL_CACHE_MESSAGES` | no | `20000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
-| `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `5000` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
+| `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `10000` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
 | `DREYMAIL_CACHE_MAX_BODY_MB` | no | `1` | Largest message whose content is kept (`0`: keep no message content). |
-| `DREYMAIL_CACHE_USER_MB` | no | `1024` | Space per user for their copy of mail, search index and stored messages, split across their mailboxes (12.3). |
+| `DREYMAIL_CACHE_USER_MB` | no | `4096` | Space per user for their copy of mail, search index and stored messages, split across their mailboxes (12.3). |
 | `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
 | `DREYMAIL_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
 | `LOG_LEVEL` | no | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
@@ -1052,7 +1053,7 @@ Asking the mail server for everything on every click is slow: one page of a fold
 IMAP round trips, and finding the rest of each conversation in the Sent folder means header
 searches that some servers are slow at. So DreyMail keeps a copy of the newest messages
 (`DREYMAIL_CACHE_MESSAGES`, 20000 by default) of each account's **INBOX** and **Sent** folder, and of
-the newest messages of **every other folder** (`DREYMAIL_CACHE_FOLDER_MESSAGES`, 5000 by default):
+the newest messages of **every other folder** (`DREYMAIL_CACHE_FOLDER_MESSAGES`, 10000 by default):
 sender, subject, snippet, flags and the headers that tie conversations together.
 
 The other folders are filled in the background, one at a time, as soon as a mailbox is added and
@@ -1068,9 +1069,11 @@ the index holds no words either. A word search of a folder whose copy holds all 
 all indexed, and unchanged on the server (one folder list with each folder's newest UID and
 message count tells), is answered from the index at once; other folders are searched by the mail
 server as before, and changed ones are brought up to date in the background. Settings → Search
-and storage shows how many folders of each mailbox are searched instantly. Searches match whole words, with simple English endings ("printer" finds "printers").
+and storage shows how many folders of each mailbox are searched instantly. Every word search
+first shows what the index finds, at once (newest mail is indexed first), with "still searching
+all your mail" until the full search's results replace it. Searches match whole words, with simple English endings ("printer" finds "printers").
 
-**Space.** Each user has `DREYMAIL_CACHE_USER_MB` (1024 by default; Settings → Server) for their
+**Space.** Each user has `DREYMAIL_CACHE_USER_MB` (4096 by default; Settings → Server) for their
 copy, index and stored messages, split across their mailboxes evenly, or by the shares they choose
 in Settings → Search and storage, which also shows each mailbox's space and how far it is indexed.
 Stored message content gives way first (the least recently read); the index stops growing when a

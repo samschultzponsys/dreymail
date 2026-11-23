@@ -165,6 +165,10 @@ describe('filling the index', () => {
     const list = await mail.listMessages('u1', [{ accountId: 'a1', folder: 'INBOX' }], null, 20, { text: 'Word42', unread: false });
     expect(list.errors).toEqual([]);
     expect(list.messages.map((m) => m.uid)).toEqual([42]);
+    // 12.8: a quick search answers from the index alone, marked partial.
+    const quick = await mail.listMessages('u1', [{ accountId: 'a1', folder: 'INBOX' }], null, 20, { text: 'word7', unread: false }, { quick: true });
+    expect(quick).toMatchObject({ partial: true, errors: [] });
+    expect(quick.messages.map((m) => m.uid)).toEqual([7]);
     const common = await mail.listMessages('u1', [{ accountId: 'a1', folder: 'INBOX' }], null, 20, { text: 'quarterly', unread: false });
     expect(common.messages).toHaveLength(20);
     expect(common.cursor).not.toBeNull();

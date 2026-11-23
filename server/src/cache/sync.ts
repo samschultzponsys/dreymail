@@ -26,7 +26,7 @@ export const WARM_MAX_AGE_MS = 10 * 60_000;
 /** At most this many other folders per mailbox are cached (the special ones first). */
 export const WARM_MAX_FOLDERS = 100;
 /** Messages read per round when filling the search index, and how much of each (DreyMail 12.3). */
-const INDEX_BATCH = 25;
+const INDEX_BATCH = 50;
 export const INDEX_BYTES = 96 * 1024;
 /** SQLite result codes for a damaged database file: SQLITE_IOERR, SQLITE_CORRUPT, SQLITE_NOTADB. */
 const DAMAGED = new Set([10, 11, 26]);
@@ -577,7 +577,7 @@ export class CacheSync {
             }
           }
           this.enforceBudget(userId, accountId);
-          await sleep(50);
+          await sleep(20);
         }
       } while (state.again && !this.stopped);
     })()

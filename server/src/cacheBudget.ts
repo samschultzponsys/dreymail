@@ -10,7 +10,7 @@ import type { CacheSplit } from '../../shared/types.js';
 import type { Store } from './db.js';
 import { storedServerSettings } from './serverSettings.js';
 
-export const DEFAULT_USER_MB = 1024;
+export const DEFAULT_USER_MB = 4096;
 const MB = 1024 * 1024;
 
 /** Each mailbox's fraction of the allowance: even, or the chosen shares (mailboxes left out get none). */

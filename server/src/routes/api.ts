@@ -810,6 +810,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
           filter: z.string().max(4000).optional(),
           // 1: the user asked to refresh, so the cache must check with the IMAP server first.
           fresh: z.enum(['0', '1']).optional(),
+          // 1: a quick word search from the search index only (DreyMail 12.8).
+          quick: z.enum(['0', '1']).optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),
         })
         .parse(req.query);
@@ -832,7 +834,12 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         sources = picked.map((accountId) => ({ accountId, folder: 'INBOX' }));
       }
       const limit = q.limit ?? req.user!.preferences.pageSize;
-      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1' });
+      // The browser leaving (another folder, the search cleared) stops a long search (DreyMail 12.8).
+      const gone = new AbortController();
+      reply.raw.on('close', () => {
+        if (!reply.raw.writableFinished) gone.abort();
+      });
+      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1', quick: q.quick === '1', signal: gone.signal });
       const until = snoozedUntil(userId);
       const follow = deps.followups?.lookup(userId);
       for (const m of [...list.messages, ...list.related]) {

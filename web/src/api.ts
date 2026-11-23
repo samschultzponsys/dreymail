@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-16: sidebar order.
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: a locked device (423) shows the lock screen.
+// Modified by samschultzponsys, 2026-11-23: quick searches (quick=1).
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -53,7 +54,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+export async function request<T>(method: string, url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { 'x-dreymail': '1' };
   let payload: BodyInit | undefined;
   if (body instanceof FormData) payload = body;
@@ -61,7 +62,7 @@ export async function request<T>(method: string, url: string, body?: unknown): P
     headers['content-type'] = 'application/json';
     payload = JSON.stringify(body);
   }
-  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin' });
+  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal });
   if (!res.ok) {
     let msg = res.statusText;
     let stale = false;
@@ -205,7 +206,7 @@ export const api = {
     freshUntil = Date.now() + 5000;
   },
 
-  messages: (sel: MailboxSel, cursor: string | null, q: string, unread: boolean, filter = '') => {
+  messages: (sel: MailboxSel, cursor: string | null, q: string, unread: boolean, filter = '', quick = false, signal?: AbortSignal) => {
     const p = new URLSearchParams();
     if (sel.accountId) {
       p.set('accountId', sel.accountId);
@@ -215,8 +216,10 @@ export const api = {
     if (q) p.set('q', q);
     if (unread) p.set('unread', '1');
     if (filter) p.set('filter', filter);
-    if (!cursor && Date.now() < freshUntil) p.set('fresh', '1');
-    return request<ListResponse>('GET', `/api/messages?${p.toString()}`);
+    if (quick) p.set('quick', '1');
+    else if (!cursor && Date.now() < freshUntil) p.set('fresh', '1');
+    // A search left (another folder opened, the box cleared) is cancelled, so the server stops it (DreyMail 12.8).
+    return request<ListResponse>('GET', `/api/messages?${p.toString()}`, undefined, signal);
   },
   /** auto: the server applies the sender-domain allowlist; load / block: override it. */
   message: (r: MessageRef, remote: RemoteMode) =>

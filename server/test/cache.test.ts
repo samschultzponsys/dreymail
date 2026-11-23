@@ -265,7 +265,7 @@ describe('mail cache settings', () => {
   const base = { DREYMAIL_SECRET_KEY: secret(), DREYMAIL_DEV_LOGIN: 'true' };
 
   it('is on by default with 20000 messages per folder (12.3), 1 MB per message and 200 MB per account', () => {
-    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 20000, messagesPerOtherFolder: 5000, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
+    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 20000, messagesPerOtherFolder: 10000, maxBodyBytes: 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
   });
 
   it('can be switched off or sized by the administrator', () => {

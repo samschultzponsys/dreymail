@@ -38,7 +38,7 @@
 // Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
 // Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule; search everything, per mailbox.
 
-import { encodeFilters, type SavedSearch } from '../../shared/search';
+import { encodeFilters, filterCount, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AccountView, AttachmentView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary, TopFolder } from '../../shared/types';
@@ -72,7 +72,7 @@ import { TasksPage } from './components/TasksPage';
 import { AppLock } from './components/AppLock';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
-import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useSavedSearches, useTheme, useToasts, type NotifyEvent, type ReminderEvent, type SnoozeEndedEvent } from './hooks';
+import { useAccounts, useFolders, useLiveUpdates, useMe, useMessageAction, useMessages, useQuickSearch, useSavedSearches, useTheme, useToasts, type NotifyEvent, type ReminderEvent, type SnoozeEndedEvent } from './hooks';
 import { PENDING_MAILTO_KEY, parseMailto } from './mailto';
 import { blankComposer, composerFor, composerForMailto } from './replies';
 import { useRouter, type Location } from './router';
@@ -257,6 +257,10 @@ export function App() {
   })();
   const filterParam = encodeFilters(route.filters);
   const messagesQ = useMessages(effectiveSel, query, route.unread, loggedIn && accounts.length > 0, filterParam);
+  // Word searches (DreyMail 12.8): DreyMail's own index answers at once; shown until the full search,
+  // which asks the mail servers, has its first page.
+  const quickQ = useQuickSearch(effectiveSel, query, route.unread, loggedIn && accounts.length > 0 && filterCount(route.filters) === 0, filterParam);
+  const showQuick = !!query && !messagesQ.data && !!quickQ.data && quickQ.data.messages.length > 0;
   const savedSearches = useSavedSearches(loggedIn);
   const assistantStatus = useQuery({ queryKey: ['ai', 'status'], queryFn: api.assistantStatus, enabled: loggedIn, staleTime: 60_000 });
   const scheduledQ = useScheduled(loggedIn);
@@ -278,7 +282,7 @@ export function App() {
     reviewShown.current = true;
     setAssistantFor({ id, tab: 'learning' });
   }, [reviews.data, accounts]);
-  const serverMessages = useMemo(() => messagesQ.data?.pages.flatMap((p) => p.messages) ?? [], [messagesQ.data]);
+  const serverMessages = useMemo(() => (showQuick ? quickQ.data!.messages : (messagesQ.data?.pages.flatMap((p) => p.messages) ?? [])), [messagesQ.data, showQuick, quickQ.data]);
 
   // "Unread only": messages read in this view stay listed (dimmed) until the view changes or is
   // refreshed. Both the sticky keys and the last shown list are tied to the current view.
@@ -931,7 +935,8 @@ export function App() {
         accounts={accountMap}
         folders={folders.data}
         messages={rows}
-        loading={messagesQ.isLoading && accounts.length > 0}
+        loading={messagesQ.isLoading && accounts.length > 0 && !showQuick}
+        searchingMore={showQuick}
         fetchingMore={messagesQ.isFetchingNextPage}
         hasMore={!!messagesQ.hasNextPage}
         errors={listErrors}

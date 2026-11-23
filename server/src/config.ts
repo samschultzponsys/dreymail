@@ -191,7 +191,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cache: CacheConfig | null = bool(env.DREYMAIL_CACHE, true)
     ? {
         messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 20000),
-        messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 5000),
+        messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 10000),
         maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 1) * 1024 * 1024),
         bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
       }

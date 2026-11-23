@@ -202,6 +202,8 @@ export interface ListResponse {
   /** Accounts that could not be queried, with a human-readable reason. */
   /** Mailboxes (and, for searches of many folders, the folder: DreyMail 12.6) that couldn't be read. */
   errors: { accountId: string; folder?: string; error: string }[];
+  /** Only what DreyMail's copy holds (a quick search; the full one follows) (DreyMail 12.8). */
+  partial?: boolean;
   /** True if the server noticed a UIDVALIDITY change and the client should reload. */
   reset: boolean;
 }
