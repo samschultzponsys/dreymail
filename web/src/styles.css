@@ -1504,3 +1504,14 @@ body.resizing iframe { pointer-events: none; }
 .cal-allow { padding: 4px 0 2px 4px; }
 .banner.searching-more { display: flex; align-items: center; gap: 8px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
 .spinner.small { width: 14px; height: 14px; border-width: 2px; }
+
+/* Each message's own buttons as a bar at its top, staying in view while it scrolls (DreyMail 12.9). */
+.msg-actionbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; margin-bottom: 4px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.msg-actionbar .msg-action { display: inline-flex; align-items: center; gap: 6px; }
+.msg-actionbar.size-small .msg-action { height: 28px; padding: 0 8px; font-size: 12.5px; }
+.msg-actionbar.size-medium .msg-action { height: 34px; padding: 0 12px; font-size: 13.5px; }
+.msg-actionbar.size-large .msg-action { height: 44px; padding: 0 16px; font-size: 15px; }
+.msg-actionbar .msg-action:first-child { border-color: var(--accent); }
+.btn-order { display: inline-flex; gap: 2px; margin-left: auto; }
+.btn-order .icon-btn { width: 24px; height: 24px; }
+.msg-button-row { display: flex; align-items: center; gap: 8px; }

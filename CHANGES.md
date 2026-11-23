@@ -13,6 +13,17 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-23 (v12.9): each message's buttons, your way
+
+- **Settings → General → Buttons on each message:** tick the buttons (Reply, Reply all, Forward,
+  Mark read/unread, Flag, Archive, Delete), put them in any order (arrows), and choose where:
+  a bar at the top of the message that stays in view while it scrolls (the new default; small,
+  medium or large, with or without names) or the small icons beside the date as before. New
+  preference `messageButtonStyle`; the order of `messageButtons` is now kept.
+- **Files:** `shared/types.ts`, `server/src/routes/api.ts`, `web/src/components/Reader.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/App.tsx`, `web/src/styles.css`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-23 (v12.8): instant search results; more space
 
 - **Quick results:** every word search (no other filters) first asks the search index alone

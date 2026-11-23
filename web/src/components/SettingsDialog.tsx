@@ -38,15 +38,15 @@
 // Modified by samschultzponsys, 2026-11-19: Android: notifications as conversations (the mailbox's icon on the left); which icon on each side.
 // Modified by samschultzponsys, 2026-11-21: the Backup tab.
 // Modified by samschultzponsys, 2026-11-22: opens on a given tab (the search at the top); images in all mail, or from everyone you know.
-// Modified by samschultzponsys, 2026-11-23: the Search and storage tab.
+// Modified by samschultzponsys, 2026-11-23: the Search and storage tab; each message's buttons: order, place and size.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Permission } from '../../../shared/permissions';
-import { DEFAULT_MESSAGE_BUTTONS, type DomainName, type Me, type MessageButton, type NotificationContent, type Preferences, type SwipeAction, type TransitionSpeed } from '../../../shared/types';
+import { DEFAULT_MESSAGE_BUTTON_STYLE, DEFAULT_MESSAGE_BUTTONS, MESSAGE_BUTTONS, type MessageButtonStyle, type DomainName, type Me, type MessageButton, type NotificationContent, type Preferences, type SwipeAction, type TransitionSpeed } from '../../../shared/types';
 import { api } from '../api';
 import { desktopBridge, mailboxNotificationIcon } from '../desktop';
 import { effectiveUiScale, saveUiScale, savedUiScale, UI_SCALES, type UiScale } from '../uiScale';
@@ -300,33 +300,16 @@ export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onC
           )}
           {tab === 'general' && (
             <div>
-              <label className="label">Buttons pinned to each message</label>
-              <div className="check-list">
-                {(
-                  [
-                    ['reply', 'Reply'],
-                    ['replyAll', 'Reply all'],
-                    ['forward', 'Forward'],
-                    ['seen', 'Mark read / unread'],
-                    ['flag', 'Flag'],
-                    ['archive', 'Archive'],
-                    ['delete', 'Delete'],
-                  ] as [MessageButton, string][]
-                ).map(([b, label]) => {
-                  const pinned = v.messageButtons ?? DEFAULT_MESSAGE_BUTTONS;
-                  return (
-                    <label key={b} className="check">
-                      <input
-                        type="checkbox"
-                        checked={pinned.includes(b)}
-                        onChange={(e) => void save({ ...v, messageButtons: e.target.checked ? [...pinned, b] : pinned.filter((x) => x !== b) })}
-                      />{' '}
-                      {label}
-                    </label>
-                  );
-                })}
+              <label className="label">Buttons on each message</label>
+              <MessageButtonsEditor
+                buttons={v.messageButtons ?? DEFAULT_MESSAGE_BUTTONS}
+                style={v.messageButtonStyle ?? DEFAULT_MESSAGE_BUTTON_STYLE}
+                onChange={(messageButtons, messageButtonStyle) => void save({ ...v, messageButtons, messageButtonStyle })}
+              />
+              <div className="hint">
+                They act on that message only (the bar above the reader acts on the whole conversation). Tick the ones you want and use the arrows for their order;
+                the bar stays at the top of the message while you scroll it.
               </div>
-              <div className="hint">Small buttons in the header of every opened message (also single messages and each message of a conversation) that act on that message only. The bar at the top acts on the whole conversation; the arrow at its right end makes its buttons bigger, with names.</div>
             </div>
           )}
           {tab === 'general' && (
@@ -1121,6 +1104,67 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
       </div>
       {!desktop && !android && <EmailLinks />}
     </>
+  );
+}
+
+const BUTTON_NAMES: Record<MessageButton, string> = { reply: 'Reply', replyAll: 'Reply all', forward: 'Forward', seen: 'Mark read / unread', flag: 'Flag', archive: 'Archive', delete: 'Delete' };
+
+/** Settings → General: which buttons each message has, their order, where and how big (DreyMail 12.9). */
+function MessageButtonsEditor({ buttons, style, onChange }: { buttons: MessageButton[]; style: MessageButtonStyle; onChange: (b: MessageButton[], s: MessageButtonStyle) => void }) {
+  // Chosen ones first, in their order; then the rest.
+  const all = [...buttons, ...MESSAGE_BUTTONS.filter((b) => !buttons.includes(b))];
+  const move = (b: MessageButton, by: number) => {
+    const i = buttons.indexOf(b);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= buttons.length) return;
+    const next = [...buttons];
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    onChange(next, style);
+  };
+  return (
+    <div className="stack">
+      <div className="check-list">
+        {all.map((b) => {
+          const on = buttons.includes(b);
+          const i = buttons.indexOf(b);
+          return (
+            <div key={b} className="msg-button-row">
+              <label className="check">
+                <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked ? [...buttons, b] : buttons.filter((x) => x !== b), style)} /> {BUTTON_NAMES[b]}
+              </label>
+              {on && (
+                <span className="btn-order">
+                  <button className="icon-btn" title="Earlier" aria-label={`Move ${BUTTON_NAMES[b]} earlier`} disabled={i === 0} onClick={() => move(b, -1)}>
+                    <ChevronUp size={14} />
+                  </button>
+                  <button className="icon-btn" title="Later" aria-label={`Move ${BUTTON_NAMES[b]} later`} disabled={i === buttons.length - 1} onClick={() => move(b, 1)}>
+                    <ChevronDown size={14} />
+                  </button>
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="cal-when-row">
+        <select className="select" aria-label="Where" value={style.place} onChange={(e) => onChange(buttons, { ...style, place: e.target.value as MessageButtonStyle['place'] })}>
+          <option value="bar">A bar at the top of the message</option>
+          <option value="header">Small icons beside the date</option>
+        </select>
+        {style.place === 'bar' && (
+          <>
+            <select className="select" aria-label="Size" value={style.size} onChange={(e) => onChange(buttons, { ...style, size: e.target.value as MessageButtonStyle['size'] })}>
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <label className="check">
+              <input type="checkbox" checked={style.labels} onChange={(e) => onChange(buttons, { ...style, labels: e.target.checked })} /> Names
+            </label>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

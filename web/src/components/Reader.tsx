@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-17: attached pictures open in an image viewer; a download arrow on their chip.
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of the message.
 // Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing; follow-up flags.
+// Modified by samschultzponsys, 2026-11-23: each message's buttons as a bar at its top that stays in view, in your order and size.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -52,7 +53,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ConversationRow } from '../../../shared/threads';
-import { DEFAULT_MESSAGE_BUTTONS, type AccountFolders, type AccountView, type AttachmentView, type DomainName, type MessageAction, type MessageButton, type MessageDetail, type MessageRef, type MessageSummary } from '../../../shared/types';
+import { DEFAULT_MESSAGE_BUTTONS, type AccountFolders, type AccountView, type AttachmentView, type DomainName, type MessageAction, type MessageButton, type MessageDetail, type MessageRef, type MessageSummary, DEFAULT_MESSAGE_BUTTON_STYLE, type MessageButtonStyle } from '../../../shared/types';
 import { api, ApiError } from '../api';
 import type { ResolvedTheme } from '../hooks';
 import { displayName, formatFullDate, formatListDate, formatSize, refKey, toRef } from '../util';
@@ -147,6 +148,8 @@ interface Props {
   onGone: (stale: boolean) => void;
   /** Buttons pinned to each message of a conversation (Settings → General). */
   messageButtons?: MessageButton[];
+  /** Where and how big they are (DreyMail 12.9). */
+  messageButtonStyle?: MessageButtonStyle;
 }
 
 /** The toolbar's size, per device: compact icons, or larger buttons with their names. */
@@ -174,7 +177,7 @@ function useBigToolbar(): [boolean, (big: boolean) => void] {
 
 const retry = (n: number, err: Error) => !(err instanceof ApiError && err.status < 500) && n < 1;
 
-export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone, messageButtons = DEFAULT_MESSAGE_BUTTONS }: Props) {
+export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone, messageButtons = DEFAULT_MESSAGE_BUTTONS, messageButtonStyle = DEFAULT_MESSAGE_BUTTON_STYLE }: Props) {
   const [bigToolbar, setBigToolbar] = useBigToolbar();
   const key = openRef ? refKey(openRef) : '';
   const [busy, setBusy] = useState(false);
@@ -369,6 +372,7 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
               onMailto={onMailto}
               onGone={k === key ? onGone : undefined}
               buttons={isDrafts ? [] : messageButtons}
+              buttonStyle={messageButtonStyle}
               onReply={replyWith}
             />
           );
@@ -481,7 +485,6 @@ export function AttachmentChip({
 
 /** One message of the open conversation: just a summary line when collapsed. */
 /** The order pinned buttons appear in, whatever order they were picked in. */
-const MESSAGE_BUTTON_ORDER: MessageButton[] = ['reply', 'replyAll', 'forward', 'seen', 'flag', 'archive', 'delete'];
 
 function MessageCard({
   msgRef,
@@ -498,6 +501,7 @@ function MessageCard({
   onMailto,
   onGone,
   buttons = [],
+  buttonStyle = DEFAULT_MESSAGE_BUTTON_STYLE,
   onReply,
 }: {
   msgRef: MessageRef;
@@ -517,6 +521,7 @@ function MessageCard({
   onGone?: (stale: boolean) => void;
   /** Small buttons in this message's header, acting on this message. */
   buttons?: MessageButton[];
+  buttonStyle?: MessageButtonStyle;
   onReply?: (kind: ReplyKind, detail: MessageDetail) => void;
 }) {
   const [remote, setRemote] = useState(false);
@@ -585,6 +590,28 @@ function MessageCard({
     </div>
   );
 
+  // This message's own buttons (Settings → General), in the chosen order; each acts on this message only.
+  const iconSize = buttonStyle.size === 'large' ? 20 : buttonStyle.size === 'medium' ? 17 : 15;
+  const messageButton = (b: MessageButton, className: string, withLabel: boolean) => {
+    if (!d) return null;
+    const act: Record<MessageButton, { title: string; icon: ReactNode; run: () => void }> = {
+      reply: { title: 'Reply', icon: <Reply size={iconSize} />, run: () => onReply?.('reply', d) },
+      replyAll: { title: 'Reply all', icon: <ReplyAll size={iconSize} />, run: () => onReply?.('replyAll', d) },
+      forward: { title: 'Forward', icon: <Forward size={iconSize} />, run: () => onReply?.('forward', d) },
+      archive: { title: 'Archive', icon: <Archive size={iconSize} />, run: () => onAction([msgRef], { type: 'archive' }) },
+      delete: { title: 'Delete', icon: <Trash2 size={iconSize} />, run: () => onAction([msgRef], { type: 'delete' }) },
+      flag: { title: d.flagged ? 'Unflag' : 'Flag', icon: <Flag size={iconSize} fill={d.flagged ? 'currentColor' : 'none'} />, run: () => onAction([msgRef], { type: 'flagged', value: !d.flagged }) },
+      seen: { title: d.seen ? 'Mark unread' : 'Mark read', icon: d.seen ? <Mail size={iconSize} /> : <MailOpen size={iconSize} />, run: () => onAction([msgRef], { type: 'seen', value: !d.seen }) },
+    };
+    const a = act[b];
+    return (
+      <button key={b} className={className} title={`${a.title} (this message)`} aria-label={a.title} onClick={a.run}>
+        {a.icon}
+        {withLabel && <span>{a.title}</span>}
+      </button>
+    );
+  };
+
   return (
     <article className="msg-card">
       {q.isLoading && (
@@ -595,6 +622,12 @@ function MessageCard({
       {q.error && <div className="banner error">{(q.error as Error).message}</div>}
       {d && (
         <>
+          {buttons.length > 0 && buttonStyle.place === 'bar' && (
+            // A bar at the top of the message that stays in view while it scrolls (DreyMail 12.9).
+            <div className={`msg-actionbar size-${buttonStyle.size}`} role="toolbar" aria-label="This message">
+              {buttons.map((b) => messageButton(b, 'btn msg-action', buttonStyle.labels))}
+            </div>
+          )}
           {/* In a conversation, clicking the header folds the message away again. */}
           <div className={`msg-head ${headOpen ? 'open' : ''} ${onToggle ? 'foldable' : ''}`} onClick={onToggle}>
             <Avatar address={d.from[0]} photos={contactPhotos} />
@@ -630,26 +663,10 @@ function MessageCard({
               </div>
             </div>
             <div className="msg-date">{formatFullDate(d.date)}</div>
-            {buttons.length > 0 && (
+            {buttons.length > 0 && buttonStyle.place === 'header' && (
               // Pinned in Settings → General; they act on this message only.
               <div className="msg-buttons" onClick={(e) => e.stopPropagation()}>
-                {MESSAGE_BUTTON_ORDER.filter((b) => buttons.includes(b)).map((b) => {
-                  const act: Record<MessageButton, { title: string; icon: ReactNode; run: () => void }> = {
-                    reply: { title: 'Reply', icon: <Reply size={15} />, run: () => onReply?.('reply', d) },
-                    replyAll: { title: 'Reply all', icon: <ReplyAll size={15} />, run: () => onReply?.('replyAll', d) },
-                    forward: { title: 'Forward', icon: <Forward size={15} />, run: () => onReply?.('forward', d) },
-                    archive: { title: 'Archive', icon: <Archive size={15} />, run: () => onAction([msgRef], { type: 'archive' }) },
-                    delete: { title: 'Delete', icon: <Trash2 size={15} />, run: () => onAction([msgRef], { type: 'delete' }) },
-                    flag: { title: d.flagged ? 'Unflag' : 'Flag', icon: <Flag size={15} fill={d.flagged ? 'currentColor' : 'none'} />, run: () => onAction([msgRef], { type: 'flagged', value: !d.flagged }) },
-                    seen: { title: d.seen ? 'Mark unread' : 'Mark read', icon: d.seen ? <Mail size={15} /> : <MailOpen size={15} />, run: () => onAction([msgRef], { type: 'seen', value: !d.seen }) },
-                  };
-                  const a = act[b];
-                  return (
-                    <button key={b} className="icon-btn small" title={`${a.title} (this message)`} aria-label={a.title} onClick={a.run}>
-                      {a.icon}
-                    </button>
-                  );
-                })}
+                {buttons.map((b) => messageButton(b, 'icon-btn small', false))}
               </div>
             )}
           </div>

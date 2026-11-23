@@ -387,6 +387,15 @@ export type FooterIdentity = 'both' | 'name' | 'photo';
 export type MessageButton = 'reply' | 'replyAll' | 'forward' | 'archive' | 'delete' | 'flag' | 'seen';
 export const MESSAGE_BUTTONS: readonly MessageButton[] = ['reply', 'replyAll', 'forward', 'archive', 'delete', 'flag', 'seen'];
 export const DEFAULT_MESSAGE_BUTTONS: MessageButton[] = ['reply', 'replyAll', 'forward', 'delete'];
+/** Where and how big each message's buttons are (DreyMail 12.9). */
+export interface MessageButtonStyle {
+  /** 'bar': a bar at the top of the message that stays in view; 'header': small icons beside the date. */
+  place: 'bar' | 'header';
+  size: 'small' | 'medium' | 'large';
+  /** Names next to the icons. */
+  labels: boolean;
+}
+export const DEFAULT_MESSAGE_BUTTON_STYLE: MessageButtonStyle = { place: 'bar', size: 'medium', labels: true };
 
 /** How a user's cache space is split across their mailboxes (DreyMail 12.3): evenly, or by shares (percent). */
 export interface CacheSplit {
@@ -439,6 +448,8 @@ export interface Preferences {
   sidebarSearches: boolean;
   /** Buttons pinned to each message's header in a conversation (DreyMail). */
   messageButtons: MessageButton[];
+  /** Where and how big they are (DreyMail 12.9). */
+  messageButtonStyle?: MessageButtonStyle;
   /** Whose addresses are suggested when writing (DreyMail): all mailboxes, the sending one, its group, or chosen ones. */
   suggestScope: SuggestScope;
   /** The mailboxes for suggestScope 'chosen'. */

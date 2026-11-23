@@ -1037,6 +1037,7 @@ export function App() {
         markReadOnOpen={me.data!.preferences.markReadOnOpen}
         contactPhotos={me.data!.preferences.contactPhotos}
         messageButtons={me.data!.preferences.messageButtons}
+        messageButtonStyle={me.data!.preferences.messageButtonStyle}
         onAction={(refs, a) => void act(refs, a)}
         snoozeSignal={snoozeSignal}
         onReply={reply}
