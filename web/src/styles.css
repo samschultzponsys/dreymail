@@ -47,7 +47,8 @@
    Modified by samschultzponsys, 2026-11-19: no pin buttons over the counts on touch screens.
    Modified by samschultzponsys, 2026-11-22: search scope, mailbox search boxes, the search at the top.
    Modified by samschultzponsys, 2026-11-23: rows show their mailbox in lists of several mailboxes.
-   Modified by samschultzponsys, 2026-11-24: phones: reader toolbar in one scrolling row with a clear Back; message buttons as large, highlighted icons. */
+   Modified by samschultzponsys, 2026-11-24: phones: reader toolbar in one scrolling row with a clear Back; message buttons as large, highlighted icons.
+   Modified by samschultzponsys, 2026-11-24: the quoted message in the composer on a white sheet in dark mode. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -538,6 +539,12 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 .editor { flex: 1; overflow-y: auto; position: relative; contain: layout paint; transform: translateZ(0); }
 .editor-content { min-height: 100%; padding: 14px 16px; outline: none; font-size: 14.5px; line-height: 1.55; word-break: break-word; }
 .editor-content blockquote { margin: 8px 0 8px 2px; padding-left: 12px; border-left: 3px solid var(--border-strong); color: var(--text-2); }
+/* The quoted message in dark mode (DreyMail 13.4): on a white sheet, like the reader's Paper view, so
+   its own colors (dark text, colored signatures, logos) stay readable. Only how it shows here: what
+   is sent is unchanged. */
+[data-theme='dark'] .editor-content blockquote { background: #ffffff; color: #1d1f23; border-left-color: var(--accent-fill); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 10px 14px; }
+[data-theme='dark'] .editor-content blockquote a { color: #1a5fd0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .editor-content blockquote { background: #ffffff; color: #1d1f23; border-left-color: var(--accent-fill); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 10px 14px; } }
 .editor-content img { max-width: 100%; }
 .composer-attachments { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; border-top: 1px solid var(--border); }
 .composer-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }

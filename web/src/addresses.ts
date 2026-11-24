@@ -3,9 +3,13 @@
 
 // The To, Cc and Bcc fields stay comma-separated text (what drafts, replies and sending use); this
 // splits that text into finished addresses (shown as bubbles) and the one being typed.
+// DreyMail 13.4: names in quotes may hold commas ("Last, First" <…>).
 
-/** "a@b.example" or "Name <a@b.example>". */
-const ADDRESS = /^(?:[^<>,;]*<\s*)?[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+(?:\s*>)?$/;
+/**
+ * "a@b.example", "Name <a@b.example>" or "\"Last, First\" <a@b.example>" (DreyMail 13.4: a quoted
+ * name may hold commas, as Outlook's "Last, First" names do).
+ */
+const ADDRESS = /^(?:(?:"[^"]*"|[^<>,;"]*)\s*<\s*)?[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+(?:\s*>)?$/;
 
 export function isAddress(token: string): boolean {
   const t = token.trim();
@@ -16,7 +20,21 @@ export function isAddress(token: string): boolean {
 
 /** Finished entries (everything before the last comma) and what is being typed after it. */
 export function splitAddresses(value: string): { done: string[]; draft: string } {
-  const parts = value.split(/[,;]/);
+  // Commas and semicolons inside a quoted name or <…> don't end an entry.
+  const parts: string[] = [];
+  let cur = '';
+  let quoted = false;
+  let angle = false;
+  for (const ch of value) {
+    if (ch === '"' && !angle) quoted = !quoted;
+    else if (ch === '<' && !quoted) angle = true;
+    else if (ch === '>' && !quoted) angle = false;
+    if ((ch === ',' || ch === ';') && !quoted && !angle) {
+      parts.push(cur);
+      cur = '';
+    } else cur += ch;
+  }
+  parts.push(cur);
   const draft = parts.pop() ?? '';
   return { done: parts.map((p) => p.trim()).filter(Boolean), draft: draft.replace(/^\s+/, '') };
 }

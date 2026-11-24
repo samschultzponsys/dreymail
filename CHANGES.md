@@ -13,6 +13,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.4): "Last, First" names; quoted mail in the dark composer
+
+- **Fix:** recipients whose name is in quotes with a comma (Outlook's "Estomo, Toni" <…>) were
+  split at the comma into two bubbles, shown red as invalid (`"Estomo` and `Toni`). The To, Cc and
+  Bcc fields now ignore commas inside quotes and <…>, and such names count as valid. Sending was
+  never affected (the server parses addresses properly), but removing or editing such a bubble
+  could break the line.
+- **The quoted message in the composer** shows on a white sheet in dark mode, like the reader's
+  Paper view, so its own colors (dark text, colored signatures, logos) stay readable. What is
+  sent is unchanged.
+- **Files:** `web/src/addresses.ts`, `web/src/styles.css`, `web/test/addresses.test.ts`,
+  `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.3): messages show without waiting for their pictures; a message to guests
 
 - **Faster opening of picture-heavy mail:** a message with images to load waited up to 5 s for
