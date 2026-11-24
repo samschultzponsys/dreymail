@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.6): opening mail and lists from the copy
+
+- **Opening a message without the mail server:** filling the search index already downloaded
+  most of each message and threw it away; it now downloads each whole message (up to
+  `DREYMAIL_CACHE_MAX_BODY_MB`) and keeps it as its content, so opening it is answered from the
+  copy. Messages indexed before 13.6 get theirs afterwards, newest first, while the mailbox has
+  room. When space runs short, the oldest mail's content goes first (each counts as last read
+  when it arrived), not the newest's.
+- **No more stalls while indexing:** the space each mailbox uses (which counts the whole word
+  index) was measured several times a second; it is now remembered for 20 seconds.
+- **Lists show sooner:** a folder's list waits at most 0.4 s (was 1.5 s) for the check with the
+  mail server; what a slower check finds reaches the list by itself.
+- **Files:** `server/src/cache/sync.ts`, `server/src/cache/store.ts`,
+  `server/test/searchIndex.test.ts`, `server/test/integration/cache.test.ts`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.5): Outlook invitations keep their line breaks
 
 - **Fix:** an Outlook event's message to guests was sent to Microsoft as plain text; on the way

@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-24: messages are kept whole while indexed: even the first open needs no mail server.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -229,9 +230,9 @@ describe('mail cache', () => {
     await settled(hedy);
     const lunch = (await list(hedy)).messages.find((m) => m.subject === 'Lunch on Friday?')!;
     const ref = `accountId=${hedy.id}&folder=INBOX&uid=${lunch.uid}&uidValidity=${lunch.uidValidity}`;
-    // Read messages aren't loaded ahead: the first time goes to the server...
-    expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBeGreaterThan(0);
-    // ...the second time doesn't.
+    // Since 13.6 the whole message is kept while it is indexed: even the first time needs no mail
+    // server, and neither does the second.
+    expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
     expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
   });
 

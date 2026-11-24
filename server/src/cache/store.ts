@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-17: every other folder cached too (role 'folder').
 // Modified by samschultzponsys, 2026-11-17: space used per mailbox (Settings → Storage).
 // Modified by samschultzponsys, 2026-11-23: a search index (keyed hashes of words) for searching the cached mail.
+// Modified by samschultzponsys, 2026-11-24: space per account remembered a little while; arrival times for keeping the newest content.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -364,6 +365,7 @@ export class MailCache {
   }
 
   dropAccount(userId: string, accountId: string) {
+    this.usageMemo.delete(`${userId}\u0000${accountId}`);
     this.db.prepare('DELETE FROM folders WHERE user_id = ? AND account_id = ?').run(userId, accountId);
     this.db.prepare('DELETE FROM folder_lists WHERE user_id = ? AND account_id = ?').run(userId, accountId);
   }
@@ -718,6 +720,25 @@ export class MailCache {
     return { folders: rows.length, instant: rows.filter((r) => r.complete === 1 && r.i === r.n).length };
   }
 
+  /** Messages of the account small enough to keep whole whose content isn't stored, newest first (DreyMail 13.6). */
+  withoutBody(userId: string, accountId: string, maxBytes: number, limit: number): { folder: CachedFolder; uids: number[] }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.folder_id, m.uid FROM messages m JOIN folders f ON f.id = m.folder_id
+         WHERE f.user_id = ? AND f.account_id = ? AND m.size <= ? AND NOT EXISTS (SELECT 1 FROM bodies b WHERE b.folder_id = m.folder_id AND b.uid = m.uid)
+         ORDER BY m.sort_time DESC LIMIT ?`,
+      )
+      .all(userId, accountId, maxBytes, limit) as { folder_id: number; uid: number }[];
+    const byFolder = new Map<number, number[]>();
+    for (const r of rows) byFolder.set(r.folder_id, [...(byFolder.get(r.folder_id) ?? []), r.uid]);
+    const out: { folder: CachedFolder; uids: number[] }[] = [];
+    for (const [id, uids] of byFolder) {
+      const r = this.db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as FolderRow | undefined;
+      if (r) out.push({ folder: toFolder(r), uids });
+    }
+    return out;
+  }
+
   /** How much of a folder's cached mail is searchable by content. */
   indexState(f: CachedFolder): { messages: number; indexed: number } {
     const r = this.db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN indexed > 0 THEN 1 ELSE 0 END), 0) AS i FROM messages WHERE folder_id = ?').get(f.id) as { n: number; i: number };
@@ -742,7 +763,25 @@ export class MailCache {
   }
 
   /** Space an account takes (bytes): message summaries, stored content, and the index (estimated). */
-  accountBytes(userId: string, accountId: string): { messages: number; bodies: number; index: number; total: number; count: number; indexed: number } {
+  /** Space per account, remembered a little while (DreyMail 13.6): counting the index is a big scan. */
+  private readonly usageMemo = new Map<string, { at: number; value: ReturnType<MailCache['measureAccount']> }>();
+
+  accountBytes(userId: string, accountId: string, maxAgeMs = 20_000): { messages: number; bodies: number; index: number; total: number; count: number; indexed: number } {
+    const k = `${userId}\u0000${accountId}`;
+    const hit = this.usageMemo.get(k);
+    if (hit && Date.now() - hit.at < maxAgeMs) return hit.value;
+    const value = this.measureAccount(userId, accountId);
+    this.usageMemo.set(k, { at: Date.now(), value });
+    return value;
+  }
+
+  /** When a message arrived (ms), for keeping the newest content longest. */
+  sortTimeOf(f: CachedFolder, uid: number): number | null {
+    const r = this.db.prepare('SELECT sort_time FROM messages WHERE folder_id = ? AND uid = ?').get(f.id, uid) as { sort_time: number } | undefined;
+    return r ? r.sort_time : null;
+  }
+
+  private measureAccount(userId: string, accountId: string): { messages: number; bodies: number; index: number; total: number; count: number; indexed: number } {
     const m = this.db
       .prepare(
         `SELECT COUNT(*) AS n, COALESCE(SUM(length(m.data)), 0) AS bytes, COALESCE(SUM(CASE WHEN m.indexed > 0 THEN 1 ELSE 0 END), 0) AS i

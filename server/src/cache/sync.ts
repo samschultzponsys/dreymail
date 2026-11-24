@@ -6,6 +6,7 @@
 // Modified by samschultzponsys, 2026-11-18: Gmail labels fetched with message lists.
 // Modified by samschultzponsys, 2026-11-23: the search index filled in the background; space per mailbox from the user's share.
 // Modified by samschultzponsys, 2026-11-23: messages for the index read in worker threads, in parallel; requests of people using DreyMail go first.
+// Modified by samschultzponsys, 2026-11-24: whole messages kept while indexing (opening needs no mail server), newest kept longest; shorter wait before lists.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -21,7 +22,8 @@ export const FILL_CHUNK = 200;
 const PREFETCH_COUNT = 25;
 const PREFETCH_AMONG = 200;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
-export const LISTING_WAIT_MS = 1500;
+// DreyMail 13.6: 400 ms (was 1.5 s); what a slower check finds reaches the list by itself.
+export const LISTING_WAIT_MS = 400;
 const DEBOUNCE_MS = 300;
 /** Other folders synced longer ago than this are brought up to date again when a session opens (DreyMail). */
 export const WARM_MAX_AGE_MS = 10 * 60_000;
@@ -557,6 +559,7 @@ export class CacheSync {
           // Messages are read in worker threads, in parallel; between rounds, requests of people using
           // DreyMail go first.
           if (this.deps.busy?.()) await sleep(300);
+          const readBytes = Math.max(INDEX_BYTES, this.deps.config.maxBodyBytes);
           const batch = this.cache.unindexed(userId, accountId, INDEX_BATCH);
           if (!batch.length) break;
           for (const { folder: f, uids } of batch) {
@@ -570,7 +573,8 @@ export class CacheSync {
                   const mailbox = (client.mailbox || selected) as MailboxObject;
                   if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
                   const out = new Map<number, Buffer>();
-                  for (const m of await client.fetchAll(uids.join(','), { uid: true, source: { start: 0, maxLength: INDEX_BYTES } } as never, { uid: true })) if (m.source) out.set(m.uid, m.source);
+                  // The whole message where it fits (DreyMail 13.6): kept, so opening it needs no mail server.
+                  for (const m of await client.fetchAll(uids.join(','), { uid: true, source: { start: 0, maxLength: readBytes } } as never, { uid: true })) if (m.source) out.set(m.uid, m.source);
                   return out;
                 },
                 'sync',
@@ -578,9 +582,19 @@ export class CacheSync {
               .catch(() => null);
             // The folder can't be read now (or changed): try again after its next sync.
             if (!got) return;
+            // Whole messages are kept as their content, newest kept longest when space runs short
+            // (each counts as last read when it arrived).
+            for (const uid of uids) {
+              const raw = got.get(uid);
+              if (raw && raw.length < readBytes && raw.length <= this.deps.config.maxBodyBytes && !this.cache.hasBody(f, uid)) {
+                this.cache.putBody(f, uid, raw, this.cache.sortTimeOf(f, uid) ?? Date.now());
+              }
+            }
             const read = await Promise.all(
               uids.map(async (uid) => {
-                const raw = got.get(uid);
+                const full = got.get(uid);
+                // The words are in the first part of a message; attachments needn't be read whole.
+                const raw = full && full.length > INDEX_BYTES * 3 ? full.subarray(0, INDEX_BYTES * 3) : full;
                 if (!raw) return { uid, terms: null };
                 if (this.deps.termsOf) return { uid, terms: await this.deps.termsOf(raw).catch(() => null) };
                 const text = await this.deps.textOf!(raw).catch(() => null);
@@ -596,12 +610,57 @@ export class CacheSync {
           this.enforceBudget(userId, accountId);
           await sleep(50);
         }
+        // Then the content of the rest (indexed before 13.6 without keeping it), newest first,
+        // while the mailbox has room: opening them needs no mail server either.
+        await this.keepContent(userId, accountId);
       } while (state.again && !this.stopped);
     })()
       .catch((err: unknown) => {
         this.deps.log?.('search index filling failed', { accountId, error: (err as Error).message });
       })
       .finally(() => this.indexing.delete(k));
+  }
+
+  /** Store the content of cached messages that don't have it yet, newest first, until the mailbox's space is used (DreyMail 13.6). */
+  private async keepContent(userId: string, accountId: string) {
+    const max = this.deps.config.maxBodyBytes;
+    if (max <= 0) return;
+    for (;;) {
+      if (this.stopped) return;
+      if (this.deps.busy?.()) await sleep(300);
+      const used = this.cache.accountBytes(userId, accountId, 5_000);
+      if (used.total >= this.budgetOf(userId, accountId) * 0.97) return;
+      const batch = this.cache.withoutBody(userId, accountId, max, INDEX_BATCH);
+      if (!batch.length) return;
+      let stored = 0;
+      for (const { folder: f, uids } of batch) {
+        const got = await this.deps.pool
+          .withMailbox(
+            userId,
+            accountId,
+            f.path,
+            async (client, selected) => {
+              const mailbox = (client.mailbox || selected) as MailboxObject;
+              if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
+              const out = new Map<number, Buffer>();
+              for (const m of await client.fetchAll(uids.join(','), { uid: true, source: true }, { uid: true })) if (m.source) out.set(m.uid, m.source);
+              return out;
+            },
+            'sync',
+          )
+          .catch(() => null);
+        if (!got) return;
+        for (const [uid, raw] of got) {
+          if (raw.length > max) continue;
+          this.cache.putBody(f, uid, raw, this.cache.sortTimeOf(f, uid) ?? Date.now());
+          stored++;
+        }
+      }
+      this.enforceBudget(userId, accountId);
+      // Nothing more could be kept (all too big, or gone): done for now.
+      if (!stored) return;
+      await sleep(50);
+    }
   }
 
   /** Whether an account's search index is being filled right now. */

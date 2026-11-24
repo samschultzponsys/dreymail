@@ -90,7 +90,8 @@
      Modified by samschultzponsys, 2026-11-24: v13.2 (conversations newest first; large highlighted message buttons on phones).
      Modified by samschultzponsys, 2026-11-24: v13.3 (messages show without waiting for their pictures; a message to guests).
      Modified by samschultzponsys, 2026-11-24: v13.4 ("Last, First" names stay one recipient; quoted mail readable in the dark composer).
-     Modified by samschultzponsys, 2026-11-24: v13.5 (Outlook invitations keep their line breaks; meeting IDs aren't codes). -->
+     Modified by samschultzponsys, 2026-11-24: v13.5 (Outlook invitations keep their line breaks; meeting IDs aren't codes).
+     Modified by samschultzponsys, 2026-11-24: v13.6 (messages kept whole while indexed; faster lists). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -102,7 +103,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **13.5**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **13.6**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1067,8 +1068,8 @@ The other folders are filled in the background, one at a time, as soon as a mail
 again whenever a session opens (folders not checked in the last 10 minutes; up to 100 folders per
 mailbox, Drafts, Archive, Junk and Trash first). This runs on a connection of its own, so it never
 holds up what you are doing. A folder you open before its turn starts filling right away. It also keeps the
-content of messages you have opened, and loads the newest unread ones ahead, up to
-`DREYMAIL_CACHE_MAX_BODY_MB` per message.
+whole content of messages (since 13.6 every message it indexes, newest first, so opening one
+needs no mail server), up to `DREYMAIL_CACHE_MAX_BODY_MB` per message.
 
 **Search index (12.3).** In the background DreyMail also reads each cached message once (at most
 96 KB of it, without marking it read; since 13.0 in worker threads, several at once, so the app

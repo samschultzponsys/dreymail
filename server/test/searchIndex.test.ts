@@ -96,7 +96,7 @@ describe('the index in the cache', () => {
 });
 
 describe('filling the index', () => {
-  function setup(n: number, budget: number) {
+  function setup(n: number, budget: number, maxBodyBytes = 0) {
     const cache = new MailCache(':memory:', keys());
     const body = (uid: number) => Buffer.from(`Subject: Message ${uid}\r\n\r\nBody word${uid} and the common word quarterly.\r\n`);
     const pool = {
@@ -118,6 +118,7 @@ describe('filling the index', () => {
           enabled: new Set<string>(),
           noop: async () => undefined,
           fetchAll: async (range: string, q: { source?: unknown }) => pick(range).map((m) => (q.source ? { ...m, source: body(m.uid) } : m)),
+          fetchOne: async (uid: string) => ({ ...msg(Number(uid)), source: body(Number(uid)) }),
           search: async (q: { uid: string }) => pick(q.uid).map((m) => m.uid),
         };
         return fn(client, mailbox);
@@ -126,7 +127,7 @@ describe('filling the index', () => {
     const sync = new CacheSync({
       cache,
       pool,
-      config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes: 0, bodyBytesPerAccount: 0 },
+      config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes, bodyBytesPerAccount: 0 },
       sentFolder: async () => null,
       isWatched: () => false,
       onChanged: () => {},
@@ -172,6 +173,16 @@ describe('filling the index', () => {
     const common = await mail.listMessages('u1', [{ accountId: 'a1', folder: 'INBOX' }], null, 20, { text: 'quarterly', unread: false });
     expect(common.messages).toHaveLength(20);
     expect(common.cursor).not.toBeNull();
+  });
+
+  it('keeps each whole message while indexing it, so opening needs no mail server (13.6)', async () => {
+    const { cache, sync } = setup(30, 50 * 1024 * 1024, 1024 * 1024);
+    sync.syncAccount('u1', 'a1');
+    await settle(sync, cache);
+    const f = cache.folder('u1', 'a1', 'INBOX')!;
+    expect(cache.indexState(f)).toEqual({ messages: 30, indexed: 30 });
+    expect(Array.from({ length: 30 }, (_, i) => cache.hasBody(f, i + 1)).every(Boolean)).toBe(true);
+    expect(cache.body(f, 7)!.toString()).toContain('word7');
   });
 
   it('stops where the mailbox has no space left', async () => {
