@@ -13,7 +13,7 @@
 // Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing; follow-up flags.
 // Modified by samschultzponsys, 2026-11-23: each message's buttons as a bar at its top that stays in view, in your order and size.
 // Modified by samschultzponsys, 2026-11-24: phones: a clear Back button that stays put, the other buttons scroll sideways.
-// Modified by samschultzponsys, 2026-11-24: conversations newest first (or oldest first, a setting).
+// Modified by samschultzponsys, 2026-11-24: conversations newest first (or oldest first, a setting); pictures fill in after the message shows.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -542,6 +542,8 @@ function MessageCard({
     queryFn: () => api.message(msgRef, remote ? 'load' : 'auto'),
     enabled: expanded,
     staleTime: 5 * 60_000,
+    // Pictures still downloading on the server (DreyMail 13.3): ask again shortly, a few times.
+    refetchInterval: (query) => (query.state.data?.imagesPending && query.state.dataUpdateCount < 6 ? 1200 : false),
     retry,
   });
   const d = q.data;

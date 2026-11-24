@@ -258,6 +258,8 @@ export interface MessageDetail {
   htmlStyle: HtmlStyle | null;
   remoteContentBlocked: number;
   remoteContentLoaded: boolean;
+  /** Some pictures are still downloading on the server: ask again shortly (DreyMail 13.3). */
+  imagesPending?: boolean;
   /** Domain of the From address, if it has a valid one. */
   senderDomain: DomainName | null;
   /** Allowlisted domain that made remote images load automatically. */

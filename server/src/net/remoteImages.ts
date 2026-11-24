@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-16: a message waits at most 5 s for its pictures.
 // Modified by samschultzponsys, 2026-11-16: browser user agent (sites behind Cloudflare/Akamai).
+// Modified by samschultzponsys, 2026-11-24: a message no longer waits for its pictures: they keep downloading and the app asks again.
 
 import http from 'node:http';
 import https from 'node:https';
@@ -160,8 +161,10 @@ export interface InlineOptions {
 }
 
 // A message shows after at most deadlineMs; pictures still on their way keep downloading into the
-// cache and show the next time it opens (DreyMail: it used to wait up to 20 s, plus stragglers).
-export const INLINE_DEFAULTS = { concurrency: 6, totalBytes: 15 * 1024 * 1024, maxImages: 100, deadlineMs: 5_000 };
+// cache (for up to BACKGROUND_MS), and the app asks again for them (DreyMail 13.3: it used to wait
+// up to 5 s, and pictures not started by then were never fetched).
+export const INLINE_DEFAULTS = { concurrency: 8, totalBytes: 15 * 1024 * 1024, maxImages: 100, deadlineMs: 600 };
+const BACKGROUND_MS = 30_000;
 
 const toDataUri = (img: RemoteImage) => `data:${img.contentType};base64,${img.body.toString('base64')}`;
 
@@ -177,6 +180,7 @@ export async function inlineRemoteImages(urls: string[], opts: InlineOptions): P
   const queue = unique.slice(0, o.maxImages);
   for (const u of unique.slice(o.maxImages)) out.set(u, null);
   const deadline = Date.now() + o.deadlineMs;
+  const giveUp = Date.now() + Math.max(o.deadlineMs, BACKGROUND_MS);
   let budget = o.totalBytes;
 
   const accept = (url: string, img: RemoteImage | null) => {
@@ -190,7 +194,7 @@ export async function inlineRemoteImages(urls: string[], opts: InlineOptions): P
 
   const worker = async () => {
     for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
-      if (budget <= 0 || Date.now() > deadline || !fetchableImageUrl(url)) {
+      if (budget <= 0 || Date.now() > giveUp || !fetchableImageUrl(url)) {
         out.set(url, null);
         continue;
       }
@@ -216,10 +220,10 @@ export async function inlineRemoteImages(urls: string[], opts: InlineOptions): P
     timer.unref?.();
   });
   if ((await Promise.race([all.then(() => 'done' as const), late])) === 'late') {
-    // Don't wait for slow servers: what hasn't arrived is left out this time.
-    const done = new Map(out);
-    for (const u of unique) if (!done.has(u)) done.set(u, null);
-    return done;
+    // Don't wait for slow servers: what hasn't arrived is left out this time (absent from the
+    // map: still coming, see imagesStillComing) and keeps downloading into the cache.
+    void all.catch(() => undefined);
+    return new Map(out);
   }
   clearTimeout(timer);
   return out;
@@ -283,3 +287,9 @@ export class RemoteImageCache {
     return this.size;
   }
 }
+
+/** Pictures of a message not here yet but on their way (DreyMail 13.3): the app asks again shortly. */
+export function imagesStillComing(urls: string[], inlined: Map<string, string | null>): boolean {
+  return urls.some((u) => !inlined.has(u) && fetchableImageUrl(u));
+}
+

@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildMessageDetail } from '../src/mail/parse.js';
 import { collectRemoteImageUrls } from '../src/mail/sanitize.js';
-import { inlineRemoteImages, RemoteImageCache, RemoteImageError, type RemoteImage } from '../src/net/remoteImages.js';
+import { imagesStillComing, inlineRemoteImages, RemoteImageCache, RemoteImageError, type RemoteImage } from '../src/net/remoteImages.js';
 
 const png = (bytes: number): RemoteImage => ({ contentType: 'image/png', body: Buffer.alloc(bytes, 7) });
 const dataUri = (img: RemoteImage) => `data:${img.contentType};base64,${img.body.toString('base64')}`;
@@ -102,12 +102,30 @@ describe('a slow picture server', () => {
     const out = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 150 });
     expect(Date.now() - started).toBeLessThan(1000);
     expect(out.get(urls[0]!)).toMatch(/^data:image\/png/);
-    expect(out.get(urls[1]!)).toBeNull();
+    // Not there yet, and said to be on its way (13.3): the app asks again.
+    expect(out.get(urls[1]!)).toBeUndefined();
+    expect(imagesStillComing(urls, out)).toBe(true);
     finish();
     await new Promise((r) => setTimeout(r, 10));
     const again = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 150 });
     expect(again.get(urls[1]!)).toMatch(/^data:image\/png/);
     expect(fetchImage).toHaveBeenCalledTimes(2);
+    expect(imagesStillComing(urls, again)).toBe(false);
+  });
+
+  it('keeps fetching pictures not started by the deadline, in the background (13.3)', async () => {
+    const cache = new RemoteImageCache();
+    const fetchImage = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 40));
+      return png(5);
+    });
+    const urls = Array.from({ length: 6 }, (_, i) => `https://img${i}.example.com/p.png`);
+    const out = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 10, concurrency: 2 });
+    expect(imagesStillComing(urls, out)).toBe(true);
+    await new Promise((r) => setTimeout(r, 300));
+    const later = await inlineRemoteImages(urls, { userId: 'u1', fetchImage, cache, deadlineMs: 10, concurrency: 2 });
+    expect([...later.values()].every((v) => v?.startsWith('data:image/png'))).toBe(true);
+    expect(fetchImage).toHaveBeenCalledTimes(6);
   });
 });
 

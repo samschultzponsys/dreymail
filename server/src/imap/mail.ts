@@ -41,7 +41,7 @@ import type { CacheSync } from '../cache/sync.js';
 import { decideRemoteImages, displayDomain, type AutoImages } from '../mail/imageAllowlist.js';
 import { attachmentBytes, buildMessageDetail, parseRaw, type ParsedEmail } from '../mail/parse.js';
 import { collectRemoteImageUrls } from '../mail/sanitize.js';
-import { inlineRemoteImages, type InlineOptions, type RemoteImageCache } from '../net/remoteImages.js';
+import { imagesStillComing, inlineRemoteImages, type InlineOptions, type RemoteImageCache } from '../net/remoteImages.js';
 import { MailServerError, describeError } from './connect.js';
 import type { ImapPool, Lane } from './pool.js';
 import { lookupTerms, matchesTerm, RelatedIndex, searchFor, termKey, type LookupTerm } from './related.js';
@@ -974,6 +974,7 @@ export class MailService {
       },
     );
     if (opened) detail.smime = opened.info;
+    if (decision.load && email.html && imagesStillComing(urls.slice(0, 100), inlined)) detail.imagesPending = true;
     return detail;
   }
 

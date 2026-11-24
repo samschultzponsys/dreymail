@@ -13,6 +13,20 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.3): messages show without waiting for their pictures; a message to guests
+
+- **Faster opening of picture-heavy mail:** a message with images to load waited up to 5 s for
+  the server to fetch them (and pictures not started by then were never fetched). Now it shows
+  after at most 0.6 s with the pictures already here; the rest keep downloading on the server (8
+  at a time, up to 30 s) and the app asks again (`imagesPending`) every 1.2 s, a few times, so they
+  fill in.
+- **Events with guests:** the Notes box becomes "Message to guests" (bigger, with a hint): it is
+  what guests see in the invitation (Outlook and Google put it in the event; DreyMail and CalDAV
+  invitations carry it in the email and the event).
+- **Files:** `server/src/net/remoteImages.ts`, `server/src/imap/mail.ts`, `shared/types.ts`,
+  `web/src/components/Reader.tsx`, `web/src/components/EventEditor.tsx`,
+  `server/test/remoteImages.test.ts`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.2): conversations newest first; bigger message buttons on phones
 
 - **Conversations** show their newest message at the top; scroll down to go back in time.

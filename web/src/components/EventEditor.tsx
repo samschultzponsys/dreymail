@@ -681,10 +681,20 @@ function EventForm({
         )}
 
         <div>
+          {/* With guests, this is the message in their invitation (DreyMail 13.3). */}
           <label className="label" htmlFor="ev-notes">
-            Notes
+            {guests.length > 0 || typed.trim() ? 'Message to guests' : 'Notes'}
           </label>
-          <textarea id="ev-notes" className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={10_000} />
+          <textarea
+            id="ev-notes"
+            className="input"
+            rows={guests.length > 0 || typed.trim() ? 5 : 3}
+            value={notes}
+            placeholder={guests.length > 0 || typed.trim() ? 'Agenda, what to bring, how to join… Your guests see this in the invitation.' : ''}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={10_000}
+          />
+          {(guests.length > 0 || typed.trim()) && <div className="hint">Shown in the invitation your guests get, and in the event in their calendar.</div>}
         </div>
         {scope === 'all' && !isNew && (base.recurrence ?? 'none') !== 'none' && <div className="hint">Changes apply to every occurrence of this event.</div>}
         {scope === 'following' && <div className="hint">This occurrence and the ones after it become a series of their own with these changes.</div>}
