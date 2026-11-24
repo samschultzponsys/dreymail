@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.1): phones: a clear Back button, toolbars in one row
+
+- **Reader toolbar on phones:** Back is a filled accent button that stays at the left; the other
+  buttons stay in one row that scrolls sideways (a fade at the edge shows there are more) instead
+  of running off the screen.
+- **Each message's buttons on phones:** large icons sharing one row (names hidden), instead of
+  wrapping onto two rows.
+- **Files:** `web/src/components/Reader.tsx`, `web/src/styles.css`, `README.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-23 (v13.0): indexing in parallel, out of the app's way
 
 - **Fix:** filling the search index read and parsed messages (MIME, HTML) on the server's one

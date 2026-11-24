@@ -46,7 +46,8 @@
    Modified by samschultzponsys, 2026-11-18: unread bubble for folders out of sight; dragged pinned folders; the open mailbox at the top of the bar.
    Modified by samschultzponsys, 2026-11-19: no pin buttons over the counts on touch screens.
    Modified by samschultzponsys, 2026-11-22: search scope, mailbox search boxes, the search at the top.
-   Modified by samschultzponsys, 2026-11-23: rows show their mailbox in lists of several mailboxes. */
+   Modified by samschultzponsys, 2026-11-23: rows show their mailbox in lists of several mailboxes.
+   Modified by samschultzponsys, 2026-11-24: phones: reader toolbar in one scrolling row with a clear Back; message buttons as large icons. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -1515,3 +1516,23 @@ body.resizing iframe { pointer-events: none; }
 .btn-order { display: inline-flex; gap: 2px; margin-left: auto; }
 .btn-order .icon-btn { width: 24px; height: 24px; }
 .msg-button-row { display: flex; align-items: center; gap: 8px; }
+
+/* Phones (DreyMail 13.1): the reader's toolbar keeps one row. Back stands out and stays put; the
+   other buttons scroll sideways (a fade shows there are more). Each message's buttons become large
+   icons in one row. */
+@media (max-width: 640px) {
+  .reader-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-right: 28px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .reader-toolbar::-webkit-scrollbar { display: none; }
+  .reader-toolbar > * { flex: none; }
+  .reader-toolbar .spacer { flex: 0 0 4px; }
+  .reader-toolbar .toolbar-back { position: sticky; left: 0; z-index: 2; width: 40px; height: 40px; margin-right: 6px; border-radius: 12px; background: var(--accent-fill); color: var(--accent-text); box-shadow: 6px 0 10px -4px var(--surface); }
+  .reader-toolbar .toolbar-back:hover { background: var(--accent-fill); filter: brightness(1.08); }
+  .reader-toolbar.big { flex-wrap: nowrap; }
+  .msg-actionbar { flex-wrap: nowrap; gap: 8px; }
+  .msg-actionbar .msg-action { flex: 1 1 0; justify-content: center; min-width: 0; padding: 0 !important; }
+  .msg-actionbar .msg-action span { display: none; }
+  .msg-actionbar.size-small .msg-action { height: 36px; }
+  .msg-actionbar.size-medium .msg-action { height: 44px; }
+  .msg-actionbar.size-large .msg-action { height: 52px; }
+  .msg-actionbar .msg-action svg { width: 22px; height: 22px; }
+}

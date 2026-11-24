@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-17: Gmail labels of the message.
 // Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing; follow-up flags.
 // Modified by samschultzponsys, 2026-11-23: each message's buttons as a bar at its top that stays in view, in your order and size.
+// Modified by samschultzponsys, 2026-11-24: phones: a clear Back button that stays put, the other buttons scroll sideways.
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -271,8 +272,8 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
   return (
     <section className="pane reader">
       <div className={`reader-toolbar ${bigToolbar ? 'big' : ''}`}>
-        <button className="icon-btn phone-only" onClick={onBack} title="Back">
-          <ArrowLeft size={18} />
+        <button className="icon-btn phone-only toolbar-back" onClick={onBack} title="Back" aria-label="Back">
+          <ArrowLeft size={20} />
         </button>
         {isDrafts ? (
           <button className="btn" disabled={!d} onClick={() => d && replyWith('editDraft', d)}>
