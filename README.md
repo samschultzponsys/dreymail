@@ -86,7 +86,8 @@
      Modified by samschultzponsys, 2026-11-23: v12.8 (instant results from the index while the full search runs; 4 GB per user).
      Modified by samschultzponsys, 2026-11-23: v12.9 (each message's buttons as a bar in your order and size).
      Modified by samschultzponsys, 2026-11-23: v13.0 (the search index read in worker threads, in parallel, out of the app's way).
-     Modified by samschultzponsys, 2026-11-24: v13.1 (phones: a clear Back button; toolbars in one row). -->
+     Modified by samschultzponsys, 2026-11-24: v13.1 (phones: a clear Back button; toolbars in one row).
+     Modified by samschultzponsys, 2026-11-24: v13.2 (conversations newest first; large highlighted message buttons on phones). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -98,7 +99,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **13.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **13.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end

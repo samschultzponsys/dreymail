@@ -300,6 +300,13 @@ export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onC
           )}
           {tab === 'general' && (
             <div>
+              <label className="label" htmlFor="thread-order">
+                Conversations
+              </label>
+              <select id="thread-order" className="select" value={v.threadOrder ?? 'newest'} onChange={(e) => void save({ ...v, threadOrder: e.target.value as 'newest' | 'oldest' })}>
+                <option value="newest">Newest message first (scroll down for older ones)</option>
+                <option value="oldest">Oldest message first</option>
+              </select>
               <label className="label">Buttons on each message</label>
               <MessageButtonsEditor
                 buttons={v.messageButtons ?? DEFAULT_MESSAGE_BUTTONS}

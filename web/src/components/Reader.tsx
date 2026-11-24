@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-18: importance, read-receipt requests, printing; follow-up flags.
 // Modified by samschultzponsys, 2026-11-23: each message's buttons as a bar at its top that stays in view, in your order and size.
 // Modified by samschultzponsys, 2026-11-24: phones: a clear Back button that stays put, the other buttons scroll sideways.
+// Modified by samschultzponsys, 2026-11-24: conversations newest first (or oldest first, a setting).
 
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { InviteCard } from './InviteCard';
@@ -151,6 +152,8 @@ interface Props {
   messageButtons?: MessageButton[];
   /** Where and how big they are (DreyMail 12.9). */
   messageButtonStyle?: MessageButtonStyle;
+  /** A conversation newest first (default, DreyMail 13.2) or oldest first. */
+  threadOrder?: 'newest' | 'oldest';
 }
 
 /** The toolbar's size, per device: compact icons, or larger buttons with their names. */
@@ -178,7 +181,7 @@ function useBigToolbar(): [boolean, (big: boolean) => void] {
 
 const retry = (n: number, err: Error) => !(err instanceof ApiError && err.status < 500) && n < 1;
 
-export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone, messageButtons = DEFAULT_MESSAGE_BUTTONS, messageButtonStyle = DEFAULT_MESSAGE_BUTTON_STYLE }: Props) {
+export function Reader({ openRef, conversation, account, multipleAccounts, folders, isDrafts, theme, markReadOnOpen, contactPhotos, onAction, snoozeSignal, onReply, onMailto, onBack, onGone, messageButtons = DEFAULT_MESSAGE_BUTTONS, messageButtonStyle = DEFAULT_MESSAGE_BUTTON_STYLE, threadOrder = 'newest' }: Props) {
   const [bigToolbar, setBigToolbar] = useBigToolbar();
   const key = openRef ? refKey(openRef) : '';
   const [busy, setBusy] = useState(false);
@@ -354,7 +357,7 @@ export function Reader({ openRef, conversation, account, multipleAccounts, folde
             {threaded && <span className="msg-count">{items.length}</span>}
           </h2>
         )}
-        {items.map((it) => {
+        {(threadOrder === 'newest' ? [...items].reverse() : items).map((it) => {
           const k = refKey(it.ref);
           return (
             <MessageCard

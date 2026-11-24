@@ -1038,6 +1038,7 @@ export function App() {
         contactPhotos={me.data!.preferences.contactPhotos}
         messageButtons={me.data!.preferences.messageButtons}
         messageButtonStyle={me.data!.preferences.messageButtonStyle}
+        threadOrder={me.data!.preferences.threadOrder ?? 'newest'}
         onAction={(refs, a) => void act(refs, a)}
         snoozeSignal={snoozeSignal}
         onReply={reply}

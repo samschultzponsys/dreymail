@@ -450,6 +450,8 @@ export interface Preferences {
   messageButtons: MessageButton[];
   /** Where and how big they are (DreyMail 12.9). */
   messageButtonStyle?: MessageButtonStyle;
+  /** A conversation's messages newest first (the default since 13.2) or oldest first. */
+  threadOrder?: 'newest' | 'oldest';
   /** Whose addresses are suggested when writing (DreyMail): all mailboxes, the sending one, its group, or chosen ones. */
   suggestScope: SuggestScope;
   /** The mailboxes for suggestScope 'chosen'. */

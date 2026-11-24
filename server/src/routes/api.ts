@@ -166,6 +166,7 @@ export const prefsSchema = z.object({
     .default({}),
   messageButtons: z.array(z.enum(MESSAGE_BUTTONS as [MessageButton, ...MessageButton[]])).max(MESSAGE_BUTTONS.length).default([...DEFAULT_MESSAGE_BUTTONS]),
   messageButtonStyle: z.object({ place: z.enum(['bar', 'header']), size: z.enum(['small', 'medium', 'large']), labels: z.boolean() }).optional(),
+  threadOrder: z.enum(['newest', 'oldest']).optional(),
   // Up to 10 minutes: longer than that is what Send later is for.
   undoSendSeconds: z.number().int().min(0).max(600).default(10),
 });

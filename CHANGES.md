@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.2): conversations newest first; bigger message buttons on phones
+
+- **Conversations** show their newest message at the top; scroll down to go back in time.
+  Settings → General → Conversations switches back to oldest first (preference `threadOrder`).
+- **Each message's buttons on phones:** large icons on tinted accent buttons, the first (Reply by
+  default) filled, all in one row.
+- **Files:** `shared/types.ts`, `server/src/routes/api.ts`, `web/src/components/Reader.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/src/App.tsx`, `web/src/styles.css`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.1): phones: a clear Back button, toolbars in one row
 
 - **Reader toolbar on phones:** Back is a filled accent button that stays at the left; the other
