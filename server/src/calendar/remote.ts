@@ -464,6 +464,20 @@ export function repeatFromGraph(r: GraphRecurrence, localStart: Date): RepeatFie
 /** Microsoft 365 group calendars (DreyMail 12.5) are listed with this prefix on their group's id. */
 const GROUP = 'group:';
 
+/** An event's notes as HTML for Outlook: escaped, line breaks kept, web addresses as links. */
+export function notesHtml(notes: string): string {
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const linked = notes
+    .split(/(https?:\/\/[^\s<>"]+)/g)
+    .map((part, i) => {
+      if (i % 2 === 0) return esc(part);
+      const url = part.replace(/[).,;:!?]+$/, '');
+      return `<a href="${esc(url)}">${esc(url)}</a>${esc(part.slice(url.length))}`;
+    })
+    .join('');
+  return `<div>${linked.replace(/\r?\n/g, '<br>')}</div>`;
+}
+
 export class OutlookCalendar implements CalendarProvider {
   private readonly base = 'https://graph.microsoft.com/v1.0';
   constructor(
@@ -592,7 +606,9 @@ export class OutlookCalendar implements CalendarProvider {
     if (f.onlyRepeat) return { recurrence: graphRecurrence(f, localStart) };
     return {
       subject: f.title,
-      body: { contentType: 'text', content: f.notes },
+      // As HTML with its line breaks and links (DreyMail 13.5): sent as plain text, Exchange (and
+      // server-side signature tools) ran it into one line.
+      body: { contentType: 'html', content: notesHtml(f.notes) },
       location: { displayName: f.location },
       isAllDay: f.allDay,
       start,

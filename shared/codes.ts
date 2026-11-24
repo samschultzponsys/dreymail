@@ -9,6 +9,14 @@
 const KEYWORD = /\b(code|codes|verification|verify|otp|one[- ]time|passcode|pass code|pin|security|sign[- ]?in|log[- ]?in|2fa|two[- ]factor|confirmation|confirm|token|kod|código|code de)\b/gi;
 const CANDIDATE = /(?<![\w$€£.,/:-])(\d{4,8}|\d{3}[ -]\d{3}|\d{2}[ -]\d{2}[ -]\d{2}|(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6,8})(?![\w%.,/:-])/g;
 
+/**
+ * Not part of a longer run of digit groups ("Meeting ID: 730 9908 7625" holds no code) (DreyMail
+ * 13.5).
+ */
+function standalone(source: string, at: number, length: number): boolean {
+  return !/\d[ -]?$/.test(source.slice(Math.max(0, at - 2), at)) && !/^[ -]?\d/.test(source.slice(at + length, at + length + 2));
+}
+
 function clean(c: string): string {
   return c.replace(/[ -]/g, '');
 }
@@ -28,7 +36,7 @@ export function findCode(subject: string, text: string): string | null {
     CANDIDATE.lastIndex = 0;
     let c: RegExpExecArray | null;
     const head = text.slice(0, 300);
-    while ((c = CANDIDATE.exec(head))) if (plausible(c[1]!)) return clean(c[1]!);
+    while ((c = CANDIDATE.exec(head))) if (plausible(c[1]!) && standalone(head, c.index, c[0].length)) return clean(c[1]!);
   }
   for (const source of [subject, text.slice(0, 5000)]) {
     if (!source) continue;
@@ -40,7 +48,7 @@ export function findCode(subject: string, text: string): string | null {
       const window = source.slice(start, m.index + m[0].length + 80);
       CANDIDATE.lastIndex = 0;
       let c: RegExpExecArray | null;
-      while ((c = CANDIDATE.exec(window))) if (plausible(c[1]!)) return clean(c[1]!);
+      while ((c = CANDIDATE.exec(window))) if (plausible(c[1]!) && standalone(window, c.index, c[0].length)) return clean(c[1]!);
     }
   }
   return null;

@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.5): Outlook invitations keep their line breaks
+
+- **Fix:** an Outlook event's message to guests was sent to Microsoft as plain text; on the way
+  (Exchange, server-side signature tools) it lost its line breaks and arrived as one long line.
+  It is now sent as HTML: line breaks kept, web addresses as links, everything else escaped.
+- **Fix:** the one-time code button picked a number out of a longer run of digit groups (a Zoom
+  meeting ID, "730 9908 7625"); such numbers are skipped, so the real passcode is found instead.
+- **Files:** `server/src/calendar/remote.ts`, `shared/codes.ts`, `server/test/conveniences.test.ts`,
+  `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.4): "Last, First" names; quoted mail in the dark composer
 
 - **Fix:** recipients whose name is in quotes with a comma (Outlook's "Estomo, Toni" <…>) were

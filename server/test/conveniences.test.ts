@@ -60,3 +60,22 @@ describe('automatic inbox tabs', () => {
     expect(categoryFromHeaders('', 'grace@example.com')).toBe('personal');
   });
 });
+
+describe('one-time codes next to meeting details (13.5)', async () => {
+  const { findCode } = await import('../../shared/codes.js');
+  it('skips a number inside a meeting ID and finds the passcode', () => {
+    const zoom = 'Join Zoom Meeting\nhttps://us04web.zoom.us/j/73099087625?pwd=X\n\nMeeting ID: 730 9908 7625\nPasscode: ZA30Y3\n';
+    expect(findCode('SpotOn Demo', zoom)).toBe('ZA30Y3');
+    expect(findCode('Your code', 'Your verification code is 482913 (valid 10 minutes)')).toBe('482913');
+    expect(findCode('', 'Call 730 9908 7625 for your security code.')).toBeNull();
+  });
+});
+
+describe('event notes for Outlook (13.5)', async () => {
+  const { notesHtml } = await import('../src/calendar/remote.js');
+  it('keeps line breaks and makes links, escaping the rest', () => {
+    expect(notesHtml('Topic: <Demo>\nJoin https://us04web.zoom.us/j/1?pwd=a&b.\nPasscode: ZA30Y3')).toBe(
+      '<div>Topic: &lt;Demo&gt;<br>Join <a href="https://us04web.zoom.us/j/1?pwd=a&amp;b">https://us04web.zoom.us/j/1?pwd=a&amp;b</a>.<br>Passcode: ZA30Y3</div>',
+    );
+  });
+});
