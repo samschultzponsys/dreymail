@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-23: the search index filled in the background; space per mailbox from the user's share.
 // Modified by samschultzponsys, 2026-11-23: messages for the index read in worker threads, in parallel; requests of people using DreyMail go first.
 // Modified by samschultzponsys, 2026-11-24: whole messages kept while indexing (opening needs no mail server), newest kept longest; shorter wait before lists.
+// Modified by samschultzponsys, 2026-11-24: new messages' content fetched as they arrive, in every folder.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -21,6 +22,8 @@ export const FILL_CHUNK = 200;
 /** Unread messages (among the newest) whose content is loaded ahead after a sync of INBOX. */
 const PREFETCH_COUNT = 25;
 const PREFETCH_AMONG = 200;
+/** Newest arrivals whose content comes along with them in a sync (13.8). */
+const FRESH_CONTENT = 30;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
 // DreyMail 13.6: 400 ms (was 1.5 s); what a slower check finds reaches the list by itself.
 export const LISTING_WAIT_MS = 400;
@@ -437,6 +440,21 @@ export class CacheSync {
           this.deps.onNewMessages?.(userId, accountId, path, role, entries.map((e) => e.summary));
         } catch {
           /* a listener's problem is its own */
+        }
+      }
+      // New mail is opened soonest: its content is fetched with it (DreyMail 13.8), in any folder
+      // (Sent Items too, for the reply you just sent), so opening it never waits for the mail server.
+      const { maxBodyBytes } = this.deps.config;
+      if (fresh.length && maxBodyBytes > 0 && this.budgetOf(userId, accountId) > 0) {
+        const small = fresh.filter((m) => (m.size ?? 0) > 0 && (m.size ?? 0) <= maxBodyBytes).map((m) => m.uid).sort((a, b) => b - a).slice(0, FRESH_CONTENT);
+        if (small.length) {
+          try {
+            for (const m of await client.fetchAll(small.join(','), { uid: true, source: true }, { uid: true })) {
+              if (m.source && m.source.length <= maxBodyBytes) cache.putBody(f, m.uid, m.source);
+            }
+          } catch {
+            /* fetched when opened, as before */
+          }
         }
       }
       const uidNext = Math.max(f.uidNext, ...fresh.map((m) => m.uid + 1));

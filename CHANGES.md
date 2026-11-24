@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.9): new mail opens at once
+
+- **New messages open at once.** When the cache sees new messages in any folder (the inbox,
+  Sent Items with the reply you just sent, any other folder), it fetches their content in the same
+  step, up to the 30 newest. Before, only unread inbox mail was fetched ahead, and everything else
+  waited for the background indexer, so opening a message that had just arrived could still wait
+  for the mail server (slow with Outlook).
+- **Files:** `server/src/cache/sync.ts`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-24 (v13.8): loading screen; noticing updates
 
 - **Loading screen.** DreyMail shows its icon and a progress bar the moment it opens, until there

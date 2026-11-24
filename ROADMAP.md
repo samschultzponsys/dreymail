@@ -22,6 +22,7 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] New mail's content comes with it, in every folder (Sent Items too), so it opens at once (13.9).
 - [x] A loading screen while DreyMail opens (web page and desktop app) instead of a black window and
       an empty mailbox; pages notice a server update and reload; a banner when the desktop or Android
       app is older than the server, with Update (13.8).
