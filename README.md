@@ -92,7 +92,8 @@
      Modified by samschultzponsys, 2026-11-24: v13.4 ("Last, First" names stay one recipient; quoted mail readable in the dark composer).
      Modified by samschultzponsys, 2026-11-24: v13.5 (Outlook invitations keep their line breaks; meeting IDs aren't codes).
      Modified by samschultzponsys, 2026-11-24: v13.6 (messages kept whole while indexed; faster lists).
-     Modified by samschultzponsys, 2026-11-24: v13.7 (Settings uses most of the window; tabs wrap). -->
+     Modified by samschultzponsys, 2026-11-24: v13.7 (Settings uses most of the window; tabs wrap).
+     Modified by samschultzponsys, 2026-11-24: v13.8 (loading screen; update banners; reload after a server update). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -104,8 +105,8 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **13.7**. A fast three-pane mail client with its own look (a cyan envelope in an
-indigo drey), per-account colors that recolor the whole app, an on/off switch for "All
+Current version: **13.8**. A fast three-pane mail client with its own look (a cyan envelope in an
+indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
 encrypted notifications that sound and look different per account, and point-and-click search

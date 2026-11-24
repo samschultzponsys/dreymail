@@ -22,6 +22,9 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] A loading screen while DreyMail opens (web page and desktop app) instead of a black window and
+      an empty mailbox; pages notice a server update and reload; a banner when the desktop or Android
+      app is older than the server, with Update (13.8).
 - [x] Search everywhere (all mailboxes, plus contacts, tasks, calendar and settings), a search box
       per mailbox, whole-mailbox search by default; folders pinned to a bar above the list, dragged
       into order; inbox tabs off by default; images from everyone you know or from all mail (12.1).

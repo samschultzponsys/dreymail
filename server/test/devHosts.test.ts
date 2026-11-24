@@ -162,7 +162,7 @@ describe('dev login when served from a host other than DREYMAIL_BASE_URL', () =>
     );
     const first = await firstMessage;
     ws.terminate();
-    expect(JSON.parse(first)).toEqual({ type: 'hello' });
+    expect(JSON.parse(first)).toEqual({ type: 'hello', version: expect.any(String) }); // 13.8: the server's version, to notice updates
   });
 
   it('refuses the WebSocket from an origin that does not match the Host', async () => {

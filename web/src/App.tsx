@@ -52,6 +52,8 @@ import { accountIcon, desktopBridge, loadMailboxPicture, mailboxNotificationIcon
 import { androidBridge, registerAndroidPush, syncAndroidAccounts } from './android';
 import { startDeviceBackups } from './deviceBackup';
 import { GlobalSearch } from './components/SidebarSearch';
+import { VersionBanner } from './components/VersionBanner';
+import { hideSplash, splashText } from './splash';
 import { TopFolderBar, type TopFolderItem } from './components/TopFolderBar';
 import { settingTabsFor } from './components/SettingsDialog';
 import type { CalendarEvent } from '../../shared/calendar';
@@ -728,13 +730,22 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (me.isLoading) {
-    return (
-      <div className="center">
-        <div className="spinner" />
-      </div>
-    );
-  }
+  // The loading screen goes once there is something to show: the sign-in page, or the mail list
+  // (not an empty mailbox that fills in a moment later). Never longer than 10 seconds.
+  const appReady = !me.isLoading && (!!me.error || (accountsQ.isFetched && (accounts.length === 0 || folders.data !== undefined) && (accounts.length === 0 || !messagesQ.isLoading)));
+  useEffect(() => {
+    if (appReady) hideSplash();
+  }, [appReady]);
+  useEffect(() => {
+    const slow = window.setTimeout(() => splashText('Still loading… the server may be starting up.'), 4000);
+    const cap = window.setTimeout(hideSplash, 10_000);
+    return () => {
+      clearTimeout(slow);
+      clearTimeout(cap);
+    };
+  }, []);
+
+  if (me.isLoading) return null; // the loading screen (index.html) is still up
   if (me.error) {
     if (me.error instanceof ApiError && me.error.status === 401) return <Login />;
     if (me.error instanceof ApiError && me.error.status === 423) return <AppLock enabled />;
@@ -1084,6 +1095,8 @@ export function App() {
         />
       )}
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
+      {/* Versions out of step (DreyMail 13.8): reload, or update the app. */}
+      <VersionBanner busy={() => !!composerRef.current} isAdmin={!!me.data?.permissions.includes('server.manage')} />
       <ReminderWindow
         enabled={loggedIn && accounts.length > 0}
         onOpenCalendar={() => go({ ...HOME, calendar: true })}

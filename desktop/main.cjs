@@ -113,8 +113,14 @@ function showSetup() {
 
 function showServer() {
   const url = serverUrl();
-  if (url) void win.loadURL(url);
-  else showSetup();
+  if (!url) return showSetup();
+  // A loading screen at once (13.8); it stays up until the server's page arrives and replaces it.
+  const icon = nativeImage.createFromPath(ICON).resize({ width: 192 }).toDataURL();
+  void win
+    .loadFile(path.join(__dirname, 'loading.html'))
+    .then(() => win.webContents.executeJavaScript(`document.getElementById('icon').src = ${JSON.stringify(icon)}`).catch(() => {}))
+    .catch(() => {})
+    .finally(() => void win.loadURL(url));
 }
 
 function createWindow() {

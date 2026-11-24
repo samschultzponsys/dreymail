@@ -32,6 +32,7 @@
 // Modified by samschultzponsys, 2026-11-17: server and app versions at the bottom, with a warning when they differ.
 // Modified by samschultzponsys, 2026-11-18: the version as one short label (a red ! when the app is out of step).
 // Modified by samschultzponsys, 2026-11-18: Contacts and Tasks buttons under Calendar.
+// Modified by samschultzponsys, 2026-11-24: the server's version is checked every 5 minutes and on focus (13.8).
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -169,7 +170,8 @@ interface Props {
 
 export function Sidebar({ onResize, topFolders = [], onTopFolder, globalSearch, onMailboxSearch, onPin, groups = [], accounts, showUnified, userFullName, userAvatar, footerIdentity = 'both', folders, sel, onSelect, onCompose, onAccounts, onSettings, onLogout, userLabel, onCloseNav, searches, activeSearch, onSearch, onDeleteSearch, onAssistant, onEditAccount, onReorder, onEditGroup, onNewGroup, scheduledCount = 0, onScheduled, onCalendar, belowCompose, collapsedFolders = {}, onToggleFolder, calendarActive = false, pageActive = null, onPage }: Props) {
   // Server version (bottom left) and, for administrators, whether a newer image is out.
-  const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 3600_000, refetchInterval: 3600_000 });
+  // Checked often (DreyMail 13.8): every 5 minutes, on coming back to the window, and on reconnecting.
+  const version = useQuery({ queryKey: ['version'], queryFn: api.version, staleTime: 60_000, refetchInterval: 5 * 60_000, refetchOnWindowFocus: true });
   const [showLog, setShowLog] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   // In a browser only: the desktop and Android apps and installed web apps don't need it.

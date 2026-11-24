@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-17: Mark as spam; address suggestions scope.
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
 // Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions; shared mailboxes; S/MIME.
+// Modified by samschultzponsys, 2026-11-24: the live connection's hello carries the server's version (13.8).
 
 // Types shared between the server API and the web client.
 
@@ -697,7 +698,8 @@ export type ServerEvent =
    * native notification in the account's colour. Browsers use Web Push instead and ignore this.
    */
   | { type: 'notify'; accountId: string; title: string; body: string; tag: string; url: string }
-  | { type: 'hello' }
+  /** On (re)connecting; `version`: the server's (DreyMail 13.8), so open pages notice an update. */
+  | { type: 'hello'; version?: string }
   /** The user's preferences changed on some device: fetch them again (DreyMail). */
   | { type: 'preferences' }
   /** An event reminder is due: the desktop app shows it as a notification, every app opens its reminder window (DreyMail). */

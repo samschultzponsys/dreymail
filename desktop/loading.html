@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- DreyMail. Copyright (C) 2026 samschultzponsys.
+     Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE. -->
+<!-- Shown the moment the window opens while your DreyMail server's page loads (13.8), instead of a black window. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'" />
+    <title>DreyMail</title>
+    <style>
+      html, body { margin: 0; height: 100%; }
+      body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #f6f6f4; color: #5b6070; font: 14px system-ui, sans-serif; }
+      img { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 8px 30px rgba(20, 27, 52, 0.25); animation: pulse 1.6s ease-in-out infinite; }
+      .bar { width: 140px; height: 3px; border-radius: 3px; background: rgba(34, 211, 238, 0.2); overflow: hidden; }
+      .bar::after { content: ''; display: block; width: 40%; height: 100%; border-radius: 3px; background: #22d3ee; animation: slide 1.1s ease-in-out infinite; }
+      @media (prefers-color-scheme: dark) { body { background: #141517; color: #9aa0b0; } }
+      @keyframes pulse { 50% { transform: scale(0.95); } }
+      @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+    </style>
+  </head>
+  <body>
+    <img id="icon" alt="" />
+    <div class="bar"></div>
+    <div>Connecting to your DreyMail server…</div>
+  </body>
+</html>

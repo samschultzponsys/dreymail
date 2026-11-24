@@ -2,12 +2,14 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-13: desktop-app sessions ask for new-mail notifications.
+// Modified by samschultzponsys, 2026-11-24: the hello carries the server's version (open pages notice an update).
 
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { isDevHostAllowed } from '../../../shared/devHosts.js';
 import type { ClientEvent, ServerEvent } from '../../../shared/types.js';
 import type { Config } from '../config.js';
+import { serverVersion } from '../version.js';
 import type { Store } from '../db.js';
 import type { ImapPool } from '../imap/pool.js';
 import type { Sessions } from '../auth/session.js';
@@ -102,7 +104,7 @@ export async function registerWebSocket(
     }
     set.add(socket);
     pool.watch(user.id);
-    socket.send(JSON.stringify({ type: 'hello' } satisfies ServerEvent));
+    socket.send(JSON.stringify({ type: 'hello', version: serverVersion() } satisfies ServerEvent));
 
     const ping = setInterval(() => socket.ping(), 30_000);
     socket.on('close', () => {

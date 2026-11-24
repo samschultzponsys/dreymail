@@ -13,6 +13,26 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.8): loading screen; noticing updates
+
+- **Loading screen.** DreyMail shows its icon and a progress bar the moment it opens, until there
+  is something to show (the sign-in page, or your mail list), instead of a blank or black window
+  followed by an empty mailbox. After 4 seconds it says the server may be starting up; it never
+  stays longer than 10 seconds. The desktop app shows the same screen while it connects to the
+  server, instead of a black window.
+- **Server updates are noticed without restarting.** The live connection's greeting now carries
+  the server's version, so a reconnect after an update is noticed at once; the version is also
+  checked every 5 minutes and when the window gets focus.
+- **Update banners.** A page older than the server shows "Reload" and reloads by itself when you
+  come back to it (or while it's in the background), unless you're writing a message. A desktop or
+  Android app older than the server shows a banner with "Update the app". Administrators see a
+  note when the server is older than the app. "Not now" hides a banner for the session.
+- **Files:** `server/src/routes/ws.ts`, `shared/types.ts`, `web/index.html`, `web/src/App.tsx`,
+  `web/src/hooks.ts`, `web/src/splash.ts` (new), `web/src/components/VersionBanner.tsx` (new),
+  `web/src/components/Sidebar.tsx`, `web/src/styles.css`, `desktop/main.cjs`,
+  `desktop/loading.html` (new), `desktop/electron-builder.yml`, `server/test/devHosts.test.ts`,
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.7): Settings uses the window
 
 - **Settings** uses most of the window (up to 1100 px wide, the full height), scaling with it

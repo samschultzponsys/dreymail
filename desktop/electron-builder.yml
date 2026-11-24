@@ -18,6 +18,7 @@ files:
   - notify.cjs
   - dbus.cjs
   - setup.html
+  - loading.html
   - build/icon.png
 extraResources:
   - from: ../LICENSE

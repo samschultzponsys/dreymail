@@ -1552,3 +1552,9 @@ body.resizing iframe { pointer-events: none; }
   .msg-actionbar.size-medium .msg-action { height: 52px; }
   .msg-actionbar.size-large .msg-action { height: 60px; }
 }
+
+/* Versions out of step (DreyMail 13.8): a banner at the top. */
+.version-banner { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 10px; max-width: min(720px, calc(100vw - 24px)); padding: 8px 8px 8px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow-lg); font-size: 13px; color: var(--text); }
+.version-banner > svg { flex: none; color: var(--accent); }
+.version-banner span { flex: 1; min-width: 0; }
+.version-banner .btn { flex: none; }

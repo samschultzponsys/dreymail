@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-17: preferences changed on another device are fetched again.
 // Modified by samschultzponsys, 2026-11-17: event reminders over the WebSocket.
 // Modified by samschultzponsys, 2026-11-23: quick searches from the search index while the full one runs.
+// Modified by samschultzponsys, 2026-11-24: reconnecting checks the server's version again.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -146,7 +147,9 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
       };
       ws.onmessage = (e) => {
         const ev = JSON.parse(String(e.data)) as ServerEvent;
-        if (ev.type === 'reset') void qc.resetQueries({ queryKey: ['messages'] });
+        // Reconnected (the server may have been updated): check its version again (DreyMail 13.8).
+        if (ev.type === 'hello') void qc.invalidateQueries({ queryKey: ['version'] });
+        else if (ev.type === 'reset') void qc.resetQueries({ queryKey: ['messages'] });
         else if (ev.type === 'mailbox') refresh();
         else if (ev.type === 'snoozeEnded') snoozeEnded.current?.(ev);
         else if (ev.type === 'preferences') void qc.invalidateQueries({ queryKey: ['me'] });
