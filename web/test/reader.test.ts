@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: account tag markup.
 // Modified by samschultzponsys, 2026-11-17: the account tag as a colored bubble.
+// Modified by samschultzponsys, 2026-11-24: conversations newest first.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
@@ -162,7 +163,7 @@ describe('conversation view', () => {
     snippet: 'Sure, noon works',
   });
 
-  function renderConversation() {
+  function renderConversation(threadOrder?: 'newest' | 'oldest') {
     const conversation = groupConversations([original], [myReply])[0]!;
     const qc = new QueryClient();
     qc.setQueryData(['message', refKey(myReplyRef), 'auto'], detail({ ...myReplyRef, subject: 'Re: Hello', from: myReply.from, to: myReply.to, text: 'Sure, noon works', html: null }));
@@ -185,6 +186,7 @@ describe('conversation view', () => {
           onMailto: noop,
           onBack: noop,
           onGone: noop,
+          threadOrder,
         }),
       ),
     );
@@ -199,7 +201,10 @@ describe('conversation view', () => {
     const html = renderConversation();
     expect(html).toMatch(/<button class="msg-card msg-collapsed"[^>]*>.*Ada Lovelace.*Are you free for lunch\?/);
     expect(html).toContain('Sure, noon works');
-    expect(html.indexOf('Are you free for lunch?')).toBeLessThan(html.indexOf('Sure, noon works'));
+    // Newest first by default (13.2); oldest first when chosen.
+    expect(html.indexOf('Sure, noon works')).toBeLessThan(html.indexOf('Are you free for lunch?'));
+    const oldest = renderConversation('oldest');
+    expect(oldest.indexOf('Are you free for lunch?')).toBeLessThan(oldest.indexOf('Sure, noon works'));
   });
 
   it('replies to the newest message of the conversation', () => {
