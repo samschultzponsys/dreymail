@@ -39,6 +39,7 @@
 // Modified by samschultzponsys, 2026-11-21: the Backup tab.
 // Modified by samschultzponsys, 2026-11-22: opens on a given tab (the search at the top); images in all mail, or from everyone you know.
 // Modified by samschultzponsys, 2026-11-23: the Search and storage tab; each message's buttons: order, place and size.
+// Modified by samschultzponsys, 2026-11-24: the dialog uses most of the window; tabs wrap instead of being cut off.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -169,7 +170,8 @@ export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onC
   return (
     <div className="overlay">
       {/* No closing on a click outside: it would lose what was typed. Close with × or Cancel. */}
-      <div className="dialog" role="dialog" aria-modal="true" style={{ width: 'min(640px, 100%)', height: 'min(720px, calc(100dvh - 32px))' }}>
+      {/* Most of the window, like the other big dialogs (DreyMail 13.7). */}
+      <div className="dialog settings-dialog" role="dialog" aria-modal="true">
         <div className="dialog-head">
           <h2>Settings</h2>
           <button className="icon-btn" onClick={onClose} title="Close">

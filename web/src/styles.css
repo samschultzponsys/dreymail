@@ -48,7 +48,8 @@
    Modified by samschultzponsys, 2026-11-22: search scope, mailbox search boxes, the search at the top.
    Modified by samschultzponsys, 2026-11-23: rows show their mailbox in lists of several mailboxes.
    Modified by samschultzponsys, 2026-11-24: phones: reader toolbar in one scrolling row with a clear Back; message buttons as large, highlighted icons.
-   Modified by samschultzponsys, 2026-11-24: the quoted message in the composer on a white sheet in dark mode. */
+   Modified by samschultzponsys, 2026-11-24: the quoted message in the composer on a white sheet in dark mode.
+   Modified by samschultzponsys, 2026-11-24: Settings uses most of the window; its tabs wrap. */
 :root {
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 10px;
@@ -674,9 +675,11 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 /* ---- DreyMail: settings tabs, signatures --------------------------------------------------- */
 .tabs.grouped { gap: 4px 14px; align-items: flex-end; padding-top: 4px; flex-wrap: wrap; overflow-x: visible; }
 .tab-group { display: flex; flex-direction: column; flex: none; }
-.tab-group + .tab-group { padding-left: 14px; border-left: 1px solid var(--border); }
+.tab-group + .tab-group { padding-left: 14px; }
 .tab-group-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 4px 10px 0; white-space: nowrap; }
-.tab-group-tabs { display: flex; gap: 2px; }
+.tab-group-tabs { display: flex; flex-wrap: wrap; gap: 2px; }
+/* Settings (DreyMail 13.7): most of the window, scaling with it, so no tab or line is cut off. */
+.dialog.settings-dialog { width: min(1100px, 100%); height: calc(100dvh / var(--ui-zoom, 1) - 32px); }
 .tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { border: 0; background: none; padding: 10px 10px 9px; font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
@@ -1252,7 +1255,7 @@ a.btn { text-decoration: none; }
   .tab-group, .tab-group + .tab-group { width: 100%; padding-left: 0; border-left: 0; }
   .tab-group + .tab-group { border-top: 1px solid var(--border); }
   .tab-group-label { padding: 6px 16px 0; }
-  .tab-group-tabs { overflow-x: auto; scrollbar-width: none; padding: 0 6px; }
+  .tab-group-tabs { flex-wrap: wrap; padding: 0 6px; }
   .tab-group-tabs::-webkit-scrollbar { display: none; }
   .tab-group-tabs .tab { padding: 8px 10px 9px; }
 }

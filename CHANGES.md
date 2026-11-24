@@ -13,6 +13,14 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-24 (v13.7): Settings uses the window
+
+- **Settings** uses most of the window (up to 1100 px wide, the full height), scaling with it
+  like the other big dialogs, and its tabs wrap onto another line instead of being cut off (also
+  on phones, where they used to scroll sideways out of sight).
+- **Files:** `web/src/components/SettingsDialog.tsx`, `web/src/styles.css`, `README.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-24 (v13.6): opening mail and lists from the copy
 
 - **Opening a message without the mail server:** filling the search index already downloaded
