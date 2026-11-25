@@ -17,6 +17,7 @@
 // Modified by samschultzponsys, 2026-11-23: many folders searched a few at a time on connections of their own.
 // Modified by samschultzponsys, 2026-11-23: an unchanged folder (one STATUS list per mailbox) is searched from the index without syncing it first.
 // Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
+// Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -73,6 +74,13 @@ const NAME_FALLBACKS: Partial<Record<SpecialUse, RegExp>> = {
 };
 
 export class MessageGoneError extends Error {}
+
+/** What the cache already knows of a message before fetching it. */
+interface KnownMessage {
+  flags: Set<string>;
+  internalDate: Date | null;
+  size: number;
+}
 export class StaleError extends Error {}
 
 export interface ListSource {
@@ -885,15 +893,24 @@ export class MailService {
     maxBytes: number,
   ): Promise<{ raw: Buffer; flags: Set<string>; internalDate: Date | null }> {
     const f = this.cachedFolder(userId, ref.accountId, ref.folder, ref.uidValidity);
+    let known: KnownMessage | null = null;
     if (f) {
       const hit = this.fromCache(userId, ref.accountId, ref.folder, null, ({ cache }) => {
         const m = cache.message(f, ref.uid);
-        const raw = m && cache.body(f, ref.uid);
-        return m && raw ? { raw, flags: imapFlags(m.summary), internalDate: toDate(m.internalDate ?? undefined) } : null;
+        if (!m) return null;
+        const meta: KnownMessage = { flags: imapFlags(m.summary), internalDate: toDate(m.internalDate ?? undefined), size: m.summary.size };
+        return { meta, raw: cache.body(f, ref.uid) };
       });
-      if (hit) return hit;
+      if (hit?.raw) return { raw: hit.raw, flags: hit.meta.flags, internalDate: hit.meta.internalDate };
+      if (hit) {
+        // New mail whose content is on its way right now: wait for that instead of fetching it twice (DreyMail 14.0).
+        const coming = this.cached?.sync.downloadingBody(userId, ref.accountId, ref.folder, ref.uid);
+        const raw = coming ? await coming : null;
+        if (raw) return { raw, flags: hit.meta.flags, internalDate: hit.meta.internalDate };
+        known = hit.meta;
+      }
     }
-    const res = await this.fetchRawLive(userId, ref, maxBytes);
+    const res = await this.fetchRawLive(userId, ref, maxBytes, known);
     if (f && this.cached && res.raw.length <= this.cached.maxBodyBytes) {
       this.fromCache(userId, ref.accountId, ref.folder, undefined, ({ cache, sync }) => {
         if (sync.budgetOf(userId, ref.accountId) <= 0) return;
@@ -904,19 +921,57 @@ export class MailService {
     return res;
   }
 
-  private async fetchRawLive(userId: string, ref: MessageRef, maxBytes: number): Promise<{ raw: Buffer; flags: Set<string>; internalDate: Date | null }> {
+  /**
+   * Fetch a message from the mail server, on a connection of its own ('read', DreyMail 14.0) so
+   * opening it never waits behind a sync or an action. With its size known from the cache it takes
+   * one round trip instead of two.
+   */
+  private async fetchRawLive(userId: string, ref: MessageRef, maxBytes: number, known: KnownMessage | null = null): Promise<{ raw: Buffer; flags: Set<string>; internalDate: Date | null }> {
+    const tooLarge = (size: number) => new MailServerError(`Message is too large to display (${Math.round(size / 1048576)} MB)`, 'protocol');
     return this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
       this.checkValidity(mailbox, ref);
+      if (known && known.size > 0) {
+        if (known.size > maxBytes) throw tooLarge(known.size);
+        // `source` is fetched with BODY.PEEK, so reading never sets \Seen implicitly.
+        const full = await client.fetchOne(String(ref.uid), { uid: true, flags: true, internalDate: true, source: true }, { uid: true });
+        if (!full || !full.source) throw new MessageGoneError('Message not found');
+        return { raw: full.source, flags: full.flags ?? known.flags, internalDate: toDate(full.internalDate) ?? known.internalDate };
+      }
       const meta = await client.fetchOne(String(ref.uid), { uid: true, flags: true, internalDate: true, size: true }, { uid: true });
       if (!meta) throw new MessageGoneError('Message not found');
-      if ((meta.size ?? 0) > maxBytes) {
-        throw new MailServerError(`Message is too large to display (${Math.round((meta.size ?? 0) / 1048576)} MB)`, 'protocol');
-      }
+      if ((meta.size ?? 0) > maxBytes) throw tooLarge(meta.size ?? 0);
       // `source` is fetched with BODY.PEEK, so reading never sets \Seen implicitly.
       const full = await client.fetchOne(String(ref.uid), { uid: true, source: true }, { uid: true });
       if (!full || !full.source) throw new MessageGoneError('Message not found');
       return { raw: full.source, flags: meta.flags ?? new Set(), internalDate: toDate(meta.internalDate) };
-    });
+    }, 'read');
+  }
+
+  /**
+   * Fetch the content of messages the user is likely to open next (the ones around the open one,
+   * or one under the pointer) into the cache ahead, so opening them doesn't wait for the mail
+   * server (DreyMail 14.0). Only cached messages without their content; on the main connection,
+   * never the one opening messages uses. Never rejects.
+   */
+  async warm(userId: string, refs: MessageRef[]): Promise<void> {
+    if (!this.cached) return;
+    const { sync, maxBodyBytes } = this.cached;
+    const byFolder = new Map<string, { ref: MessageRef; uids: number[] }>();
+    for (const ref of refs) {
+      const f = this.cachedFolder(userId, ref.accountId, ref.folder, ref.uidValidity);
+      if (!f) continue;
+      const wanted = this.fromCache(userId, ref.accountId, ref.folder, false, ({ cache }) => {
+        const m = cache.message(f, ref.uid);
+        return !!m && m.summary.size > 0 && m.summary.size <= maxBodyBytes && !cache.hasBody(f, ref.uid);
+      });
+      if (!wanted || sync.downloadingBody(userId, ref.accountId, ref.folder, ref.uid)) continue;
+      const k = `${ref.accountId}\u0000${ref.folder}`;
+      const group = byFolder.get(k) ?? { ref, uids: [] };
+      group.uids.push(ref.uid);
+      byFolder.set(k, group);
+    }
+    if (!byFolder.size || sync.budgetOf(userId, [...byFolder.values()][0]!.ref.accountId) <= 0) return;
+    for (const { ref, uids } of byFolder.values()) await sync.fetchBodies(userId, ref.accountId, ref.folder, uids, 'main');
   }
 
   async getMessage(

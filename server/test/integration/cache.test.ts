@@ -2,6 +2,7 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-24: messages are kept whole while indexed: even the first open needs no mail server.
+// Modified by samschultzponsys, 2026-11-25: new mail's content, opening on its own connection, warming messages ahead.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -234,6 +235,61 @@ describe('mail cache', () => {
     // server, and neither does the second.
     expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
     expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
+  });
+
+  /** Forget a cached message's content (as if space had run short), once nothing fills it back meanwhile. */
+  const dropBody = async (account: AccountView, uid: number) => {
+    await settled(account);
+    await until(() => !ctx.cacheSync!.isIndexing(userId, account.id));
+    const db = new DatabaseSync(cacheFile);
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.prepare(`DELETE FROM bodies WHERE uid = ? AND folder_id = (SELECT id FROM folders WHERE account_id = ? AND path = 'INBOX')`).run(uid, account.id);
+    db.close();
+  };
+  const hasBody = (account: AccountView, uid: number) => {
+    const f = ctx.cacheSync!.ready(userId, account.id, 'INBOX');
+    return !!f && ctx.cache!.hasBody(f, uid);
+  };
+
+  it('fetches the content of new mail right after listing it, so it opens without the mail server', async () => {
+    await deliver(HEDY, 'Just in', { text: 'Hot off the wire' });
+    expect(await until(async () => subjects((await list(hedy)).messages).includes('Just in'))).toBe(true);
+    const fresh = (await list(hedy)).messages.find((m) => m.subject === 'Just in')!;
+    expect(await until(() => hasBody(hedy, fresh.uid))).toBe(true);
+    const ref = `accountId=${hedy.id}&folder=INBOX&uid=${fresh.uid}&uidValidity=${fresh.uidValidity}`;
+    const { result, calls } = await imapCalls(() => api<MessageDetail>('GET', `/api/message?${ref}`));
+    expect(result.json.text).toContain('Hot off the wire');
+    expect(calls).toBe(0);
+  });
+
+  it('opens a message not kept yet on a connection of its own, and keeps it', async () => {
+    const welcome = (await list(hedy)).messages.find((m) => m.subject === 'Welcome aboard')!;
+    await dropBody(hedy, welcome.uid);
+    const lanes: unknown[] = [];
+    const orig = ctx.pool.withMailbox;
+    ctx.pool.withMailbox = ((...args: Parameters<typeof orig>) => {
+      lanes.push(args[4] ?? 'main');
+      return orig.apply(ctx.pool, args);
+    }) as typeof orig;
+    try {
+      const ref = `accountId=${hedy.id}&folder=INBOX&uid=${welcome.uid}&uidValidity=${welcome.uidValidity}`;
+      expect((await api<MessageDetail>('GET', `/api/message?${ref}`)).json.text).toContain('Glad to have you');
+    } finally {
+      ctx.pool.withMailbox = orig;
+    }
+    expect(lanes).toEqual(['read']);
+    expect(hasBody(hedy, welcome.uid)).toBe(true);
+  });
+
+  it('fetches messages likely opened next ahead when asked to warm them', async () => {
+    const welcome = (await list(hedy)).messages.find((m) => m.subject === 'Welcome aboard')!;
+    await dropBody(hedy, welcome.uid);
+    expect(hasBody(hedy, welcome.uid)).toBe(false);
+    const ref = { accountId: hedy.id, folder: 'INBOX', uid: welcome.uid, uidValidity: welcome.uidValidity };
+    expect((await api('POST', '/api/messages/warm', { refs: [ref] })).status).toBe(202);
+    expect(await until(() => hasBody(hedy, welcome.uid))).toBe(true);
+    // Someone else's mailbox is left alone.
+    expect((await api('POST', '/api/messages/warm', { refs: [{ ...ref, accountId: 'not-mine' }] })).status).toBe(202);
   });
 
   it('brings my reply along from the cached Sent folder', async () => {

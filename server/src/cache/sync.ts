@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-23: messages for the index read in worker threads, in parallel; requests of people using DreyMail go first.
 // Modified by samschultzponsys, 2026-11-24: whole messages kept while indexing (opening needs no mail server), newest kept longest; shorter wait before lists.
 // Modified by samschultzponsys, 2026-11-24: new messages' content fetched as they arrive, in every folder.
+// Modified by samschultzponsys, 2026-11-25: new messages listed before their content comes, in small newest-first batches an open joins; content kept by a warm-up.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -24,6 +25,8 @@ const PREFETCH_COUNT = 25;
 const PREFETCH_AMONG = 200;
 /** Newest arrivals whose content comes along with them in a sync (13.8). */
 const FRESH_CONTENT = 30;
+/** Arrivals whose content is fetched per IMAP command, newest first (14.0), so the newest is ready soonest. */
+const FRESH_BATCH = 5;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
 // DreyMail 13.6: 400 ms (was 1.5 s); what a slower check finds reaches the list by itself.
 export const LISTING_WAIT_MS = 400;
@@ -113,6 +116,10 @@ export class CacheSync {
   private readonly warming = new Map<string, { again: boolean }>();
   /** Accounts whose search index is being filled, and whether to go round again (DreyMail 12.3). */
   private readonly indexing = new Map<string, { again: boolean }>();
+  /** New messages whose content is still to be fetched, per folder (14.0). */
+  private readonly freshContent = new Map<string, number[]>();
+  /** Content being downloaded right now, per folder key + UID: opening the message waits for it instead of fetching it twice. */
+  private readonly downloading = new Map<string, Promise<Buffer | null>>();
   private stopped = false;
 
   constructor(private readonly deps: CacheSyncDeps) {}
@@ -312,6 +319,7 @@ export class CacheSync {
         // Extras, interrupted by anyone waiting for the next sync; they continue after it.
         const interrupted = () => this.stopped || job.again || job.waiters.length > 0;
         try {
+          await this.fetchFreshContent(userId, accountId, path);
           if (role === 'inbox') await this.prefetch(userId, accountId, path, interrupted);
           await this.fill(userId, accountId, path, interrupted);
           this.indexAccount(userId, accountId);
@@ -442,19 +450,16 @@ export class CacheSync {
           /* a listener's problem is its own */
         }
       }
-      // New mail is opened soonest: its content is fetched with it (DreyMail 13.8), in any folder
-      // (Sent Items too, for the reply you just sent), so opening it never waits for the mail server.
+      // New mail is opened soonest: its content is fetched right after this sync (DreyMail 13.8), in
+      // any folder (Sent Items too, for the reply you just sent). Since 14.0 the list is updated
+      // first, and the content follows in small batches, newest first (fetchFreshContent).
       const { maxBodyBytes } = this.deps.config;
       if (fresh.length && maxBodyBytes > 0 && this.budgetOf(userId, accountId) > 0) {
-        const small = fresh.filter((m) => (m.size ?? 0) > 0 && (m.size ?? 0) <= maxBodyBytes).map((m) => m.uid).sort((a, b) => b - a).slice(0, FRESH_CONTENT);
+        const small = fresh.filter((m) => (m.size ?? 0) > 0 && (m.size ?? 0) <= maxBodyBytes).map((m) => m.uid);
         if (small.length) {
-          try {
-            for (const m of await client.fetchAll(small.join(','), { uid: true, source: true }, { uid: true })) {
-              if (m.source && m.source.length <= maxBodyBytes) cache.putBody(f, m.uid, m.source);
-            }
-          } catch {
-            /* fetched when opened, as before */
-          }
+          const k = this.key(userId, accountId, path);
+          const queued = new Set([...(this.freshContent.get(k) ?? []), ...small]);
+          this.freshContent.set(k, [...queued].sort((a, b) => b - a).slice(0, FRESH_CONTENT));
         }
       }
       const uidNext = Math.max(f.uidNext, ...fresh.map((m) => m.uid + 1));
@@ -480,6 +485,76 @@ export class CacheSync {
       cache.trim(f, limit);
       return changed;
     }, lane);
+  }
+
+  /**
+   * The content of a message being downloaded right now (new mail, or a warm-up), if it is: opening
+   * it waits for that download instead of starting a second one (DreyMail 14.0). Null when it
+   * couldn't be fetched after all.
+   */
+  downloadingBody(userId: string, accountId: string, path: string, uid: number): Promise<Buffer | null> | null {
+    return this.downloading.get(`${this.key(userId, accountId, path)}\u0000${uid}`) ?? null;
+  }
+
+  /**
+   * Fetch and keep the content of these cached messages that don't have it yet (on `lane`), a few
+   * per IMAP command so each batch is ready soon, and so an open waits at most for its own batch.
+   * Never rejects.
+   */
+  async fetchBodies(userId: string, accountId: string, path: string, uids: number[], lane: Lane) {
+    const max = this.deps.config.maxBodyBytes;
+    const k = this.key(userId, accountId, path);
+    for (let i = 0; i < uids.length && !this.stopped; i += FRESH_BATCH) {
+      const f = this.cache.folder(userId, accountId, path);
+      if (!f) return;
+      const batch = uids.slice(i, i + FRESH_BATCH).filter((uid) => !this.downloading.has(`${k}\u0000${uid}`) && !this.cache.hasBody(f, uid));
+      if (!batch.length) continue;
+      const waiting = new Map<number, (raw: Buffer | null) => void>();
+      for (const uid of batch) this.downloading.set(`${k}\u0000${uid}`, new Promise((resolve) => waiting.set(uid, resolve)));
+      try {
+        await this.deps.pool.withMailbox(
+          userId,
+          accountId,
+          path,
+          async (client, selected) => {
+            const mailbox = (client.mailbox || selected) as MailboxObject;
+            if (mailbox.uidValidity.toString() !== f.uidValidity) return;
+            // `source` is fetched with BODY.PEEK, so this never marks anything read.
+            for await (const m of client.fetch(batch.join(','), { uid: true, source: true }, { uid: true })) {
+              if (!m.source || m.source.length > max) continue;
+              try {
+                this.cache.putBody(f, m.uid, m.source);
+              } catch {
+                /* still handed to whoever is waiting */
+              }
+              waiting.get(m.uid)?.(m.source);
+              waiting.delete(m.uid);
+            }
+          },
+          lane,
+        );
+      } catch {
+        /* fetched when opened, as before */
+      } finally {
+        for (const resolve of waiting.values()) resolve(null);
+        for (const uid of batch) this.downloading.delete(`${k}\u0000${uid}`);
+      }
+    }
+    try {
+      this.enforceBudget(userId, accountId);
+    } catch (err) {
+      this.handleError(err, userId, accountId, path);
+    }
+  }
+
+  /** The content of the messages the last sync found new (DreyMail 13.8, after the list since 14.0). */
+  private async fetchFreshContent(userId: string, accountId: string, path: string) {
+    const k = this.key(userId, accountId, path);
+    const uids = this.freshContent.get(k);
+    this.freshContent.delete(k);
+    const f = this.cache.folder(userId, accountId, path);
+    if (!uids?.length || !f) return;
+    await this.fetchBodies(userId, accountId, path, uids, this.lane(f.role));
   }
 
   /** Extend the folder towards older messages, a chunk at a time, up to the configured size. */

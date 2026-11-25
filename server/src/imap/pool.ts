@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-16: folder lists on their own connection, so opening a message never waits behind them.
 // Modified by samschultzponsys, 2026-11-17: a third command connection for filling the cache of other folders in the background.
 // Modified by samschultzponsys, 2026-11-23: four more connections for searching many folders of a mailbox at once (never the main one); UIDNEXT in folder lists.
+// Modified by samschultzponsys, 2026-11-25: a connection of its own for opening messages, so reading never waits behind syncing.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -47,7 +48,8 @@ export class NotFoundError extends Error {}
 
 /** Which of an account's command connections (see ImapPool.client). */
 /** 'search1'..'search3' (DreyMail 12.6): extra connections for searching many folders at once. */
-export type Lane = 'main' | 'folders' | 'sync' | 'search1' | 'search2' | 'search3' | 'search4';
+/** 'read' (DreyMail 14.0): opening a message, never queued behind syncs, actions or listings. */
+export type Lane = 'main' | 'folders' | 'sync' | 'read' | 'search1' | 'search2' | 'search3' | 'search4';
 
 const FOLDER_CACHE_MS = 60_000;
 
@@ -182,7 +184,7 @@ export class ImapPool {
   invalidate(userId: string, accountId: string) {
     const key = this.key(userId, accountId);
     this.folderLists.delete(key);
-    for (const k of [key, `${key}#folders`, `${key}#sync`, `${key}#search1`, `${key}#search2`, `${key}#search3`, `${key}#search4`]) {
+    for (const k of [key, ...[...this.conns.keys()].filter((k) => k.startsWith(`${key}#`))]) {
       const conn = this.conns.get(k);
       this.conns.delete(k);
       conn?.client?.logout().catch(() => conn.client?.close());
