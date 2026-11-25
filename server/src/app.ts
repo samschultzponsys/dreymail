@@ -26,6 +26,7 @@
 // Modified by samschultzponsys, 2026-11-17: server settings saved in the UI; the assistant's sending actions; follow-up flags; contacts and tasks; S/MIME; meeting rooms.
 // Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
 // Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars; background indexing waits while DreyMail is in use.
+// Modified by samschultzponsys, 2026-11-25: larger messages being opened are decoded on worker threads of their own.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -261,6 +262,11 @@ export async function buildApp(
   // S/MIME: encrypted mail opened and signatures checked when read; sent mail signed and encrypted (DreyMail 10.6).
   const smime = new SmimeStore(store);
   mail.smime = smime;
+  // Larger messages being opened are decoded on threads of their own, never queued behind the
+  // index's (DreyMail 14.1).
+  const readPool = new TextPool(2);
+  app.addHook('onClose', async () => readPool.close());
+  mail.parser = (raw) => readPool.parse(raw);
   pool.onInboxActivity = (userId, accountId) => mail.folderChanged(userId, accountId, 'INBOX');
   const vapid = vapidKeysFromSeed(keyring.vapidSeed);
   let live: LiveSessions = { isUserActive: () => false };

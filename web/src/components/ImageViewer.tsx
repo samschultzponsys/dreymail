@@ -1,5 +1,6 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-25: the pictures beside the one shown are fetched ahead.
 
 import { ChevronLeft, ChevronRight, CircleAlert, Download, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -16,7 +17,8 @@ export interface ViewerImage {
 /**
  * Attached pictures, full size over the app: arrows (or ← →) between them, Download, Esc or a
  * click beside the picture to close. Each picture is fetched once and shown from memory (a blob:
- * URL of its own type), never from the server's download address.
+ * URL of its own type), never from the server's download address. The pictures before and after
+ * the one shown are fetched ahead (DreyMail 14.1), so the arrows show them at once.
  */
 export function ImageViewer({ images, start, onClose }: { images: ViewerImage[]; start: number; onClose: () => void }) {
   const [index, setIndex] = useState(start);
@@ -26,19 +28,53 @@ export function ImageViewer({ images, start, onClose }: { images: ViewerImage[];
   const current = images[index]!;
   const loaded = blobs[index];
 
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  /** Downloads under way (or done), per picture; all stop when the viewer closes. */
+  const loading = useRef(new Map<number, Promise<Blob | null>>());
+  const closing = useRef(new AbortController());
+  /** The picture being shown follows its download's progress; ones fetched ahead don't. */
+  const shown = useRef(index);
+  shown.current = index;
+
+  useEffect(
+    () => () => {
+      closing.current.abort();
+      urls.current.forEach((u) => URL.revokeObjectURL(u));
+    },
+    [],
+  );
+
+  const load = (i: number): Promise<Blob | null> => {
+    let job = loading.current.get(i);
+    if (!job) {
+      const img = images[i]!;
+      job = fetchAttachmentBlob(img.url, img.attachment.mimeType, (s) => shown.current === i && setState(s), { signal: closing.current.signal }).then((blob) => {
+        if (!blob || closing.current.signal.aborted) {
+          loading.current.delete(i);
+          return null;
+        }
+        const url = URL.createObjectURL(blob);
+        urls.current.push(url);
+        setBlobs((b) => ({ ...b, [i]: { url, blob } }));
+        return blob;
+      });
+      loading.current.set(i, job);
+    }
+    return job;
+  };
 
   useEffect(() => {
-    if (blobs[index]) return;
-    const ctrl = new AbortController();
-    setState({ status: 'preparing' });
-    void fetchAttachmentBlob(current.url, current.attachment.mimeType, setState, { signal: ctrl.signal }).then((blob) => {
-      if (!blob || ctrl.signal.aborted) return;
-      const url = URL.createObjectURL(blob);
-      urls.current.push(url);
-      setBlobs((b) => ({ ...b, [index]: { url, blob } }));
+    if (!blobs[index]) setState({ status: 'preparing' });
+    let gone = false;
+    void load(index).then((blob) => {
+      if (gone || !blob || images.length < 2) return;
+      // Then the next one and the one before, one at a time.
+      void load((index + 1) % images.length).then(() => {
+        if (!gone) void load((index - 1 + images.length) % images.length);
+      });
     });
-    return () => ctrl.abort();
+    return () => {
+      gone = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 

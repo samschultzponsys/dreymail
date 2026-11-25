@@ -18,9 +18,11 @@
 // Modified by samschultzponsys, 2026-11-23: an unchanged folder (one STATUS list per mailbox) is searched from the index without syncing it first.
 // Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
 // Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
+// Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
+import { OpenedMemo, type OpenedMessage } from '../mail/openedMemo.js';
 import type { FetchMessageObject, ImapFlow, ListResponse, SearchObject } from 'imapflow';
 import type {
   AccountCursor,
@@ -74,6 +76,15 @@ const NAME_FALLBACKS: Partial<Record<SpecialUse, RegExp>> = {
 };
 
 export class MessageGoneError extends Error {}
+
+/** Messages larger than this are decoded in a worker thread (smaller ones are quicker where they are). */
+const PARSE_IN_WORKER_BYTES = 256 * 1024;
+
+/** A message decoded, with its flags when they were fetched along with it. */
+interface Decoded {
+  opened: OpenedMessage;
+  meta: { flags: Set<string>; internalDate: Date | null } | null;
+}
 
 /** What the cache already knows of a message before fetching it. */
 interface KnownMessage {
@@ -264,8 +275,13 @@ export interface MailCacheDeps {
 
 export class MailService {
   private readonly relatedIndex = new RelatedIndex();
+  /** The last messages opened, decoded (DreyMail 14.1), and those being decoded right now. */
+  private readonly opened = new OpenedMemo();
+  private readonly decoding = new Map<string, Promise<Decoded>>();
   /** S/MIME: decrypts and checks signed mail before it is read (DreyMail 10.6). */
   smime?: { open(userId: string, accountId: string, raw: Buffer): { raw: Buffer; info: SmimeInfo } | null };
+  /** Decodes larger messages in a worker thread, so the server stays free meanwhile (DreyMail 14.1). */
+  parser?: (raw: Buffer) => Promise<ParsedEmail>;
 
   constructor(
     private readonly pool: ImapPool,
@@ -317,6 +333,7 @@ export class MailService {
 
   /** Forget everything cached for an account (deleted, or now pointing at another mailbox). */
   forgetAccount(userId: string, accountId: string) {
+    this.opened.deletePrefix(`${userId}\u0000${accountId}\u0000`);
     this.forgetFolders(userId, accountId);
     this.fromCache(userId, accountId, 'INBOX', undefined, ({ cache }) => cache.dropAccount(userId, accountId));
   }
@@ -996,13 +1013,12 @@ export class MailService {
       if (opts.timing) opts.timing[name] = Math.round(now - t);
       t = now;
     };
-    const fetched = await this.fetchRaw(userId, ref, opts.maxBytes);
-    const { flags, internalDate } = fetched;
-    const opened = this.smime?.open(userId, ref.accountId, fetched.raw) ?? null;
-    const raw = opened?.raw ?? fetched.raw;
-    step('fetch');
-    const email = await parseRaw(raw);
-    step('parse');
+    const decoded = await this.decode(userId, ref, opts.maxBytes, opts.timing);
+    const { email, smime } = decoded.opened;
+    // Decoded a moment ago (opened again, or asked again for pictures still coming): only its flags
+    // are fetched, not the whole message (DreyMail 14.1).
+    const { flags, internalDate } = decoded.meta ?? (await this.currentMeta(userId, ref));
+    t = performance.now();
     const urls = email.html ? collectRemoteImageUrls(email.html) : [];
     const decision = decideRemoteImages(email, opts.allowRemote, opts.imageDomains ?? [], opts.autoImages ? { ...opts.autoImages, imageUrls: urls } : undefined);
     // Remote images are fetched here and inlined as data: URIs; the browser never fetches them.
@@ -1028,15 +1044,59 @@ export class MailService {
         },
       },
     );
-    if (opened) detail.smime = opened.info;
+    if (smime) detail.smime = smime;
     if (decision.load && email.html && imagesStillComing(urls.slice(0, 100), inlined)) detail.imagesPending = true;
     return detail;
   }
 
   async getParsed(userId: string, ref: MessageRef, maxBytes: number): Promise<ParsedEmail> {
-    const { raw } = await this.fetchRaw(userId, ref, maxBytes);
-    // Replies, forwards and invitations see the decrypted message too.
-    return parseRaw(this.smime?.open(userId, ref.accountId, raw)?.raw ?? raw);
+    // Replies, forwards, invitations and attachments see the decrypted message too.
+    return (await this.decode(userId, ref, maxBytes)).opened.email;
+  }
+
+  /**
+   * A message decoded (and decrypted): from memory when it was opened in the last few minutes
+   * (DreyMail 14.1), else fetched and decoded once, however many ask at the same time. `meta` (its
+   * flags) comes along only when it was fetched just now.
+   */
+  private async decode(userId: string, ref: MessageRef, maxBytes: number, timing?: Record<string, number>): Promise<Decoded> {
+    const key = `${userId}\u0000${ref.accountId}\u0000${ref.folder}\u0000${ref.uidValidity}\u0000${ref.uid}`;
+    const known = this.opened.get(key);
+    if (known) {
+      if (timing) timing.memory = 0;
+      return { opened: known, meta: null };
+    }
+    let job = this.decoding.get(key);
+    if (!job) {
+      job = (async () => {
+        let t = performance.now();
+        const fetched = await this.fetchRaw(userId, ref, maxBytes);
+        const decrypted = this.smime?.open(userId, ref.accountId, fetched.raw) ?? null;
+        if (timing) timing.fetch = Math.round(performance.now() - t);
+        t = performance.now();
+        const raw = decrypted?.raw ?? fetched.raw;
+        const email = await (this.parser && raw.length > PARSE_IN_WORKER_BYTES ? this.parser(raw) : parseRaw(raw));
+        if (timing) timing.parse = Math.round(performance.now() - t);
+        const opened: OpenedMessage = { email, smime: decrypted?.info ?? null };
+        this.opened.set(key, opened, Math.max(fetched.raw.length, decrypted?.raw.length ?? 0));
+        return { opened, meta: { flags: fetched.flags, internalDate: fetched.internalDate } };
+      })().finally(() => this.decoding.delete(key));
+      this.decoding.set(key, job);
+    }
+    return job;
+  }
+
+  /** A message's flags and date: from the cache where it is cached, else a small request to the mail server. */
+  private async currentMeta(userId: string, ref: MessageRef): Promise<{ flags: Set<string>; internalDate: Date | null }> {
+    const f = this.cachedFolder(userId, ref.accountId, ref.folder, ref.uidValidity);
+    const m = f ? this.fromCache(userId, ref.accountId, ref.folder, null, ({ cache }) => cache.message(f, ref.uid)) : null;
+    if (m) return { flags: imapFlags(m.summary), internalDate: toDate(m.internalDate ?? undefined) };
+    return this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
+      this.checkValidity(mailbox, ref);
+      const meta = await client.fetchOne(String(ref.uid), { uid: true, flags: true, internalDate: true }, { uid: true });
+      if (!meta) throw new MessageGoneError('Message not found');
+      return { flags: meta.flags ?? new Set(), internalDate: toDate(meta.internalDate) };
+    }, 'read');
   }
 
   async getAttachment(userId: string, ref: MessageRef, index: number, maxBytes: number) {

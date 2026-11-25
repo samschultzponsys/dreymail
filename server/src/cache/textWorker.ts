@@ -1,5 +1,6 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-25: also decodes whole messages being opened (DreyMail 14.1).
 
 // A worker thread for the search index (DreyMail 12.10): reads a message (MIME, HTML) and returns
 // its words, so this CPU-heavy part runs beside the server, not in its way.
@@ -20,6 +21,17 @@ export async function messageTerms(raw: Buffer): Promise<string[] | null> {
   }
 }
 
-parentPort?.on('message', (m: { id: number; raw: Uint8Array }) => {
+parentPort?.on('message', (m: { id: number; raw: Uint8Array; kind?: 'terms' | 'parse' }) => {
+  if (m.kind === 'parse') {
+    // A message being opened (DreyMail 14.1): decoded here, its attachments handed over without copying.
+    void parseRaw(Buffer.from(m.raw)).then(
+      (email) => {
+        const moved = email.attachments.map((a) => a.content).filter((c): c is ArrayBuffer => c instanceof ArrayBuffer);
+        parentPort!.postMessage({ id: m.id, email }, moved);
+      },
+      (err: Error) => parentPort!.postMessage({ id: m.id, error: err.message || 'Unreadable message' }),
+    );
+    return;
+  }
   void messageTerms(Buffer.from(m.raw)).then((terms) => parentPort!.postMessage({ id: m.id, terms }));
 });
