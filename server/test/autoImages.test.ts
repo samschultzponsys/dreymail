@@ -53,5 +53,8 @@ describe('12.1: images from everyone you know, or from all mail', () => {
     store.db.prepare("INSERT INTO address_book (user_id, account_id, address, name, sent, received, last_seen) VALUES (?, ?, 'heard@example.org', 'Heard', 0, 3, 1)").run(u.id, acc.id);
     store.db.prepare("INSERT INTO contacts (id, user_id, name, emails, phones, company, title, notes, updated_at) VALUES ('c', ?, 'C', '[\"Card@Example.org\"]', '[]', '', '', '', 1)").run(u.id);
     expect([...store.knownAddresses(u.id)].sort()).toEqual(['card@example.org', 'heard@example.org', 'wrote@example.org']);
+    // One address at a time (DreyMail 14.0), the same answers without reading them all.
+    for (const known of ['wrote@example.org', 'HEARD@example.org', ' card@example.org ']) expect(store.isKnownAddress(u.id, known)).toBe(true);
+    for (const stranger of ['', 'ard@example.org', 'card@example', 'c_rd@example.org', '%@example.org']) expect(store.isKnownAddress(u.id, stranger)).toBe(false);
   });
 });

@@ -36,6 +36,7 @@
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 // Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
 // Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups); inbox tabs off by default; folders pinned to the top bar; images from everyone you know, or from all mail; calendar nicknames and mailbox colors.
+// Modified by samschultzponsys, 2026-11-25: one known address looked up without reading the whole address book.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -1618,6 +1619,27 @@ export class Store {
       }
     }
     return out;
+  }
+
+  /**
+   * Whether one address is known (as knownAddresses, without reading them all): opening a message
+   * asks this for its sender (DreyMail 14.0).
+   */
+  isKnownAddress(userId: string, address: string): boolean {
+    const a = address.trim().toLowerCase();
+    if (!a) return false;
+    if (this.db.prepare('SELECT 1 FROM recent_recipients WHERE user_id = ? AND lower(address) = ? LIMIT 1').get(userId, a)) return true;
+    if (this.db.prepare('SELECT 1 FROM address_book WHERE user_id = ? AND lower(address) = ? AND (sent > 0 OR received > 0) LIMIT 1').get(userId, a)) return true;
+    // Contacts keep their addresses as a JSON list: narrow down with LIKE, then check exactly.
+    const like = `%${a.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    for (const r of this.db.prepare("SELECT emails FROM contacts WHERE user_id = ? AND emails LIKE ? ESCAPE '\\'").all(userId, like) as { emails: string }[]) {
+      try {
+        if ((JSON.parse(r.emails) as unknown[]).some((e) => typeof e === 'string' && e.trim().toLowerCase() === a)) return true;
+      } catch {
+        /* not a list */
+      }
+    }
+    return false;
   }
 
   recipientAddresses(userId: string): Set<string> {

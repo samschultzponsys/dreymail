@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-18: read receipts; importance and receipts when sending; follow-up flags; company directory suggestions; shared mailboxes; S/MIME.
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 // Modified by samschultzponsys, 2026-11-22: inbox tabs off by default; folders pinned to the top bar (preference).
+// Modified by samschultzponsys, 2026-11-25: senders looked up one at a time for images; warm-up of messages likely opened next.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -870,7 +871,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
         prefs?.imagesOwnDomains === false
           ? []
           : [...new Set(store.listAccounts(userId).map((a) => normaliseDomain(a.email)).filter((d): d is string => !!d && !isPublicMailDomain(d)))],
-      contacts: prefs?.imagesContacts === false || junk ? new Set<string>() : store.knownAddresses(userId),
+      contacts: prefs?.imagesContacts === false || junk ? new Set<string>() : { has: (address: string) => store.isKnownAddress(userId, address) },
       senderHosted: prefs?.imagesSenderHosted === true,
     };
   };
@@ -1000,6 +1001,22 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       if (total > 3000) req.log.warn({ ...timing, total, folder: q.folder }, 'slow message');
       reply.header('cache-control', 'private, no-store');
       return detail;
+    } catch (err) {
+      return sendError(reply, err);
+    }
+  });
+
+  /**
+   * Messages likely opened next (around the open one, or under the pointer): their content is
+   * fetched into the cache in the background, so opening them is quick (DreyMail 14.0).
+   */
+  app.post('/api/messages/warm', async (req, reply) => {
+    try {
+      const body = z.object({ refs: z.array(refSchema).max(10) }).parse(req.body);
+      const userId = uid(req);
+      const own = new Set(store.listAccounts(userId).map((a) => a.id));
+      void mail.warm(userId, body.refs.filter((r) => own.has(r.accountId))).catch(() => undefined);
+      return reply.code(202).send({ ok: true });
     } catch (err) {
       return sendError(reply, err);
     }

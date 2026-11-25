@@ -37,6 +37,7 @@
 // Modified by samschultzponsys, 2026-11-19: the Android app gets the groups' icons for notifications.
 // Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
 // Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule; search everything, per mailbox.
+// Modified by samschultzponsys, 2026-11-25: the messages around the open one fetched ahead.
 
 import { encodeFilters, filterCount, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -85,6 +86,7 @@ import { removesFromList, swipeToAction, type Direction, type UndoStep } from '.
 import { formatSnoozeTime } from './snooze';
 import { planRun, runFor, runSpeed, SLIDE_MS, slideKeyframes, type PaneView } from './squirrel';
 import { refKey, toRef } from './util';
+import { rowRefs, warm } from './warm';
 
 /** Bottom-left name: the user's chosen name, else their login name with a capital first letter. */
 export function userLabel(me: { name: string; displayName: string; email: string }, full = false): string {
@@ -506,6 +508,14 @@ export function App() {
     },
     [rows, rowIndex],
   );
+
+  // The messages around the open one are fetched ahead (j / k, archive or delete move to them).
+  useEffect(() => {
+    if (!open) return;
+    const i = rowIndex(open);
+    if (i === -1) return;
+    warm([rows[i + 1], rows[i + 2], rows[i - 1]].flatMap((r) => (r ? rowRefs(r) : [])));
+  }, [open, rows, rowIndex]);
 
   const runUndo = useCallback(
     async (steps: UndoStep[]) => {
@@ -996,6 +1006,7 @@ export function App() {
           )
         }
         onOpen={openMessage}
+        onWarm={(m) => warm(rowRefs(m))}
         onCheck={(m, on) =>
           setChecked((c) => {
             const n = new Set(c);

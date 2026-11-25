@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-16: group pictures; right-click a group to edit it.
 // Modified by samschultzponsys, 2026-11-17: a locked device (423) shows the lock screen.
 // Modified by samschultzponsys, 2026-11-23: quick searches (quick=1).
+// Modified by samschultzponsys, 2026-11-25: messages likely opened next fetched ahead (warmMessages).
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -224,6 +225,8 @@ export const api = {
   /** auto: the server applies the sender-domain allowlist; load / block: override it. */
   message: (r: MessageRef, remote: RemoteMode) =>
     request<MessageDetail>('GET', `/api/message?${refQuery(r)}${remote === 'auto' ? '' : `&remote=${remote === 'load' ? 1 : 0}`}`),
+  /** Messages likely opened next: the server fetches their content ahead (DreyMail 14.0). */
+  warmMessages: (refs: MessageRef[]) => request<{ ok: true }>('POST', '/api/messages/warm', { refs }),
   attachmentUrl: (r: MessageRef, index: number) => `/api/attachment?${refQuery(r)}&index=${index}`,
   action: (messages: MessageRef[], action: MessageAction) => request<ActionResult>('POST', '/api/messages/actions', { messages, action }),
 

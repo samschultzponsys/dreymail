@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-16: automatic image loading for your own domains, people you
 // write to, and images on the sender's own domain.
 // Modified by samschultzponsys, 2026-11-21: images from everyone you know, or from all mail (not Junk).
+// Modified by samschultzponsys, 2026-11-25: known senders looked up one address at a time.
 
 import { domainToASCII, domainToUnicode } from 'node:url';
 import type { DomainName } from '../../../shared/types.js';
@@ -103,7 +104,7 @@ export interface AutoImages {
   /** Domains of the user's own mailboxes ("your own domains"), without public ones like gmail.com; empty when switched off. */
   ownDomains: readonly string[];
   /** Addresses the user knows (wrote to, had mail from, contacts); empty when switched off. */
-  contacts: ReadonlySet<string>;
+  contacts: { has(address: string): boolean };
   /** Load images in all mail (DreyMail 12.1; never in Junk, nor for a forged sender). */
   everyone?: boolean;
   /** Load when every remote image is on the sender's own domain. */

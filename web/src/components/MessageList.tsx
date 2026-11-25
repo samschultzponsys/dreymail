@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-18: high and low importance markers; follow-up due dates; Gmail labels.
 // Modified by samschultzponsys, 2026-11-22: search the whole mailbox by default, or the folder, or all mail.
 // Modified by samschultzponsys, 2026-11-23: rows show their mailbox wherever the list holds several; quick results while searching.
+// Modified by samschultzponsys, 2026-11-25: a row's message fetched ahead while the mouse rests on it.
 
 import { MailboxIcon } from './MailboxIcon';
 import { PaneResizer } from './PaneResizer';
@@ -68,6 +69,8 @@ interface Props {
   /** Set when the user has no mailboxes yet: the list shows how to add one instead. */
   noMailboxes?: { canAdd: boolean; onAdd: () => void };
   onOpen: (m: MessageSummary) => void;
+  /** The mouse rests on a row: its messages are fetched ahead (DreyMail 14.0). */
+  onWarm?: (m: ConversationRow) => void;
   onCheck: (m: MessageSummary, on: boolean) => void;
   onCheckAll: (on: boolean) => void;
   onLoadMore: () => void;
@@ -429,6 +432,7 @@ export function MessageList(p: Props) {
               removes={(d) => p.swipeRemoves(m, d)}
               confirm={(d) => p.confirmSwipe(m, d)}
               onSwipe={(d) => p.onSwipe(m, d)}
+              onHover={p.onWarm ? () => p.onWarm!(m) : undefined}
               style={marked && acc ? ({ ['--acct-color' as string]: acc.color } as React.CSSProperties) : undefined}
               className={`row ${marked && acc ? 'mailbox-marked' : ''} ${m.seen ? '' : 'unread'} ${isOpen ? 'selected' : ''} ${has(p.lastOpenKey) && !isOpen ? 'recent' : ''} ${p.checked.has(key) ? 'checked' : ''} ${p.unreadOnly && m.seen ? 'read-in-filter' : ''}`}
               onClick={(e) => {
