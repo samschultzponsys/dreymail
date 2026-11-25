@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-24: messages are kept whole while indexed: even the first open needs no mail server.
 // Modified by samschultzponsys, 2026-11-25: new mail's content, opening on its own connection, warming messages ahead.
+// Modified by samschultzponsys, 2026-11-25: a big message's pictures open from memory.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -125,6 +126,8 @@ beforeAll(async () => {
     DREYMAIL_DATA_DIR: '/nonexistent-not-used',
     DREYMAIL_BASE_URL: 'http://localhost:8080',
     DREYMAIL_CACHE_MESSAGES: '50',
+    // Small, so the test of a big message's pictures has one the cache doesn't keep.
+    DREYMAIL_CACHE_MAX_BODY_MB: '1',
   });
   store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
   ctx = await buildApp(config, { store, logger: false, cacheFile, pushTransport: async () => 'sent', pushHostCheck: async () => {} });
@@ -245,6 +248,8 @@ describe('mail cache', () => {
     db.exec('PRAGMA busy_timeout = 5000');
     db.prepare(`DELETE FROM bodies WHERE uid = ? AND folder_id = (SELECT id FROM folders WHERE account_id = ? AND path = 'INBOX')`).run(uid, account.id);
     db.close();
+    // Nor kept in memory from an earlier open (DreyMail 14.1).
+    (ctx.mail as unknown as { opened: { deletePrefix(p: string): void } }).opened.deletePrefix('');
   };
   const hasBody = (account: AccountView, uid: number) => {
     const f = ctx.cacheSync!.ready(userId, account.id, 'INBOX');
@@ -290,6 +295,29 @@ describe('mail cache', () => {
     expect(await until(() => hasBody(hedy, welcome.uid))).toBe(true);
     // Someone else's mailbox is left alone.
     expect((await api('POST', '/api/messages/warm', { refs: [{ ...ref, accountId: 'not-mine' }] })).status).toBe(202);
+  });
+
+  it('opens the pictures of a big message without the mail server once it is open', async () => {
+    // Larger than the cache keeps (1 MB), like most mail with photos.
+    const photo = crypto.randomBytes(1_500_000).toString('base64').replace(/.{76}/g, '$&\r\n');
+    const big = Buffer.from(
+      `From: Kim <kim@example.com>\r\nTo: ${HEDY}\r\nSubject: Holiday photos\r\nDate: ${new Date().toUTCString()}\r\nMessage-ID: <${crypto.randomUUID()}@example.com>\r\n` +
+        `MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nSee attached\r\n` +
+        `--b\r\nContent-Type: image/jpeg; name=beach.jpg\r\nContent-Disposition: attachment; filename=beach.jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n${photo}\r\n--b--\r\n`,
+    );
+    await withImap(HEDY, (c) => c.append('INBOX', big, []));
+    expect(await until(async () => subjects((await list(hedy)).messages).includes('Holiday photos'))).toBe(true);
+    await settled(hedy);
+    const m = (await list(hedy)).messages.find((x) => x.subject === 'Holiday photos')!;
+    const ref = `accountId=${hedy.id}&folder=INBOX&uid=${m.uid}&uidValidity=${m.uidValidity}`;
+    const opened = await api<MessageDetail>('GET', `/api/message?${ref}`);
+    expect(opened.json.attachments.map((a) => a.filename)).toEqual(['beach.jpg']);
+    const { result, calls } = await imapCalls(() => ctx.app.inject({ method: 'GET', url: `/api/attachment?${ref}&index=0`, headers: { cookie, 'x-dreymail': '1' } }));
+    expect(result.statusCode).toBe(200);
+    expect(result.rawPayload.length).toBe(1_500_000);
+    expect(calls).toBe(0);
+    // Opened again: from memory too, its flags from the cache.
+    expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
   });
 
   it('brings my reply along from the cached Sent folder', async () => {

@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-24: whole messages kept while indexing (opening needs no mail server), newest kept longest; shorter wait before lists.
 // Modified by samschultzponsys, 2026-11-24: new messages' content fetched as they arrive, in every folder.
 // Modified by samschultzponsys, 2026-11-25: new messages listed before their content comes, in small newest-first batches an open joins; content kept by a warm-up.
+// Modified by samschultzponsys, 2026-11-25: background reads in batches of bounded size (bigger messages kept); only the start of messages too big to keep is read for the index.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -38,6 +39,17 @@ export const WARM_MAX_FOLDERS = 100;
 /** Messages read per round when filling the search index, and how much of each (DreyMail 12.3). */
 const INDEX_BATCH = 80;
 export const INDEX_BYTES = 96 * 1024;
+/** Most bytes one background IMAP command fetches (one larger message goes alone), so memory stays bounded (DreyMail 14.1). */
+const FETCH_BYTES = 32 * 1024 * 1024;
+/** What the index reads of a message too big to keep: its words are near the start. */
+const INDEX_READ = INDEX_BYTES * 3;
+
+/** A group of messages fetched with one IMAP command: whole (`length` null), or only their start. */
+interface FetchGroup {
+  folder: CachedFolder;
+  uids: number[];
+  length: number | null;
+}
 /** SQLite result codes for a damaged database file: SQLITE_IOERR, SQLITE_CORRUPT, SQLITE_NOTADB. */
 const DAMAGED = new Set([10, 11, 26]);
 
@@ -652,42 +664,25 @@ export class CacheSync {
           // Messages are read in worker threads, in parallel; between rounds, requests of people using
           // DreyMail go first.
           if (this.deps.busy?.()) await sleep(300);
-          const readBytes = Math.max(INDEX_BYTES, this.deps.config.maxBodyBytes);
           const batch = this.cache.unindexed(userId, accountId, INDEX_BATCH);
           if (!batch.length) break;
-          for (const { folder: f, uids } of batch) {
+          for (const { folder: f, uids, length } of this.fetchGroups(batch, this.deps.config.maxBodyBytes)) {
             if (this.stopped) return;
-            const got = await this.deps.pool
-              .withMailbox(
-                userId,
-                accountId,
-                f.path,
-                async (client, selected) => {
-                  const mailbox = (client.mailbox || selected) as MailboxObject;
-                  if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
-                  const out = new Map<number, Buffer>();
-                  // The whole message where it fits (DreyMail 13.6): kept, so opening it needs no mail server.
-                  for (const m of await client.fetchAll(uids.join(','), { uid: true, source: { start: 0, maxLength: readBytes } } as never, { uid: true })) if (m.source) out.set(m.uid, m.source);
-                  return out;
-                },
-                'sync',
-              )
-              .catch(() => null);
+            const got = await this.fetchSources(userId, accountId, f, uids, length);
             // The folder can't be read now (or changed): try again after its next sync.
             if (!got) return;
-            // Whole messages are kept as their content, newest kept longest when space runs short
-            // (each counts as last read when it arrived).
-            for (const uid of uids) {
-              const raw = got.get(uid);
-              if (raw && raw.length < readBytes && raw.length <= this.deps.config.maxBodyBytes && !this.cache.hasBody(f, uid)) {
-                this.cache.putBody(f, uid, raw, this.cache.sortTimeOf(f, uid) ?? Date.now());
+            // Whole messages are kept as their content (DreyMail 13.6), so opening them needs no mail
+            // server; newest kept longest when space runs short (each counts as last read when it arrived).
+            if (length === null) {
+              for (const [uid, raw] of got) {
+                if (raw.length <= this.deps.config.maxBodyBytes && !this.cache.hasBody(f, uid)) this.cache.putBody(f, uid, raw, this.cache.sortTimeOf(f, uid) ?? Date.now());
               }
             }
             const read = await Promise.all(
               uids.map(async (uid) => {
                 const full = got.get(uid);
                 // The words are in the first part of a message; attachments needn't be read whole.
-                const raw = full && full.length > INDEX_BYTES * 3 ? full.subarray(0, INDEX_BYTES * 3) : full;
+                const raw = full && full.length > INDEX_READ ? full.subarray(0, INDEX_READ) : full;
                 if (!raw) return { uid, terms: null };
                 if (this.deps.termsOf) return { uid, terms: await this.deps.termsOf(raw).catch(() => null) };
                 const text = await this.deps.textOf!(raw).catch(() => null);
@@ -726,22 +721,10 @@ export class CacheSync {
       const batch = this.cache.withoutBody(userId, accountId, max, INDEX_BATCH);
       if (!batch.length) return;
       let stored = 0;
-      for (const { folder: f, uids } of batch) {
-        const got = await this.deps.pool
-          .withMailbox(
-            userId,
-            accountId,
-            f.path,
-            async (client, selected) => {
-              const mailbox = (client.mailbox || selected) as MailboxObject;
-              if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
-              const out = new Map<number, Buffer>();
-              for (const m of await client.fetchAll(uids.join(','), { uid: true, source: true }, { uid: true })) if (m.source) out.set(m.uid, m.source);
-              return out;
-            },
-            'sync',
-          )
-          .catch(() => null);
+      for (const { folder: f, uids, length } of this.fetchGroups(batch, max)) {
+        // Only messages known to fit are fetched whole.
+        if (length !== null) continue;
+        const got = await this.fetchSources(userId, accountId, f, uids, null);
         if (!got) return;
         for (const [uid, raw] of got) {
           if (raw.length > max) continue;
@@ -754,6 +737,56 @@ export class CacheSync {
       if (!stored) return;
       await sleep(50);
     }
+  }
+
+  /**
+   * Split messages to fetch in the background into groups of at most FETCH_BYTES (a larger message
+   * alone), newest order kept (DreyMail 14.1): with bigger messages kept, a batch of 80 must never
+   * hold gigabytes. Messages too big to keep (or of unknown size) are read only for their start.
+   */
+  private fetchGroups(batch: { folder: CachedFolder; uids: number[] }[], maxBodyBytes: number): FetchGroup[] {
+    const out: FetchGroup[] = [];
+    for (const { folder, uids } of batch) {
+      const sizes = this.cache.sizesOf(folder, uids);
+      const whole = uids.filter((u) => maxBodyBytes > 0 && (sizes.get(u) ?? 0) > 0 && sizes.get(u)! <= maxBodyBytes);
+      const start = uids.filter((u) => !whole.includes(u));
+      let group: number[] = [];
+      let bytes = 0;
+      for (const uid of whole) {
+        const size = sizes.get(uid)!;
+        if (group.length && bytes + size > FETCH_BYTES) {
+          out.push({ folder, uids: group, length: null });
+          group = [];
+          bytes = 0;
+        }
+        group.push(uid);
+        bytes += size;
+      }
+      if (group.length) out.push({ folder, uids: group, length: null });
+      if (start.length) out.push({ folder, uids: start, length: INDEX_READ });
+    }
+    return out;
+  }
+
+  /** Fetch messages of a folder on the background connection: whole, or only their first `length` bytes. Null when the folder can't be read now. */
+  private fetchSources(userId: string, accountId: string, f: CachedFolder, uids: number[], length: number | null): Promise<Map<number, Buffer> | null> {
+    return this.deps.pool
+      .withMailbox(
+        userId,
+        accountId,
+        f.path,
+        async (client, selected) => {
+          const mailbox = (client.mailbox || selected) as MailboxObject;
+          if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
+          const out = new Map<number, Buffer>();
+          // `source` is fetched with BODY.PEEK, so nothing is marked read.
+          const source = length === null ? true : { start: 0, maxLength: length };
+          for (const m of await client.fetchAll(uids.join(','), { uid: true, source } as never, { uid: true })) if (m.source) out.set(m.uid, m.source);
+          return out;
+        },
+        'sync',
+      )
+      .catch(() => null);
   }
 
   /** Whether an account's search index is being filled right now. */

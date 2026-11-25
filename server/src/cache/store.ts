@@ -7,6 +7,7 @@
 // Modified by samschultzponsys, 2026-11-17: space used per mailbox (Settings → Storage).
 // Modified by samschultzponsys, 2026-11-23: a search index (keyed hashes of words) for searching the cached mail.
 // Modified by samschultzponsys, 2026-11-24: space per account remembered a little while; arrival times for keeping the newest content.
+// Modified by samschultzponsys, 2026-11-25: message sizes, for fetching in batches of bounded size.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -773,6 +774,17 @@ export class MailCache {
     const value = this.measureAccount(userId, accountId);
     this.usageMemo.set(k, { at: Date.now(), value });
     return value;
+  }
+
+  /** Sizes of cached messages (bytes, as the mail server reported them), for fetching in batches of bounded size (DreyMail 14.1). */
+  sizesOf(f: CachedFolder, uids: number[]): Map<number, number> {
+    const out = new Map<number, number>();
+    const stmt = this.db.prepare('SELECT size FROM messages WHERE folder_id = ? AND uid = ?');
+    for (const uid of uids) {
+      const r = stmt.get(f.id, uid) as { size: number } | undefined;
+      if (r) out.set(uid, r.size);
+    }
+    return out;
   }
 
   /** When a message arrived (ms), for keeping the newest content longest. */
