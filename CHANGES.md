@@ -13,6 +13,41 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.3): folders list at once
+
+Measured with `node scripts/bench/open.mjs … --suite list` (a mailbox of 300 conversations, 120
+replies in Sent, 250 in Archive, and a second mailbox; GreenMail behind a simulated Office 365 link,
+80 ms round trip, 50 Mbit/s; 5 runs). Milliseconds, median / slowest:
+
+| Listing | 13.9 | 14.2 | 14.3 |
+|---|---:|---:|---:|
+| Inbox, its next pages, All inboxes, unread only | 5–7 | 5–7 | 5–7 |
+| Sent | 382 / 390 | 378 / 381 | 5 / 10 |
+| Archive (any other folder) | 406 / 408 | 406 / 1964 | 6 / 9 |
+| The same folder again right away | 406 / 407 | 406 / 408 | 4 / 7 |
+| A folder never opened before | 1591 / 3411 | 1563 / 3387 | 659 / 667 |
+| That folder 1 s later | 406 / 1926 | 406 / 407 | 6 / 10 |
+| Refresh button (checks with the mail server first) | 406 | 406 | 406 |
+
+- **Folders other than the inbox are listed from the copy at once.** Each listing used to wait up
+  to 0.4 s for a check with the mail server. The check now runs in the background, and the list
+  updates by itself when it finds changes made by other mail clients. A folder where DreyMail itself
+  just moved or sent mail, and an inbox not being watched, still wait for the check.
+- **No more once-a-minute stall:** which folder is Sent or Drafts came from a folder list that,
+  once a minute, had to be fetched again before a folder could be listed (seconds on a big
+  mailbox; the slowest runs above). An older list is now used while a fresh one is fetched.
+- **A folder never opened before** isn't searched on the mail server for older messages of its
+  conversations; its copy is ready a moment later, the browser is told, and the list comes again
+  from it with whole conversations.
+- **Fix:** a sync still under way when a mailbox was removed could write some of its mail back
+  into the cache.
+- **Tests:** two integration tests now check that another client's changes to a folder reach its
+  list after the check, instead of on the very first listing.
+- **Files:** `server/src/imap/mail.ts`, `server/src/imap/pool.ts`, `server/src/cache/sync.ts`,
+  `server/test/integration/cache.test.ts`, `server/test/integration/mail.test.ts`,
+  `server/test/integration/threads.test.ts`, `scripts/bench/open.mjs`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.2): measured speed-ups
 
 Every change below was measured with the new benchmark (`scripts/bench/open.mjs`): 13.9 against

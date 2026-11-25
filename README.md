@@ -97,7 +97,8 @@
      Modified by samschultzponsys, 2026-11-24: v13.9 (new mail opens at once).
      Modified by samschultzponsys, 2026-11-25: v14.0 (messages open faster).
      Modified by samschultzponsys, 2026-11-25: v14.1 (pictures and attachments open at once).
-     Modified by samschultzponsys, 2026-11-25: v14.2 (measured speed-ups; conversations in one request to the mail server). -->
+     Modified by samschultzponsys, 2026-11-25: v14.2 (measured speed-ups; conversations in one request to the mail server).
+     Modified by samschultzponsys, 2026-11-25: v14.3 (folders list at once). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -109,7 +110,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **14.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **14.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1119,10 +1120,13 @@ The mail server stays the source of truth:
   once the server has done it.
 - The copy follows the server. While INBOX is watched (a browser is open, or notifications are on),
   every change reported by IDLE is fetched right away, so the inbox shows without asking the server.
-  Otherwise, a listing first gives the server a moment (1.5 s) to report changes (a quick check
-  that goes ahead of the background filling), and shows the copy if it is slower; the list
-  updates by itself when the changes arrive. **Refresh**
-  always checks with the server first. Changes are fetched incrementally: new messages, changed
+  Other folders (and an inbox not being watched) are listed from the copy at once (since 14.3),
+  while a quick check with the server runs in the background, ahead of the background filling;
+  the list updates by itself when it finds changes made by other mail clients. A folder where
+  DreyMail itself just changed something (moved or sent mail there), and an inbox not being
+  watched, wait for that check first (up to 0.4 s). **Refresh** always checks with the server
+  first. A folder opened before it was copied is listed by the mail server, and comes again from
+  the copy (whole conversations included) as soon as it is filled. Changes are fetched incrementally: new messages, changed
   flags (only those since the last check where the server supports CONDSTORE) and messages that are
   gone. A new UIDVALIDITY starts the folder over.
 - Searches of folders not all copied and indexed, scrolling past the copy, attachments and folder
@@ -1249,7 +1253,7 @@ logins always return to that one host.
 | `npm run test:integration` | Starts a throwaway [GreenMail](https://greenmail-mail-test.github.io/greenmail/) container (Docker), runs the full HTTP API against real IMAP/SMTP, and removes the container. Also builds the image's base stage and checks the container entrypoint (`PUID`/`PGID`, data directory ownership). |
 | `npm run build` | Compiles the server to `dist/server` and the web client to `dist/web`. |
 | `npm start` | Runs the production build. |
-| `node scripts/bench/open.mjs old=<app.js> new=<app.js>` | Measures how fast messages, conversations and pictures open, comparing builds (`dist/server/server/src/app.js` of each) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
+| `node scripts/bench/open.mjs old=<app.js> new=<app.js> [--suite list]` | Measures how fast messages, conversations and pictures open (or, with `--suite list`, how fast folders list), comparing builds (`dist/server/server/src/app.js` of each) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
 
 ### Releasing
 

@@ -22,6 +22,8 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Folders list at once from the copy (checked in the background), a folder never opened before
+      in 0.7 s instead of 1.6–3.4 s, no more once-a-minute stall for the folder list (14.3).
 - [x] Measured speed-ups (benchmark against a simulated Office 365 link): new mail's content fetched
       alongside the sync, a conversation's messages in one IMAP request, remote images found in a light
       pass instead of a second sanitizing, messages up to 50 MB kept (14.2).
