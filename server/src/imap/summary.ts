@@ -3,10 +3,11 @@
 // Modified by samschultzponsys, 2026-11-15: automatic inbox tabs (category of each message).
 // Modified by samschultzponsys, 2026-11-16: longer snippets with paragraphs, for notification previews.
 // Modified by samschultzponsys, 2026-11-18: importance (high / low) in message lists; Gmail labels.
+// Modified by samschultzponsys, 2026-11-25: searchOrThrow (a refused search is an error, never an empty answer).
 
 import { importanceOf } from '../../../shared/importance.js';
 import { categoryFromHeaders } from '../../../shared/categories.js';
-import type { FetchMessageObject, FetchQueryObject, ImapFlow, MessageAddressObject } from 'imapflow';
+import type { FetchMessageObject, FetchQueryObject, ImapFlow, MessageAddressObject, SearchObject } from 'imapflow';
 import type { Address, MessageSummary } from '../../../shared/types.js';
 import { firstMessageId, type ThreadHeaders } from '../../../shared/threads.js';
 import { parseReferences } from '../mail/parse.js';
@@ -21,6 +22,17 @@ export const LIST_FETCH: FetchQueryObject = { uid: true, flags: true, envelope: 
 const MAX_REFERENCES = 30;
 
 /** LIST_FETCH, with Gmail's labels on Gmail (X-GM-EXT-1) (DreyMail 10.9). */
+/**
+ * A SEARCH's results, or an error when the mail server refused it (imapflow answers `false`, e.g.
+ * when Microsoft 365 throttles). Never an empty list in its place (DreyMail 14.6): an empty answer
+ * read as "no messages" made a sync drop the whole cached inbox.
+ */
+export async function searchOrThrow(client: Pick<ImapFlow, 'search'>, query: SearchObject, opts: { uid: boolean }): Promise<number[]> {
+  const res = await client.search(query, opts);
+  if (!Array.isArray(res)) throw new Error('The mail server did not answer a search of the folder (busy or limiting); trying again later');
+  return res;
+}
+
 export function listFetch(client: { capabilities?: Map<string, unknown> | Set<string> }): FetchQueryObject {
   return client.capabilities?.has('X-GM-EXT-1') ? { ...LIST_FETCH, labels: true } : LIST_FETCH;
 }

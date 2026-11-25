@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
 // Modified by samschultzponsys, 2026-11-25: lists answered from the copy at once and checked in the background; a folder being cached for the first time isn't searched on the mail server for conversations.
 // Modified by samschultzponsys, 2026-11-25: word searches from the index without asking about every folder; search connections within the mailbox's limit; actions on the connection for your requests.
+// Modified by samschultzponsys, 2026-11-25: a refused search when paging is an error, not the end of the folder.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -51,7 +52,7 @@ import { imagesStillComing, inlineRemoteImages, type InlineOptions, type RemoteI
 import { MailServerError, describeError } from './connect.js';
 import type { ImapPool, Lane } from './pool.js';
 import { lookupTerms, matchesTerm, RelatedIndex, searchFor, termKey, type LookupTerm } from './related.js';
-import { addresses, fetchSnippets, listFetch, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
+import { addresses, fetchSnippets, listFetch, searchOrThrow, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
 
 export { threadHeaders };
 
@@ -575,10 +576,11 @@ export class MailService {
         let top = mailbox.exists;
         if (cursor && cursor.beforeUid < mailbox.uidNext) {
           // Find the sequence number just below the cursor UID.
-          const exact = (await client.search({ uid: String(cursor.beforeUid) }, { uid: false })) || [];
+          // A refused search is an error, not the end of the folder (DreyMail 14.6).
+          const exact = await searchOrThrow(client, { uid: String(cursor.beforeUid) }, { uid: false });
           if (exact.length) top = exact[0]! - 1;
           else {
-            const below = (await client.search({ uid: `1:${cursor.beforeUid - 1}` }, { uid: false })) || [];
+            const below = await searchOrThrow(client, { uid: `1:${cursor.beforeUid - 1}` }, { uid: false });
             top = below.length ? Math.max(...below) : 0;
           }
         }
@@ -710,6 +712,12 @@ export class MailService {
       }
       const empty: SourcePage = { source, uidValidity: f.uidValidity, items: [], exhausted: true, reset };
       if (cursor?.done) return empty;
+      // A copy missing messages the server has is not trusted: the mail server answers until the
+      // copy is filled again (DreyMail 14.6).
+      if (!sync.isIntact(f)) {
+        sync.syncSoon(userId, accountId, folder);
+        return null;
+      }
       const rows = cache.page(f, cursor?.beforeUid ?? null, limit, filter.unread);
       if (rows.length < limit && !f.complete) return null;
       return { source, uidValidity: f.uidValidity, items: rows.map((m) => cachedItem(source, f.uidValidity, m)), exhausted: rows.length < limit, reset };

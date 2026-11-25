@@ -13,12 +13,13 @@
 // Modified by samschultzponsys, 2026-11-25: unread mail loaded ahead a few messages per command (was one round trip each), batches capped by size.
 // Modified by samschultzponsys, 2026-11-25: listings checked in the background (checkSoon); a folder opened before it was cached says when its copy is ready.
 // Modified by samschultzponsys, 2026-11-25: background downloading paced per mailbox; checks nobody waits for on the background connection.
+// Modified by samschultzponsys, 2026-11-25: a refused search never empties the copy; a copy missing messages is filled again.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
 import type { CacheConfig } from '../config.js';
 import type { ImapPool, Lane } from '../imap/pool.js';
-import { fetchSnippets, listFetch, sortTime, summaryOf, toDate } from '../imap/summary.js';
+import { fetchSnippets, listFetch, searchOrThrow, sortTime, summaryOf, toDate } from '../imap/summary.js';
 import { MAX_BODY_TERMS, termsOf } from './searchTerms.js';
 import { CacheCorruptError, flagsOf, type CachedFolder, type CachedRole, type MailCache, type MessageEntry } from './store.js';
 
@@ -29,6 +30,8 @@ const PREFETCH_COUNT = 25;
 const PREFETCH_AMONG = 200;
 /** Newest arrivals whose content comes along with them in a sync (13.8). */
 const FRESH_CONTENT = 30;
+/** Messages the copy may lack against the server (arrived meanwhile) before it counts as damaged (14.6). */
+const MISSING_TOLERANCE = 5;
 /** Arrivals whose content is fetched per IMAP command, newest first (14.0), so the newest is ready soonest. */
 const FRESH_BATCH = 5;
 /** How long a listing waits for a sync before it answers from the (possibly older) cache. */
@@ -239,6 +242,15 @@ export class CacheSync {
     }
     drop();
     if (running.length) void Promise.all(running).then(drop, drop);
+  }
+
+  /**
+   * The copy holds about as many messages as the server last said the folder has (up to what is
+   * kept): a copy missing many (damaged before 14.6) isn't trusted for listing until it is filled
+   * again (DreyMail 14.6).
+   */
+  isIntact(f: CachedFolder): boolean {
+    return this.cache.count(f) + MISSING_TOLERANCE >= Math.min(f.exists, this.limit(f.role));
   }
 
   /** A folder's first fill is under way (it was opened, or is being cached): its copy is coming. */
@@ -545,10 +557,21 @@ export class CacheSync {
       if (cache.setFlags(f, updates) > 0) changed = true;
       for (const m of flagged) if (m.modseq !== undefined && (modseq === null || m.modseq > modseq)) modseq = m.modseq;
 
-      // Messages that are gone (deleted, or moved by another client).
-      const present = new Set(((await client.search({ uid: `${f.lowUid}:*` }, { uid: true })) || []) as number[]);
+      // Messages that are gone (deleted, or moved by another client). A refused search is an error,
+      // never "none left" (DreyMail 14.6: that emptied the cached inbox); nor is an empty answer
+      // for a folder the server says holds messages.
+      const present = new Set(await searchOrThrow(client, { uid: `${f.lowUid}:*` }, { uid: true }));
+      if (present.size === 0 && mailbox.exists > 0) throw new Error(`The mail server listed no messages in ${path}, which holds ${mailbox.exists}; trying again later`);
       const gone = cache.uids(f).filter((u) => !present.has(u));
       if (gone.length && cache.removeMessages(f, gone) > 0) changed = true;
+      // The copy must hold every message the server has from its oldest one up. If it doesn't (a
+      // copy damaged before 14.6), it is filled again from scratch (DreyMail 14.6).
+      if (cache.count(f) + MISSING_TOLERANCE < present.size) {
+        this.deps.log?.('mail cache folder incomplete, filling it again', { accountId, cached: cache.count(f), onServer: present.size });
+        cache.resetFolder(userId, accountId, path, role, uidValidity);
+        this.syncSoon(userId, accountId, path, role, 0);
+        return true;
+      }
 
       cache.updateFolder(f, {
         uidNext,
@@ -666,10 +689,11 @@ export class CacheSync {
         if (mailbox.uidValidity.toString() !== f.uidValidity) return false; // the next sync starts over
         // The sequence number just below the lowest cached UID.
         let top: number;
-        const exact = (await client.search({ uid: String(f.lowUid) }, { uid: false })) || [];
+        // A refused search must not end the folder early (DreyMail 14.6: it marked it complete).
+        const exact = await searchOrThrow(client, { uid: String(f.lowUid) }, { uid: false });
         if (exact.length) top = exact[0]! - 1;
         else {
-          const below = (await client.search({ uid: `1:${f.lowUid - 1}` }, { uid: false })) || [];
+          const below = await searchOrThrow(client, { uid: `1:${f.lowUid - 1}` }, { uid: false });
           top = below.length ? Math.max(...below) : 0;
         }
         if (top < 1) {
