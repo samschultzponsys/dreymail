@@ -4,6 +4,7 @@
 # Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 # Modified by samschultzponsys, 2026-11-13: version and changelog at the bottom left; first name only by default.
 # Modified by samschultzponsys, 2026-11-15: Node 24 (image, CI and GitHub Actions on their Node 24 versions).
+# Modified by samschultzponsys, 2026-11-25: the build stage gets the script that compresses the web app.
 
 # ---- base: runtime OS plus the entrypoint that drops to PUID:PGID ------------
 # Its own stage so the entrypoint tests can build it without compiling the app.
@@ -21,6 +22,7 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY shared ./shared
 COPY server/src ./server/src
 COPY web ./web
+COPY scripts/compress-web.mjs ./scripts/
 RUN npm run build
 
 # ---- prod-deps: runtime dependencies only ----------------------------------

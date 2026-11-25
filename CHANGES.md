@@ -49,8 +49,9 @@ Milliseconds, median / slowest:
 - **Files:** `web/index.html`, `web/src/api.ts`, `web/src/App.tsx`, `web/src/lazyPart.ts` (new),
   `web/src/settingTabs.ts` (new), `web/src/components/SettingsDialog.tsx`,
   `web/test/bootPreload.test.ts` (new), `server/src/app.ts`, `server/test/spa.test.ts`,
-  `scripts/compress-web.mjs` (new), `scripts/bench/speed.mjs` (was `open.mjs`), `README.md`,
-  `ROADMAP.md`, `package.json`, `package-lock.json`.
+  `scripts/compress-web.mjs` (new), `scripts/bench/speed.mjs` (was `open.mjs`), `Dockerfile` (the
+  image's build stage gets the compression script), `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
 
 ## 2026-11-25 (v14.3): folders list at once
 
