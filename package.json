@@ -1,6 +1,6 @@
 {
   "name": "dreymail",
-  "version": "14.3.0",
+  "version": "14.4.0",
   "private": true,
   "description": "A simple, good-looking, self-hosted webmail client for any IMAP/SMTP account.",
   "type": "module",
@@ -13,7 +13,7 @@
     "dev:web": "vite --config web/vite.config.ts",
     "build": "npm run build:server && npm run build:web",
     "build:server": "tsc -p tsconfig.build.json",
-    "build:web": "vite build --config web/vite.config.ts",
+    "build:web": "vite build --config web/vite.config.ts && node scripts/compress-web.mjs",
     "start": "node --disable-warning=ExperimentalWarning dist/server/server/src/index.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
     "test": "vitest run",

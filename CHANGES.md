@@ -13,6 +13,45 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.4): starts faster
+
+Measured with `node scripts/bench/speed.mjs … --suite startup` (renamed from `open.mjs`; the built
+web app in Chromium, two mailboxes, from opening DreyMail to the mail list; a desktop on the LAN,
+and a phone on 4G: 120 ms more per request, 12 Mbit/s, a 4× slower processor; 5 runs).
+Milliseconds, median / slowest:
+
+| Until the mail list shows | 14.3 | 14.4 |
+|---|---:|---:|
+| Phone on 4G, first visit | 1749 / 1826 | 948 / 1003 |
+| Phone on 4G, next start | 855 / 875 | 513 / 549 |
+| Desktop on the LAN, first visit | 207 / 221 (loading screen up to 560) | 171 / 197 |
+| Desktop on the LAN, next start | 120 / 131 | 101 / 112 |
+| Downloaded on a first visit | 946 KB | 287 KB |
+
+- **Compressed at build:** the web app is compressed once when it is built (brotli and gzip,
+  `scripts/compress-web.mjs`), and the server sends the compressed files (910 KB → 230 KB).
+- **Cached for good:** files whose name carries their content's hash (everything under `assets/`)
+  are kept by the browser instead of being checked with the server on every start. Pages are
+  always checked (`no-cache`; they were `max-age=0`).
+- **Split:** Settings, Accounts, the AI assistant, Calendar, Contacts, Tasks and the composer are
+  separate files loaded when first opened, and fetched in the background once the app is idle, so
+  opening them stays instant (the start's script: 816 KB → 489 KB). After an update, a file of
+  the old version that is gone makes the page start again once.
+- **The first requests start at once:** the app remembers which data it asked for in its first
+  seconds on each page (addresses only, never any mail; in this browser), and a small script in
+  the page asks for the same again on the next start while the app's script is still
+  downloading, what the mail list needs first. The app takes those answers instead of asking one
+  after another. Without anything remembered (a new device) it still asks for who you are, your
+  mailboxes and groups together. The script is allowed by its hash in the page's
+  Content-Security-Policy; any other inline script stays blocked.
+- **The loading screen doesn't wait for the folder list;** the sidebar's folders and counts
+  follow a moment later.
+- **Files:** `web/index.html`, `web/src/api.ts`, `web/src/App.tsx`, `web/src/lazyPart.ts` (new),
+  `web/src/settingTabs.ts` (new), `web/src/components/SettingsDialog.tsx`,
+  `web/test/bootPreload.test.ts` (new), `server/src/app.ts`, `server/test/spa.test.ts`,
+  `scripts/compress-web.mjs` (new), `scripts/bench/speed.mjs` (was `open.mjs`), `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.3): folders list at once
 
 Measured with `node scripts/bench/open.mjs … --suite list` (a mailbox of 300 conversations, 120

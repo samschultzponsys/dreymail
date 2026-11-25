@@ -22,6 +22,10 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Starts faster: the app's script compressed and split (Settings, Calendar and other windows load
+      when first needed), versioned files cached for good, the first requests started by the page itself
+      while the script downloads (remembered per page, addresses only), the loading screen no longer
+      waits for the folder list (14.4).
 - [x] Folders list at once from the copy (checked in the background), a folder never opened before
       in 0.7 s instead of 1.6–3.4 s, no more once-a-minute stall for the folder list (14.3).
 - [x] Measured speed-ups (benchmark against a simulated Office 365 link): new mail's content fetched

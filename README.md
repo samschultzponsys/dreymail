@@ -98,7 +98,8 @@
      Modified by samschultzponsys, 2026-11-25: v14.0 (messages open faster).
      Modified by samschultzponsys, 2026-11-25: v14.1 (pictures and attachments open at once).
      Modified by samschultzponsys, 2026-11-25: v14.2 (measured speed-ups; conversations in one request to the mail server).
-     Modified by samschultzponsys, 2026-11-25: v14.3 (folders list at once). -->
+     Modified by samschultzponsys, 2026-11-25: v14.3 (folders list at once).
+     Modified by samschultzponsys, 2026-11-25: v14.4 (starts faster). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -110,7 +111,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **14.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **14.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1042,6 +1043,8 @@ claim, and each user sees only the mail accounts they added themselves. DreyMail
 
 - Terminate TLS at the proxy and set `DREYMAIL_BASE_URL` to the public `https://` URL and
   `DREYMAIL_TRUST_PROXY=true`.
+- The web app is sent already compressed (since 14.4) and its versioned files with a long
+  cache lifetime: leave the proxy's own compression on or off, and don't override `Cache-Control`.
 - **WebSockets** must be proxied on `/api/ws` (live updates). Nginx:
 
   ```nginx
@@ -1253,7 +1256,7 @@ logins always return to that one host.
 | `npm run test:integration` | Starts a throwaway [GreenMail](https://greenmail-mail-test.github.io/greenmail/) container (Docker), runs the full HTTP API against real IMAP/SMTP, and removes the container. Also builds the image's base stage and checks the container entrypoint (`PUID`/`PGID`, data directory ownership). |
 | `npm run build` | Compiles the server to `dist/server` and the web client to `dist/web`. |
 | `npm start` | Runs the production build. |
-| `node scripts/bench/open.mjs old=<app.js> new=<app.js> [--suite list]` | Measures how fast messages, conversations and pictures open (or, with `--suite list`, how fast folders list), comparing builds (`dist/server/server/src/app.js` of each) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
+| `node scripts/bench/speed.mjs old=<app.js> new=<app.js> [--suite open\|list\|startup]` | Measures how fast messages, conversations and pictures open (`open`), folders list (`list`), or the app starts in Chromium on a desktop on the LAN and a phone on 4G (`startup`; needs Playwright), comparing builds (`dist/server/server/src/app.js` of each, with its `dist/web`) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
 
 ### Releasing
 
