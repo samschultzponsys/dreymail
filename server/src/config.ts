@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-17: keeps the environment it was read from (server settings saved in the UI).
 // Modified by samschultzponsys, 2026-11-23: more messages kept per folder by default (searched from the index).
 // Modified by samschultzponsys, 2026-11-25: messages up to 25 MB kept by default (was 1 MB), so mail with photos opens from the copy.
+// Modified by samschultzponsys, 2026-11-25: up to 50 MB (the largest message shown), so the biggest photo mail is kept too.
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -193,7 +194,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ? {
         messagesPerFolder: int(env.DREYMAIL_CACHE_MESSAGES, 20000),
         messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 10000),
-        maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 25) * 1024 * 1024),
+        maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 50) * 1024 * 1024),
         bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
       }
     : null;

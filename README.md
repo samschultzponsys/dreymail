@@ -96,7 +96,8 @@
      Modified by samschultzponsys, 2026-11-24: v13.8 (loading screen; update banners; reload after a server update).
      Modified by samschultzponsys, 2026-11-24: v13.9 (new mail opens at once).
      Modified by samschultzponsys, 2026-11-25: v14.0 (messages open faster).
-     Modified by samschultzponsys, 2026-11-25: v14.1 (pictures and attachments open at once). -->
+     Modified by samschultzponsys, 2026-11-25: v14.1 (pictures and attachments open at once).
+     Modified by samschultzponsys, 2026-11-25: v14.2 (measured speed-ups; conversations in one request to the mail server). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -108,7 +109,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **14.1**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **14.2**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -864,7 +865,7 @@ environment.
 | `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
 | `DREYMAIL_CACHE_MESSAGES` | no | `20000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
 | `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `10000` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
-| `DREYMAIL_CACHE_MAX_BODY_MB` | no | `25` | Largest message whose content is kept (`0`: keep no message content). 25 MB since 14.1 (was 1), so mail with photos is kept too. |
+| `DREYMAIL_CACHE_MAX_BODY_MB` | no | `50` | Largest message whose content is kept (`0`: keep no message content). 50 MB since 14.2 (was 1), so mail with photos is kept too. |
 | `DREYMAIL_CACHE_USER_MB` | no | `4096` | Space per user for their copy of mail, search index and stored messages, split across their mailboxes (12.3). |
 | `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
 | `DREYMAIL_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
@@ -1076,16 +1077,18 @@ holds up what you are doing. A folder you open before its turn starts filling ri
 whole content of messages (since 13.6 every message it indexes, newest first, and since 13.9 new mail as it arrives, so opening one
 needs no mail server), up to `DREYMAIL_CACHE_MAX_BODY_MB` per message.
 
-**Opening messages quickly (14.0).** New mail shows in the list first; its content follows right
-after, a few messages at a time, newest first, and opening one whose content is on its way waits
-for that download instead of starting another. A message whose content isn't kept yet is fetched
-on a connection used only for opening messages, so it never waits behind syncing, actions or
-folder lists, in one round trip when its size is already known. The messages around the open one
+**Opening messages quickly (14.0, 14.2).** New mail shows in the list as soon as the sync sees
+it; its content is fetched at the same moment on the connection used for opening messages, a few
+messages at a time, newest first, and opening one whose content is on its way waits for that
+download instead of starting another. A message whose content isn't kept yet is fetched on that
+connection too, so it never waits behind syncing, actions or folder lists, in one round trip when
+its size is already known; messages of one folder asked for together (a conversation opening) go
+in one request to the mail server. The messages around the open one
 (the next two and the previous one), and a message the mouse rests on in the list, are fetched
 ahead in the background, so moving with j / k, archiving or clicking finds them ready.
 
-**Pictures and attachments (14.1).** Messages up to 25 MB are kept whole (was 1 MB), so mail
-with photos opens from the copy too. The last messages opened are also kept decoded in memory
+**Pictures and attachments (14.1).** Messages up to 50 MB are kept whole (was 1 MB; the
+largest message DreyMail shows), so mail with photos opens from the copy too. The last messages opened are also kept decoded in memory
 (up to 512 MB in all, for 10 minutes), so opening a picture or another attachment of the message
 you're reading, or replying to it, needs neither the mail server nor decoding the message again.
 The image viewer fetches the pictures before and after the one shown, so the arrows show them at
@@ -1246,6 +1249,7 @@ logins always return to that one host.
 | `npm run test:integration` | Starts a throwaway [GreenMail](https://greenmail-mail-test.github.io/greenmail/) container (Docker), runs the full HTTP API against real IMAP/SMTP, and removes the container. Also builds the image's base stage and checks the container entrypoint (`PUID`/`PGID`, data directory ownership). |
 | `npm run build` | Compiles the server to `dist/server` and the web client to `dist/web`. |
 | `npm start` | Runs the production build. |
+| `node scripts/bench/open.mjs old=<app.js> new=<app.js>` | Measures how fast messages, conversations and pictures open, comparing builds (`dist/server/server/src/app.js` of each) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
 
 ### Releasing
 

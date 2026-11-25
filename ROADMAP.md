@@ -22,6 +22,9 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Measured speed-ups (benchmark against a simulated Office 365 link): new mail's content fetched
+      alongside the sync, a conversation's messages in one IMAP request, remote images found in a light
+      pass instead of a second sanitizing, messages up to 50 MB kept (14.2).
 - [x] Pictures and attachments open at once: messages up to 25 MB kept, the last opened kept decoded in
       memory, the viewer fetches the neighbouring pictures, big messages decoded on worker threads (14.1).
 - [x] Messages open faster: new mail listed before its content downloads (newest first, an open joins

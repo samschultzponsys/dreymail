@@ -13,6 +13,53 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.2): measured speed-ups
+
+Every change below was measured with the new benchmark (`scripts/bench/open.mjs`): 13.9 against
+14.2, each on a fresh mailbox of 300 messages (notes, newsletters, photo mail) on GreenMail behind
+a simulated Office 365 link (80 ms round trip, 50 Mbit/s), 5–7 runs each. Milliseconds, median /
+slowest:
+
+| Measurement | 13.9 | 14.2 |
+|---|---:|---:|
+| 1 new message: arrival → open | 1352 / 1549 | 707 / 1541 |
+| 8 new messages at once: arrival → open | 1028 / 1776 | 1029 / 1076 |
+| 1 new photo message (2 × 4 MB): arrival → open | 3330 / 3442 | 2908 / 2940 |
+| open a message whose content isn't kept | 260 / 270 | 177 / 191 |
+| the same, while a sync is running | 861 / 884 | 175 / 193 |
+| conversation of 4, none kept: all open | 1136 / 1159 | 325 / 344 |
+| photo message: open | 2221 / 2235 | 234 / 251 |
+| photo message: each picture | ~2240 | ~65 |
+| photo message too new to be kept: each picture | ~2235 | ~56 |
+
+Opening a photo message whose content isn't kept yet still takes as long as downloading it
+(about 2.2 s for 11 MB at 50 Mbit/s); everything after that is from memory.
+
+- **New mail's content is fetched at once**, on the connection for reading, alongside the sync
+  that lists it, newest first, a few at a time. Every message is claimed at the start, so loading
+  ahead never downloads one a second time. (Fetching it after the sync was measured too: a burst
+  sometimes took 2.5 s to open.)
+- **A conversation opens in one request to the mail server:** messages of one folder asked for
+  while a fetch is under way go together in the next IMAP command (at most 25, and 64 MB).
+- **Remote images are found in a light pass** instead of a whole second sanitizing of the
+  message (3–4× quicker: 8.6 → 2.3 ms for a typical newsletter, 45 → 16 ms for a very long one).
+  It follows the sanitizer's rules exactly; a test compares both on 20,000 generated messages and
+  the hostile fixtures.
+- **Messages up to 50 MB are kept** (`DREYMAIL_CACHE_MAX_BODY_MB`, was 25 in 14.1): the largest
+  message DreyMail shows, so the biggest photo mail (a 25 MB attachment is about 34 MB as mail)
+  is kept too.
+- **Unread mail loaded ahead a few messages per command** (it was one round trip per message);
+  every background download is capped by size.
+- **Cleanup:** removed unused code (`addMonths`, `ADMIN_PERMISSIONS`, `useMessageCache`,
+  `knownAddresses`).
+- **Benchmark:** `node scripts/bench/open.mjs old=<app.js> new=<app.js>` (see README, Development).
+- **Files:** `server/src/cache/sync.ts`, `server/src/cache/store.ts`, `server/src/imap/mail.ts`,
+  `server/src/mail/sanitize.ts`, `server/src/config.ts`, `server/src/db.ts`,
+  `server/src/calendar/adminReminders.ts`, `shared/permissions.ts`, `web/src/hooks.ts`,
+  `server/test/remoteUrls.test.ts` (new), `server/test/autoImages.test.ts`,
+  `server/test/cache.test.ts`, `server/test/integration/cache.test.ts`,
+  `scripts/bench/open.mjs` (new), `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.1): pictures and attachments open at once
 
 - **Opening a picture no longer downloads the whole message again.** Messages larger than the
