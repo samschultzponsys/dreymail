@@ -1,17 +1,22 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 
-// How fast messages open, measured end to end (DreyMail 14.1). Compares builds of the server
-// against a GreenMail mail server (Docker) behind a proxy that adds a realistic network: by default
-// 80 ms round trip and 50 Mbit/s, about what a home server sees talking to Office 365.
+// How fast DreyMail is, measured end to end (DreyMail 14.2). Compares builds against a GreenMail
+// mail server (Docker) behind a proxy that adds a realistic network: by default 80 ms round trip
+// and 50 Mbit/s, about what a home server sees talking to Office 365.
 //
-//   node scripts/bench/open.mjs <label>=<path to dist/server/server/src/app.js> [...more]
-//        [--rtt 80] [--mbit 50] [--reps 5]
+//   node scripts/bench/speed.mjs <label>=<path to dist/server/server/src/app.js> [...more]
+//        [--suite open|list|startup] [--rtt 80] [--mbit 50] [--reps 5]
+//
+// Suites: open (messages, conversations, pictures), list (folders), startup (the built web app
+// in Chromium, from opening it to the mail list, on a desktop on the LAN and a phone on 4G; the
+// build's dist/web is served).
 //
 // Each build runs in its own process, on a fresh mailbox seeded the same way, with its own
 // default settings (what people get). Prints the median and the slowest of each measurement.
 
 import { execFileSync, spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -33,7 +38,7 @@ else await driver();
 
 async function driver() {
   const builds = args.filter((a) => a.includes('=') && !a.startsWith('--')).map((a) => a.split('='));
-  if (!builds.length) throw new Error('usage: open.mjs <label>=<dist app.js> ...');
+  if (!builds.length) throw new Error('usage: speed.mjs <label>=<dist app.js> ...');
   const rtt = Number(opt('rtt', 80));
   const mbit = Number(opt('mbit', 50));
   const reps = Number(opt('reps', 5));
@@ -50,14 +55,29 @@ async function driver() {
     const results = {};
     for (const [label, app] of builds) {
       process.stderr.write(`\n== ${label} ==\n`);
+      const webPort = suite === 'startup' ? await freePort() : 0;
       results[label] = await new Promise((resolve, reject) => {
         const c = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', process.argv[1]], {
-          env: { ...process.env, NODE_ENV: 'test', BENCH_CHILD: JSON.stringify({ app, imapPort, slowPort: proxy.port, smtpPort, reps, suite }) },
-          stdio: ['ignore', 'pipe', 'inherit'],
+          env: { ...process.env, NODE_ENV: 'test', BENCH_CHILD: JSON.stringify({ app, imapPort, slowPort: proxy.port, smtpPort, reps, suite, webPort }) },
+          stdio: ['pipe', 'pipe', 'inherit'],
         });
         let out = '';
-        c.stdout.on('data', (d) => (out += d));
-        c.on('exit', (code) => (code === 0 ? resolve(JSON.parse(out.trim().split('\n').pop())) : reject(new Error(`${label} exited ${code}`))));
+        let measured = null;
+        c.stdout.on('data', (d) => {
+          out += d;
+          // startup: the server is ready; the browser measures, then the server is stopped.
+          const ready = out.match(/^READY (.*)$/m);
+          if (ready && !measured) {
+            measured = browserRuns(`http://127.0.0.1:${webPort}`, JSON.parse(ready[1]).cookie, reps).then(
+              (r) => (c.stdin.end('stop\n'), r),
+              (err) => (c.kill(), reject(err)),
+            );
+          }
+        });
+        c.on('exit', async (code) => {
+          if (measured) return resolve(await measured);
+          code === 0 ? resolve(JSON.parse(out.trim().split('\n').pop())) : reject(new Error(`${label} exited ${code}`));
+        });
       });
     }
     proxy.close();
@@ -65,6 +85,105 @@ async function driver() {
   } finally {
     docker('rm', '-f', id);
   }
+}
+
+function freePort() {
+  return new Promise((resolve) => {
+    const srv = net.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+/**
+ * The built web app in Chromium, from opening it to the mail list: a desktop on the LAN and a phone
+ * on 4G (slower network, 4× slower processor), each a first visit (nothing cached) and a reload.
+ */
+async function browserRuns(baseUrl, cookie, reps) {
+  // Playwright isn't one of DreyMail's dependencies: installed globally (or with npm i --no-save playwright).
+  const { chromium } = createRequire(import.meta.url)('playwright');
+  const browser = await chromium.launch();
+  const profiles = {
+    'desktop on the LAN': { latency: 2, down: 200e6 / 8, up: 200e6 / 8, cpu: 1, viewport: { width: 1400, height: 900 }, mobile: false },
+    'phone on 4G': { latency: 120, down: 12e6 / 8, up: 4e6 / 8, cpu: 4, viewport: { width: 390, height: 844 }, mobile: true },
+  };
+  const out = {};
+  const add = (k, v) => (out[k] ??= []).push(v);
+  try {
+    for (const [name, p] of Object.entries(profiles)) {
+      for (let r = 0; r < reps; r++) {
+        const context = await browser.newContext({ viewport: p.viewport, isMobile: p.mobile, hasTouch: p.mobile });
+        await context.addCookies([{ name: 'dm_session', value: cookie.replace(/^dm_session=/, ''), url: baseUrl }]);
+        // When the first list row shows and the loading screen goes, from the start of navigation.
+        await context.addInitScript(() => {
+          const w = window;
+          w.__dm = { row: null, splash: null };
+          let seen = false;
+          const check = () => {
+            const t = performance.now();
+            if (w.__dm.row === null && document.querySelector('.row-main')) w.__dm.row = t;
+            const s = document.getElementById('splash');
+            // Gone once it was there (a slow page arrives in pieces: not before it is parsed).
+            if (s) seen = true;
+            if (w.__dm.splash === null && seen && (!s || s.classList.contains('gone'))) w.__dm.splash = t;
+          };
+          new MutationObserver(check).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+        });
+        const page = await context.newPage();
+        // The page's own script must run: a blocked one (Content-Security-Policy) is counted.
+        let blocked = 0;
+        page.on('console', (msg) => {
+          if (msg.type() === 'error' && /Content Security Policy/i.test(msg.text())) blocked++;
+        });
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Network.enable');
+        await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: p.latency, downloadThroughput: p.down, uploadThroughput: p.up });
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: p.cpu });
+        let bytes = 0;
+        let requests = 0;
+        // BENCH_WATERFALL=1: each request's start and end (ms since navigation), first run only.
+        const timeline = new Map();
+        let navStart = 0;
+        cdp.on('Network.requestWillBeSent', (e) => {
+          requests++;
+          if (e.type === 'Document') navStart = e.timestamp;
+          timeline.set(e.requestId, { url: e.request.url.replace(baseUrl, ''), start: e.timestamp });
+        });
+        cdp.on('Network.loadingFinished', (e) => {
+          bytes += e.encodedDataLength;
+          const t = timeline.get(e.requestId);
+          if (t) t.end = e.timestamp;
+        });
+        for (const visit of ['first visit', 'reload']) {
+          bytes = 0;
+          requests = 0;
+          if (visit === 'first visit') await page.goto(`${baseUrl}/`, { waitUntil: 'commit' });
+          else await page.reload({ waitUntil: 'commit' });
+          await page.waitForFunction(() => window.__dm.row !== null && window.__dm.splash !== null, null, { timeout: 60_000, polling: 50 });
+          const m = await page.evaluate(() => window.__dm);
+          add(`${name}, ${visit}: mail list shown`, m.row);
+          add(`${name}, ${visit}: loading screen gone`, m.splash);
+          // Let the app settle (WebSocket, background requests, and what it remembers for its next
+          // start, 4 s in) before counting what it loaded and starting again.
+          await page.waitForTimeout(5000);
+          if (process.env.BENCH_WATERFALL && r === 0) {
+            const rows = [...timeline.values()].filter((t) => t.start >= navStart).sort((x, y) => x.start - y.start);
+            process.stderr.write(`  ${name}, ${visit} (list ${Math.round(m.row)}, loading screen ${Math.round(m.splash)}):\n${rows.map((t) => `    ${String(Math.round((t.start - navStart) * 1000)).padStart(5)} → ${t.end ? String(Math.round((t.end - navStart) * 1000)).padStart(5) : '    …'}  ${t.url.slice(0, 90)}`).join('\n')}\n`);
+          }
+          timeline.clear();
+          add(`${name}, ${visit}: downloaded (KB)`, bytes / 1024);
+          add(`${name}, ${visit}: requests`, requests);
+          add(`${name}, ${visit}: scripts blocked (must be 0)`, blocked);
+          blocked = 0;
+        }
+        await context.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  return out;
 }
 
 function report(results, net) {
@@ -132,7 +251,7 @@ function slowProxy(target, oneWayMs, bytesPerMs) {
 
 // ---- child: one build, measured ---------------------------------------------------------------
 
-async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite }) {
+async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, webPort }) {
   const root = path.resolve(path.dirname(appPath));
   const { buildApp } = await import(pathToFileURL(appPath).href);
   const { loadConfig } = await import(pathToFileURL(path.join(root, 'config.js')).href);
@@ -174,7 +293,7 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite }
   const user2 = `bench2-${crypto.randomUUID().slice(0, 8)}@example.com`;
   await direct(async (c) => {
     await c.mailboxCreate('Sent').catch(() => undefined);
-    if (suite === 'list') {
+    if (suite === 'list' || suite === 'startup') {
       // A work mailbox: conversations with your replies in Sent, an Archive, some unread mail.
       for (let i = 0; i < 300; i++) await c.append('INBOX', textMail(`Thread ${i}`, { id: `<t${i}@bench.example>` }), i % 7 === 0 ? [] : ['\\Seen']);
       for (let i = 0; i < 120; i++) await c.append('Sent', textMail(`Re: Thread ${i * 2}`, { inReplyTo: `<t${i * 2}@bench.example>` }), ['\\Seen']);
@@ -186,7 +305,7 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite }
     for (let i = 0; i < 40; i++) await c.append('INBOX', newsletter(`Newsletter ${i}`), ['\\Seen']);
     for (let i = 0; i < 10; i++) await c.append('INBOX', photos(`Photos ${i}`), []);
   });
-  if (suite === 'list') {
+  if (suite === 'list' || suite === 'startup') {
     await direct(async (c) => {
       await c.mailboxCreate('Sent').catch(() => undefined);
       for (let i = 0; i < 150; i++) await c.append('INBOX', textMail(`Second ${i}`), ['\\Seen']);
@@ -200,7 +319,9 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite }
     DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
     DREYMAIL_DEV_LOGIN: 'true',
     DREYMAIL_DATA_DIR: '/nonexistent-not-used',
-    DREYMAIL_BASE_URL: 'http://localhost:8080',
+    DREYMAIL_BASE_URL: webPort ? `http://127.0.0.1:${webPort}` : 'http://localhost:8080',
+    // startup: this build's web app.
+    DREYMAIL_WEB_DIR: path.resolve(path.dirname(appPath), '../../../web'),
   });
   const store = new Store(':memory:', new Keyring(config.secretKey).credentialKey);
   const ctx = await buildApp(config, { store, logger: false, cacheFile, pushTransport: async () => 'sent', pushHostCheck: async () => {} });
@@ -283,6 +404,17 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite }
   const t0 = performance.now();
   await settled();
   add('setup: first fill of 300 messages (s, informational)', (performance.now() - t0) / 1000);
+  if (suite === 'startup') {
+    // Two mailboxes (All inboxes), filled; then the browser measures (see browserRuns).
+    const account2 = (await api('POST', '/api/accounts', { name: 'Bench 2', displayName: 'Bench 2', email: user2, color: '#664422', imap: { ...server, user: user2 }, smtp: { ...server, user: user2, port: smtpPort }, appendSent: false })).json();
+    await settled(account, ['Sent']);
+    await settled(account2);
+    await ctx.app.listen({ port: webPort, host: '127.0.0.1' });
+    process.stdout.write(`READY ${JSON.stringify({ cookie })}\n`);
+    await new Promise((resolve) => process.stdin.once('data', resolve));
+    await ctx.app.close();
+    process.exit(0);
+  }
   if (suite === 'list') {
     await listSuite();
     await ctx.app.close();
