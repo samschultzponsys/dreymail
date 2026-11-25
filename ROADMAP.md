@@ -22,6 +22,12 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Connections per mailbox kept within a limit (`DREYMAIL_IMAP_CONNECTIONS`, 6), extra ones closed
+      after a minute unused; background downloading paced (`DREYMAIL_CACHE_BACKGROUND_MBIT`, 20);
+      word searches from the index without asking about every folder (about 1 s → under 10 ms);
+      actions never queued behind a sync; Settings → Server → Speed (real timings); the Speed
+      workflow on every push to main; your list shown at once when starting, per device (off unless
+      chosen) (14.5).
 - [x] Starts faster: the app's script compressed and split (Settings, Calendar and other windows load
       when first needed), versioned files cached for good, the first requests started by the page itself
       while the script downloads (remembered per page, addresses only), the loading screen no longer

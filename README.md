@@ -99,7 +99,8 @@
      Modified by samschultzponsys, 2026-11-25: v14.1 (pictures and attachments open at once).
      Modified by samschultzponsys, 2026-11-25: v14.2 (measured speed-ups; conversations in one request to the mail server).
      Modified by samschultzponsys, 2026-11-25: v14.3 (folders list at once).
-     Modified by samschultzponsys, 2026-11-25: v14.4 (starts faster). -->
+     Modified by samschultzponsys, 2026-11-25: v14.4 (starts faster).
+     Modified by samschultzponsys, 2026-11-25: v14.5 (connections, searches, speed page). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -111,7 +112,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **14.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **14.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -861,13 +862,15 @@ environment.
 | `UMASK` | no | – | Docker image only: umask for files the server creates, e.g. `022` or `002`. |
 | `PORT` / `HOST` | no | `8080` / `0.0.0.0` | Listen address. |
 | `DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS` | no | `false` | Refuse IMAP/SMTP hosts that resolve to private/internal addresses. Turn on if untrusted users can log in. Leave off if your mail server is on your LAN. |
-| `DREYMAIL_IMAP_IDLE_TIMEOUT` | no | `300` | Seconds before an unused pooled IMAP connection is closed. |
+| `DREYMAIL_IMAP_IDLE_TIMEOUT` | no | `300` | Seconds before an unused pooled IMAP connection is closed (connections for searching, folder lists and background filling: after 60 seconds at most). |
+| `DREYMAIL_IMAP_CONNECTIONS` | no | `6` | Most IMAP connections one mailbox has open at once, the one watching the inbox included (5–20). Gmail allows 15 per account across all your mail apps. Opening messages and actions, lists, folder lists and the background filling always get theirs; searching many folders at once uses what's left. |
 | `DREYMAIL_MAX_MESSAGE_MB` | no | `50` | Largest message the server downloads for display. |
 | `DREYMAIL_MAX_UPLOAD_MB` | no | `25` | Largest total attachment upload when composing. |
 | `DREYMAIL_CACHE` | no | `true` | Keep a local copy of each account's newest mail, see [Mail cache](#mail-cache). `false` asks the mail server every time. |
 | `DREYMAIL_CACHE_MESSAGES` | no | `20000` | Newest messages kept of INBOX and Sent (50–100000). Older mail is fetched from the mail server as you scroll. |
 | `DREYMAIL_CACHE_FOLDER_MESSAGES` | no | `10000` | Newest messages kept of every other folder (50–100000), filled in the background. `0` caches only INBOX and Sent. |
 | `DREYMAIL_CACHE_MAX_BODY_MB` | no | `50` | Largest message whose content is kept (`0`: keep no message content). 50 MB since 14.2 (was 1), so mail with photos is kept too. |
+| `DREYMAIL_CACHE_BACKGROUND_MBIT` | no | `20` | How fast filling the copy in the background (content kept, the search index) may download, per mailbox, in Mbit/s; `0` for no limit. New mail and opening messages are never held back. |
 | `DREYMAIL_CACHE_USER_MB` | no | `4096` | Space per user for their copy of mail, search index and stored messages, split across their mailboxes (12.3). |
 | `DREYMAIL_VAPID_SUBJECT` | no | `DREYMAIL_BASE_URL` if it is `https://`, else `mailto:postmaster@<host>` | Contact sent to push services (Apple, Google, Mozilla) with every notification: a `mailto:` or `https:` URL. |
 | `DREYMAIL_DEFAULT_*` | no | – | Starting values for new mail accounts, see [Default account settings](#default-account-settings). |
@@ -1091,6 +1094,16 @@ in one request to the mail server. The messages around the open one
 (the next two and the previous one), and a message the mouse rests on in the list, are fetched
 ahead in the background, so moving with j / k, archiving or clicking finds them ready.
 
+**Speed (14.5).** Settings → Server → Speed (administrators) shows how long opening a message,
+listing, searching, opening an attachment, actions, sending and starting DreyMail actually took
+for the people using it since the server started: the typical time, the slow one (1 in 20 took
+longer) and the slowest. Kept in memory only, nothing about whose or which mail.
+
+**Showing your list at once (14.5, off unless chosen).** Settings → This device can keep the first
+page of the list you last saw on that device and show it the moment DreyMail opens, until the
+current one arrives. That means subjects, senders and previews stored in the browser (or app) of
+that device, so it is off unless you choose it; never in a device backup, removed when signing out.
+
 **Pictures and attachments (14.1).** Messages up to 50 MB are kept whole (was 1 MB; the
 largest message DreyMail shows), so mail with photos opens from the copy too. The last messages opened are also kept decoded in memory
 (up to 512 MB in all, for 10 minutes), so opening a picture or another attachment of the message
@@ -1256,7 +1269,7 @@ logins always return to that one host.
 | `npm run test:integration` | Starts a throwaway [GreenMail](https://greenmail-mail-test.github.io/greenmail/) container (Docker), runs the full HTTP API against real IMAP/SMTP, and removes the container. Also builds the image's base stage and checks the container entrypoint (`PUID`/`PGID`, data directory ownership). |
 | `npm run build` | Compiles the server to `dist/server` and the web client to `dist/web`. |
 | `npm start` | Runs the production build. |
-| `node scripts/bench/speed.mjs old=<app.js> new=<app.js> [--suite open\|list\|startup]` | Measures how fast messages, conversations and pictures open (`open`), folders list (`list`), or the app starts in Chromium on a desktop on the LAN and a phone on 4G (`startup`; needs Playwright), comparing builds (`dist/server/server/src/app.js` of each, with its `dist/web`) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
+| `node scripts/bench/speed.mjs old=<app.js> new=<app.js> [--suite open\|list\|search\|actions\|startup]` | Measures how fast messages, conversations and pictures open (`open`), folders list (`list`), searches answer (`search`), actions and sending take (`actions`), or the app starts in Chromium on a desktop on the LAN and a phone on 4G (`startup`; needs Playwright), comparing builds (`dist/server/server/src/app.js` of each, with its `dist/web`) against GreenMail (Docker) behind a simulated network (`--rtt 80 --mbit 50` by default, `--reps 5`). Prints a table of medians and slowest runs. |
 
 ### Releasing
 
@@ -1269,7 +1282,11 @@ if that version is still the one on `main`), then creates the `vX.Y` tag and a G
 generated notes. Runs queue per version, so pushing the next version quickly doesn't cancel the
 previous one's release. If a version's release never ran, push its tag (`git tag vX.Y <commit>`,
 `git push origin vX.Y`), then start the workflow by hand (Actions → Release → Run workflow) with
-that version's full commit SHA in **sha**. To release:
+that version's full commit SHA in **sha**.
+
+Every push to `main` also runs the **Speed** workflow (since 14.5), beside the release and without
+holding it up: `scripts/bench/speed.mjs`, every suite, this version against the last release,
+with the tables in the run's summary (nothing is uploaded). To release:
 
 ```sh
 scripts/release-version.sh next      # prints the next version, e.g. 1.1
