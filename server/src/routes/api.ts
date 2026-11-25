@@ -31,6 +31,7 @@
 // Modified by samschultzponsys, 2026-11-18: mark a whole folder read.
 // Modified by samschultzponsys, 2026-11-22: inbox tabs off by default; folders pinned to the top bar (preference).
 // Modified by samschultzponsys, 2026-11-25: senders looked up one at a time for images; warm-up of messages likely opened next.
+// Modified by samschultzponsys, 2026-11-25: the app reports how long it took to start.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -74,6 +75,7 @@ import { gravatarEmail, parsePicture, PictureError, pictureUrl } from '../profil
 import { isNewer, readChangelog, serverVersion, UpdateChecker } from '../version.js';
 import { SnoozeError, type SnoozeService } from '../mail/snooze.js';
 import { PushSubscriptionError, validateSubscription, type PushService } from '../push/service.js';
+import type { SpeedStats } from '../speed.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -263,6 +265,8 @@ export interface ApiDeps {
   onBlocklistChanged?: (userId: string) => void;
   scheduled?: ScheduledSends;
   addressBook?: AddressBook;
+  /** How fast DreyMail is for the people using it (DreyMail 14.5). */
+  speed?: SpeedStats;
 }
 
 export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
@@ -1020,6 +1024,14 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
     } catch (err) {
       return sendError(reply, err);
     }
+  });
+
+  /** The app says how long it took to start, until the mail list showed (DreyMail 14.5). */
+  app.post('/api/speed/startup', async (req, reply) => {
+    const body = z.object({ ms: z.number().min(0).max(120_000), remembered: z.boolean() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Not a startup time' });
+    deps.speed?.record(body.data.remembered ? 'startup' : 'startupNew', body.data.ms);
+    return { ok: true };
   });
 
   app.get('/api/attachment', async (req, reply) => {

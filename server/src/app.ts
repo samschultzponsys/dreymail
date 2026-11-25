@@ -28,6 +28,7 @@
 // Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars; background indexing waits while DreyMail is in use.
 // Modified by samschultzponsys, 2026-11-25: larger messages being opened are decoded on worker threads of their own.
 // Modified by samschultzponsys, 2026-11-25: the web app sent compressed (made at build), its hashed files cached for good.
+// Modified by samschultzponsys, 2026-11-25: connections per mailbox; speed measured for Settings → Server → Speed.
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -95,6 +96,7 @@ import { inboxUnread } from '../../shared/unread.js';
 import { registerWebSocket, type LiveSessions } from './routes/ws.js';
 import { AutoReplies } from './autoReply.js';
 import { registerAutoReplyRoutes } from './routes/autoReplies.js';
+import { SpeedStats, speedMetricOf } from './speed.js';
 
 /** CSP for the application itself. Message iframes (srcdoc) inherit it, plus their own. */
 /**
@@ -189,6 +191,7 @@ export async function buildApp(
   const sessions = new Sessions(keyring.sessionKey, config.baseUrl.protocol === 'https:');
   const pool = new ImapPool(store, {
     idleTimeoutMs: config.imapIdleTimeoutMs,
+    maxConnections: config.imapConnections,
     blockPrivateHosts: config.blockPrivateMailHosts,
     log: (msg, extra) => app.log.info(extra ?? {}, msg),
   });
@@ -416,6 +419,12 @@ export async function buildApp(
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 50, fieldSize: 6 * 1024 * 1024 } });
   await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
 
+  // How long requests take, for Settings → Server → Speed (DreyMail 14.5).
+  const speed = new SpeedStats();
+  app.addHook('onResponse', async (req, reply) => {
+    const metric = speedMetricOf(req.method, req.routeOptions.url, (req.query ?? {}) as Record<string, unknown>, reply.statusCode);
+    if (metric) speed.record(metric, reply.elapsedTime);
+  });
   const indexFile = path.join(config.webDir, 'index.html');
   const appCsp = cspFor(fs.existsSync(indexFile) ? fs.readFileSync(indexFile, 'utf8') : null);
   app.addHook('onSend', async (_req, reply, payload) => {
@@ -433,6 +442,7 @@ export async function buildApp(
   const login = new LoginSettings(config, store);
   await registerAuthRoutes(app, config, store, sessions, login);
   await registerApiRoutes(app, {
+    speed,
     config,
     store,
     sessions,
@@ -477,6 +487,7 @@ export async function buildApp(
       ],
     },
     onAiAccess: (id) => assistant.syncWatching(id),
+    speed,
   });
   registerAndroidPushRoutes(app, { store, pool, firebase });
   registerMicrosoftRoutes(app, { config, store, sessions, access, microsoft, microsoftConfig, onSignedIn: (userId, accountId) => calendars.signedIn(userId, accountId) });

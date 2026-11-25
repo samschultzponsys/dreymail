@@ -26,6 +26,7 @@ import { LoginSettingsError, type LoginSettings } from '../loginSettings.js';
 import type { FirebaseConfig } from '../push/fcm.js';
 import type { MailCache } from '../cache/store.js';
 import { databaseUsage, emptyDatabaseUsage, sqliteFileBytes } from '../storage.js';
+import type { SpeedStats } from '../speed.js';
 
 export interface AdminDeps {
   config: Config;
@@ -44,6 +45,8 @@ export interface AdminDeps {
   storage?: { cache: MailCache | null; files: { name: string; path: string | null }[] };
   /** A user's AI assistant switch changed (start or stop watching their inboxes). */
   onAiAccess?: (userId: string) => void;
+  /** How fast DreyMail is for the people using it (DreyMail 14.5). */
+  speed?: SpeedStats;
 }
 
 const registrationSchema = z.enum(['open', 'first', 'closed']);
@@ -280,6 +283,8 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps)
 
   // ---- server settings (DreyMail 9.7) -----------------------------------------------
 
+  // Settings → Server → Speed (DreyMail 14.5).
+  app.get('/api/admin/speed', async (req, reply) => (may(req, reply, 'server.manage') ? (deps.speed?.view() ?? { since: new Date().toISOString(), rows: [] }) : reply));
   app.get('/api/admin/server', async (req, reply) => (may(req, reply, 'server.manage') ? (serverSettings?.view() ?? { settings: [], restartNeeded: false }) : reply));
 
   app.put('/api/admin/server', async (req, reply) => {

@@ -4,11 +4,13 @@
 // Settings → Server: starting values for new mailboxes, the mail cache, limits and push. Saved in
 // the database; a value set in the environment (the compose file) wins and is shown locked.
 // DreyMail 11.9: the automatic backups, and one made now.
+// DreyMail 14.5: Speed, how fast DreyMail is for the people using it.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { SERVER_SETTINGS, type ServerSettingDef, type ServerSettingsView } from '../../../shared/serverSettings';
+import type { SpeedView } from '../../../shared/speed';
 import { fetchJson } from '../api';
 
 const GROUPS = ['New mailboxes', 'Mail cache', 'Limits and safety', 'Notifications and updates', 'Backups'] as const;
@@ -20,6 +22,47 @@ const GROUP_HINTS: Record<(typeof GROUPS)[number], string> = {
   Backups:
     'A copy of the whole database (everyone’s settings and mailboxes, secrets still encrypted with the secret key) every day. Each user can restore their own data from one in Settings → Backup; to restore the whole server, stop DreyMail and put a copy in place of dreymail.db (same secret key).',
 };
+
+const ms = (v: number | null) => (v === null ? '–' : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`);
+
+/** How long things take for the people using this server, since it started (DreyMail 14.5). */
+function SpeedPanel() {
+  const q = useQuery({ queryKey: ['admin', 'speed'], queryFn: () => fetchJson<SpeedView>('GET', '/api/admin/speed'), refetchInterval: 30_000 });
+  return (
+    <section className="server-group">
+      <h3>Speed</h3>
+      <div className="hint">
+        How long things took for the people using DreyMail, measured on this server (starting: in their app) since it started
+        {q.data ? ` (${new Date(q.data.since).toLocaleString()})` : ''}. Typical: half were quicker; slow: 1 in 20 took longer. Kept in memory only, nothing
+        about whose or which mail.
+      </div>
+      {q.data && (
+        <table className="storage-table">
+          <thead>
+            <tr>
+              <th />
+              <th>Typical</th>
+              <th>Slow</th>
+              <th>Slowest</th>
+              <th>Times</th>
+            </tr>
+          </thead>
+          <tbody>
+            {q.data.rows.map((r) => (
+              <tr key={r.metric}>
+                <td>{r.label}</td>
+                <td>{ms(r.median)}</td>
+                <td>{ms(r.p95)}</td>
+                <td>{ms(r.max)}</td>
+                <td>{r.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
 
 export function ServerAdmin() {
   const qc = useQueryClient();
@@ -109,6 +152,7 @@ export function ServerAdmin() {
         The secret key, data folder and address stay in the environment.
       </div>
       {q.data.restartNeeded && <div className="warning-text">Some saved changes apply after DreyMail restarts (restart the container).</div>}
+      <SpeedPanel />
       {GROUPS.map((g) => (
         <section key={g} className="server-group">
           <h3>{g}</h3>
