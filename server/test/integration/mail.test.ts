@@ -3,6 +3,7 @@
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-17: Not spam, Mark as spam and address suggestions.
 // Modified by samschultzponsys, 2026-11-23: searching a whole mailbox of many folders.
+// Modified by samschultzponsys, 2026-11-25: a recreated folder is noticed after its background check.
 
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
@@ -505,8 +506,8 @@ describe('UIDVALIDITY changes', () => {
     await c.mailboxCreate('Recreated');
     await c.append('Recreated', rawMessage({ from: BOB, to: ALICE, subject: 'new', date: new Date(), id: 'rn' }));
     await c.logout();
-    const page2 = (await api<ListResponse>('GET', `/api/messages?accountId=${id}&folder=Recreated&limit=1&cursor=${page1.cursor}`)).json;
-    expect(page2.reset).toBe(true);
+    // Done by another mail client: the folder's copy notices after its background check (DreyMail 14.3).
+    expect(await until(async () => (await api<ListResponse>('GET', `/api/messages?accountId=${id}&folder=Recreated&limit=1&cursor=${page1.cursor}`)).json.reset === true)).toBe(true);
   });
 });
 

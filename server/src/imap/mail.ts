@@ -20,6 +20,7 @@
 // Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
 // Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
 // Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
+// Modified by samschultzponsys, 2026-11-25: lists answered from the copy at once and checked in the background; a folder being cached for the first time isn't searched on the mail server for conversations.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -204,6 +205,8 @@ export function decodeCursor(raw: string | undefined | null): CursorMap {
 const MAX_RELATED = 200;
 /** A listing of a current cached INBOX checks the cached Sent folder in the background when it is older than this. */
 const SENT_REFRESH_MS = 5000;
+/** A listed folder (not a watched inbox) synced longer ago than this is checked in the background. */
+const LISTED_CHECK_MS = 3000;
 
 /**
  * K-way merge of per-source pages. Each source's items are a queue ordered newest-UID-first; at
@@ -363,7 +366,15 @@ export class MailService {
   forgetAccount(userId: string, accountId: string) {
     this.opened.deletePrefix(`${userId}\u0000${accountId}\u0000`);
     this.forgetFolders(userId, accountId);
-    this.fromCache(userId, accountId, 'INBOX', undefined, ({ cache }) => cache.dropAccount(userId, accountId));
+    this.fromCache(userId, accountId, 'INBOX', undefined, ({ cache, sync }) =>
+      sync.forgetAccount(userId, accountId, () => {
+        try {
+          cache.dropAccount(userId, accountId);
+        } catch {
+          /* the cache is optional */
+        }
+      }),
+    );
   }
 
   // ---- folders -------------------------------------------------------------
@@ -585,16 +596,6 @@ export class MailService {
     }, lane);
   }
 
-  /**
-   * A page of `source` from the cache, or null if the cache can't answer it: the folder isn't
-   * cached (or not filled yet), there is a text search (always done by the IMAP server), or the
-   * page reaches below the oldest cached message. Also makes a background sync check for news.
-   */
-  /**
-   * A text search answered from the search index (DreyMail 12.3), at once, when the folder's copy
-   * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
-   * searches). Only plain word searches (and unread only) are answered here.
-   */
   /** A word search from the search index alone (see listMessages' `quick`): never asks a mail server. */
   private async quickSearch(userId: string, sources: ListSource[], previous: Record<string, AccountCursor>, limit: number, filter: ListFilter): Promise<MessageListResponse> {
     const none: MessageListResponse = { messages: [], related: [], cursor: null, errors: [], reset: false, partial: true };
@@ -643,6 +644,11 @@ export class MailService {
     return out;
   }
 
+  /**
+   * A text search answered from the search index (DreyMail 12.3), at once, when the folder's copy
+   * holds all its mail and every message's content is indexed; otherwise null (the IMAP server
+   * searches). Only plain word searches (and unread only) are answered here.
+   */
   private indexedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter, current: Set<string>): SourcePage | null {
     if (!this.cached || !indexable(filter)) return null;
     const terms = queryTerms(filter.text);
@@ -664,6 +670,11 @@ export class MailService {
     });
   }
 
+  /**
+   * A page of `source` from the cache, or null if the cache can't answer it: the folder isn't
+   * cached (or not filled yet; it starts filling), there is a text search (always done by the IMAP
+   * server), or the page reaches below the oldest cached message.
+   */
   private cachedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
     if (!this.cached || needsSearch(filter)) return null;
     const { accountId, folder } = source;
@@ -752,6 +763,10 @@ export class MailService {
             lookIn = [...new Set([folder, ...(sent ? [sent] : [])])];
           }
           for (const f of lookIn) {
+            // The listed folder, opened before it was cached, isn't searched on the mail server for
+            // older messages of its conversations (slow on a big folder): its copy is ready in a
+            // moment, and the list then comes again from it, whole conversations included (DreyMail 14.3).
+            if (f === folder && this.cached?.sync.isFilling(userId, accountId, f)) continue;
             const source = { accountId, folder: f };
             const items = await this.findRelated(userId, source, [...terms.values()]).catch(() => [] as FetchedItem[]);
             for (const it of items) {
@@ -793,12 +808,27 @@ export class MailService {
           if (!sync.ready(userId, accountId, folder)) return;
           const sent = cache.folderByRole(userId, accountId, 'sent');
           const others = sent && sent.path !== folder ? [sent.path] : [];
-          if (!fresh && sync.isCurrent(userId, accountId, folder)) {
-            // Nothing tells us about changes in Sent; have a look in the background now and then.
-            for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);
+          if (fresh) {
+            // The refresh button: the user wants what the mail server has now.
+            await sync.beforeListing(userId, accountId, [folder, ...others], { force: true });
             return;
           }
-          await sync.beforeListing(userId, accountId, [folder, ...others], { force: fresh });
+          if (!sync.isCurrent(userId, accountId, folder)) {
+            // An inbox not being watched right now (new mail can't be heard of otherwise), or a folder
+            // where something DreyMail knows of changed (a move, a sent message, activity the
+            // watcher saw): wait for the check, up to 0.4 s, as before.
+            const known = [folder, ...others].filter((p) => sync.hasPendingChange(userId, accountId, p));
+            if (folder === 'INBOX' || known.length) {
+              await sync.beforeListing(userId, accountId, folder === 'INBOX' ? [folder, ...others] : known);
+              return;
+            }
+            // Any other folder is answered from the copy at once (DreyMail 14.3; it waited up to 0.4 s
+            // every time). The check runs in the background; what it finds (changes made by other
+            // mail clients) reaches the list by itself.
+            sync.checkSoon(userId, accountId, folder, LISTED_CHECK_MS);
+          }
+          // Nothing tells us about changes in Sent; have a look in the background now and then.
+          for (const p of others) sync.refreshIfOlder(userId, accountId, p, SENT_REFRESH_MS);
         } catch (err) {
           sync.handleError(err, userId, accountId, folder);
         }

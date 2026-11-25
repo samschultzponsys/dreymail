@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-24: messages are kept whole while indexed: even the first open needs no mail server.
 // Modified by samschultzponsys, 2026-11-25: new mail's content, opening on its own connection, warming messages ahead.
 // Modified by samschultzponsys, 2026-11-25: a big message's pictures open from memory.
+// Modified by samschultzponsys, 2026-11-25: other folders listed from their copy at once, catching up afterwards.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -338,6 +339,30 @@ describe('mail cache', () => {
     expect(calls).toBe(0);
     // Opened again: from memory too, its flags from the cache.
     expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
+  });
+
+  it('answers other folders from their copy at once, and catches up with changes made elsewhere', async () => {
+    await settled(hedy);
+    events.length = 0;
+    await deliver(HEDY, 'Filed by another client', { folder: 'Sent', flags: ['\\Seen'] });
+    // Listed again and again, as the browser does when told the folder changed: it shows up.
+    expect(await until(async () => subjects((await list(hedy, 'Sent')).messages).includes('Filed by another client'))).toBe(true);
+    // The browser was told (it refreshes the list by itself).
+    expect(events).toContainEqual({ type: 'mailbox', accountId: hedy.id, folder: 'Sent' });
+  });
+
+  it('tells the browser when a folder opened before it was cached is ready, then lists it from the copy', async () => {
+    await withImap(HEDY, async (c) => {
+      await c.mailboxCreate('Opened early');
+      for (let i = 0; i < 3; i++) await c.append('Opened early', raw(HEDY, `Early ${i}`), ['\\Seen']);
+    });
+    events.length = 0;
+    // Not cached yet: the mail server answers, and the folder starts being cached.
+    expect(subjects((await list(hedy, 'Opened early')).messages).sort()).toEqual(['Early 0', 'Early 1', 'Early 2']);
+    expect(await until(() => events.some((e) => e.type === 'mailbox' && e.folder === 'Opened early'))).toBe(true);
+    const { result, calls } = await imapCalls(() => list(hedy, 'Opened early'));
+    expect(subjects(result.messages).sort()).toEqual(['Early 0', 'Early 1', 'Early 2']);
+    expect(calls).toBe(0);
   });
 
   it('brings my reply along from the cached Sent folder', async () => {

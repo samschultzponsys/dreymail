@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-25: new messages listed before their content comes, in small newest-first batches an open joins; content kept by a warm-up.
 // Modified by samschultzponsys, 2026-11-25: background reads in batches of bounded size (bigger messages kept); only the start of messages too big to keep is read for the index.
 // Modified by samschultzponsys, 2026-11-25: unread mail loaded ahead a few messages per command (was one round trip each), batches capped by size.
+// Modified by samschultzponsys, 2026-11-25: listings checked in the background (checkSoon); a folder opened before it was cached says when its copy is ready.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -63,6 +64,8 @@ interface Job {
   /** Someone waits for the next run: it goes on the main connection, ahead of background filling (DreyMail). */
   urgent?: boolean;
   timer: NodeJS.Timeout | null;
+  /** The run under way started because something changed in the folder (DreyMail 14.3). */
+  forChange?: boolean;
 }
 
 export interface CacheSyncDeps {
@@ -127,6 +130,8 @@ export class CacheSync {
   private readonly dirty = new Set<string>();
   /** Accounts whose other folders are being filled (warmAccount), and whether to go round again. */
   private readonly warming = new Map<string, { again: boolean }>();
+  /** Folders opened before they were cached: their first fill tells the browser (DreyMail 14.3). */
+  private readonly opened = new Set<string>();
   /** Accounts whose search index is being filled, and whether to go round again (DreyMail 12.3). */
   private readonly indexing = new Map<string, { again: boolean }>();
   /** Content being downloaded right now, per folder key + UID: opening the message waits for it instead of fetching it twice. */
@@ -189,6 +194,53 @@ export class CacheSync {
     if (waits.length) await Promise.race([Promise.all(waits), sleep(opts.maxWaitMs ?? LISTING_WAIT_MS)]);
   }
 
+  /**
+   * A listing was answered from the copy (DreyMail 14.3): check with the mail server now, on the
+   * main connection (not behind the background filling), unless the copy was synced in the last
+   * `maxAgeMs` or a sync is already under way. What the check finds reaches the list by itself.
+   */
+  checkSoon(userId: string, accountId: string, path: string, maxAgeMs: number) {
+    const f = this.cache.folder(userId, accountId, path);
+    const job = this.jobs.get(this.key(userId, accountId, path));
+    if (!f || job?.running || Date.now() - f.syncedAt < maxAgeMs) return;
+    void this.sync(userId, accountId, path, f.role, true);
+  }
+
+  /**
+   * Something is known to have changed in the folder (DreyMail moved or sent mail there, or the
+   * watcher saw activity) that the copy doesn't have yet: a listing waits for it (DreyMail 14.3).
+   */
+  hasPendingChange(userId: string, accountId: string, path: string): boolean {
+    const k = this.key(userId, accountId, path);
+    const job = this.jobs.get(k);
+    return this.dirty.has(k) || !!job?.timer || !!job?.forChange;
+  }
+
+  /**
+   * An account was removed: nothing more is synced for it, and what a sync still under way writes
+   * is dropped once it ends (DreyMail 14.3).
+   */
+  forgetAccount(userId: string, accountId: string, drop: () => void) {
+    const prefix = `${userId}\u0000${accountId}\u0000`;
+    const running: Promise<void>[] = [];
+    for (const [k, job] of this.jobs) {
+      if (!k.startsWith(prefix)) continue;
+      if (job.timer) clearTimeout(job.timer);
+      job.timer = null;
+      this.dirty.delete(k);
+      this.opened.delete(k);
+      if (job.running) running.push(job.running);
+    }
+    drop();
+    if (running.length) void Promise.all(running).then(drop, drop);
+  }
+
+  /** A folder's first fill is under way (it was opened, or is being cached): its copy is coming. */
+  isFilling(userId: string, accountId: string, path: string): boolean {
+    const job = this.jobs.get(this.key(userId, accountId, path));
+    return !this.ready(userId, accountId, path) && !!(job?.running || job?.timer);
+  }
+
   /** Sync in the background if the last sync is older than `maxAgeMs` and none is running or due. */
   refreshIfOlder(userId: string, accountId: string, path: string, maxAgeMs: number) {
     const f = this.cache.folder(userId, accountId, path);
@@ -213,6 +265,7 @@ export class CacheSync {
   /** Start caching an other folder now (it was just opened and isn't cached yet). */
   startFolder(userId: string, accountId: string, path: string) {
     if (!this.cachesOtherFolders || path === 'INBOX' || this.cache.folder(userId, accountId, path)) return;
+    this.opened.add(this.key(userId, accountId, path));
     this.syncSoon(userId, accountId, path, 'folder', 0);
   }
 
@@ -317,12 +370,16 @@ export class CacheSync {
       while (!this.stopped) {
         job.again = false;
         const waiting = job.waiters.splice(0);
-        this.dirty.delete(k);
+        job.forChange = this.dirty.delete(k);
         const lane: Lane = job.urgent ? 'main' : this.lane(role);
         job.urgent = false;
         try {
-          const changed = await this.update(userId, accountId, path, role, lane);
-          if (changed) this.deps.onChanged(userId, accountId, path);
+          const changed = await this.update(userId, accountId, path, role, lane).finally(() => (job.forChange = false));
+          // The copy of a folder someone has open is ready: the list can now come from it, whole
+          // conversations included (DreyMail 14.3).
+          const firstFill = this.opened.has(k) && !!this.ready(userId, accountId, path);
+          if (firstFill) this.opened.delete(k);
+          if (changed || firstFill) this.deps.onChanged(userId, accountId, path);
         } catch (err) {
           this.handleError(err, userId, accountId, path);
         }

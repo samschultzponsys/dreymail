@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
+// Modified by samschultzponsys, 2026-11-25: other folders catch up after their background check.
 
 import crypto from 'node:crypto';
 import { ImapFlow } from 'imapflow';
@@ -46,6 +47,16 @@ async function withImap(fn: (c: ImapFlow) => Promise<void>) {
   } finally {
     await c.logout();
   }
+}
+
+/** Wait for `fn` to hold: a folder other than INBOX is answered from its copy at once (DreyMail 14.3), and catches up after a check. */
+async function until(fn: () => Promise<boolean>, ms = 15_000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (await fn()) return true;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return false;
 }
 
 async function list(folder: string, query = '') {
@@ -157,8 +168,8 @@ describe('conversations', () => {
     await withImap((c) =>
       c.append('Drafts', raw({ from: FRAN, to: GUS, subject: 'Re: Boat trip', id: id('draft'), date: at(6), inReplyTo: ids.question, references: [ids.question] }), ['\\Draft'], at(6)).then(() => undefined),
     );
-    const res = await list('Drafts');
-    expect(res.messages).toHaveLength(1);
-    expect(res.related).toEqual([]);
+    // Saved by another mail client: Drafts' copy catches up after its background check.
+    expect(await until(async () => (await list('Drafts')).messages.length === 1)).toBe(true);
+    expect((await list('Drafts')).related).toEqual([]);
   });
 });
