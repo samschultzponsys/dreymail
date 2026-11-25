@@ -13,6 +13,22 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.6): fix: an inbox showing only its newest few messages
+
+- **Fix:** when the mail server refused a search during a sync (Microsoft 365 does when it limits
+  heavy use, which saving whole messages since 14.1 made far more likely), DreyMail read the refusal
+  as "no messages left" and dropped every saved message of the folder from its copy except the
+  newest. A refusal while filling a folder could also mark it complete. The inbox list then trusted
+  that copy and showed only a handful of messages. A refused search is now an error (the sync tries
+  again later), never an empty answer; nor is an empty answer for a folder the server says isn't
+  empty; paging further into a folder on the mail server is not cut short by one either.
+- **Copies damaged this way repair themselves:** a copy holding fewer messages than the server has
+  is filled again from scratch on its next sync, and isn't used for listing meanwhile (the mail
+  server answers), so the whole inbox shows again as soon as 14.6 runs.
+- **Files:** `server/src/cache/sync.ts`, `server/src/imap/summary.ts`, `server/src/imap/mail.ts`,
+  `server/test/cacheSafety.test.ts` (new), `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-25 (v14.5): connections, searches, speed page
 
 Measured with `scripts/bench/speed.mjs` (new suites `search` and `actions`; 14.4 against 14.5,
