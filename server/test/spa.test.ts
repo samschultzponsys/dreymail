@@ -2,13 +2,15 @@
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-13: DreyMail's own names (env vars, identifiers, comments).
 // Modified by samschultzponsys, 2026-11-15: the privacy page at /privacy.
+// Modified by samschultzponsys, 2026-11-25: compressed files and long caching for hashed assets.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildApp, isSpaRequest, type App } from '../src/app.js';
+import { APP_CSP, buildApp, cspFor, isSpaRequest, type App } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { Keyring } from '../src/crypto.js';
 import { Store } from '../src/db.js';
@@ -30,6 +32,17 @@ describe('isSpaRequest', () => {
   });
 });
 
+describe("the page's Content-Security-Policy", () => {
+  it("allows the page's own inline script by its hash, and nothing else", () => {
+    const html = '<head><script>start()</script><script type="module" src="/assets/a.js"></script></head>';
+    const hash = crypto.createHash('sha256').update('start()').digest('base64');
+    expect(cspFor(html)).toContain(`script-src 'self' 'sha256-${hash}';`);
+    expect(cspFor(html).split('; ').find((d) => d.startsWith('script-src'))).toBe(`script-src 'self' 'sha256-${hash}'`);
+    expect(cspFor(null)).toBe(APP_CSP);
+    expect(cspFor('<p>no scripts</p>')).toBe(APP_CSP);
+  });
+});
+
 describe('SPA fallback in the production server', () => {
   let ctx: App;
   const webDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-web-'));
@@ -37,6 +50,12 @@ describe('SPA fallback in the production server', () => {
   beforeAll(async () => {
     fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
     fs.writeFileSync(path.join(webDir, 'privacy.html'), '<!doctype html><title>Privacy</title>');
+    // As scripts/compress-web.mjs leaves the build.
+    fs.mkdirSync(path.join(webDir, 'assets'));
+    const script = 'console.log("app");'.repeat(200);
+    fs.writeFileSync(path.join(webDir, 'assets', 'index-AbC123.js'), script);
+    fs.writeFileSync(path.join(webDir, 'assets', 'index-AbC123.js.br'), zlib.brotliCompressSync(script));
+    fs.writeFileSync(path.join(webDir, 'assets', 'index-AbC123.js.gz'), zlib.gzipSync(script));
     const config = loadConfig({
       NODE_ENV: 'test',
       DREYMAIL_SECRET_KEY: crypto.randomBytes(48).toString('base64'),
@@ -67,6 +86,20 @@ describe('SPA fallback in the production server', () => {
     const res = await get('/privacy');
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain('<title>Privacy</title>');
+  });
+  it('sends the compressed build to browsers that accept it, and lets them keep hashed assets', async () => {
+    const br = await ctx.app.inject({ method: 'GET', url: '/assets/index-AbC123.js', headers: { 'accept-encoding': 'gzip, deflate, br' } });
+    expect(br.statusCode).toBe(200);
+    expect(br.headers['content-encoding']).toBe('br');
+    expect(zlib.brotliDecompressSync(br.rawPayload).toString()).toBe('console.log("app");'.repeat(200));
+    expect(br.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    const gz = await ctx.app.inject({ method: 'GET', url: '/assets/index-AbC123.js', headers: { 'accept-encoding': 'gzip' } });
+    expect(gz.headers['content-encoding']).toBe('gzip');
+    const plain = await ctx.app.inject({ method: 'GET', url: '/assets/index-AbC123.js' });
+    expect(plain.headers['content-encoding']).toBeUndefined();
+    expect(plain.body).toBe('console.log("app");'.repeat(200));
+    // The page itself is always checked again (it names the current assets).
+    expect((await get('/mail/x/INBOX')).headers['cache-control']).toBe('no-cache');
   });
   it('does not answer missing assets with HTML', async () => {
     const res = await get('/assets/missing.js', '*/*');

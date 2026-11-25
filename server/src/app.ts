@@ -27,7 +27,9 @@
 // Modified by samschultzponsys, 2026-11-21: backups (the user's own file; daily copies of the database).
 // Modified by samschultzponsys, 2026-11-23: the search index and each user's cache space; Microsoft 365 group calendars; background indexing waits while DreyMail is in use.
 // Modified by samschultzponsys, 2026-11-25: larger messages being opened are decoded on worker threads of their own.
+// Modified by samschultzponsys, 2026-11-25: the web app sent compressed (made at build), its hashed files cached for good.
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import cookie from '@fastify/cookie';
@@ -95,6 +97,16 @@ import { AutoReplies } from './autoReply.js';
 import { registerAutoReplyRoutes } from './routes/autoReplies.js';
 
 /** CSP for the application itself. Message iframes (srcdoc) inherit it, plus their own. */
+/**
+ * The page's Content-Security-Policy, also allowing the page's own inline scripts by their hash
+ * (DreyMail 14.4: the one that starts the first requests while the app's script downloads). Any
+ * other inline script stays blocked.
+ */
+export function cspFor(html: string | null): string {
+  const hashes = [...(html ?? '').matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]!).digest('base64')}'`);
+  return hashes.length ? APP_CSP.replace("script-src 'self'", `script-src 'self' ${hashes.join(' ')}`) : APP_CSP;
+}
+
 export const APP_CSP = [
   "default-src 'self'",
   "script-src 'self'",
@@ -404,13 +416,15 @@ export async function buildApp(
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 50, fieldSize: 6 * 1024 * 1024 } });
   await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
 
+  const indexFile = path.join(config.webDir, 'index.html');
+  const appCsp = cspFor(fs.existsSync(indexFile) ? fs.readFileSync(indexFile, 'utf8') : null);
   app.addHook('onSend', async (_req, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('referrer-policy', 'no-referrer');
     reply.header('x-frame-options', 'DENY');
     reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
     reply.header('cross-origin-opener-policy', 'same-origin');
-    if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', APP_CSP);
+    if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', appCsp);
     return payload;
   });
 
@@ -559,7 +573,20 @@ export async function buildApp(
 
   // Static frontend (production build). In development Vite serves the UI and proxies /api.
   if (fs.existsSync(path.join(config.webDir, 'index.html'))) {
-    await app.register(fastifyStatic, { root: config.webDir, wildcard: false, index: ['index.html'] });
+    await app.register(fastifyStatic, {
+      root: config.webDir,
+      wildcard: false,
+      index: ['index.html'],
+      // Compressed at build (scripts/compress-web.mjs), sent to browsers that accept it (DreyMail 14.4).
+      preCompressed: true,
+      // Files under assets/ have their content's hash in their name: a browser keeps them for good
+      // instead of asking the server again on every start (DreyMail 14.4).
+      setHeaders: (res, file) => {
+        if (/[/\\]assets[/\\]/.test(file)) res.header('cache-control', 'public, max-age=31536000, immutable');
+        // Pages name the current assets: always checked again.
+        else if (file.endsWith('.html')) res.header('cache-control', 'no-cache');
+      },
+    });
     // The privacy page Google and Microsoft app registrations link to (https://your-dreymail/privacy).
     app.get('/privacy', async (_req, reply) => reply.header('cache-control', 'no-cache').sendFile('privacy.html'));
     app.setNotFoundHandler((req, reply) => {
