@@ -13,6 +13,65 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.5): connections, searches, speed page
+
+Measured with `scripts/bench/speed.mjs` (new suites `search` and `actions`; 14.4 against 14.5,
+GreenMail behind a simulated Office 365 link, 3 runs). Milliseconds, median / slowest:
+
+| | 14.4 | 14.5 |
+|---|---:|---:|
+| Word search: inbox | 988 / 994 | 5 / 8 |
+| Word search: Archive | 985 / 986 | 2 / 3 |
+| Word search: all mail (10 folders) | 991 / 1035 | 7 / 9 |
+| Search with a filter (from:) | 167 / 168 | 167 / 169 |
+| Flag (right after another action) | 92 / 664 | 87 / 96 |
+| Archive, delete, mark 20 read, send | about the same | about the same |
+| Lists, opening messages, starting | about the same | about the same |
+
+The benchmark runs without a browser session, so its first action opens the connection for your
+requests (mark read: 170 / 755); with DreyMail open that connection is ready beforehand.
+
+- **Connections per mailbox kept within a limit:** `DREYMAIL_IMAP_CONNECTIONS` (also in Settings →
+  Server; 6 by default, 5–20), the one watching the inbox included, so other mail apps keep room
+  (Gmail allows 15 per account in all). Opening messages and actions, lists, folder lists and the
+  background filling always get theirs; searching many folders at once uses what's left.
+  Connections for searching, folder lists and the background filling close after a minute unused
+  (was 5); the main one and the one for your requests stay ready while DreyMail is open.
+- **Background downloading paced:** `DREYMAIL_CACHE_BACKGROUND_MBIT` (also in Settings → Server; 20
+  Mbit/s per mailbox by default, 0 for no limit) for filling the copy and the search index, so a
+  big mailbox (messages up to 50 MB are kept since 14.2) fills steadily without taking the whole
+  connection or the mail server's patience. New mail and opening messages are never held back.
+- **Word searches from the index at once:** before answering from the search index, DreyMail asked
+  the mail server for the status of every folder of the mailbox (one request per folder on most
+  servers), even for a watched inbox. Now a watched inbox, or another folder checked in the last
+  few minutes, answers at once and is checked in the background (results update themselves); only
+  the folders in question are asked about otherwise. An inbox not being watched is always checked.
+- **Actions never wait behind a sync:** mark read, flag, archive, delete and move run on the
+  connection for your requests; they used to queue behind the sync the previous action set off.
+- **Background checks off the main connection:** checks nobody waits for (after a list or search
+  answered from the copy) run on the background connection; a search of ten folders used to queue
+  ten checks on the main one.
+- **Settings → Server → Speed:** how long opening, listing, searching, opening attachments,
+  actions, sending and starting DreyMail actually took for the people using this server since it
+  started (typical, slow, slowest). In memory only, nothing about whose or which mail.
+- **Showing your list at once when starting** (Settings → This device, off unless chosen): the
+  first page of the list last seen on that device is kept there and shown the moment DreyMail
+  opens, until the current one arrives. Only for the same person and view, never in a device
+  backup (nor the remembered startup requests), removed when signing out or switching it off.
+- **The Speed workflow:** every push to main measures this version against the last release
+  (every suite), the tables in the run's summary; it never holds up the release.
+- **Fix:** Settings → Server showed the largest message kept whole as 1 MB by default (50 since 14.2).
+- **Files:** `server/src/imap/pool.ts`, `server/src/imap/mail.ts`, `server/src/cache/sync.ts`,
+  `server/src/config.ts`, `server/src/app.ts`, `server/src/routes/api.ts`,
+  `server/src/routes/admin.ts`, `server/src/speed.ts` (new), `shared/speed.ts` (new),
+  `shared/serverSettings.ts`, `web/src/listSnapshot.ts` (new), `web/src/hooks.ts`, `web/src/App.tsx`,
+  `web/src/api.ts`, `web/src/deviceBackup.ts`, `web/src/components/ServerAdmin.tsx`,
+  `web/src/components/SettingsDialog.tsx`, `web/index.html`, `server/test/speed.test.ts` (new),
+  `server/test/integration/connections.test.ts` (new), `web/test/listSnapshot.test.ts` (new),
+  `server/test/searchIndex.test.ts`, `server/test/cache.test.ts`,
+  `server/test/integration/cache.test.ts`, `scripts/bench/speed.mjs`,
+  `.github/workflows/speed.yml` (new), `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.4): starts faster
 
 Measured with `node scripts/bench/speed.mjs … --suite startup` (renamed from `open.mjs`; the built

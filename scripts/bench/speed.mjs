@@ -382,10 +382,14 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, slowSmtpPort,
   };
   const list = async () => (await api('GET', `/api/messages?accountId=${account.id}&folder=INBOX&limit=50`)).json().messages;
   const ref = (m) => `accountId=${account.id}&folder=INBOX&uid=${m.uid}&uidValidity=${m.uidValidity}`;
-  const timed = async (fn) => {
+  const timed = async (fn, label = '') => {
     const t = performance.now();
+    traceFrom = t;
+    trace.length = 0;
     await fn();
-    return performance.now() - t;
+    const ms = performance.now() - t;
+    if (process.env.BENCH_TRACE && label) log(`  trace ${label}: ${Math.round(ms)} ms\n    ${trace.join('\n    ')}`);
+    return ms;
   };
   const dropBodies = (uids) => {
     const db = new DatabaseSync(cacheFile);
@@ -685,7 +689,7 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, slowSmtpPort,
     await settled();
     lag.reset();
     lag.enable();
-    add('photo message: open', await timed(() => api('GET', `/api/message?${ref(m)}`)));
+    add('photo message: open', await timed(() => api('GET', `/api/message?${ref(m)}`), 'photo message: open'));
     lag.disable();
     add('photo message: server stalled during open (worst, ms)', lag.max / 1e6);
     add('photo message: 1st picture', await timed(() => api('GET', `/api/attachment?${ref(m)}&index=0`)));
