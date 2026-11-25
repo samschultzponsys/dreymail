@@ -41,8 +41,4 @@ export function setAdminReminder(store: Store, userIds: string[], r: AdminRemind
   return userIds.length;
 }
 
-export const addMonths = (d: Date, months: number) => {
-  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate()));
-  return x.toISOString().slice(0, 10);
-};
 export const addDays = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);

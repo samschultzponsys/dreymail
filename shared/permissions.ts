@@ -44,6 +44,3 @@ export interface Role {
 export function isPermission(v: unknown): v is Permission {
   return typeof v === 'string' && (ALL_PERMISSIONS as string[]).includes(v);
 }
-
-/** Any administrative flag: opens the administration tabs. */
-export const ADMIN_PERMISSIONS: Permission[] = PERMISSIONS.filter((p) => p.group === 'Administration').map((p) => p.key);

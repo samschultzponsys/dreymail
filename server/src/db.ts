@@ -36,7 +36,7 @@
 // Modified by samschultzponsys, 2026-11-17: repeats, reminders, guests and meetings on calendar events; reminder alerts.
 // Modified by samschultzponsys, 2026-11-18: phone transitions default to a plain slide; follow-up flags; show-as on events; contacts and tasks; shared mailboxes; S/MIME certificates.
 // Modified by samschultzponsys, 2026-11-22: device settings backups (device_backups); inbox tabs off by default; folders pinned to the top bar; images from everyone you know, or from all mail; calendar nicknames and mailbox colors.
-// Modified by samschultzponsys, 2026-11-25: one known address looked up without reading the whole address book.
+// Modified by samschultzponsys, 2026-11-25: one known address looked up without reading the whole address book (the read-all version removed).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -1608,22 +1608,9 @@ export class Store {
    * Everyone the user knows (DreyMail 12.1): people they have written to, people whose mail is in
    * their address book (sent to or received from), and their own contacts.
    */
-  knownAddresses(userId: string): Set<string> {
-    const out = this.recipientAddresses(userId);
-    for (const r of this.db.prepare('SELECT address FROM address_book WHERE user_id = ? AND (sent > 0 OR received > 0)').all(userId) as { address: string }[]) out.add(r.address.trim().toLowerCase());
-    for (const r of this.db.prepare('SELECT emails FROM contacts WHERE user_id = ?').all(userId) as { emails: string }[]) {
-      try {
-        for (const e of JSON.parse(r.emails) as string[]) if (typeof e === 'string') out.add(e.trim().toLowerCase());
-      } catch {
-        /* not a list */
-      }
-    }
-    return out;
-  }
-
   /**
-   * Whether one address is known (as knownAddresses, without reading them all): opening a message
-   * asks this for its sender (DreyMail 14.0).
+   * Whether an address is known: someone you wrote to, who wrote to you, or one of your contacts.
+   * Opening a message asks this for its sender (DreyMail 14.0; it used to read every address).
    */
   isKnownAddress(userId: string, address: string): boolean {
     const a = address.trim().toLowerCase();

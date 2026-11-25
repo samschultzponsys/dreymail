@@ -10,13 +10,14 @@
 // Modified by samschultzponsys, 2026-11-17: event reminders over the WebSocket.
 // Modified by samschultzponsys, 2026-11-23: quick searches from the search index while the full one runs.
 // Modified by samschultzponsys, 2026-11-24: reconnecting checks the server's version again.
+// Modified by samschultzponsys, 2026-11-25: unused useMessageCache removed.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AccountFolders, ClientEvent, MessageAction, MessageRef, MessageSummary, Preferences, ServerEvent } from '../../shared/types';
+import type { AccountFolders, ClientEvent, MessageAction, MessageRef, Preferences, ServerEvent } from '../../shared/types';
 import { api, type MailboxSel } from './api';
 import { desktopBridge } from './desktop';
-import { actionsPending, fetchMessageList, runMessageAction, updateMessageLists, type ActionOutcome } from './messageActions';
+import { actionsPending, fetchMessageList, runMessageAction, type ActionOutcome } from './messageActions';
 import { closeNotifications } from './push';
 import { applyThemeColor } from './themeColor';
 
@@ -75,12 +76,6 @@ export function useQuickSearch(sel: MailboxSel, q: string, unread: boolean, enab
     enabled: enabled && !!q.trim(),
     staleTime: 20_000,
   });
-}
-
-/** Apply a transformation to every cached message list (optimistic updates). */
-export function useMessageCache() {
-  const qc = useQueryClient();
-  return useCallback((fn: (m: MessageSummary) => MessageSummary | null) => updateMessageLists(qc, fn), [qc]);
 }
 
 /**
