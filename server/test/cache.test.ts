@@ -4,6 +4,7 @@
 // Modified by samschultzponsys, 2026-11-17: other folders cached ('folder' role, DREYMAIL_CACHE_FOLDER_MESSAGES).
 // Modified by samschultzponsys, 2026-11-23: bigger default copies (searched from the index).
 // Modified by samschultzponsys, 2026-11-25: messages up to 25 MB kept by default.
+// Modified by samschultzponsys, 2026-11-25: up to 50 MB; background download rate.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -266,16 +267,17 @@ describe('mail cache settings', () => {
   const base = { DREYMAIL_SECRET_KEY: secret(), DREYMAIL_DEV_LOGIN: 'true' };
 
   it('is on by default with 20000 messages per folder (12.3), 1 MB per message and 200 MB per account', () => {
-    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 20000, messagesPerOtherFolder: 10000, maxBodyBytes: 50 * 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024 });
+    expect(loadConfig(base).cache).toEqual({ messagesPerFolder: 20000, messagesPerOtherFolder: 10000, maxBodyBytes: 50 * 1024 * 1024, bodyBytesPerAccount: 200 * 1024 * 1024, backgroundBytesPerSecond: 2_500_000 });
   });
 
   it('can be switched off or sized by the administrator', () => {
     expect(loadConfig({ ...base, DREYMAIL_CACHE: 'false' }).cache).toBeNull();
-    expect(loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '500', DREYMAIL_CACHE_FOLDER_MESSAGES: '0', DREYMAIL_CACHE_MAX_BODY_MB: '0.5', DREYMAIL_CACHE_ACCOUNT_MB: '50' }).cache).toEqual({
+    expect(loadConfig({ ...base, DREYMAIL_CACHE_MESSAGES: '500', DREYMAIL_CACHE_FOLDER_MESSAGES: '0', DREYMAIL_CACHE_MAX_BODY_MB: '0.5', DREYMAIL_CACHE_ACCOUNT_MB: '50', DREYMAIL_CACHE_BACKGROUND_MBIT: '0' }).cache).toEqual({
       messagesPerFolder: 500,
       messagesPerOtherFolder: 0,
       maxBodyBytes: 512 * 1024,
       bodyBytesPerAccount: 50 * 1024 * 1024,
+      backgroundBytesPerSecond: 0,
     });
   });
 

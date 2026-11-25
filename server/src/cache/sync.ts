@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-25: background reads in batches of bounded size (bigger messages kept); only the start of messages too big to keep is read for the index.
 // Modified by samschultzponsys, 2026-11-25: unread mail loaded ahead a few messages per command (was one round trip each), batches capped by size.
 // Modified by samschultzponsys, 2026-11-25: listings checked in the background (checkSoon); a folder opened before it was cached says when its copy is ready.
+// Modified by samschultzponsys, 2026-11-25: background downloading paced per mailbox; checks nobody waits for on the background connection.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -66,6 +67,8 @@ interface Job {
   timer: NodeJS.Timeout | null;
   /** The run under way started because something changed in the folder (DreyMail 14.3). */
   forChange?: boolean;
+  /** Nobody waits for the next run: it goes on the background connection (DreyMail 14.5). */
+  background?: boolean;
 }
 
 export interface CacheSyncDeps {
@@ -130,6 +133,8 @@ export class CacheSync {
   private readonly dirty = new Set<string>();
   /** Accounts whose other folders are being filled (warmAccount), and whether to go round again. */
   private readonly warming = new Map<string, { again: boolean }>();
+  /** Per mailbox: when background downloading may go on (DreyMail 14.5, see pace). */
+  private readonly pacedUntil = new Map<string, number>();
   /** Folders opened before they were cached: their first fill tells the browser (DreyMail 14.3). */
   private readonly opened = new Set<string>();
   /** Accounts whose search index is being filled, and whether to go round again (DreyMail 12.3). */
@@ -195,15 +200,16 @@ export class CacheSync {
   }
 
   /**
-   * A listing was answered from the copy (DreyMail 14.3): check with the mail server now, on the
-   * main connection (not behind the background filling), unless the copy was synced in the last
-   * `maxAgeMs` or a sync is already under way. What the check finds reaches the list by itself.
+   * A listing or search was answered from the copy (DreyMail 14.3): check with the mail server
+   * now, unless the copy was synced in the last `maxAgeMs` or a sync is already under way. On the
+   * background connection (14.5: a search of ten folders queued ten checks on the main one, and
+   * everything else waited seconds). What the check finds reaches the list by itself.
    */
   checkSoon(userId: string, accountId: string, path: string, maxAgeMs: number) {
     const f = this.cache.folder(userId, accountId, path);
     const job = this.jobs.get(this.key(userId, accountId, path));
     if (!f || job?.running || Date.now() - f.syncedAt < maxAgeMs) return;
-    void this.sync(userId, accountId, path, f.role, true);
+    void this.sync(userId, accountId, path, f.role, false, true);
   }
 
   /**
@@ -352,7 +358,7 @@ export class CacheSync {
    * started after this call (loading older messages and message content may continue in the
    * background); never rejects.
    */
-  sync(userId: string, accountId: string, path: string, role: CachedRole, urgent = false): Promise<void> {
+  sync(userId: string, accountId: string, path: string, role: CachedRole, urgent = false, background = false): Promise<void> {
     if (this.stopped) return Promise.resolve();
     const k = this.key(userId, accountId, path);
     const job = this.job(userId, accountId, path);
@@ -362,6 +368,8 @@ export class CacheSync {
     }
     const done = new Promise<void>((resolve) => job.waiters.push(resolve));
     if (urgent) job.urgent = true;
+    // A check nobody waits for (DreyMail 14.5): on the background connection, never holding up the main one.
+    if (background && !job.running) job.background = true;
     if (job.running) {
       job.again = true;
       return done;
@@ -371,8 +379,9 @@ export class CacheSync {
         job.again = false;
         const waiting = job.waiters.splice(0);
         job.forChange = this.dirty.delete(k);
-        const lane: Lane = job.urgent ? 'main' : this.lane(role);
+        const lane: Lane = job.urgent ? 'main' : job.background ? 'sync' : this.lane(role);
         job.urgent = false;
+        job.background = false;
         try {
           const changed = await this.update(userId, accountId, path, role, lane).finally(() => (job.forChange = false));
           // The copy of a folder someone has open is ready: the list can now come from it, whole
@@ -738,6 +747,7 @@ export class CacheSync {
           for (const { folder: f, uids, length } of this.fetchGroups(batch, this.deps.config.maxBodyBytes)) {
             if (this.stopped) return;
             const got = await this.fetchSources(userId, accountId, f, uids, length);
+            if (got) await this.pace(userId, accountId, got);
             // The folder can't be read now (or changed): try again after its next sync.
             if (!got) return;
             // Whole messages are kept as their content (DreyMail 13.6), so opening them needs no mail
@@ -794,6 +804,7 @@ export class CacheSync {
         // Only messages known to fit are fetched whole.
         if (length !== null) continue;
         const got = await this.fetchSources(userId, accountId, f, uids, null);
+        if (got) await this.pace(userId, accountId, got);
         if (!got) return;
         for (const [uid, raw] of got) {
           if (raw.length > max) continue;
@@ -856,6 +867,23 @@ export class CacheSync {
         'sync',
       )
       .catch(() => null);
+  }
+
+  /**
+   * Keep filling the copy in the background within the mailbox's download rate (DreyMail 14.5):
+   * after downloading `got`, wait as long as those bytes take at that rate, so a big mailbox fills
+   * steadily instead of taking the whole connection (and the mail server's patience).
+   */
+  private async pace(userId: string, accountId: string, got: Map<number, Buffer>) {
+    const rate = this.deps.config.backgroundBytesPerSecond ?? 0;
+    if (rate <= 0) return;
+    let bytes = 0;
+    for (const raw of got.values()) bytes += raw.length;
+    const k = `${userId}\u0000${accountId}`;
+    const now = Date.now();
+    const until = Math.max(now, this.pacedUntil.get(k) ?? 0) + (bytes / rate) * 1000;
+    this.pacedUntil.set(k, until);
+    if (until > now) await sleep(until - now);
   }
 
   /** Whether an account's search index is being filled right now. */

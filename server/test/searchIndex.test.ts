@@ -96,13 +96,17 @@ describe('the index in the cache', () => {
 });
 
 describe('filling the index', () => {
-  function setup(n: number, budget: number, maxBodyBytes = 0) {
+  function setup(n: number, budget: number, maxBodyBytes = 0, backgroundBytesPerSecond = 0) {
     const cache = new MailCache(':memory:', keys());
     const body = (uid: number) => Buffer.from(`Subject: Message ${uid}\r\n\r\nBody word${uid} and the common word quarterly.\r\n`);
     const pool = {
       // The folder list with STATUS (12.7): unchanged folders are searched from the index.
       async folders() {
         return [{ path: 'INBOX', name: 'INBOX', delimiter: '/', flags: new Set<string>(), specialUse: '\\Inbox', status: { messages: n, uidNext: n + 1, unseen: 0 } }];
+      },
+      // DreyMail 14.5: only the folders searched are asked about.
+      async status(_u: string, _a: string, paths: string[]) {
+        return new Map(paths.map((p) => [p, { messages: n, uidNext: n + 1 }]));
       },
       async withMailbox<T>(_u: string, _a: string, p: string, fn: (client: unknown, mailbox: unknown) => Promise<T>): Promise<T> {
         const mailbox = { path: p, exists: n, uidNext: n + 1, uidValidity: 7n, noModseq: true };
@@ -127,7 +131,7 @@ describe('filling the index', () => {
     const sync = new CacheSync({
       cache,
       pool,
-      config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes, bodyBytesPerAccount: 0 },
+      config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes, bodyBytesPerAccount: 0, backgroundBytesPerSecond },
       sentFolder: async () => null,
       isWatched: () => false,
       onChanged: () => {},
@@ -146,6 +150,26 @@ describe('filling the index', () => {
       }
     }
   };
+
+  it('fills in the background no faster than the download rate allows (DreyMail 14.5)', async () => {
+    // 60 messages of about 75 bytes at 9,000 bytes a second: at least half a second.
+    const { cache, sync } = setup(60, 50 * 1024 * 1024, 0, 9000);
+    const started = Date.now();
+    sync.syncAccount('u1', 'a1');
+    for (let i = 0; i < 300; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      const f = cache.folder('u1', 'a1', 'INBOX');
+      if (f && cache.indexState(f).indexed === 60) break;
+    }
+    expect(cache.indexState(cache.folder('u1', 'a1', 'INBOX')!).indexed).toBe(60);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(450);
+    // Without a limit the same takes a fraction of that.
+    const quick = setup(60, 50 * 1024 * 1024);
+    const t = Date.now();
+    quick.sync.syncAccount('u1', 'a1');
+    await settle(quick.sync, quick.cache);
+    expect(Date.now() - t).toBeLessThan(400);
+  });
 
   it('reads and indexes every cached message in the background', async () => {
     const { cache, sync } = setup(60, 50 * 1024 * 1024);
