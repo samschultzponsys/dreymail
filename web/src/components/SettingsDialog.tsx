@@ -40,6 +40,7 @@
 // Modified by samschultzponsys, 2026-11-22: opens on a given tab (the search at the top); images in all mail, or from everyone you know.
 // Modified by samschultzponsys, 2026-11-23: the Search and storage tab; each message's buttons: order, place and size.
 // Modified by samschultzponsys, 2026-11-24: the dialog uses most of the window; tabs wrap instead of being cut off.
+// Modified by samschultzponsys, 2026-11-25: settingTabsFor moved to settingTabs.ts (the app's start doesn't load this window).
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -88,30 +89,6 @@ const SWIPE_OPTIONS: [SwipeAction, string][] = [
 ];
 
 type SettingsTab = 'device' | 'ai' | 'profile' | 'general' | 'signatures' | 'autoreplies' | 'notifications' | 'privacy' | 'password' | 'users' | 'storage' | 'roles' | 'signin' | 'server' | 'outlook' | 'google' | 'android' | 'backup' | 'cache';
-
-/** The Settings tabs this user has (DreyMail 12.1: the search at the top only offers these). */
-export function settingTabsFor(me: Me): string[] {
-  const can = (p: Permission) => me.permissions.includes(p);
-  return [
-    'device',
-    'profile',
-    'general',
-    'signatures',
-    'autoreplies',
-    'privacy',
-    'backup',
-    'cache',
-    ...(me.hasPassword ? ['password'] : []),
-    ...(can('ai.assistant') ? ['ai'] : []),
-    ...(can('users.manage') || can('users.pictures') || can('roles.manage') ? ['users'] : []),
-    ...(can('users.manage') ? ['storage'] : []),
-    ...(can('roles.manage') ? ['roles'] : []),
-    ...(can('signin.manage') ? ['signin'] : []),
-    ...(can('server.manage') ? ['server'] : []),
-    ...(can('providers.manage') ? ['outlook', 'google'] : []),
-    ...(can('android.manage') ? ['android'] : []),
-  ];
-}
 
 export function SettingsDialog({ me, onClose, initialTab = null }: { me: Me; onClose: () => void; initialTab?: string | null }) {
   const qc = useQueryClient();

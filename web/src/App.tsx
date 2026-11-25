@@ -38,10 +38,12 @@
 // Modified by samschultzponsys, 2026-11-19: Android Back stays within the mailbox you are in.
 // Modified by samschultzponsys, 2026-11-22: this device's settings saved on a schedule; search everything, per mailbox.
 // Modified by samschultzponsys, 2026-11-25: the messages around the open one fetched ahead.
+// Modified by samschultzponsys, 2026-11-25: the loading screen doesn't wait for the folder list.
+// Modified by samschultzponsys, 2026-11-25: Settings, Calendar, the composer and other windows load when first needed.
 
 import { encodeFilters, filterCount, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AccountView, AttachmentView, MailboxGroupView, MessageAction, MessageDetail, MessageRef, MessageSummary, TopFolder } from '../../shared/types';
 import { composerFromPayload, filesFrom, isSending } from './sending';
 import { SendingBox } from './components/SendingBox';
@@ -56,22 +58,16 @@ import { GlobalSearch } from './components/SidebarSearch';
 import { VersionBanner } from './components/VersionBanner';
 import { hideSplash, splashText } from './splash';
 import { TopFolderBar, type TopFolderItem } from './components/TopFolderBar';
-import { settingTabsFor } from './components/SettingsDialog';
+import { settingTabsFor } from './settingTabs';
 import type { CalendarEvent } from '../../shared/calendar';
 import { applyThemeColor } from './themeColor';
-import { AccountsDialog } from './components/AccountsDialog';
-import { Composer, type ComposerInit } from './components/Composer';
+import type { ComposerInit } from './components/Composer';
 import { Login, SIGNED_OUT_KEY } from './components/Login';
 import { useListWidth, useSideWidth } from './listWidth';
 import { MessageList } from './components/MessageList';
 import { quotableDetail, Reader, replyTarget, type ReplyKind } from './components/Reader';
-import { SettingsDialog } from './components/SettingsDialog';
-import { AssistantDialog } from './components/AssistantDialog';
 import { ScheduledDialog, useScheduled } from './components/ScheduledDialog';
-import { CalendarDialog } from './components/CalendarDialog';
 import { ReminderWindow } from './components/ReminderWindow';
-import { ContactsPage } from './components/ContactsPage';
-import { TasksPage } from './components/TasksPage';
 import { AppLock } from './components/AppLock';
 import { Sidebar } from './components/Sidebar';
 import { SquirrelRun, type Run } from './components/SquirrelRun';
@@ -87,6 +83,16 @@ import { formatSnoozeTime } from './snooze';
 import { planRun, runFor, runSpeed, SLIDE_MS, slideKeyframes, type PaneView } from './squirrel';
 import { refKey, toRef } from './util';
 import { rowRefs, warm } from './warm';
+import { lazyPart, preloadParts } from './lazyPart';
+
+// Not needed to show your mail: loaded when first opened, or in the background once idle (DreyMail 14.4).
+const AccountsDialog = lazyPart(() => import('./components/AccountsDialog'), 'AccountsDialog');
+const Composer = lazyPart(() => import('./components/Composer'), 'Composer');
+const SettingsDialog = lazyPart(() => import('./components/SettingsDialog'), 'SettingsDialog');
+const AssistantDialog = lazyPart(() => import('./components/AssistantDialog'), 'AssistantDialog');
+const CalendarDialog = lazyPart(() => import('./components/CalendarDialog'), 'CalendarDialog');
+const ContactsPage = lazyPart(() => import('./components/ContactsPage'), 'ContactsPage');
+const TasksPage = lazyPart(() => import('./components/TasksPage'), 'TasksPage');
 
 /** Bottom-left name: the user's chosen name, else their login name with a capital first letter. */
 export function userLabel(me: { name: string; displayName: string; email: string }, full = false): string {
@@ -741,10 +747,13 @@ export function App() {
   });
 
   // The loading screen goes once there is something to show: the sign-in page, or the mail list
-  // (not an empty mailbox that fills in a moment later). Never longer than 10 seconds.
-  const appReady = !me.isLoading && (!!me.error || (accountsQ.isFetched && (accounts.length === 0 || folders.data !== undefined) && (accounts.length === 0 || !messagesQ.isLoading)));
+  // (not an empty mailbox that fills in a moment later). Never longer than 10 seconds. Since 14.4 it
+  // doesn't wait for the folder list too: the sidebar's folders and counts follow a moment later.
+  const appReady = !me.isLoading && (!!me.error || (accountsQ.isFetched && (accounts.length === 0 || !messagesQ.isLoading)));
   useEffect(() => {
-    if (appReady) hideSplash();
+    if (!appReady) return;
+    hideSplash();
+    preloadParts();
   }, [appReady]);
   useEffect(() => {
     const slow = window.setTimeout(() => splashText('Still loading… the server may be starting up.'), 4000);
@@ -1042,9 +1051,11 @@ export function App() {
         confirmSwipe={(m, d) => swipeFor(d) !== 'delete' || !isTrash(m) || window.confirm('Delete this message permanently?')}
         onSwipe={(m, d) => void onSwipe(m, d)}
       />
+      <Suspense fallback={null}>
       {route.calendar && <CalendarDialog key={pageFocus?.event ? pageFocus.n : 'cal'} focus={pageFocus?.event} accounts={accounts} onNav={() => openOverlay('nav')} />}
       {route.page === 'contacts' && <ContactsPage key={pageFocus?.contact ? pageFocus.n : 'contacts'} focus={pageFocus?.contact} accounts={accounts} onNav={() => openOverlay('nav')} onWrite={(to) => composeMailto(`mailto:${encodeURIComponent(to)}`)} />}
       {route.page === 'tasks' && <TasksPage key={pageFocus?.task ? pageFocus.n : 'tasks'} focus={pageFocus?.task} accounts={accounts} onNav={() => openOverlay('nav')} />}
+      </Suspense>
       <Reader
         openRef={readerRef}
         conversation={readerRef ? rowOf(rows, readerRef) : undefined}
@@ -1068,6 +1079,7 @@ export function App() {
         onBack={() => back(listRoute(route))}
         onGone={open ? onGone : () => {}}
       />
+      <Suspense fallback={null}>
       {composer && (
         <Composer
           key={composeId}
@@ -1105,6 +1117,7 @@ export function App() {
           }}
         />
       )}
+      </Suspense>
       {run && <SquirrelRun key={run.id} run={run} appRef={appRef} onDone={() => setRun(null)} />}
       {/* Versions out of step (DreyMail 13.8): reload, or update the app. */}
       <VersionBanner busy={() => !!composerRef.current} isAdmin={!!me.data?.permissions.includes('server.manage')} />
