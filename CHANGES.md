@@ -13,6 +13,29 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.0): messages open faster
+
+- **New mail is listed sooner.** A sync used to download the content of up to 30 new messages
+  before the list heard about them, holding the main mail-server connection the whole time. Now the
+  list updates first, and the content follows right after in batches of 5, newest first.
+- **Opening new mail joins the download.** Opening a message whose content is being downloaded
+  right then waits for that download instead of fetching the message a second time.
+- **A connection only for opening messages.** A message whose content isn't kept yet is fetched on
+  its own connection, so it never waits behind a sync, an action (marking read, moving) or a
+  folder list. When the cache already knows its size, it takes one round trip instead of two.
+- **Messages fetched ahead.** When a message opens, the two below it and the one above it are
+  fetched into the cache in the background (`POST /api/messages/warm`), and so is a row the mouse
+  rests on for a moment, so j / k, archive, delete and clicks find them ready.
+- **Image permission check without reading the whole address book.** Deciding whether to load a
+  message's images for a known sender looked up only that sender's address instead of reading
+  every remembered address and contact on each open.
+- **Files:** `server/src/imap/pool.ts`, `server/src/imap/mail.ts`, `server/src/cache/sync.ts`,
+  `server/src/routes/api.ts`, `server/src/db.ts`, `server/src/mail/imageAllowlist.ts`,
+  `server/test/autoImages.test.ts`, `server/test/integration/cache.test.ts`, `web/src/api.ts`,
+  `web/src/App.tsx`, `web/src/warm.ts` (new), `web/src/components/MessageList.tsx`,
+  `web/src/components/SwipeRow.tsx`, `README.md`, `ROADMAP.md`, `package.json`,
+  `package-lock.json`.
+
 ## 2026-11-24 (v13.9): new mail opens at once
 
 - **New messages open at once.** When the cache sees new messages in any folder (the inbox,

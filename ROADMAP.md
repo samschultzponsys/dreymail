@@ -22,6 +22,9 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Messages open faster: new mail listed before its content downloads (newest first, an open joins
+      the download), a connection only for opening messages, one round trip, the messages around the
+      open one and the one under the mouse fetched ahead (14.0).
 - [x] New mail's content comes with it, in every folder (Sent Items too), so it opens at once (13.9).
 - [x] A loading screen while DreyMail opens (web page and desktop app) instead of a black window and
       an empty mailbox; pages notice a server update and reload; a banner when the desktop or Android

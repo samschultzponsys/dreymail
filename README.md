@@ -94,7 +94,8 @@
      Modified by samschultzponsys, 2026-11-24: v13.6 (messages kept whole while indexed; faster lists).
      Modified by samschultzponsys, 2026-11-24: v13.7 (Settings uses most of the window; tabs wrap).
      Modified by samschultzponsys, 2026-11-24: v13.8 (loading screen; update banners; reload after a server update).
-     Modified by samschultzponsys, 2026-11-24: v13.9 (new mail opens at once). -->
+     Modified by samschultzponsys, 2026-11-24: v13.9 (new mail opens at once).
+     Modified by samschultzponsys, 2026-11-25: v14.0 (messages open faster). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -106,7 +107,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **13.9**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **14.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1073,6 +1074,14 @@ mailbox, Drafts, Archive, Junk and Trash first). This runs on a connection of it
 holds up what you are doing. A folder you open before its turn starts filling right away. It also keeps the
 whole content of messages (since 13.6 every message it indexes, newest first, and since 13.9 new mail as it arrives, so opening one
 needs no mail server), up to `DREYMAIL_CACHE_MAX_BODY_MB` per message.
+
+**Opening messages quickly (14.0).** New mail shows in the list first; its content follows right
+after, a few messages at a time, newest first, and opening one whose content is on its way waits
+for that download instead of starting another. A message whose content isn't kept yet is fetched
+on a connection used only for opening messages, so it never waits behind syncing, actions or
+folder lists, in one round trip when its size is already known. The messages around the open one
+(the next two and the previous one), and a message the mouse rests on in the list, are fetched
+ahead in the background, so moving with j / k, archiving or clicking finds them ready.
 
 **Search index (12.3).** In the background DreyMail also reads each cached message once (at most
 96 KB of it, without marking it read; since 13.0 in worker threads, several at once, so the app
