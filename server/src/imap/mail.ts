@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
 // Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
 // Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
+// Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -85,6 +86,31 @@ interface Decoded {
   opened: OpenedMessage;
   meta: { flags: Set<string>; internalDate: Date | null } | null;
 }
+
+/** A message as fetched for reading. */
+interface RawMessage {
+  raw: Buffer;
+  flags: Set<string>;
+  internalDate: Date | null;
+}
+
+/** Someone waiting for a message of a folder to be fetched for reading (DreyMail 14.2). */
+interface ReadWaiter {
+  uid: number;
+  known: KnownMessage | null;
+  maxBytes: number;
+  resolve: (m: RawMessage) => void;
+  reject: (err: unknown) => void;
+}
+
+interface ReadQueue {
+  waiting: ReadWaiter[];
+  running: boolean;
+}
+
+/** Most messages, and bytes, fetched for reading in one IMAP command. */
+const READ_BATCH = 25;
+const READ_BATCH_BYTES = 64 * 1024 * 1024;
 
 /** What the cache already knows of a message before fetching it. */
 interface KnownMessage {
@@ -278,6 +304,8 @@ export class MailService {
   /** The last messages opened, decoded (DreyMail 14.1), and those being decoded right now. */
   private readonly opened = new OpenedMemo();
   private readonly decoding = new Map<string, Promise<Decoded>>();
+  /** Messages waiting to be fetched for reading, per folder (DreyMail 14.2). */
+  private readonly reads = new Map<string, ReadQueue>();
   /** S/MIME: decrypts and checks signed mail before it is read (DreyMail 10.6). */
   smime?: { open(userId: string, accountId: string, raw: Buffer): { raw: Buffer; info: SmimeInfo } | null };
   /** Decodes larger messages in a worker thread, so the server stays free meanwhile (DreyMail 14.1). */
@@ -941,26 +969,76 @@ export class MailService {
   /**
    * Fetch a message from the mail server, on a connection of its own ('read', DreyMail 14.0) so
    * opening it never waits behind a sync or an action. With its size known from the cache it takes
-   * one round trip instead of two.
+   * one round trip instead of two. Messages of one folder asked for while a fetch is under way (a
+   * conversation opening, several at once) go together in the next IMAP command (DreyMail 14.2).
    */
-  private async fetchRawLive(userId: string, ref: MessageRef, maxBytes: number, known: KnownMessage | null = null): Promise<{ raw: Buffer; flags: Set<string>; internalDate: Date | null }> {
-    const tooLarge = (size: number) => new MailServerError(`Message is too large to display (${Math.round(size / 1048576)} MB)`, 'protocol');
-    return this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
-      this.checkValidity(mailbox, ref);
-      if (known && known.size > 0) {
-        if (known.size > maxBytes) throw tooLarge(known.size);
-        // `source` is fetched with BODY.PEEK, so reading never sets \Seen implicitly.
-        const full = await client.fetchOne(String(ref.uid), { uid: true, flags: true, internalDate: true, source: true }, { uid: true });
-        if (!full || !full.source) throw new MessageGoneError('Message not found');
-        return { raw: full.source, flags: full.flags ?? known.flags, internalDate: toDate(full.internalDate) ?? known.internalDate };
+  private fetchRawLive(userId: string, ref: MessageRef, maxBytes: number, known: KnownMessage | null = null): Promise<RawMessage> {
+    const key = `${userId}\u0000${ref.accountId}\u0000${ref.folder}\u0000${ref.uidValidity}`;
+    let queue = this.reads.get(key);
+    if (!queue) this.reads.set(key, (queue = { waiting: [], running: false }));
+    const q = queue;
+    return new Promise((resolve, reject) => {
+      q.waiting.push({ uid: ref.uid, known, maxBytes, resolve, reject });
+      if (q.running) return;
+      q.running = true;
+      // Requests of this same moment (one page of a conversation) join the first command too.
+      setImmediate(() => void this.drainReads(userId, ref, key, q));
+    });
+  }
+
+  private async drainReads(userId: string, ref: MessageRef, key: string, q: ReadQueue) {
+    while (q.waiting.length) {
+      const batch = q.waiting.splice(0, READ_BATCH);
+      try {
+        await this.readBatch(userId, ref, batch);
+      } catch (err) {
+        for (const w of batch) w.reject(err);
       }
-      const meta = await client.fetchOne(String(ref.uid), { uid: true, flags: true, internalDate: true, size: true }, { uid: true });
-      if (!meta) throw new MessageGoneError('Message not found');
-      if ((meta.size ?? 0) > maxBytes) throw tooLarge(meta.size ?? 0);
-      // `source` is fetched with BODY.PEEK, so reading never sets \Seen implicitly.
-      const full = await client.fetchOne(String(ref.uid), { uid: true, source: true }, { uid: true });
-      if (!full || !full.source) throw new MessageGoneError('Message not found');
-      return { raw: full.source, flags: meta.flags ?? new Set(), internalDate: toDate(meta.internalDate) };
+    }
+    q.running = false;
+    if (this.reads.get(key) === q) this.reads.delete(key);
+  }
+
+  /** One folder's waiting messages: sizes where unknown, then the messages, each handed over as it arrives. */
+  private async readBatch(userId: string, ref: MessageRef, batch: ReadWaiter[]) {
+    await this.pool.withMailbox(userId, ref.accountId, ref.folder, async (client, mailbox) => {
+      this.checkValidity(mailbox, ref);
+      const sizes = new Map<number, number>();
+      for (const w of batch) if (w.known && w.known.size > 0) sizes.set(w.uid, w.known.size);
+      const unknown = [...new Set(batch.filter((w) => !sizes.has(w.uid)).map((w) => w.uid))];
+      if (unknown.length) for (const m of await client.fetchAll(unknown.join(','), { uid: true, size: true }, { uid: true })) sizes.set(m.uid, m.size ?? 0);
+      const byUid = new Map<number, ReadWaiter[]>();
+      for (const w of batch) {
+        const size = sizes.get(w.uid);
+        if (size === undefined) w.reject(new MessageGoneError('Message not found'));
+        else if (size > w.maxBytes) w.reject(new MailServerError(`Message is too large to display (${Math.round(size / 1048576)} MB)`, 'protocol'));
+        else byUid.set(w.uid, [...(byUid.get(w.uid) ?? []), w]);
+      }
+      // A few large messages per command, so a batch never holds much in memory at once.
+      const groups: number[][] = [];
+      let group: number[] = [];
+      let bytes = 0;
+      for (const uid of byUid.keys()) {
+        const size = sizes.get(uid)!;
+        if (group.length && bytes + size > READ_BATCH_BYTES) {
+          groups.push(group);
+          group = [];
+          bytes = 0;
+        }
+        group.push(uid);
+        bytes += size;
+      }
+      if (group.length) groups.push(group);
+      for (const uids of groups) {
+        // `source` is fetched with BODY.PEEK, so reading never sets \Seen implicitly.
+        for await (const m of client.fetch(uids.join(','), { uid: true, flags: true, internalDate: true, source: true }, { uid: true })) {
+          const waiters = byUid.get(m.uid);
+          if (!waiters || !m.source) continue;
+          byUid.delete(m.uid);
+          for (const w of waiters) w.resolve({ raw: m.source, flags: m.flags ?? w.known?.flags ?? new Set(), internalDate: toDate(m.internalDate) ?? w.known?.internalDate ?? null });
+        }
+      }
+      for (const waiters of byUid.values()) for (const w of waiters) w.reject(new MessageGoneError('Message not found'));
     }, 'read');
   }
 

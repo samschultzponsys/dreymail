@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-24: new messages' content fetched as they arrive, in every folder.
 // Modified by samschultzponsys, 2026-11-25: new messages listed before their content comes, in small newest-first batches an open joins; content kept by a warm-up.
 // Modified by samschultzponsys, 2026-11-25: background reads in batches of bounded size (bigger messages kept); only the start of messages too big to keep is read for the index.
+// Modified by samschultzponsys, 2026-11-25: unread mail loaded ahead a few messages per command (was one round trip each), batches capped by size.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -128,8 +129,6 @@ export class CacheSync {
   private readonly warming = new Map<string, { again: boolean }>();
   /** Accounts whose search index is being filled, and whether to go round again (DreyMail 12.3). */
   private readonly indexing = new Map<string, { again: boolean }>();
-  /** New messages whose content is still to be fetched, per folder (14.0). */
-  private readonly freshContent = new Map<string, number[]>();
   /** Content being downloaded right now, per folder key + UID: opening the message waits for it instead of fetching it twice. */
   private readonly downloading = new Map<string, Promise<Buffer | null>>();
   private stopped = false;
@@ -331,7 +330,6 @@ export class CacheSync {
         // Extras, interrupted by anyone waiting for the next sync; they continue after it.
         const interrupted = () => this.stopped || job.again || job.waiters.length > 0;
         try {
-          await this.fetchFreshContent(userId, accountId, path);
           if (role === 'inbox') await this.prefetch(userId, accountId, path, interrupted);
           await this.fill(userId, accountId, path, interrupted);
           this.indexAccount(userId, accountId);
@@ -462,17 +460,15 @@ export class CacheSync {
           /* a listener's problem is its own */
         }
       }
-      // New mail is opened soonest: its content is fetched right after this sync (DreyMail 13.8), in
-      // any folder (Sent Items too, for the reply you just sent). Since 14.0 the list is updated
-      // first, and the content follows in small batches, newest first (fetchFreshContent).
+      // New mail is opened soonest, so its content is fetched at once (DreyMail 13.8), in any folder
+      // (Sent Items too, for the reply you just sent): since 14.2 on the connection for reading,
+      // alongside the rest of this sync, newest first, a few at a time; opening one joins its download.
       const { maxBodyBytes } = this.deps.config;
       if (fresh.length && maxBodyBytes > 0 && this.budgetOf(userId, accountId) > 0) {
-        const small = fresh.filter((m) => (m.size ?? 0) > 0 && (m.size ?? 0) <= maxBodyBytes).map((m) => m.uid);
-        if (small.length) {
-          const k = this.key(userId, accountId, path);
-          const queued = new Set([...(this.freshContent.get(k) ?? []), ...small]);
-          this.freshContent.set(k, [...queued].sort((a, b) => b - a).slice(0, FRESH_CONTENT));
-        }
+        const small = fresh.filter((m) => (m.size ?? 0) > 0 && (m.size ?? 0) <= maxBodyBytes).map((m) => m.uid).sort((a, b) => b - a).slice(0, FRESH_CONTENT);
+        // Measured (scripts/bench/open.mjs): starting it after the sync instead lists a burst of new
+        // mail a little sooner but sometimes opens it seconds later; starting it now never does.
+        if (small.length) void this.fetchBodies(userId, accountId, path, small, 'read');
       }
       const uidNext = Math.max(f.uidNext, ...fresh.map((m) => m.uid + 1));
 
@@ -513,60 +509,82 @@ export class CacheSync {
    * per IMAP command so each batch is ready soon, and so an open waits at most for its own batch.
    * Never rejects.
    */
-  async fetchBodies(userId: string, accountId: string, path: string, uids: number[], lane: Lane) {
+  async fetchBodies(userId: string, accountId: string, path: string, uids: number[], lane: Lane, interrupted: () => boolean = () => false) {
     const max = this.deps.config.maxBodyBytes;
     const k = this.key(userId, accountId, path);
-    for (let i = 0; i < uids.length && !this.stopped; i += FRESH_BATCH) {
-      const f = this.cache.folder(userId, accountId, path);
-      if (!f) return;
-      const batch = uids.slice(i, i + FRESH_BATCH).filter((uid) => !this.downloading.has(`${k}\u0000${uid}`) && !this.cache.hasBody(f, uid));
-      if (!batch.length) continue;
-      const waiting = new Map<number, (raw: Buffer | null) => void>();
-      for (const uid of batch) this.downloading.set(`${k}\u0000${uid}`, new Promise((resolve) => waiting.set(uid, resolve)));
-      try {
-        await this.deps.pool.withMailbox(
-          userId,
-          accountId,
-          path,
-          async (client, selected) => {
-            const mailbox = (client.mailbox || selected) as MailboxObject;
-            if (mailbox.uidValidity.toString() !== f.uidValidity) return;
-            // `source` is fetched with BODY.PEEK, so this never marks anything read.
-            for await (const m of client.fetch(batch.join(','), { uid: true, source: true }, { uid: true })) {
-              if (!m.source || m.source.length > max) continue;
-              try {
-                this.cache.putBody(f, m.uid, m.source);
-              } catch {
-                /* still handed to whoever is waiting */
-              }
-              waiting.get(m.uid)?.(m.source);
-              waiting.delete(m.uid);
-            }
-          },
-          lane,
-        );
-      } catch {
-        /* fetched when opened, as before */
-      } finally {
-        for (const resolve of waiting.values()) resolve(null);
-        for (const uid of batch) this.downloading.delete(`${k}\u0000${uid}`);
+    const first = this.cache.folder(userId, accountId, path);
+    if (!first) return;
+    // Every message is claimed at once (DreyMail 14.2), not batch by batch: an open waits for this
+    // download, and loading ahead (prefetch) or a warm-up never fetches the same message meanwhile.
+    const waiting = new Map<number, { resolve: (raw: Buffer | null) => void; promise: Promise<Buffer | null> }>();
+    for (const uid of uids) {
+      if (waiting.has(uid) || this.downloading.has(`${k}\u0000${uid}`) || this.cache.hasBody(first, uid)) continue;
+      let resolve!: (raw: Buffer | null) => void;
+      const promise = new Promise<Buffer | null>((r) => (resolve = r));
+      waiting.set(uid, { resolve, promise });
+      this.downloading.set(`${k}\u0000${uid}`, promise);
+    }
+    const release = (uid: number, raw: Buffer | null) => {
+      const w = waiting.get(uid);
+      if (!w) return;
+      waiting.delete(uid);
+      w.resolve(raw);
+      if (this.downloading.get(`${k}\u0000${uid}`) === w.promise) this.downloading.delete(`${k}\u0000${uid}`);
+    };
+    // At most FRESH_BATCH messages and FETCH_BYTES per command (a larger message alone), in the order given.
+    const sizes = this.cache.sizesOf(first, [...waiting.keys()]);
+    const batches: number[][] = [];
+    let bytes = 0;
+    for (const uid of waiting.keys()) {
+      const size = sizes.get(uid) ?? 0;
+      const last = batches.at(-1);
+      if (last && last.length < FRESH_BATCH && bytes + size <= FETCH_BYTES) last.push(uid);
+      else {
+        batches.push([uid]);
+        bytes = 0;
       }
+      bytes += size;
+    }
+    try {
+      for (const batch of batches) {
+        if (this.stopped || interrupted()) break;
+        const f = this.cache.folder(userId, accountId, path);
+        if (!f) break;
+        try {
+          await this.deps.pool.withMailbox(
+            userId,
+            accountId,
+            path,
+            async (client, selected) => {
+              const mailbox = (client.mailbox || selected) as MailboxObject;
+              if (mailbox.uidValidity.toString() !== f.uidValidity) return;
+              // `source` is fetched with BODY.PEEK, so this never marks anything read.
+              for await (const m of client.fetch(batch.join(','), { uid: true, source: true }, { uid: true })) {
+                if (!m.source || m.source.length > max) continue;
+                try {
+                  this.cache.putBody(f, m.uid, m.source);
+                } catch {
+                  /* still handed to whoever is waiting */
+                }
+                release(m.uid, m.source);
+              }
+            },
+            lane,
+          );
+        } catch {
+          /* fetched when opened, as before */
+        }
+        for (const uid of batch) release(uid, null);
+      }
+    } finally {
+      // Not fetched after all (stopped, interrupted, the folder gone): whoever waits fetches it themselves.
+      for (const uid of [...waiting.keys()]) release(uid, null);
     }
     try {
       this.enforceBudget(userId, accountId);
     } catch (err) {
       this.handleError(err, userId, accountId, path);
     }
-  }
-
-  /** The content of the messages the last sync found new (DreyMail 13.8, after the list since 14.0). */
-  private async fetchFreshContent(userId: string, accountId: string, path: string) {
-    const k = this.key(userId, accountId, path);
-    const uids = this.freshContent.get(k);
-    this.freshContent.delete(k);
-    const f = this.cache.folder(userId, accountId, path);
-    if (!uids?.length || !f) return;
-    await this.fetchBodies(userId, accountId, path, uids, this.lane(f.role));
   }
 
   /** Extend the folder towards older messages, a chunk at a time, up to the configured size. */
@@ -604,24 +622,18 @@ export class CacheSync {
     }
   }
 
-  /** Load the content of the newest unread messages ahead, so opening them doesn't wait for IMAP. */
+  /**
+   * Load the content of the newest unread messages ahead, so opening them doesn't wait for IMAP.
+   * A few per IMAP command (DreyMail 14.2; it was one round trip per message), stopping between
+   * commands when someone waits for the next sync.
+   */
   private async prefetch(userId: string, accountId: string, path: string, interrupted: () => boolean) {
-    const { cache, pool, config } = this.deps;
+    const { cache, config } = this.deps;
     if (config.maxBodyBytes <= 0 || this.budgetOf(userId, accountId) <= 0) return;
     const f = cache.folder(userId, accountId, path);
     if (!f) return;
-    for (const uid of cache.prefetchCandidates(f, PREFETCH_AMONG, config.maxBodyBytes, PREFETCH_COUNT)) {
-      if (interrupted()) break;
-      const raw = await pool.withMailbox(userId, accountId, path, async (client, selected) => {
-        const mailbox = (client.mailbox || selected) as MailboxObject;
-        if (mailbox.uidValidity.toString() !== f.uidValidity) return null;
-        // `source` is fetched with BODY.PEEK, so this never marks the message as read.
-        const msg = await client.fetchOne(String(uid), { uid: true, source: true }, { uid: true });
-        return msg && msg.source ? msg.source : null;
-      });
-      if (raw && raw.length <= config.maxBodyBytes) cache.putBody(f, uid, raw);
-    }
-    this.enforceBudget(userId, accountId);
+    const uids = cache.prefetchCandidates(f, PREFETCH_AMONG, config.maxBodyBytes, PREFETCH_COUNT);
+    if (uids.length) await this.fetchBodies(userId, accountId, path, uids, this.lane(f.role), interrupted);
   }
 
   // ---- space and the search index (DreyMail 12.3) ----------------------------------------------

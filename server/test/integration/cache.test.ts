@@ -286,6 +286,26 @@ describe('mail cache', () => {
     expect(hasBody(hedy, welcome.uid)).toBe(true);
   });
 
+  it('fetches messages of a folder opened together (a conversation) in one go', async () => {
+    const picked = (await list(hedy)).messages.filter((m) => !/Holiday photos/.test(m.subject)).slice(0, 3);
+    expect(picked.length).toBe(3);
+    for (const m of picked) await dropBody(hedy, m.uid);
+    const lanes: unknown[] = [];
+    const orig = ctx.pool.withMailbox;
+    ctx.pool.withMailbox = ((...args: Parameters<typeof orig>) => {
+      lanes.push(args[4] ?? 'main');
+      return orig.apply(ctx.pool, args);
+    }) as typeof orig;
+    try {
+      const opened = await Promise.all(picked.map((m) => api<MessageDetail>('GET', `/api/message?accountId=${hedy.id}&folder=INBOX&uid=${m.uid}&uidValidity=${m.uidValidity}`)));
+      expect(opened.map((o) => o.json.subject)).toEqual(picked.map((m) => m.subject));
+    } finally {
+      ctx.pool.withMailbox = orig;
+    }
+    // One IMAP command for all three, not one each.
+    expect(lanes).toEqual(['read']);
+  });
+
   it('fetches messages likely opened next ahead when asked to warm them', async () => {
     const welcome = (await list(hedy)).messages.find((m) => m.subject === 'Welcome aboard')!;
     await dropBody(hedy, welcome.uid);
