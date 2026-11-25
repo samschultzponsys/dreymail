@@ -9,6 +9,7 @@
 // Modified by samschultzponsys, 2026-11-23: four more connections for searching many folders of a mailbox at once (never the main one); UIDNEXT in folder lists.
 // Modified by samschultzponsys, 2026-11-25: a connection of its own for opening messages, so reading never waits behind syncing.
 // Modified by samschultzponsys, 2026-11-25: an older folder list is used at once while a fresh one is fetched.
+// Modified by samschultzponsys, 2026-11-25: at most so many connections per mailbox; extra ones close after a minute unused.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -22,6 +23,8 @@ const NOTIFICATION_PREVIEW_CHARS = 1000;
 
 export interface PoolOptions {
   idleTimeoutMs: number;
+  /** Most connections one mailbox may have open at once, the watcher included (default 6, at least 5). */
+  maxConnections?: number;
   blockPrivateHosts: boolean;
   log?: (msg: string, extra?: Record<string, unknown>) => void;
 }
@@ -53,6 +56,17 @@ export class NotFoundError extends Error {}
 export type Lane = 'main' | 'folders' | 'sync' | 'read' | 'search1' | 'search2' | 'search3' | 'search4';
 
 const FOLDER_CACHE_MS = 60_000;
+/**
+ * Connections every mailbox gets whatever the limit: requests of people using DreyMail, the
+ * background filling and folder lists (never moved onto the main connection, where they would hold
+ * up everything else). Searching uses what the limit leaves (DreyMail 14.5).
+ */
+const ESSENTIAL: readonly Lane[] = ['main', 'read', 'sync', 'folders'];
+/** Connections that close after EXTRA_IDLE_MS unused (the others after the pool's idle timeout). */
+const SHORT_LIVED: readonly Lane[] = ['folders', 'sync', 'search1', 'search2', 'search3', 'search4'];
+/** Searching, folder lists and background filling close after this long unused (DreyMail 14.5). */
+const EXTRA_IDLE_MS = 60_000;
+const SEARCH_LANES: readonly Lane[] = ['search1', 'search2', 'search3', 'search4'];
 
 /**
  * Lazily opened IMAP connections, one command connection per (user, account), closed after an
@@ -109,8 +123,87 @@ export class ImapPool {
    * must never wait behind it (DreyMail). Lane 'sync' fills the cache of folders other than INBOX
    * and Sent in the background, also without getting in the way.
    */
-  private async client(userId: string, accountId: string, lane: Lane = 'main'): Promise<{ conn: CommandConnection; client: ImapFlow }> {
-    const key = lane === 'main' ? this.key(userId, accountId) : `${this.key(userId, accountId)}#${lane}`;
+  private laneKey(userId: string, accountId: string, lane: Lane) {
+    return lane === 'main' ? this.key(userId, accountId) : `${this.key(userId, accountId)}#${lane}`;
+  }
+
+  private get maxConnections() {
+    return Math.max(5, this.opts.maxConnections ?? 6);
+  }
+
+  /** Connections of a mailbox open or opening now, the inbox watcher included. */
+  connectionCount(userId: string, accountId: string): number {
+    const key = this.key(userId, accountId);
+    let n = this.watchers.get(userId)?.get(accountId)?.client ? 1 : 0;
+    for (const [k, c] of this.conns) if ((k === key || k.startsWith(`${key}#`)) && (c.client?.usable || c.connecting)) n++;
+    return n;
+  }
+
+  /** Room for one more extra connection, keeping room for the essential ones not open yet. */
+  private roomForExtras(userId: string, accountId: string): number {
+    const reserved = ESSENTIAL.filter((l) => !this.hasLane(userId, accountId, l)).length;
+    return this.maxConnections - this.connectionCount(userId, accountId) - reserved;
+  }
+
+  private hasLane(userId: string, accountId: string, lane: Lane): boolean {
+    const c = this.conns.get(this.laneKey(userId, accountId, lane));
+    return !!c && (!!c.client?.usable || !!c.connecting);
+  }
+
+  /** Close an unused search connection of the mailbox to make room. */
+  private freeExtra(userId: string, accountId: string): boolean {
+    for (const lane of [...SEARCH_LANES].reverse()) {
+      const key = this.laneKey(userId, accountId, lane);
+      const c = this.conns.get(key);
+      if (c?.client && c.inFlight === 0 && !c.connecting) {
+        this.conns.delete(key);
+        const client = c.client;
+        void client.logout().catch(() => client.close());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The lane a request gets (DreyMail 14.5): its own, if it is open or there is room under the
+   * mailbox's limit (an unused extra connection is closed to make room), else the main connection.
+   * Opening messages and the main connection always get theirs.
+   */
+  private laneFor(userId: string, accountId: string, lane: Lane): Lane {
+    if (this.hasLane(userId, accountId, lane)) return lane;
+    if (ESSENTIAL.includes(lane)) {
+      // Room is kept for these; if extras took it meanwhile, an unused one makes way.
+      if (this.connectionCount(userId, accountId) >= this.maxConnections) this.freeExtra(userId, accountId);
+      return lane;
+    }
+    if (this.roomForExtras(userId, accountId) > 0) return lane;
+    if (this.freeExtra(userId, accountId) && this.roomForExtras(userId, accountId) > 0) return lane;
+    return 'main';
+  }
+
+  /**
+   * The connections to search `wanted` folders of a mailbox at once on (DreyMail 12.6): search
+   * connections already open, and new ones while there is room under the limit; at least one
+   * (the main connection, when there is no room at all).
+   */
+  searchLanes(userId: string, accountId: string, wanted: number): Lane[] {
+    const out: Lane[] = [];
+    let room = this.roomForExtras(userId, accountId);
+    for (const lane of SEARCH_LANES) {
+      if (out.length >= wanted) break;
+      if (this.hasLane(userId, accountId, lane)) out.push(lane);
+      else if (room > 0) {
+        out.push(lane);
+        room--;
+      }
+    }
+    return out.length ? out : ['main'];
+  }
+
+  private async client(userId: string, accountId: string, wantedLane: Lane = 'main'): Promise<{ conn: CommandConnection; client: ImapFlow }> {
+    const lane = this.laneFor(userId, accountId, wantedLane);
+    const key = this.laneKey(userId, accountId, lane);
     let conn = this.conns.get(key);
     if (!conn) {
       conn = { client: null, connecting: null, lastUsed: Date.now(), inFlight: 0 };
@@ -188,6 +281,28 @@ export class ImapPool {
     return this.fetchFolders(userId, accountId, key);
   }
 
+  /**
+   * The message count and next UID of a few folders, asked of the mail server now (DreyMail 14.5):
+   * one STATUS each, instead of the whole folder list when only some folders matter. Folders that
+   * can't be asked are left out.
+   */
+  async status(userId: string, accountId: string, paths: string[]): Promise<Map<string, { messages: number; uidNext: number }>> {
+    const out = new Map<string, { messages: number; uidNext: number }>();
+    if (!paths.length) return out;
+    await this.withClient(
+      userId,
+      accountId,
+      async (c) => {
+        for (const p of paths) {
+          const st = await c.status(p, { messages: true, uidNext: true }).catch(() => null);
+          if (st) out.set(p, { messages: Number(st.messages), uidNext: Number(st.uidNext) });
+        }
+      },
+      'folders',
+    );
+    return out;
+  }
+
   /** Fetches the folder list (once at a time per mailbox) and remembers it. */
   private fetchFolders(userId: string, accountId: string, key: string): Promise<ListResponse[]> {
     let job = this.folderFetches.get(key);
@@ -228,7 +343,11 @@ export class ImapPool {
   private sweep() {
     const now = Date.now();
     for (const [key, conn] of this.conns) {
-      if (conn.inFlight === 0 && !conn.connecting && now - conn.lastUsed > this.opts.idleTimeoutMs) {
+      const lane = key.split('#')[1] as Lane | undefined;
+      // While someone has DreyMail open, the connections for their requests stay ready (DreyMail 14.5).
+      if ((!lane || lane === 'read') && (this.watchRefs.get(key.split(':')[0]!) ?? 0) > 0) continue;
+      const idleMs = lane && SHORT_LIVED.includes(lane) ? Math.min(EXTRA_IDLE_MS, this.opts.idleTimeoutMs) : this.opts.idleTimeoutMs;
+      if (conn.inFlight === 0 && !conn.connecting && now - conn.lastUsed > idleMs) {
         this.conns.delete(key);
         const c = conn.client;
         if (c) c.logout().catch(() => c.close());
@@ -258,6 +377,8 @@ export class ImapPool {
   watch(userId: string) {
     const refs = (this.watchRefs.get(userId) ?? 0) + 1;
     this.watchRefs.set(userId, refs);
+    // The connection for opening messages and actions, ready before the first click (DreyMail 14.5).
+    if (refs === 1) for (const acc of this.store.listAccounts(userId)) void this.client(userId, acc.id, 'read').catch(() => undefined);
     if (refs > 1 || this.keepsWatching(userId)) return;
     for (const acc of this.store.listAccounts(userId)) this.startWatcher(userId, acc.id);
   }

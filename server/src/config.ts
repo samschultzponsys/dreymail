@@ -13,6 +13,7 @@
 // Modified by samschultzponsys, 2026-11-23: more messages kept per folder by default (searched from the index).
 // Modified by samschultzponsys, 2026-11-25: messages up to 25 MB kept by default (was 1 MB), so mail with photos opens from the copy.
 // Modified by samschultzponsys, 2026-11-25: up to 50 MB (the largest message shown), so the biggest photo mail is kept too.
+// Modified by samschultzponsys, 2026-11-25: DREYMAIL_IMAP_CONNECTIONS (connections per mailbox); DREYMAIL_CACHE_BACKGROUND_MBIT.
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -57,6 +58,8 @@ export interface Config {
   blockPrivateMailHosts: boolean;
   /** Close pooled IMAP connections after this many ms without use. */
   imapIdleTimeoutMs: number;
+  /** Most IMAP connections one mailbox may have open at once, the inbox watcher included (DreyMail 14.5). */
+  imapConnections: number;
   /** Largest message (bytes) the server will download for display. */
   maxMessageBytes: number;
   /** Largest total upload size (bytes) for compose attachments. */
@@ -117,6 +120,12 @@ export interface CacheConfig {
   maxBodyBytes: number;
   /** Total message content (bytes) kept per account; the least recently read goes first. */
   bodyBytesPerAccount: number;
+  /**
+   * How fast filling the copy in the background (content kept, the search index) may download,
+   * per mailbox, in bytes a second; 0 = no limit (DreyMail 14.5). New mail and opening messages
+   * are never held back.
+   */
+  backgroundBytesPerSecond?: number;
 }
 
 export type Registration = 'open' | 'first' | 'closed';
@@ -196,6 +205,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         messagesPerOtherFolder: int(env.DREYMAIL_CACHE_FOLDER_MESSAGES, 10000),
         maxBodyBytes: Math.round(Number(env.DREYMAIL_CACHE_MAX_BODY_MB || 50) * 1024 * 1024),
         bodyBytesPerAccount: int(env.DREYMAIL_CACHE_ACCOUNT_MB, 200) * 1024 * 1024,
+        backgroundBytesPerSecond: Math.round((Number(env.DREYMAIL_CACHE_BACKGROUND_MBIT || 20) * 1e6) / 8),
       }
     : null;
   if (cache && !(cache.messagesPerFolder >= 50 && cache.messagesPerFolder <= 100_000)) {
@@ -227,6 +237,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     devAllowedHostSuffix,
     blockPrivateMailHosts: bool(env.DREYMAIL_BLOCK_PRIVATE_MAIL_HOSTS, false),
     imapIdleTimeoutMs: int(env.DREYMAIL_IMAP_IDLE_TIMEOUT, 300) * 1000,
+    // Gmail allows 15 per account across all mail apps, Outlook a similar few: room is left for yours.
+    imapConnections: Math.min(20, Math.max(5, int(env.DREYMAIL_IMAP_CONNECTIONS, 6))),
     maxMessageBytes: int(env.DREYMAIL_MAX_MESSAGE_MB, 50) * 1024 * 1024,
     maxUploadBytes: int(env.DREYMAIL_MAX_UPLOAD_MB, 25) * 1024 * 1024,
     cache,
