@@ -1,0 +1,56 @@
+# dreymail. Copyright (C) 2026 samschultzponsys.
+# Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+#
+# How fast this version is next to the last release (DreyMail 14.5): scripts/bench/speed.mjs, every
+# suite, against GreenMail behind a simulated Office 365 link. The tables go into the run's summary
+# (no files are uploaded). Runs beside the Release workflow and never holds it up.
+name: Speed
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: speed
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: The last release to compare with
+        id: base
+        run: |
+          current="v$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
+          base=$(git tag --sort=-v:refname --list 'v*' | grep -vx "$current" | head -n 1)
+          echo "tag=$base" >> "$GITHUB_OUTPUT"
+          echo "Comparing with $base" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build this version
+        run: npm ci && npm run build
+      - name: Build the last release
+        run: |
+          git worktree add ../base "${{ steps.base.outputs.tag }}"
+          cd ../base && npm ci && npm run build
+      - name: Chromium for the startup suite
+        run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Measure
+        run: |
+          docker pull greenmail/standalone:2.1.3
+          for suite in open list search actions startup; do
+            echo "### $suite" >> "$GITHUB_STEP_SUMMARY"
+            node scripts/bench/speed.mjs "${{ steps.base.outputs.tag }}=$(realpath ../base)/dist/server/server/src/app.js" "this=$PWD/dist/server/server/src/app.js" --suite "$suite" --reps 3 | tee -a "$GITHUB_STEP_SUMMARY"
+          done

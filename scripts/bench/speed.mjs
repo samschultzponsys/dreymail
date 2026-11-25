@@ -6,9 +6,10 @@
 // and 50 Mbit/s, about what a home server sees talking to Office 365.
 //
 //   node scripts/bench/speed.mjs <label>=<path to dist/server/server/src/app.js> [...more]
-//        [--suite open|list|startup] [--rtt 80] [--mbit 50] [--reps 5]
+//        [--suite open|list|search|actions|startup] [--rtt 80] [--mbit 50] [--reps 5]
 //
-// Suites: open (messages, conversations, pictures), list (folders), startup (the built web app
+// Suites: open (messages, conversations, pictures), list (folders), search (word searches and
+// filters, one folder and all mail), actions (read, flag, archive, delete, send), startup (the built web app
 // in Chromium, from opening it to the mail list, on a desktop on the LAN and a phone on 4G; the
 // build's dist/web is served).
 //
@@ -52,13 +53,15 @@ async function driver() {
   try {
     await waitForGreeting(imapPort);
     const proxy = await slowProxy(imapPort, rtt / 2, (mbit * 1e6) / 8 / 1000);
+    // Sending goes over the same kind of network.
+    const smtpProxy = await slowProxy(smtpPort, rtt / 2, (mbit * 1e6) / 8 / 1000);
     const results = {};
     for (const [label, app] of builds) {
       process.stderr.write(`\n== ${label} ==\n`);
       const webPort = suite === 'startup' ? await freePort() : 0;
       results[label] = await new Promise((resolve, reject) => {
         const c = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', process.argv[1]], {
-          env: { ...process.env, NODE_ENV: 'test', BENCH_CHILD: JSON.stringify({ app, imapPort, slowPort: proxy.port, smtpPort, reps, suite, webPort }) },
+          env: { ...process.env, NODE_ENV: 'test', BENCH_CHILD: JSON.stringify({ app, imapPort, slowPort: proxy.port, smtpPort, slowSmtpPort: smtpProxy.port, reps, suite, webPort }) },
           stdio: ['pipe', 'pipe', 'inherit'],
         });
         let out = '';
@@ -81,6 +84,7 @@ async function driver() {
       });
     }
     proxy.close();
+    smtpProxy.close();
     report(results, { rtt, mbit, reps });
   } finally {
     docker('rm', '-f', id);
@@ -251,7 +255,7 @@ function slowProxy(target, oneWayMs, bytesPerMs) {
 
 // ---- child: one build, measured ---------------------------------------------------------------
 
-async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, webPort }) {
+async function child({ app: appPath, imapPort, slowPort, smtpPort, slowSmtpPort, reps, suite, webPort }) {
   const root = path.resolve(path.dirname(appPath));
   const { buildApp } = await import(pathToFileURL(appPath).href);
   const { loadConfig } = await import(pathToFileURL(path.join(root, 'config.js')).href);
@@ -275,7 +279,7 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
 
   // Mail like a work inbox: mostly short mail, some newsletters, some photos.
   const lorem = (n) => Array.from({ length: n }, (_, i) => `Paragraph ${i}: ${crypto.randomBytes(48).toString('base64')} quarterly figures, schedules and notes.`).join(' ');
-  const textMail = (subject, thread = {}) => mime(subject, 'text/plain', lorem(30), thread);
+  const textMail = (subject, thread = {}, extra = '') => mime(subject, 'text/plain', `${lorem(30)} ${extra}`, thread);
   const newsletter = (subject) => mime(subject, 'text/html', `<html><body><table width="600">${Array.from({ length: 300 }, (_, i) => `<tr><td style="font-family:Arial;color:#333;padding:8px"><h3>Story ${i}</h3><p>${lorem(3)}</p><a href="https://example.com/${i}">Read more</a></td></tr>`).join('')}</table></body></html>`);
   const photos = (subject, n = 2, bytes = 4_000_000) => {
     const parts = Array.from({ length: n }, (_, i) => `--b\r\nContent-Type: image/jpeg; name=photo${i}.jpg\r\nContent-Disposition: attachment; filename=photo${i}.jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n${crypto.randomBytes(bytes).toString('base64').replace(/.{76}/g, '$&\r\n')}\r\n`).join('');
@@ -293,6 +297,17 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
   const user2 = `bench2-${crypto.randomUUID().slice(0, 8)}@example.com`;
   await direct(async (c) => {
     await c.mailboxCreate('Sent').catch(() => undefined);
+    if (suite === 'search' || suite === 'actions') {
+      // A work mailbox of ten folders; one message in ten (in every folder) mentions the lighthouse.
+      const word = (i) => (i % 10 === 3 ? 'lighthouse' : '');
+      for (let i = 0; i < 300; i++) await c.append('INBOX', textMail(`Thread ${i}`, { id: `<t${i}@bench.example>` }, word(i)), i % 7 === 0 ? [] : ['\\Seen']);
+      for (let i = 0; i < 120; i++) await c.append('Sent', textMail(`Re: Thread ${i * 2}`, { inReplyTo: `<t${i * 2}@bench.example>` }, word(i)), ['\\Seen']);
+      for (const f of ['Archive', 'Trash', 'Projects', 'Receipts', 'Travel', 'Family', 'Clients', 'Old']) {
+        await c.mailboxCreate(f).catch(() => undefined);
+        for (let i = 0; i < 60; i++) await c.append(f, textMail(`${f} note ${i}`, {}, word(i)), ['\\Seen']);
+      }
+      return;
+    }
     if (suite === 'list' || suite === 'startup') {
       // A work mailbox: conversations with your replies in Sent, an Archive, some unread mail.
       for (let i = 0; i < 300; i++) await c.append('INBOX', textMail(`Thread ${i}`, { id: `<t${i}@bench.example>` }), i % 7 === 0 ? [] : ['\\Seen']);
@@ -335,7 +350,8 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
   };
   const userId = (await api('GET', '/api/me')).json().id;
   const server = { host: '127.0.0.1', port: slowPort, tls: 'none', user, password: 'pw' };
-  const account = (await api('POST', '/api/accounts', { name: 'Bench', displayName: 'Bench', email: user, color: '#224466', imap: server, smtp: { ...server, port: smtpPort }, appendSent: false })).json();
+  // Sent mail is saved to Sent by DreyMail (as for Outlook and most servers), over the same slow network.
+  const account = (await api('POST', '/api/accounts', { name: 'Bench', displayName: 'Bench', email: user, color: '#224466', imap: server, smtp: { ...server, port: slowSmtpPort ?? smtpPort }, appendSent: suite === 'actions' })).json();
   // Watched like a session would (notifications on: the server follows the inbox).
   const ecdh = crypto.createECDH('prime256v1');
   ecdh.generateKeys();
@@ -389,8 +405,9 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
       const orig = obj[name];
       obj[name] = function (...a) {
         const t = performance.now();
-        const lane = a.find((x) => typeof x === 'string' && ['main', 'read', 'sync', 'folders'].includes(x)) ?? '';
-        const done = () => trace.push(`${label}${lane ? `(${lane})` : ''} ${Math.round(t - traceFrom)}→${Math.round(performance.now() - traceFrom)}`);
+        const lane = a.find((x) => typeof x === 'string' && /^(main|read|sync|folders|search\d)$/.test(x)) ?? (name === 'withMailbox' ? 'main' : '');
+        const folder = name === 'withMailbox' && typeof a[2] === 'string' ? ` ${a[2]}` : '';
+        const done = () => trace.push(`${label}${lane ? `(${lane}${folder})` : ''} ${Math.round(t - traceFrom)}→${Math.round(performance.now() - traceFrom)}`);
         const r = orig.apply(this, a);
         if (r && typeof r.then === 'function') r.then(done, done);
         else done();
@@ -399,7 +416,36 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
     };
     for (const m of ['update', 'prefetch', 'fill', 'fetchBodies', 'beforeListing']) if (typeof sync[m] === 'function') wrap(sync, m);
     wrap(ctx.pool, 'withMailbox', 'imap');
+    wrap(ctx.pool, 'withClient', 'client');
   }
+  /** Requests to the mail server while `fn` runs (deterministic, unlike times). */
+  let imapCalls = 0;
+  let counting = false;
+  const countImap = () => {
+    if (counting) return;
+    counting = true;
+    for (const name of ['withMailbox', 'withClient']) {
+      const orig = ctx.pool[name];
+      ctx.pool[name] = function (...a) {
+        imapCalls++;
+        return orig.apply(this, a);
+      };
+    }
+  };
+  const measured = async (label, fn) => {
+    countImap();
+    const before = imapCalls;
+    const t = performance.now();
+    traceFrom = t;
+    trace.length = 0;
+    const res = await fn();
+    add(label, performance.now() - t);
+    add(`${label} (mail-server requests)`, imapCalls - before);
+    if (process.env.BENCH_TRACE) log(`  trace ${label}: ${Math.round(performance.now() - t)} ms\n    ${trace.join('\n    ')}`);
+    return res;
+  };
+  const folders = ['Sent', 'Archive', 'Trash', 'Projects', 'Receipts', 'Travel', 'Family', 'Clients', 'Old'];
+
   log('first sync and background filling');
   const t0 = performance.now();
   await settled();
@@ -413,6 +459,12 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
     process.stdout.write(`READY ${JSON.stringify({ cookie })}\n`);
     await new Promise((resolve) => process.stdin.once('data', resolve));
     await ctx.app.close();
+    process.exit(0);
+  }
+  if (suite === 'search' || suite === 'actions') {
+    await (suite === 'search' ? searchSuite() : actionsSuite());
+    await ctx.app.close();
+    process.stdout.write(`${JSON.stringify(out)}\n`);
     process.exit(0);
   }
   if (suite === 'list') {
@@ -485,6 +537,53 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
       if (process.env.BENCH_TRACE) log(`  trace ${name} #${r}: listed ${Math.round(listed - start)}, opened ${Math.round(opened - start)}\n    ${trace.join('\n    ')}`);
     }
   };
+  async function searchSuite() {
+    log('  filling and indexing every folder');
+    await settled(account, folders);
+    const get = (url) => api('GET', url).then((r) => r.json());
+    const inFolder = (p, extra) => `/api/messages?accountId=${account.id}&folder=${encodeURIComponent(p)}&limit=50${extra}`;
+    const all = (extra) => `/api/messages?limit=50&filter=${encodeURIComponent(JSON.stringify({ where: 'all' }))}${extra}`;
+    const fromKim = encodeURIComponent(JSON.stringify({ from: 'kim' }));
+    for (let r = 0; r < reps; r++) {
+      log(`  search round ${r + 1}`);
+      await settled(account, folders);
+      const hits = await measured('inbox: a word', () => get(inFolder('INBOX', '&q=lighthouse')));
+      if (hits.messages.length !== 30) throw new Error(`inbox search found ${hits.messages.length}, not 30`);
+      await measured('inbox: a word, quick answer from the index', () => get(inFolder('INBOX', '&q=lighthouse&quick=1')));
+      await measured('Archive: a word', () => get(inFolder('Archive', '&q=lighthouse')));
+      const everywhere = await measured('all mail (10 folders): a word', () => get(all('&q=lighthouse')));
+      if (everywhere.messages.length < 50) throw new Error(`all-mail search found ${everywhere.messages.length}`);
+      await measured('inbox: from (a filter)', () => get(inFolder('INBOX', `&filter=${fromKim}`)));
+      await measured('all mail: a word and unread only', () => get(all('&q=lighthouse&unread=1')));
+    }
+  }
+
+  async function actionsSuite() {
+    await settled(account, folders);
+    const inbox = async () => (await api('GET', `/api/messages?accountId=${account.id}&folder=INBOX&limit=200`)).json().messages;
+    const act = (messages, action) => api('POST', '/api/messages/actions', { messages: messages.map(({ accountId, folder, uid, uidValidity }) => ({ accountId, folder, uid, uidValidity })), action });
+    const multipart = (payload) => {
+      const b = `----bench${crypto.randomUUID()}`;
+      return { body: `--${b}\r\nContent-Disposition: form-data; name="payload"\r\n\r\n${JSON.stringify(payload)}\r\n--${b}--\r\n`, type: `multipart/form-data; boundary=${b}` };
+    };
+    for (let r = 0; r < reps; r++) {
+      log(`  actions round ${r + 1}`);
+      await settled(account, folders);
+      const msgs = await inbox();
+      const [a, b, c, d] = msgs.slice(r * 4, r * 4 + 4);
+      await measured('mark read', () => act([a], { type: 'seen', value: !a.seen }));
+      await measured('flag', () => act([b], { type: 'flagged', value: true }));
+      await measured('mark 20 read at once', () => act(msgs.slice(100 + r * 20, 120 + r * 20), { type: 'seen', value: true }));
+      await measured('archive', () => act([c], { type: 'archive' }));
+      await measured('delete (to Trash)', () => act([d], { type: 'delete' }));
+      const { body, type } = multipart({ accountId: account.id, to: user, cc: '', bcc: '', subject: `Bench send ${r}`, html: `<p>${lorem(5)}</p>`, inReplyTo: null, references: [], forwardFrom: null, replaceDraft: null, answering: null });
+      await measured('send (and save to Sent)', async () => {
+        const res = await ctx.app.inject({ method: 'POST', url: '/api/send', payload: body, headers: { cookie, 'x-dreymail': '1', 'content-type': type } });
+        if (res.statusCode >= 400) throw new Error(`send: ${res.statusCode} ${res.body.slice(0, 200)}`);
+      });
+    }
+  }
+
   async function listSuite() {
     const account2 = (await api('POST', '/api/accounts', { name: 'Bench 2', displayName: 'Bench 2', email: user2, color: '#664422', imap: { ...server, user: user2 }, smtp: { ...server, user: user2, port: smtpPort }, appendSent: false })).json();
     const all = async () => {
@@ -493,23 +592,7 @@ async function child({ app: appPath, imapPort, slowPort, smtpPort, reps, suite, 
     };
     log('  filling both mailboxes');
     await all();
-    // Requests to the mail server while a listing runs (deterministic, unlike times).
-    let imapCalls = 0;
-    for (const name of ['withMailbox', 'withClient']) {
-      const orig = ctx.pool[name];
-      ctx.pool[name] = function (...a) {
-        imapCalls++;
-        return orig.apply(this, a);
-      };
-    }
-    const measure = async (label, url) => {
-      const before = imapCalls;
-      const t = performance.now();
-      const res = await api('GET', url);
-      add(label, performance.now() - t);
-      add(`${label} (mail-server requests)`, imapCalls - before);
-      return res.json();
-    };
+    const measure = (label, url) => measured(label, () => api('GET', url).then((r) => r.json()));
     const folder = (p, extra = '') => `/api/messages?accountId=${account.id}&folder=${encodeURIComponent(p)}&limit=50${extra}`;
     for (let r = 0; r < reps; r++) {
       log(`  list round ${r + 1}`);
