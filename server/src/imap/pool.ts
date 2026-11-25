@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-17: a third command connection for filling the cache of other folders in the background.
 // Modified by samschultzponsys, 2026-11-23: four more connections for searching many folders of a mailbox at once (never the main one); UIDNEXT in folder lists.
 // Modified by samschultzponsys, 2026-11-25: a connection of its own for opening messages, so reading never waits behind syncing.
+// Modified by samschultzponsys, 2026-11-25: an older folder list is used at once while a fresh one is fetched.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -68,6 +69,7 @@ export class ImapPool {
   private readonly watchRefs = new Map<string, number>();
   /** The last folder list per account, for a minute (kept apart from connections, which come and go). */
   private readonly folderLists = new Map<string, { at: number; list: ListResponse[] }>();
+  private readonly folderFetches = new Map<string, Promise<ListResponse[]>>();
   private readonly background = new Set<string>();
   /** Users with the AI assistant on for some mailbox: their inboxes are watched for new mail too (DreyMail). */
   private readonly assistant = new Set<string>();
@@ -170,20 +172,46 @@ export class ImapPool {
     }, lane);
   }
 
-  /** Folder list with a short cache (special-use lookups happen on most actions). */
+  /**
+   * Folder list (special-use lookups happen on most actions and listings). One older than a minute
+   * is still answered at once while a fresh one is fetched (DreyMail 14.3): listing every folder
+   * with its counts can take seconds on a big mailbox, and which folder is Sent or Drafts hardly
+   * ever changes. `fresh` waits for a list fetched now.
+   */
   async folders(userId: string, accountId: string, fresh = false): Promise<ListResponse[]> {
     const key = this.key(userId, accountId);
     const known = this.folderLists.get(key);
-    if (!fresh && known && Date.now() - known.at < FOLDER_CACHE_MS) return known.list;
-    const list = await this.withClient(userId, accountId, (c) => c.list({ statusQuery: { unseen: true, messages: true, uidNext: true } }), 'folders');
-    this.folderLists.set(key, { at: Date.now(), list });
-    return list;
+    if (!fresh && known) {
+      if (Date.now() - known.at >= FOLDER_CACHE_MS) void this.fetchFolders(userId, accountId, key).catch(() => undefined);
+      return known.list;
+    }
+    return this.fetchFolders(userId, accountId, key);
+  }
+
+  /** Fetches the folder list (once at a time per mailbox) and remembers it. */
+  private fetchFolders(userId: string, accountId: string, key: string): Promise<ListResponse[]> {
+    let job = this.folderFetches.get(key);
+    if (!job) {
+      const current = this.withClient(userId, accountId, (c) => c.list({ statusQuery: { unseen: true, messages: true, uidNext: true } }), 'folders')
+        .then((list) => {
+          // An account changed meanwhile (invalidate) keeps no list from before.
+          if (this.folderFetches.get(key) === current) this.folderLists.set(key, { at: Date.now(), list });
+          return list;
+        })
+        .finally(() => {
+          if (this.folderFetches.get(key) === current) this.folderFetches.delete(key);
+        });
+      job = current;
+      this.folderFetches.set(key, current);
+    }
+    return job;
   }
 
   /** Close and forget every connection for an account (after edit or delete). */
   invalidate(userId: string, accountId: string) {
     const key = this.key(userId, accountId);
     this.folderLists.delete(key);
+    this.folderFetches.delete(key);
     for (const k of [key, ...[...this.conns.keys()].filter((k) => k.startsWith(`${key}#`))]) {
       const conn = this.conns.get(k);
       this.conns.delete(k);
