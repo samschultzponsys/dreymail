@@ -11,6 +11,7 @@
 // Modified by samschultzponsys, 2026-11-23: quick searches from the search index while the full one runs.
 // Modified by samschultzponsys, 2026-11-24: reconnecting checks the server's version again.
 // Modified by samschultzponsys, 2026-11-25: unused useMessageCache removed.
+// Modified by samschultzponsys, 2026-11-25: the list kept on this device shown at once (when switched on).
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import { desktopBridge } from './desktop';
 import { actionsPending, fetchMessageList, runMessageAction, type ActionOutcome } from './messageActions';
 import { closeNotifications } from './push';
 import { applyThemeColor } from './themeColor';
+import { saveSnapshot, snapshotFor } from './listSnapshot';
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: api.me, retry: false, staleTime: Infinity });
 export const useAccounts = (enabled = true) => useQuery({ queryKey: ['accounts'], queryFn: api.accounts, staleTime: 60_000, enabled });
@@ -53,9 +55,20 @@ export function useSavedSearches(enabled: boolean) {
 
 export function useMessages(sel: MailboxSel, q: string, unread: boolean, enabled: boolean, filter = '') {
   const qc = useQueryClient();
+  const queryKey = ['messages', sel.accountId, sel.accountId ? sel.folder : '', q, unread, filter] as const;
   return useInfiniteQuery({
-    queryKey: ['messages', sel.accountId, sel.accountId ? sel.folder : '', q, unread, filter],
-    queryFn: ({ pageParam, signal }) => fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread, filter, false, q || filter ? signal : undefined)),
+    queryKey,
+    queryFn: async ({ pageParam, signal }) => {
+      const page = await fetchMessageList(qc, () => api.messages(sel, pageParam, q, unread, filter, false, q || filter ? signal : undefined));
+      // Settings → This device: kept to show at once next time (DreyMail 14.5; off unless chosen).
+      if (pageParam === null && !q && !filter) saveSnapshot(queryKey, page);
+      return page;
+    },
+    // Until the server answers: the list kept from last time, if there is one for this view.
+    placeholderData: () => {
+      const page = q || filter ? undefined : snapshotFor(queryKey);
+      return page ? { pages: [page], pageParams: [null] } : undefined;
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.cursor,
     enabled,

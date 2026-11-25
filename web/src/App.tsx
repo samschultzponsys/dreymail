@@ -40,6 +40,7 @@
 // Modified by samschultzponsys, 2026-11-25: the messages around the open one fetched ahead.
 // Modified by samschultzponsys, 2026-11-25: the loading screen doesn't wait for the folder list.
 // Modified by samschultzponsys, 2026-11-25: Settings, Calendar, the composer and other windows load when first needed.
+// Modified by samschultzponsys, 2026-11-25: startup time reported; the list kept on this device cleared when signing out.
 
 import { encodeFilters, filterCount, type SavedSearch } from '../../shared/search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -84,6 +85,7 @@ import { planRun, runFor, runSpeed, SLIDE_MS, slideKeyframes, type PaneView } fr
 import { refKey, toRef } from './util';
 import { rowRefs, warm } from './warm';
 import { lazyPart, preloadParts } from './lazyPart';
+import { clearSnapshot, setSnapshotUser } from './listSnapshot';
 
 // Not needed to show your mail: loaded when first opened, or in the background once idle (DreyMail 14.4).
 const AccountsDialog = lazyPart(() => import('./components/AccountsDialog'), 'AccountsDialog');
@@ -109,6 +111,8 @@ export function App() {
     if (me.data && window.location.pathname.replace(/\/+$/, '') === '/login') window.history.replaceState(window.history.state, '', '/');
   }, [me.data]);
   const loggedIn = !!me.data;
+  // Whose list may be shown at once on the next start (Settings → This device, DreyMail 14.5).
+  setSnapshotUser(me.data?.id ?? null);
   const theme = useTheme(me.data?.preferences.theme);
   // Only once signed in: asked earlier it fails with 401 and wouldn't be asked again after login.
   const accountsQ = useAccounts(loggedIn);
@@ -754,6 +758,9 @@ export function App() {
     if (!appReady) return;
     hideSplash();
     preloadParts();
+    // How long it took, for Settings → Server → Speed (once per start, with a mail list to show).
+    if (accounts.length > 0) void api.reportStartup(performance.now()).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appReady]);
   useEffect(() => {
     const slow = window.setTimeout(() => splashText('Still loading… the server may be starting up.'), 4000);
@@ -777,6 +784,7 @@ export function App() {
     setAppBadge(0);
     const { redirect } = await api.logout();
     qc.clear();
+    clearSnapshot();
     // With automatic single sign-on, the sign-in page waits instead of signing straight back in.
     try {
       sessionStorage.setItem(SIGNED_OUT_KEY, '1');

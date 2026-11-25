@@ -8,6 +8,7 @@
 import { androidBridge } from './android';
 import { desktopBridge } from './desktop';
 import { fetchJson } from './api';
+import { SNAPSHOT_KEY } from './listSnapshot';
 
 export type DeviceKind = 'browser' | 'desktop' | 'android';
 
@@ -32,7 +33,8 @@ const ID_KEY = 'dreymail.deviceId';
 const NAME_KEY = 'dreymail.deviceName';
 const SCHEDULE_KEY = 'dreymail.deviceBackup';
 /** Kept out of a backup: who this device is, its schedule, and one-off state (sign-in steps, a pending link). */
-const SKIP = new Set([ID_KEY, NAME_KEY, SCHEDULE_KEY, 'dm-signed-out', 'dm-sso-attempt', 'dreymail.pendingMailto', 'dreymail.outlook', 'dreymail.sso']);
+// DreyMail 14.5: nor the list kept for starting at once (mail), nor the requests remembered for starting quickly.
+const SKIP = new Set([ID_KEY, NAME_KEY, SCHEDULE_KEY, 'dm-signed-out', 'dm-sso-attempt', 'dreymail.pendingMailto', 'dreymail.outlook', 'dreymail.sso', SNAPSHOT_KEY, 'dreymail.boot']);
 
 const storage = (): Storage | null => {
   try {

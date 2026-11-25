@@ -41,6 +41,7 @@
 // Modified by samschultzponsys, 2026-11-23: the Search and storage tab; each message's buttons: order, place and size.
 // Modified by samschultzponsys, 2026-11-24: the dialog uses most of the window; tabs wrap instead of being cut off.
 // Modified by samschultzponsys, 2026-11-25: settingTabsFor moved to settingTabs.ts (the app's start doesn't load this window).
+// Modified by samschultzponsys, 2026-11-25: This device → show your mail list at once when DreyMail starts.
 
 import { DeviceSessionSettings } from './AppLock';
 import { ServerAdmin } from './ServerAdmin';
@@ -71,6 +72,7 @@ import { useAccounts } from '../hooks';
 import { handlerTemplate } from '../mailto';
 import { currentEnvironment, currentSubscription, disablePush, enablePush, pushAvailability, type PushAvailability } from '../push';
 import { formatDelay } from '../util';
+import { instantListOn, setInstantList } from '../listSnapshot';
 
 const TRANSITION_OPTIONS: [TransitionSpeed, string][] = [
   ['off', 'Off'],
@@ -1054,6 +1056,31 @@ function InstallApp() {
   );
 }
 
+/** Settings → This device: show the list kept from last time at once when starting (DreyMail 14.5). */
+function InstantList() {
+  const [on, setOn] = useState(instantListOn);
+  return (
+    <div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setInstantList(e.target.checked);
+            setOn(e.target.checked);
+          }}
+        />
+        Show your mail list at once when DreyMail starts
+      </label>
+      <div className="hint">
+        The first page of the list you last saw (subjects, senders and the start of each message) is kept on this device and shown the moment
+        DreyMail opens, then replaced by the current one a moment later. It stays on this device only, not in its backups, and is removed when you
+        sign out or turn this off. Leave it off on a device others use.
+      </div>
+    </div>
+  );
+}
+
 function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences) => Promise<void> }) {
   const desktop = desktopBridge();
   const android = androidBridge();
@@ -1067,6 +1094,7 @@ function ThisDevice({ prefs, save }: { prefs: Preferences; save: (p: Preferences
       <InstallApp />
       <DeviceSessionSettings />
       <InterfaceSize />
+      <InstantList />
       <div>
         {(desktop || android) && <label className="label">Notifications on this device</label>}
         {desktop ? (

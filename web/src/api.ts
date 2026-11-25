@@ -23,6 +23,7 @@
 // Modified by samschultzponsys, 2026-11-23: quick searches (quick=1).
 // Modified by samschultzponsys, 2026-11-25: messages likely opened next fetched ahead (warmMessages).
 // Modified by samschultzponsys, 2026-11-25: the first requests answered from those boot.js started; which ones remembered.
+// Modified by samschultzponsys, 2026-11-25: the startup time reported (Settings → Server → Speed).
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -284,6 +285,9 @@ export const api = {
   message: (r: MessageRef, remote: RemoteMode) =>
     request<MessageDetail>('GET', `/api/message?${refQuery(r)}${remote === 'auto' ? '' : `&remote=${remote === 'load' ? 1 : 0}`}`),
   /** Messages likely opened next: the server fetches their content ahead (DreyMail 14.0). */
+  /** How long starting took, until the mail list showed (Settings → Server → Speed, DreyMail 14.5). */
+  reportStartup: (ms: number) =>
+    request<{ ok: true }>('POST', '/api/speed/startup', { ms: Math.round(ms), remembered: inBrowser && !!(window as { __dmPreload?: { remembered?: boolean } }).__dmPreload?.remembered }),
   warmMessages: (refs: MessageRef[]) => request<{ ok: true }>('POST', '/api/messages/warm', { refs }),
   attachmentUrl: (r: MessageRef, index: number) => `/api/attachment?${refQuery(r)}&index=${index}`,
   action: (messages: MessageRef[], action: MessageAction) => request<ActionResult>('POST', '/api/messages/actions', { messages, action }),
