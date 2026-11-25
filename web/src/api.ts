@@ -22,6 +22,7 @@
 // Modified by samschultzponsys, 2026-11-17: a locked device (423) shows the lock screen.
 // Modified by samschultzponsys, 2026-11-23: quick searches (quick=1).
 // Modified by samschultzponsys, 2026-11-25: messages likely opened next fetched ahead (warmMessages).
+// Modified by samschultzponsys, 2026-11-25: the first requests answered from those boot.js started; which ones remembered.
 
 import type { AiConnectionView } from '../../shared/aiProviders';
 import type { AssistantDecision, AssistantRule, HistoryEntry, MailboxAssistantSettings, RuleInput, RuleSuggestion, ScanStatus, SenderGroup, LearningStatus } from '../../shared/assistant';
@@ -55,6 +56,57 @@ export class ApiError extends Error {
   }
 }
 
+// ---- starting quickly (DreyMail 14.4) -----------------------------------------------------------
+// The data the app asks for in its first seconds is remembered per page (addresses only, never any
+// mail), and public/boot.js asks for it again on the next start while the app's script is still
+// downloading. The first request for each of them takes that answer instead of asking again.
+
+const BOOT_KEY = 'dreymail.boot';
+/** Requests in this long after the start are remembered. */
+const LEARN_MS = 4000;
+/** Answers boot.js got are used this long after the start, at most (the app asks again after that). */
+const PRELOAD_MAX_AGE_MS = 15_000;
+const inBrowser = typeof window !== 'undefined';
+const bootRoute = inBrowser ? window.location.pathname + window.location.search : '';
+const bootStarted = Date.now();
+const learned: string[] = [];
+
+interface Preload {
+  at: number;
+  requests: Record<string, Promise<Response> | undefined>;
+}
+
+function takePreload(url: string): Promise<Response> | null {
+  if (!inBrowser) return null;
+  const pre = (window as { __dmPreload?: Preload }).__dmPreload;
+  if (!pre || Date.now() - pre.at > PRELOAD_MAX_AGE_MS) return null;
+  const res = pre.requests[url];
+  if (!res) return null;
+  delete pre.requests[url];
+  return res;
+}
+
+function learn(url: string) {
+  if (!inBrowser || Date.now() - bootStarted > LEARN_MS || learned.includes(url) || learned.length >= 24) return;
+  learned.push(url);
+  if (learned.length === 1) window.setTimeout(saveLearned, LEARN_MS);
+}
+
+function saveLearned() {
+  try {
+    const saved = (JSON.parse(localStorage.getItem(BOOT_KEY) ?? 'null') as { v: number; routes: Record<string, string[]>; order: string[]; common: string[] } | null) ?? null;
+    const next = saved?.v === 1 ? saved : { v: 1, routes: {}, order: [], common: [] };
+    next.routes[bootRoute] = learned;
+    // The few pages most recently started on; anything else starts with what isn't page-specific.
+    next.order = [bootRoute, ...next.order.filter((r) => r !== bootRoute)].slice(0, 8);
+    for (const r of Object.keys(next.routes)) if (!next.order.includes(r)) delete next.routes[r];
+    next.common = learned.filter((u) => !/^\/api\/messages?[/?]/.test(u));
+    localStorage.setItem(BOOT_KEY, JSON.stringify(next));
+  } catch {
+    /* storage off or full: starts as before */
+  }
+}
+
 export async function request<T>(method: string, url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { 'x-dreymail': '1' };
   let payload: BodyInit | undefined;
@@ -63,7 +115,13 @@ export async function request<T>(method: string, url: string, body?: unknown, si
     headers['content-type'] = 'application/json';
     payload = JSON.stringify(body);
   }
-  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal });
+  let res: Response | null = null;
+  if (method === 'GET') {
+    learn(url);
+    const pre = takePreload(url);
+    if (pre) res = await pre.catch(() => null);
+  }
+  res ??= await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal });
   if (!res.ok) {
     let msg = res.statusText;
     let stale = false;

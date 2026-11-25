@@ -1,13 +1,35 @@
 <!doctype html>
 <!-- Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr), AGPL-3.0-only; see LICENSE and NOTICE.
      Modified by samschultzponsys, 2026-11-13: page and app title changed from "Ratatoskr" to "DreyMail".
-     Modified by samschultzponsys, 2026-11-24: a loading screen until your mail is ready. -->
+     Modified by samschultzponsys, 2026-11-24: a loading screen until your mail is ready.
+     Modified by samschultzponsys, 2026-11-25: the first requests start while the app's script downloads. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <meta name="referrer" content="no-referrer" />
+    <!-- Allowed by its hash, which the server adds to the page's Content-Security-Policy (server/src/app.ts). -->
+    <script>
+      (function () {
+        // The app's first requests, started while its script downloads (DreyMail 14.4; see web/src/api.ts).
+        try {
+          var saved = JSON.parse(localStorage.getItem('dreymail.boot') || 'null');
+          var urls = saved && saved.v === 1 ? (saved.routes && saved.routes[location.pathname + location.search]) || saved.common || [] : ['/api/me', '/api/accounts', '/api/groups'];
+          // What the mail list needs first: browsers only open a few connections to a server at once.
+          var first = /^\/api\/(me|accounts|messages|folders|groups)\b/;
+          urls = urls.filter(function (u) { return first.test(u); }).concat(urls.filter(function (u) { return !first.test(u); }));
+          var requests = {};
+          for (var i = 0; i < urls.length && i < 24; i++) {
+            var url = urls[i];
+            if (typeof url !== 'string' || url.indexOf('/api/') !== 0) continue;
+            requests[url] = fetch(url, { headers: { 'x-dreymail': '1' }, credentials: 'same-origin' });
+            requests[url].catch(function () {});
+          }
+          window.__dmPreload = { at: Date.now(), requests: requests };
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
