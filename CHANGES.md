@@ -13,6 +13,30 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-25 (v14.1): pictures and attachments open at once
+
+- **Opening a picture no longer downloads the whole message again.** Messages larger than the
+  cache kept (1 MB, so most mail with photos) were downloaded from the mail server and decoded
+  whole for every attachment opened, and again for each picture in the viewer. The last messages
+  opened are now kept decoded in memory (up to 512 MB for the server, 10 minutes, each only for its user), so their pictures and
+  attachments, and replies and forwards, come from memory. Asking again for pictures still
+  loading no longer downloads the message again either: only its flags are checked.
+- **Messages up to 25 MB are kept** (`DREYMAIL_CACHE_MAX_BODY_MB`, was 1 MB), so mail with photos
+  opens from the copy too, also after a restart. Space per user is unchanged; the oldest content
+  gives way first.
+- **Background reads in bounded batches.** Filling the copy and the search index fetch at most
+  32 MB per IMAP command (one larger message alone); messages too big to keep are only read for
+  their start (288 KB) to index them.
+- **The viewer fetches ahead:** the next and previous pictures load while you look at one.
+- **Decoding on worker threads:** messages over 256 KB being opened are decoded on two worker
+  threads of their own, so the server stays free for other requests meanwhile.
+- **Files:** `server/src/mail/openedMemo.ts` (new), `server/src/imap/mail.ts`,
+  `server/src/cache/sync.ts`, `server/src/cache/store.ts`, `server/src/cache/textPool.ts`,
+  `server/src/cache/textWorker.ts`, `server/src/config.ts`, `server/src/app.ts`,
+  `server/test/openedMemo.test.ts` (new), `server/test/cache.test.ts`,
+  `server/test/integration/cache.test.ts`, `web/src/components/ImageViewer.tsx`, `README.md`,
+  `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.0): messages open faster
 
 - **New mail is listed sooner.** A sync used to download the content of up to 30 new messages

@@ -22,6 +22,8 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Pictures and attachments open at once: messages up to 25 MB kept, the last opened kept decoded in
+      memory, the viewer fetches the neighbouring pictures, big messages decoded on worker threads (14.1).
 - [x] Messages open faster: new mail listed before its content downloads (newest first, an open joins
       the download), a connection only for opening messages, one round trip, the messages around the
       open one and the one under the mouse fetched ahead (14.0).
