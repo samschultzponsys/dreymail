@@ -1,6 +1,7 @@
 // Part of DreyMail, a modified version of Ratatoskr (https://github.com/magnuspihl/Ratatoskr),
 // Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 // Modified by samschultzponsys, 2026-11-16: emoji written as two halves (Outlook for iOS) show as one.
+// Modified by samschultzponsys, 2026-11-25: remote image URLs found in one light pass instead of a whole sanitizing.
 
 import { Parser } from 'htmlparser2';
 import sanitizeHtml from 'sanitize-html';
@@ -229,8 +230,90 @@ export function sanitizeEmailHtml(rawInput: string, opts: SanitizeOptions): Sani
 /**
  * The remote image URLs a message would load if remote content were allowed (in img src,
  * background attributes and CSS url()), normalised exactly as the sanitizer will look them up.
+ *
+ * DreyMail 14.2: one light pass over the HTML instead of a whole sanitizing (which this used to
+ * run, and throw away, before sanitizing again to show the message): every opening tag is seen
+ * as the sanitizer sees it (same parser, same options), and only what can hold a URL is read.
+ * `sanitizeRemoteUrlsReference` below is the old way, kept for the tests that prove both agree.
  */
-export function collectRemoteImageUrls(html: string): string[] {
+export function collectRemoteImageUrls(rawHtml: string): string[] {
+  const html = joinSurrogateReferences(rawHtml);
+  const urls: string[] = [];
+  const record = (raw: string): null => {
+    let src = raw.trim();
+    if (src.startsWith('//')) src = `https:${src}`;
+    if (/^https?:\/\//i.test(src) && fetchableImageUrl(src)) urls.push(src);
+    return null;
+  };
+  // CSS can only load something through url(), which escapes (a backslash) can hide.
+  const mayHoldUrl = (css: string) => /url|\\/i.test(css);
+  for (const sheet of extractStylesheets(html)) if (mayHoldUrl(sheet)) sanitizeStylesheet(sheet, record);
+  // The sanitizer stops looking at tags inside a disallowed element whose text it drops (a
+  // <noscript>, <svg>, <button>…) until that element ends; this follows the same rules
+  // (sanitize-html 2.18's onopentag / onclosetag) so exactly the same tags are seen.
+  const stack: string[] = [];
+  let skipText = false;
+  let skipTextDepth = 0;
+  let skipRawText = false;
+  let rawTextEnd: number | null = null;
+  const updateRawTextRegion = () => {
+    if (rawTextEnd !== null && parser.startIndex >= rawTextEnd) {
+      rawTextEnd = null;
+      skipRawText = false;
+    }
+  };
+  const parser: Parser = new Parser(
+    {
+      onopentag(name, attribs) {
+        updateRawTextRegion();
+        if (skipRawText) return;
+        if (skipText) {
+          skipTextDepth++;
+          return;
+        }
+        stack.push(name);
+        if (attribs.style !== undefined && mayHoldUrl(attribs.style)) sanitizeInlineStyle(attribs.style, record);
+        if (attribs.background !== undefined) record(attribs.background);
+        if (name === 'img' && attribs.src !== undefined) record(attribs.src);
+        if (!ALLOWED_TAGS.includes(name) && NON_TEXT_TAGS.includes(name)) {
+          skipText = true;
+          skipTextDepth = 1;
+          if (name === 'noscript') {
+            const end = /<\/noscript[\t\n\f\r />]/gi;
+            end.lastIndex = parser.endIndex + 1;
+            rawTextEnd = end.exec(html)?.index ?? Infinity;
+          }
+        }
+      },
+      onclosetag(name) {
+        updateRawTextRegion();
+        if (skipRawText) {
+          if (stack.at(-1) !== name) return;
+        } else if (skipText) {
+          skipTextDepth--;
+          if (skipTextDepth) return;
+          skipText = false;
+          if (rawTextEnd !== null) skipRawText = true;
+        }
+        const top = stack.pop();
+        if (top === undefined) return;
+        if (top !== name) {
+          stack.push(top);
+          return;
+        }
+        skipText = false;
+      },
+    },
+    // What sanitize-html parses with.
+    { decodeEntities: true },
+  );
+  parser.write(html);
+  parser.end();
+  return [...new Set(urls)];
+}
+
+/** The remote image URLs found by sanitizing the whole message (before 14.2); tests compare against it. */
+export function sanitizeRemoteUrlsReference(html: string): string[] {
   const urls: string[] = [];
   sanitizeEmailHtml(html, {
     allowRemote: true,
