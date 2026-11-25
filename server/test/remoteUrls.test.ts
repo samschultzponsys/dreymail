@@ -86,5 +86,6 @@ describe('remote image URLs', () => {
     }
     // The inputs did hold remote images (the comparison isn't of empty lists).
     expect(found).toBeGreaterThan(15_000);
-  });
+    // 20,000 sanitizings take a few seconds on a slow CI machine.
+  }, 60_000);
 });
