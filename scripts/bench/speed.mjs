@@ -164,8 +164,14 @@ async function browserRuns(baseUrl, cookie, reps) {
           requests = 0;
           if (visit === 'first visit') await page.goto(`${baseUrl}/`, { waitUntil: 'commit' });
           else await page.reload({ waitUntil: 'commit' });
-          await page.waitForFunction(() => window.__dm.row !== null && window.__dm.splash !== null, null, { timeout: 60_000, polling: 50 });
-          const m = await page.evaluate(() => window.__dm);
+          // Polled from here: waiting inside the page would need eval, which DreyMail's
+          // Content-Security-Policy rightly refuses (some Playwright versions do it that way).
+          let m = null;
+          for (const end = Date.now() + 60_000; Date.now() < end; await new Promise((r) => setTimeout(r, 50))) {
+            m = await page.evaluate(() => window.__dm).catch(() => null);
+            if (m && m.row !== null && m.splash !== null) break;
+          }
+          if (!m || m.row === null || m.splash === null) throw new Error(`${name}, ${visit}: the mail list never showed`);
           add(`${name}, ${visit}: mail list shown`, m.row);
           add(`${name}, ${visit}: loading screen gone`, m.splash);
           // Let the app settle (WebSocket, background requests, and what it remembers for its next

@@ -49,6 +49,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Measure
         run: |
+          # A failing measurement fails the run (tee would hide it).
+          set -o pipefail
           docker pull greenmail/standalone:2.1.3
           for suite in open list search actions startup; do
             echo "### $suite" >> "$GITHUB_STEP_SUMMARY"

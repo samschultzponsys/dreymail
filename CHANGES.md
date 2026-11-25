@@ -61,6 +61,10 @@ requests (mark read: 170 / 755); with DreyMail open that connection is ready bef
 - **The Speed workflow:** every push to main measures this version against the last release
   (every suite), the tables in the run's summary; it never holds up the release.
 - **Fix:** Settings → Server showed the largest message kept whole as 1 MB by default (50 since 14.2).
+- **After the release:** the Speed workflow's startup suite waited for the list inside the page,
+  which DreyMail's Content-Security-Policy (rightly) refuses with the Playwright it installs; it now
+  checks from outside the page, and a failing measurement fails the run instead of being hidden.
+  (`scripts/bench/speed.mjs`, `.github/workflows/speed.yml`; no change to DreyMail itself.)
 - **Files:** `server/src/imap/pool.ts`, `server/src/imap/mail.ts`, `server/src/cache/sync.ts`,
   `server/src/config.ts`, `server/src/app.ts`, `server/src/routes/api.ts`,
   `server/src/routes/admin.ts`, `server/src/speed.ts` (new), `shared/speed.ts` (new),
