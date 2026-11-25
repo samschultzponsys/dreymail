@@ -5,6 +5,7 @@
 // Modified by samschultzponsys, 2026-11-25: new mail's content, opening on its own connection, warming messages ahead.
 // Modified by samschultzponsys, 2026-11-25: a big message's pictures open from memory.
 // Modified by samschultzponsys, 2026-11-25: other folders listed from their copy at once, catching up afterwards.
+// Modified by samschultzponsys, 2026-11-25: a word search of a watched inbox needs no mail server.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -341,14 +342,24 @@ describe('mail cache', () => {
     expect((await imapCalls(() => api('GET', `/api/message?${ref}`))).calls).toBe(0);
   });
 
+  it('searches a watched, indexed inbox for a word without asking the mail server anything', async () => {
+    await deliver(HEDY, 'Lighthouse keepers', { text: 'The lamp needs oil' });
+    await settled(hedy);
+    expect(await until(async () => !ctx.cacheSync!.isIndexing(userId, hedy.id) && subjects((await list(hedy, 'INBOX', '&q=lighthouse')).messages).includes('Lighthouse keepers'))).toBe(true);
+    // DreyMail 14.5: it used to ask for the status of every folder first (one request per folder on most servers).
+    const { result, calls } = await imapCalls(() => list(hedy, 'INBOX', '&q=lighthouse'));
+    expect(subjects(result.messages)).toEqual(['Lighthouse keepers']);
+    expect(calls).toBe(0);
+  });
+
   it('answers other folders from their copy at once, and catches up with changes made elsewhere', async () => {
     await settled(hedy);
     events.length = 0;
     await deliver(HEDY, 'Filed by another client', { folder: 'Sent', flags: ['\\Seen'] });
     // Listed again and again, as the browser does when told the folder changed: it shows up.
     expect(await until(async () => subjects((await list(hedy, 'Sent')).messages).includes('Filed by another client'))).toBe(true);
-    // The browser was told (it refreshes the list by itself).
-    expect(events).toContainEqual({ type: 'mailbox', accountId: hedy.id, folder: 'Sent' });
+    // The browser is told (it refreshes the list by itself), by the check on the background connection.
+    expect(await until(() => events.some((e) => e.type === 'mailbox' && e.accountId === hedy.id && e.folder === 'Sent'))).toBe(true);
   });
 
   it('tells the browser when a folder opened before it was cached is ready, then lists it from the copy', async () => {

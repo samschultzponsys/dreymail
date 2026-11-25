@@ -21,6 +21,7 @@
 // Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
 // Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
 // Modified by samschultzponsys, 2026-11-25: lists answered from the copy at once and checked in the background; a folder being cached for the first time isn't searched on the mail server for conversations.
+// Modified by samschultzponsys, 2026-11-25: word searches from the index without asking about every folder; search connections within the mailbox's limit; actions on the connection for your requests.
 
 import { queryTerms } from '../cache/searchTerms.js';
 import type { SmimeInfo } from '../mail/smime.js';
@@ -142,7 +143,6 @@ export const needsSearch = (f: ListFilter) => f.text !== '' || (!!f.filters && f
  * Connections a search of many folders of one mailbox uses at once (DreyMail 12.6); never the main
  * one (12.8), so opening a message or another folder doesn't wait behind a long search.
  */
-const SEARCH_LANES: Lane[] = ['search1', 'search2', 'search3', 'search4'];
 export const isFiltered = (f: ListFilter) => f.unread || needsSearch(f);
 /** A plain word search (unread only allowed) that the cache's search index can answer (DreyMail 12.3). */
 export const indexable = (f: ListFilter) => !!f.text && !(f.filters && filterCount(f.filters) > 0) && queryTerms(f.text).length > 0;
@@ -207,6 +207,8 @@ const MAX_RELATED = 200;
 const SENT_REFRESH_MS = 5000;
 /** A listed folder (not a watched inbox) synced longer ago than this is checked in the background. */
 const LISTED_CHECK_MS = 3000;
+/** A copy checked this recently (and nothing known to have changed) answers word searches at once (DreyMail 14.5). */
+const SEARCH_TRUST_MS = 10 * 60_000;
 
 /**
  * K-way merge of per-source pages. Each source's items are a queue ordered newest-UID-first; at
@@ -629,20 +631,35 @@ export class MailService {
     const accounts = [...new Set(sources.map((s) => s.accountId))];
     await Promise.all(
       accounts.map(async (accountId) => {
-        const list = await this.pool.folders(userId, accountId, true).catch(() => null);
-        if (!list) return;
-        const byPath = new Map(list.map((f) => [f.path, f.status]));
+        const ask: { source: ListSource; f: CachedFolder }[] = [];
         for (const s of sources.filter((x) => x.accountId === accountId)) {
           const f = sync.ready(userId, accountId, s.folder);
           if (!f) continue;
-          const st = byPath.get(s.folder);
-          if (sync.isCurrent(userId, accountId, s.folder) || (st && Number(st.uidNext) === f.uidNext && Number(st.messages) === f.exists)) out.add(sourceKey(s));
-          else sync.syncSoon(userId, accountId, s.folder);
+          // Known to match (DreyMail 14.5): a watched inbox, or another folder whose copy was checked a
+          // few minutes ago with nothing known to have changed since. Answered at once; a check runs
+          // in the background, and what it finds reaches the results by itself (as for listing, 14.3).
+          // An inbox not being watched is always asked about (new mail can't be heard of otherwise).
+          if (sync.isCurrent(userId, accountId, s.folder)) out.add(sourceKey(s));
+          else if (s.folder !== 'INBOX' && !sync.hasPendingChange(userId, accountId, s.folder) && Date.now() - f.syncedAt < SEARCH_TRUST_MS) {
+            out.add(sourceKey(s));
+            sync.checkSoon(userId, accountId, s.folder, LISTED_CHECK_MS);
+          } else ask.push({ source: s, f });
+        }
+        if (!ask.length) return;
+        // Only the folders in question are asked about (it was the whole folder list, one request per folder on most servers).
+        const status = await Promise.resolve()
+          .then(() => this.pool.status(userId, accountId, ask.map((x) => x.source.folder)))
+          .catch(() => null);
+        for (const { source, f } of ask) {
+          const st = status?.get(source.folder);
+          if (st && st.uidNext === f.uidNext && st.messages === f.exists) out.add(sourceKey(source));
+          else sync.syncSoon(userId, accountId, source.folder);
         }
       }),
     );
     return out;
   }
+
 
   /**
    * A text search answered from the search index (DreyMail 12.3), at once, when the folder's copy
@@ -919,7 +936,8 @@ export class MailService {
           const out: (SourcePage | null)[] = new Array(list.length).fill(null);
           let next = 0;
           await Promise.all(
-            SEARCH_LANES.slice(0, Math.min(SEARCH_LANES.length, list.length)).map(async (lane) => {
+            // As many search connections as the mailbox's connection limit leaves room for (DreyMail 14.5).
+            this.pool.searchLanes(userId, list[0]!.accountId, Math.min(4, list.length)).map(async (lane) => {
               // A search the browser has given up on stops after the folders already under way.
               for (let i = next++; i < list.length && !opts.signal?.aborted; i = next++) out[i] = await one(list[i]!, lane);
             }),
@@ -1308,7 +1326,7 @@ export class MailService {
       const uids = ((await client.search({ seen: false }, { uid: true })) || []) as number[];
       if (uids.length) await client.messageFlagsAdd(uids.join(','), ['\\Seen'], { uid: true });
       return { uids, uidValidity: mailbox.uidValidity.toString() };
-    });
+    }, 'read');
     if (r.uids.length) this.updateCache(userId, accountId, folder, r.uidValidity, (cache, f) => cache.changeFlag(f, r.uids, 'seen', true));
     else this.foldersChanged(userId, accountId);
     return r;
@@ -1391,7 +1409,8 @@ export class MailService {
           return { res, ids, senders };
         }
       }
-    });
+      // Your own action: on the connection for your requests, never queued behind a sync (DreyMail 14.5).
+    }, 'read');
 
     if (action.type === 'seen' || action.type === 'flagged') {
       this.updateCache(userId, accountId, folder, uidValidity, (cache, f) => cache.changeFlag(f, uids, action.type as 'seen' | 'flagged', action.value));
@@ -1488,6 +1507,7 @@ export class MailService {
   }
 
   async append(userId: string, accountId: string, folder: string, raw: Buffer, flags: string[]) {
+    // On the main connection, which syncs the folder next: it sees the new message at once.
     const res = await this.pool.withClient(userId, accountId, (client) => client.append(folder, raw, flags));
     this.folderChanged(userId, accountId, folder);
     return res;
