@@ -16,6 +16,7 @@
 // Modified by samschultzponsys, 2026-11-25: a refused search never empties the copy; a copy missing messages is filled again.
 // Modified by samschultzponsys, 2026-11-27: loading unread mail ahead and older messages on the background connection, never the main one.
 // Modified by samschultzponsys, 2026-11-27: without CONDSTORE, a check reads the newest messages' flags and skips the deletion search when nothing was deleted; the whole folder every few minutes.
+// Modified by samschultzponsys, 2026-11-27: the account's cache measured at most every 20 s while keeping content.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -865,7 +866,9 @@ export class CacheSync {
     for (;;) {
       if (this.stopped) return;
       if (this.deps.busy?.()) await sleep(300);
-      const used = this.cache.accountBytes(userId, accountId, 5_000);
+      // Measured at most every 20 s (26.11; it was 5 s): measuring counts the whole search index,
+      // seconds on a big mailbox; going over meanwhile is trimmed by enforceBudget after each batch.
+      const used = this.cache.accountBytes(userId, accountId);
       if (used.total >= this.budgetOf(userId, accountId) * 0.97) return;
       const batch = this.cache.withoutBody(userId, accountId, max, INDEX_BATCH);
       if (!batch.length) return;

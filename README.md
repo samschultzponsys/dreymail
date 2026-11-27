@@ -107,7 +107,8 @@
      Modified by samschultzponsys, 2026-11-27: v26.11.1 (Linux desktop files attached again).
      Modified by samschultzponsys, 2026-11-27: v26.11.2 (lists and actions never wait behind background downloads).
      Modified by samschultzponsys, 2026-11-27: v26.11.3 (checks of a big inbox without reading all of it).
-     Modified by samschultzponsys, 2026-11-27: v26.11.4 (lists never hang on a slow mail server). -->
+     Modified by samschultzponsys, 2026-11-27: v26.11.4 (lists never hang on a slow mail server).
+     Modified by samschultzponsys, 2026-11-27: v26.11.5 (mailbox changes on every device at once; a blocked server logged). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -119,7 +120,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **26.11.4**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **26.11.5**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1127,8 +1128,11 @@ and so are slow sign-ins to the mail server (`slow IMAP connect`) and waits for 
 (`slow IMAP wait`):
 
 ```sh
-docker logs dreymail 2>&1 | grep -E "slow (request|message|IMAP)" | tail -20
+docker logs dreymail 2>&1 | grep -E "slow (request|message|IMAP|cache)|event loop" | tail -20
 ```
+
+Since 26.11.5 a server held up by something running on its one thread is logged too (`event loop
+blocked`, with the slow mail cache steps in it, `slow cache step`).
 
 **Showing your list at once (14.5, off unless chosen).** Settings → This device can keep the first
 page of the list you last saw on that device and show it the moment DreyMail opens, until the

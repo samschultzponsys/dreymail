@@ -23,6 +23,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Done
 
 ### Accounts, look and layout
+- [x] Mailbox and group changes (icons, colors, names) reach every device at once, the Android app's
+      notification icons too; a blocked server and slow mail cache steps logged (26.11.5).
 - [x] A cached folder's list waits at most 2 s for the mail server, then comes from the copy; slow
       lists, sign-ins and connection waits logged with where the time went (26.11.4).
 - [x] Light checks without CONDSTORE (Microsoft 365): the newest 500 messages' flags, deletions from

@@ -13,7 +13,7 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
-## Unreleased
+## 2026-11-27 (v26.11.5): mailbox icons everywhere at once; what holds the server up
 
 - **Mailbox changes reach your other devices at once:** a mailbox's or group's icon, picture,
   color or name changed on one device (or a mailbox added, removed, reordered) only showed on the
@@ -21,7 +21,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   server tells every open DreyMail (browser, desktop and Android apps) to fetch them again, and an
   app coming back (the Android app from the background) fetches them when it reconnects. The
   Android app takes the new icons for its notifications from there.
-- **Files:** `server/src/routes/api.ts`, `shared/types.ts`, `web/src/hooks.ts`.
+- **What holds the server up, logged:** a lag of seconds hit every mailbox at once (lists,
+  sign-ins, everything), the sign of the server's one thread being busy with something
+  synchronous. Now a blocked server is logged (`event loop blocked`, how long, and the slow steps
+  in it), as is every step on the mail cache over 0.25 s (`slow cache step`, by name, never with
+  mail).
+- **The cache measured less often while keeping content:** every 20 s (was 5 s); measuring counts
+  the whole search index, which takes a while on a big mailbox.
+- **Files:** `server/src/routes/api.ts`, `shared/types.ts`, `web/src/hooks.ts`, `server/src/stalls.ts`
+  (new), `server/src/app.ts`, `server/src/cache/sync.ts`, `server/test/stalls.test.ts` (new),
+  `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
 
 ## 2026-11-27 (v26.11.4): lists don't hang on a slow mail server
 

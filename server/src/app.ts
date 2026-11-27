@@ -30,6 +30,7 @@
 // Modified by samschultzponsys, 2026-11-25: the web app sent compressed (made at build), its hashed files cached for good.
 // Modified by samschultzponsys, 2026-11-25: connections per mailbox; speed measured for Settings → Server → Speed.
 // Modified by samschultzponsys, 2026-11-27: slow listings, searches and actions logged with their route.
+// Modified by samschultzponsys, 2026-11-27: slow mail cache steps and a blocked server logged.
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -98,6 +99,7 @@ import { registerWebSocket, type LiveSessions } from './routes/ws.js';
 import { AutoReplies } from './autoReply.js';
 import { registerAutoReplyRoutes } from './routes/autoReplies.js';
 import { SpeedStats, speedMetricOf } from './speed.js';
+import { timed, watchEventLoop } from './stalls.js';
 
 /** CSP for the application itself. Message iframes (srcdoc) inherit it, plus their own. */
 /**
@@ -201,7 +203,10 @@ export async function buildApp(
   const cacheLog = (msg: string, extra?: Record<string, unknown>) => app.log.warn(extra ?? {}, msg);
   // With an injected store (tests) the cache defaults to memory too.
   const cacheFile = opts.cacheFile !== undefined ? opts.cacheFile : opts.store ? ':memory:' : path.join(config.dataDir, 'cache.db');
-  const cache = config.cache && cacheFile !== null ? new MailCache(cacheFile, { cacheKey: keyring.cacheKey, indexKey: keyring.cacheIndexKey }, cacheLog) : null;
+  // Each cache step timed (DreyMail 26.11): a slow one is logged by name, as is a blocked server.
+  const cache = config.cache && cacheFile !== null ? timed(new MailCache(cacheFile, { cacheKey: keyring.cacheKey, indexKey: keyring.cacheIndexKey }, cacheLog), 'cache', cacheLog) : null;
+  const stopWatching = watchEventLoop(cacheLog);
+  app.addHook('onClose', async () => stopWatching());
   // Address suggestions (DreyMail): filled from the mail cache (each folder's existing mail once,
   // then new mail) and from what is sent.
   const addressBook = new AddressBook(store);
