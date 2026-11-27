@@ -18,6 +18,7 @@
 // Modified by samschultzponsys, 2026-11-23: an unchanged folder (one STATUS list per mailbox) is searched from the index without syncing it first.
 // Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
 // Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
+// Modified by samschultzponsys, 2026-11-27: an open waits at most a moment for a background download; warm-ups on the background connection.
 // Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
 // Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
 // Modified by samschultzponsys, 2026-11-25: lists answered from the copy at once and checked in the background; a folder being cached for the first time isn't searched on the mail server for conversations.
@@ -53,6 +54,7 @@ import { MailServerError, describeError } from './connect.js';
 import type { ImapPool, Lane } from './pool.js';
 import { lookupTerms, matchesTerm, RelatedIndex, searchFor, termKey, type LookupTerm } from './related.js';
 import { addresses, fetchSnippets, listFetch, searchOrThrow, sortTime, summaryOf, threadHeaders, toDate } from './summary.js';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export { threadHeaders };
 
@@ -111,6 +113,8 @@ interface ReadQueue {
   running: boolean;
 }
 
+/** How long an open waits for a download of the same message already under way before fetching it itself (DreyMail 26.11). */
+const JOIN_WAIT_MS = 400;
 /** Most messages, and bytes, fetched for reading in one IMAP command. */
 const READ_BATCH = 25;
 const READ_BATCH_BYTES = 64 * 1024 * 1024;
@@ -1004,11 +1008,21 @@ export class MailService {
       });
       if (hit?.raw) return { raw: hit.raw, flags: hit.meta.flags, internalDate: hit.meta.internalDate };
       if (hit) {
-        // New mail whose content is on its way right now: wait for that instead of fetching it twice (DreyMail 14.0).
+        // Content on its way right now (new mail, loading ahead): wait for that instead of fetching it
+        // twice (DreyMail 14.0), but only a moment (26.11): it may be on the background connection,
+        // behind other downloads. Then it is fetched here too, and whichever comes first is used.
         const coming = this.cached?.sync.downloadingBody(userId, ref.accountId, ref.folder, ref.uid);
-        const raw = coming ? await coming : null;
-        if (raw) return { raw, flags: hit.meta.flags, internalDate: hit.meta.internalDate };
         known = hit.meta;
+        if (coming) {
+          const meta = { flags: hit.meta.flags, internalDate: hit.meta.internalDate };
+          const soon = await Promise.race([coming, sleep(JOIN_WAIT_MS).then(() => 'late' as const)]);
+          if (soon instanceof Buffer) return { raw: soon, ...meta };
+          if (soon === 'late') {
+            const live = this.fetchRawLive(userId, ref, maxBytes, known);
+            live.catch(() => undefined);
+            return Promise.race([live, coming.then((raw) => (raw ? { raw, ...meta } : live))]);
+          }
+        }
       }
     }
     const res = await this.fetchRawLive(userId, ref, maxBytes, known);
@@ -1101,8 +1115,8 @@ export class MailService {
   /**
    * Fetch the content of messages the user is likely to open next (the ones around the open one,
    * or one under the pointer) into the cache ahead, so opening them doesn't wait for the mail
-   * server (DreyMail 14.0). Only cached messages without their content; on the main connection,
-   * never the one opening messages uses. Never rejects.
+   * server (DreyMail 14.0). Only cached messages without their content; on the background connection
+   * (26.11; it was the main one, where lists and actions waited behind it). Never rejects.
    */
   async warm(userId: string, refs: MessageRef[]): Promise<void> {
     if (!this.cached) return;
@@ -1122,7 +1136,7 @@ export class MailService {
       byFolder.set(k, group);
     }
     if (!byFolder.size || sync.budgetOf(userId, [...byFolder.values()][0]!.ref.accountId) <= 0) return;
-    for (const { ref, uids } of byFolder.values()) await sync.fetchBodies(userId, ref.accountId, ref.folder, uids, 'main');
+    for (const { ref, uids } of byFolder.values()) await sync.fetchBodies(userId, ref.accountId, ref.folder, uids, 'sync');
   }
 
   async getMessage(

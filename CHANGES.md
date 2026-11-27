@@ -20,7 +20,19 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
   26.11.1 once by hand (see the 26.11.1 release); from then on, updates work. deb, rpm and Windows
   installs use the file links on the release and aren't affected.
 - **Test:** the flatpak update command downloads from the whole calendar tag.
-- **Files:** `web/test/desktopUpdate.test.ts`.
+- **Faster lists and actions:** after every inbox check, loading unread mail ahead (up to 25
+  messages, 5 per request) and filling in older messages (200 per request) ran on the main
+  connection to the mail server, the one listing folders and actions (archive, delete, mark read)
+  use; on Microsoft 365 one such request took seconds, and the list or action waited behind it
+  (Settings → Server → Speed showed lists and actions taking 9 to 14 seconds 1 time in 20). They
+  now run on the background connection, as does fetching the messages around the open one.
+- **Opening never waits long for a background download:** an open joins a download of the same
+  message already under way for at most 0.4 s, then fetches it on its own connection and takes
+  whichever arrives first.
+- **Slow requests logged:** a listing, search or action over 3 seconds is logged (`slow request`,
+  with its route), like slow message opens.
+- **Files:** `server/src/cache/sync.ts`, `server/src/imap/mail.ts`, `server/src/app.ts`,
+  `server/test/cacheWarm.test.ts`, `web/test/desktopUpdate.test.ts`, `README.md`, `ROADMAP.md`.
 
 ## 2026-11-27 (v26.11.1): the Linux desktop files are attached again
 

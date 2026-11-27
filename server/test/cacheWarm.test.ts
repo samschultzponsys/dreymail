@@ -1,5 +1,6 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-27: older inbox messages filled on the background connection.
 
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -89,6 +90,20 @@ describe('filling the cache of every folder', () => {
     lanes.length = 0;
     await sync.beforeListing('u1', 'a1', ['Archive']);
     expect(lanes.filter((l) => l.path === 'Archive')[0]).toEqual({ path: 'Archive', lane: 'main' });
+    sync.stop();
+    cache.close();
+  });
+
+  it("fills an inbox's older messages on the background connection, never the main one (26.11)", async () => {
+    const { cache, sync, lanes } = setup({ INBOX: 900, Sent: 1 });
+    sync.syncAccount('u1', 'a1');
+    await settle(sync);
+    const inbox = cache.folders('u1', 'a1').find((f) => f.path === 'INBOX')!;
+    expect(cache.count(inbox)).toBe(900);
+    const onInbox = lanes.filter((l) => l.path === 'INBOX');
+    // The check itself on the main connection; every chunk of older mail after it in the background.
+    expect(onInbox.filter((l) => l.lane === 'main').length).toBe(1);
+    expect(onInbox.filter((l) => l.lane === 'sync').length).toBeGreaterThan(0);
     sync.stop();
     cache.close();
   });

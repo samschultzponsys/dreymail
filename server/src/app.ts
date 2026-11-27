@@ -29,6 +29,7 @@
 // Modified by samschultzponsys, 2026-11-25: larger messages being opened are decoded on worker threads of their own.
 // Modified by samschultzponsys, 2026-11-25: the web app sent compressed (made at build), its hashed files cached for good.
 // Modified by samschultzponsys, 2026-11-25: connections per mailbox; speed measured for Settings → Server → Speed.
+// Modified by samschultzponsys, 2026-11-27: slow listings, searches and actions logged with their route.
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -424,6 +425,11 @@ export async function buildApp(
   app.addHook('onResponse', async (req, reply) => {
     const metric = speedMetricOf(req.method, req.routeOptions.url, (req.query ?? {}) as Record<string, unknown>, reply.statusCode);
     if (metric) speed.record(metric, reply.elapsedTime);
+    // Slow ones are logged with their route (DreyMail 26.11), so the logs say what was slow; an
+    // open logs its own breakdown ("slow message"), and startup times are measured in the app.
+    if (metric && metric !== 'open' && !metric.startsWith('startup') && reply.elapsedTime > 3000) {
+      req.log.warn({ metric, route: `${req.method} ${req.routeOptions.url}`, ms: Math.round(reply.elapsedTime) }, 'slow request');
+    }
   });
   const indexFile = path.join(config.webDir, 'index.html');
   const appCsp = cspFor(fs.existsSync(indexFile) ? fs.readFileSync(indexFile, 'utf8') : null);

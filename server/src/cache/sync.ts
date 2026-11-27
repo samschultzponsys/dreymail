@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-25: listings checked in the background (checkSoon); a folder opened before it was cached says when its copy is ready.
 // Modified by samschultzponsys, 2026-11-25: background downloading paced per mailbox; checks nobody waits for on the background connection.
 // Modified by samschultzponsys, 2026-11-25: a refused search never empties the copy; a copy missing messages is filled again.
+// Modified by samschultzponsys, 2026-11-27: loading unread mail ahead and older messages on the background connection, never the main one.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -707,7 +708,9 @@ export class CacheSync {
         const uids = msgs.map((m) => m.uid);
         cache.updateFolder(f, { lowUid: uids.length ? Math.min(...uids) : f.lowUid, complete: start === 1 });
         return uids.length > 0 && start > 1;
-      }, this.lane(f.role));
+        // On the background connection (DreyMail 26.11): one chunk of an inbox took seconds on
+        // Microsoft 365, and lists and actions on the main connection waited behind it.
+      }, 'sync');
       if (!more) return;
     }
   }
@@ -723,7 +726,9 @@ export class CacheSync {
     const f = cache.folder(userId, accountId, path);
     if (!f) return;
     const uids = cache.prefetchCandidates(f, PREFETCH_AMONG, config.maxBodyBytes, PREFETCH_COUNT);
-    if (uids.length) await this.fetchBodies(userId, accountId, path, uids, this.lane(f.role), interrupted);
+    // On the background connection (DreyMail 26.11), never holding up lists and actions; an open
+    // that wants one of these joins it, or fetches it itself if it doesn't come at once.
+    if (uids.length) await this.fetchBodies(userId, accountId, path, uids, 'sync', interrupted);
   }
 
   // ---- space and the search index (DreyMail 12.3) ----------------------------------------------

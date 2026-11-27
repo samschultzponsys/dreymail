@@ -1101,7 +1101,15 @@ ahead in the background, so moving with j / k, archiving or clicking finds them 
 **Speed (14.5).** Settings → Server → Speed (administrators) shows how long opening a message,
 listing, searching, opening an attachment, actions, sending and starting DreyMail actually took
 for the people using it since the server started: the typical time, the slow one (1 in 20 took
-longer) and the slowest. Kept in memory only, nothing about whose or which mail.
+longer) and the slowest. Kept in memory only, nothing about whose or which mail. Since 26.11.2 a
+listing, search or action that took over 3 seconds is logged (`slow request`, with its route), as a
+slow message open already was (`slow message`, with where the time went).
+
+**Waiting behind nothing (26.11.2).** Loading unread mail ahead, filling in an inbox's older
+messages and fetching the messages around the open one all run on the background connection,
+never the main one that lists and actions use (on Microsoft 365 one of those requests took
+seconds, and a list or an archive waited behind it). An open joins a download of the same message
+already under way only for a moment; then it fetches the message itself.
 
 **Showing your list at once (14.5, off unless chosen).** Settings → This device can keep the first
 page of the list you last saw on that device and show it the moment DreyMail opens, until the

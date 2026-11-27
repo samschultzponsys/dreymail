@@ -23,6 +23,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Done
 
 ### Accounts, look and layout
+- [x] Lists and actions never wait behind loading ahead or filling older mail (both on the background
+      connection); an open waits for a background download at most 0.4 s; slow requests logged (26.11.2).
 - [x] Calendar versions `YY.M.N` (year, month, count from 0 each month), short in the app's footer;
       releases go out when ready instead of with every change (26.11.0).
 - [x] The reminder window fits a phone, also with larger text: Snooze on its own line, Dismiss all in
