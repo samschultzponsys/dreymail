@@ -13,6 +13,25 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-27 (v26.11.0): calendar versions
+
+- **Versions are now `YY.M.N`:** the year's last two digits, the month and a count that starts at 0
+  each month: 26.11.0, 26.11.1, … 26.12.0, … 27.1.0. No more racing through major versions; the
+  version stays short in the app's footer. The image is tagged `26.11.0` and `latest`; tags are
+  `v26.11.0`. Installed desktop and Android apps find and install it as usual.
+- **Releases when ready:** changes collect under "Unreleased" in this file and are released
+  together, or at once for an urgent fix, instead of a release for every change.
+- **Version handling:** the server, web app, desktop app and Android app compare three-part
+  versions and show calendar versions whole (older two-part versions are still read). Android's
+  version code is `YY*100000 + M*1000 + N`, above every earlier one. Each desktop file is also
+  attached under a two-part name (`DreyMail-26.11-…`) so desktop apps older than 26.11 find it.
+- **Files:** `scripts/release-version.sh`, `shared/versions.ts`, `server/src/version.ts`,
+  `desktop/update.cjs`, `android/app/build.gradle.kts`,
+  `android/app/src/main/java/io/github/samschultzponsys/dreymail/Updater.kt`,
+  `.github/workflows/release.yml`, `.github/workflows/speed.yml`, `server/test/releaseVersion.test.ts`,
+  `server/test/version.test.ts`, `web/test/versions.test.ts`, `web/test/desktopUpdate.test.ts`,
+  `README.md`, `ROADMAP.md`, `CLAUDE.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-27 (v14.7): the reminder window fits a phone
 
 - **Fix:** on a phone, especially with larger text, the reminder window's header didn't fit: "2

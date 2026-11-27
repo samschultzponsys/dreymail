@@ -6,9 +6,15 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// CI passes the release version: -PversionName=1.8 (versionCode 108 = major * 100 + minor).
+// CI passes the release version: -PversionName=26.11.2. Since 26.11 versions are YY.M.N (year,
+// month, count from 0 each month): versionCode = YY * 100000 + M * 1000 + N (26.11.2 → 2611002).
+// Before that, MAJOR.MINOR: major * 100 + minor (14.7 → 1407). Each scheme's codes are above the
+// last one's, as Android requires.
 val appVersionName = (findProperty("versionName") as String?) ?: "0.0"
-val appVersionCode = appVersionName.split(".").let { (it[0].toInt() * 100) + it.getOrElse(1) { "0" }.toInt() }.coerceAtLeast(1)
+val appVersionCode = appVersionName.split(".").map { it.toIntOrNull() ?: 0 }.let { p ->
+    val (a, b, c) = Triple(p.getOrElse(0) { 0 }, p.getOrElse(1) { 0 }, p.getOrElse(2) { 0 })
+    if (a >= 26) a * 100_000 + b * 1_000 + c else a * 100 + b
+}.coerceAtLeast(1)
 
 android {
     namespace = "io.github.samschultzponsys.dreymail"

@@ -10,23 +10,28 @@ const REPO = 'samschultzponsys/dreymail';
 const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
 
-/** "1.7.0" or "v1.7" → [1, 7]; null if it isn't a version. */
+/**
+ * "26.11.2", "1.7.0" or "v1.7" → [26, 11, 2] / [1, 7, 0]; null if it isn't a version. Since 26.11
+ * versions are YY.M.N (year, month, count from 0 each month); before, MAJOR.MINOR.
+ */
 function parseVersion(v) {
-  const m = /^v?(\d+)\.(\d+)(?:\.\d+)?$/.exec(String(v).trim());
-  return m ? [Number(m[1]), Number(m[2])] : null;
+  const m = /^v?(\d+)\.(\d+)(?:\.(\d+))?$/.exec(String(v).trim());
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3] || 0)] : null;
 }
 
-/** Two-part display version: "1.7.0" → "1.7". */
+/** As shown and in release file names: "26.11.0" (calendar versions whole), "1.7.0" → "1.7" (before them). */
 function displayVersion(v) {
   const p = parseVersion(v);
-  return p ? `${p[0]}.${p[1]}` : String(v);
+  if (!p) return String(v);
+  return p[0] >= 26 ? `${p[0]}.${p[1]}.${p[2]}` : `${p[0]}.${p[1]}`;
 }
 
 function isNewer(latest, current) {
   const a = parseVersion(latest);
   const b = parseVersion(current);
   if (!a || !b) return false;
-  return a[0] !== b[0] ? a[0] > b[0] : a[1] > b[1];
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
 }
 
 /**

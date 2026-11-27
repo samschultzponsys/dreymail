@@ -28,6 +28,12 @@ describe('desktop app updates', () => {
     expect(update.isNewer('v1.6', '1.7.0')).toBe(false);
     expect(update.isNewer('nonsense', '1.7.0')).toBe(false);
     expect(update.displayVersion('1.7.0')).toBe('1.7');
+    // Calendar versions YY.M.N since 26.11: compared and named whole.
+    expect(update.isNewer('v26.11.0', '14.7.0')).toBe(true);
+    expect(update.isNewer('v26.11.3', '26.11.2')).toBe(true);
+    expect(update.isNewer('v26.11.2', '26.11.2')).toBe(false);
+    expect(update.isNewer('v26.12.0', '26.11.9')).toBe(true);
+    expect(update.displayVersion('26.11.0')).toBe('26.11.0');
   });
 
   it('tells flatpak, deb, rpm and Windows installs apart', () => {
@@ -44,6 +50,8 @@ describe('desktop app updates', () => {
     expect(update.assetName('deb', 'v1.8', 'x64')).toBe('DreyMail-1.8-amd64.deb');
     expect(update.assetName('flatpak', 'v1.8', 'x64')).toBe('DreyMail-1.8-x86_64.flatpak');
     expect(update.assetName('windows', 'v1.8', 'x64')).toBe('DreyMail-Setup-1.8-x64.exe');
+    expect(update.assetName('windows', 'v26.11.2', 'x64')).toBe('DreyMail-Setup-26.11.2-x64.exe');
+    expect(update.assetName('deb', 'v26.11.2', 'x64')).toBe('DreyMail-26.11.2-amd64.deb');
     // Flatpak: one command downloads and installs; downloading by hand is the fallback.
     const flatpak = update.upgradeInstructions('flatpak', 'v1.8', 'x64');
     expect(flatpak.command).toBe(

@@ -66,14 +66,26 @@ Owner: samschultzponsys. Repo: https://github.com/samschultzponsys/dreymail (pub
   examples, presented as an example setup.
 
 ### Versions and releases
-- Versions are two-part, `MAJOR.MINOR`, and roll over after `.9`: `1.0` → `1.1` … `1.9` → `2.0`.
-  `package.json` (and `package-lock.json`) hold `MAJOR.MINOR.0` because npm needs three parts.
-  `scripts/release-version.sh next` prints the next version.
+- **Calendar versions since 26.11: `YY.M.N`**: the year's last two digits, the month (1-12, no
+  leading zero) and a count that starts at 0 each month: `26.11.0`, `26.11.1` … `26.12.0` … `27.1.0`.
+  `package.json` (and `package-lock.json`) hold it exactly so; tags are `vYY.M.N`; the UI shows it
+  whole. `scripts/release-version.sh next` prints the next version (this month's next count, or `.0`
+  in a new month). Versions before 26.11 were two-part `MAJOR.MINOR` (up to 14.7); `shared/versions.ts`,
+  `desktop/update.cjs` and the Android `Updater.kt` still read both.
+- **Don't release on every change.** Commits pushed to main without a version bump only run the
+  tests (no image, no Release). Collect changes under a `## Unreleased` heading at the top of
+  `CHANGES.md` (the README "Status" version stays at the last release). Release when the owner asks,
+  or straight away for an urgent fix (broken mail, data loss, security).
 - **Every release has a GitHub Release** (no files attached is fine). The Release workflow makes
-  one automatically when a push to `main` carries a `package.json` version with no `vX.Y` tag yet.
-  So, to release: bump the version, add the `CHANGES.md` entry, update `README.md`, push to main.
-- **README is rolling:** update `README.md` (including the "Status" section's current version)
-  in the same commit as any user-visible change.
+  one automatically when a push to `main` carries a `package.json` version with no `vYY.M.N` tag yet.
+  So, to release: set the version from `scripts/release-version.sh next`, turn `## Unreleased`
+  into the dated `## YYYY-MM-DD (vYY.M.N): …` entry, update `README.md` "Status", push to main.
+- Android `versionCode` is `YY*100000 + M*1000 + N` (26.11.0 → 2611000; was `major*100 + minor`).
+  The Release workflow also attaches each desktop file under a two-part name (`DreyMail-26.11-…`)
+  because desktop apps older than 26.11 look for that name; drop those copies once every desktop
+  install runs 26.11 or later (ROADMAP).
+- **README is rolling:** update `README.md` in the same commit as any user-visible change (the
+  "Status" section's current version changes only with a release).
 - **ROADMAP is rolling too:** in the same commit as any feature work, update `ROADMAP.md`: tick
   finished items into "Done" with their version, and add follow-ups or newly planned items to
   "Planned".

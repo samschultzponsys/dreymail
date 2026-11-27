@@ -29,13 +29,17 @@ object Updater {
     private const val API = "https://api.github.com/repos/samschultzponsys/dreymail/releases/latest"
     private const val PAGE = "https://github.com/samschultzponsys/dreymail/releases/latest"
 
-    private fun parse(v: String): Pair<Int, Int>? =
-        Regex("""^v?(\d+)\.(\d+)""").find(v.trim())?.let { it.groupValues[1].toInt() to it.groupValues[2].toInt() }
+    // Since 26.11 versions are YY.M.N (year, month, count from 0 each month); before, MAJOR.MINOR.
+    private fun parse(v: String): List<Int>? =
+        Regex("""^v?(\d+)\.(\d+)(?:\.(\d+))?""").find(v.trim())?.let { m ->
+            listOf(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toIntOrNull() ?: 0)
+        }
 
     fun isNewer(latest: String, current: String): Boolean {
         val a = parse(latest) ?: return false
         val b = parse(current) ?: return false
-        return if (a.first != b.first) a.first > b.first else a.second > b.second
+        for (i in 0..2) if (a[i] != b[i]) return a[i] > b[i]
+        return false
     }
 
     private const val PREF_LAST_CHECK = "update_last_check"

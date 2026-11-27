@@ -1,13 +1,21 @@
 // dreymail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-27: three-part calendar versions YY.M.N.
 
 // The server's version next to the version of what the user runs (the web page as loaded, or the
 // desktop / Android app), and what to do when they differ.
 
-/** [major, minor] of "9.0", "v9.0" or "9.0.0"; null if it isn't a version. */
-function parts(v: string | null | undefined): [number, number] | null {
-  const m = /^v?(\d+)\.(\d+)/.exec((v ?? '').trim());
-  return m ? [Number(m[1]), Number(m[2])] : null;
+// Versions (DreyMail 26.11): YY.M.N, the year, the month and a count from 0 each month (26.11.0,
+// 26.11.1, … 26.12.0). Before that, MAJOR.MINOR (… 14.7); those compare as older, since 26 beats
+// every earlier major.
+
+/** The year from which versions are YY.M.N (shown with all three numbers). */
+export const CALENDAR_FROM = 26;
+
+/** [a, b, c] of "26.11.2", "v14.7" (c = 0) or "9.0.0"; null if it isn't a version. */
+function parts(v: string | null | undefined): [number, number, number] | null {
+  const m = /^v?(\d+)\.(\d+)(?:\.(\d+))?/.exec((v ?? '').trim());
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)] : null;
 }
 
 /** -1, 0 or 1; 0 also when either isn't a version (nothing to warn about then). */
@@ -15,13 +23,15 @@ export function compareVersions(a: string | null | undefined, b: string | null |
   const x = parts(a);
   const y = parts(b);
   if (!x || !y) return 0;
-  return x[0] !== y[0] ? Math.sign(x[0] - y[0]) : Math.sign(x[1] - y[1]);
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return Math.sign(x[i]! - y[i]!);
+  return 0;
 }
 
-/** "9.0.0" → "9.0". */
+/** As shown: "26.11.0" (calendar versions whole), "9.0.0" → "9.0" (the versions before them). */
 export function shortVersion(v: string): string {
   const p = parts(v);
-  return p ? `${p[0]}.${p[1]}` : v;
+  if (!p) return v;
+  return p[0] >= CALENDAR_FROM ? `${p[0]}.${p[1]}.${p[2]}` : `${p[0]}.${p[1]}`;
 }
 
 export type ClientKind = 'web' | 'desktop' | 'android';

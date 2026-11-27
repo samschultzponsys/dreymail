@@ -12,7 +12,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 
 ## Planned
 
-Everything planned so far is done (12.5). New ideas go here.
+- [ ] Stop attaching the two-part copies of the desktop files (`DreyMail-26.11-…`) once every desktop
+      install runs 26.11 or later (they are there so apps older than 26.11 find their update).
 
 ### Not planned
 - JMAP: only a few providers offer it (mainly Fastmail and Stalwart), and they also offer IMAP,
@@ -22,6 +23,8 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] Calendar versions `YY.M.N` (year, month, count from 0 each month), short in the app's footer;
+      releases go out when ready instead of with every change (26.11.0).
 - [x] The reminder window fits a phone, also with larger text: Snooze on its own line, Dismiss all in
       view, at most about half the screen tall (14.7).
 - [x] Fix: a search the mail server refused (Microsoft 365 limiting) emptied the cached inbox; damaged

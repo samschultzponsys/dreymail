@@ -7,23 +7,20 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { compareVersions, shortVersion } from '../../shared/versions.js';
 
 const LATEST_API = 'https://api.github.com/repos/samschultzponsys/dreymail/releases/latest';
 export const RELEASES_URL = 'https://github.com/samschultzponsys/dreymail/releases';
 const CHECK_EVERY_MS = 6 * 3600 * 1000;
 
-/** "2.0.0" → "2.0". */
+/** As shown: "26.11.0" (calendar versions, since 26.11), "2.0.0" → "2.0" (before them). */
 export function displayVersion(v: string): string {
-  const m = /^v?(\d+)\.(\d+)/.exec(v.trim());
-  return m ? `${m[1]}.${m[2]}` : v;
+  return shortVersion(v.replace(/^v/, ''));
 }
 
+/** Whether `latest` is a newer release than `current` (all three numbers count since 26.11). */
 export function isNewer(latest: string, current: string): boolean {
-  const p = (v: string) => /^v?(\d+)\.(\d+)/.exec(v.trim())?.slice(1).map(Number) ?? null;
-  const a = p(latest);
-  const b = p(current);
-  if (!a || !b) return false;
-  return a[0]! !== b[0]! ? a[0]! > b[0]! : a[1]! > b[1]!;
+  return compareVersions(latest, current) > 0;
 }
 
 export function serverVersion(root = process.cwd()): string {

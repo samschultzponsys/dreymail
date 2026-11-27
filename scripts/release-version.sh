@@ -3,16 +3,19 @@
 # Copyright (C) Magnus Pihl and contributors. Licensed under the GNU AGPL v3.0 only; see LICENSE and NOTICE.
 # Modified by samschultzponsys, 2026-11-13: two-part MAJOR.MINOR versions that roll over after .9;
 # the release version now comes from package.json instead of a manual bump.
+# Modified by samschultzponsys, 2026-11-27: calendar versions YY.M.N (year, month, count from 0 each month).
 #
-# Release versions are MAJOR.MINOR (no "v"): 1.0, 1.1, ... 1.9, 2.0, ... The minor part never
-# goes past 9; the release after X.9 is (X+1).0. package.json holds the version as MAJOR.MINOR.0
-# because npm requires three parts. Used by the Release workflow.
+# Release versions are YY.M.N (no "v"): the year's last two digits, the month (1-12) and a count
+# that starts at 0 every month: 26.11.0, 26.11.1, 26.11.2, ... 26.12.0, ... 27.1.0. package.json
+# holds the version exactly so (npm's three parts). Used by the Release workflow.
 #
-#   release-version.sh current        the version in package.json, as MAJOR.MINOR
-#   release-version.sh next [X.Y]     the version after X.Y (default: the one in package.json)
-#   release-version.sh tag vX.Y       a tag's version, checked
+#   release-version.sh current        the version in package.json
+#   release-version.sh next [V]       the version to release after V (default: the one in
+#                                     package.json) today: this month's next count, or .0 in a new
+#                                     month. RELEASE_DATE=YYYY-MM-DD stands in for today (tests).
+#   release-version.sh tag vV         a tag's version, checked
 #
-# Fails when a version isn't MAJOR.MINOR with MINOR 0-9.
+# Fails when a version isn't YY.M.N.
 set -euo pipefail
 
 fail() {
@@ -21,40 +24,43 @@ fail() {
 }
 
 check() {
-  [[ "$1" =~ ^[0-9]+\.[0-9]$ ]] || fail "'$1' is not a MAJOR.MINOR version (MINOR 0-9)"
+  [[ "$1" =~ ^[0-9]{2}\.([1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]] || fail "'$1' is not a YY.M.N version (e.g. 26.11.0)"
 }
 
-current() {
+package_version() {
   local pkg="${PACKAGE_JSON:-package.json}"
-  local v
-  v="$(node -p "require(require('path').resolve(process.argv[1])).version" "$pkg")" || fail "can't read $pkg"
-  [[ "$v" =~ ^([0-9]+\.[0-9])\.0$ ]] || fail "package.json version '$v' must be MAJOR.MINOR.0 with MINOR 0-9"
-  echo "${BASH_REMATCH[1]}"
+  node -p "require(require('path').resolve(process.argv[1])).version" "$pkg" || fail "can't read $pkg"
 }
 
 case "${1:-}" in
   current)
-    version="$(current)"
+    version="$(package_version)"
     ;;
   next)
-    base="${2:-$(current)}"
+    base="${2:-$(package_version)}"
     base="${base#v}"
-    check "$base"
-    IFS='.' read -r major minor <<< "$base"
-    if [ "$minor" -ge 9 ]; then
-      major=$((major + 1))
-      minor=0
+    # Any earlier version (also the MAJOR.MINOR ones before 26.11) is a starting point.
+    [[ "$base" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || fail "'$base' is not a version"
+    if [ -n "${RELEASE_DATE:-}" ]; then
+      year="$(date -u -d "$RELEASE_DATE" +%y)" || fail "RELEASE_DATE '$RELEASE_DATE' is not a date"
+      month="$(date -u -d "$RELEASE_DATE" +%-m)"
     else
-      minor=$((minor + 1))
+      year="$(date -u +%y)"
+      month="$(date -u +%-m)"
     fi
-    version="${major}.${minor}"
+    IFS='.' read -r b_year b_month b_count <<< "$base"
+    if [ "$b_year" = "$year" ] && [ "$b_month" = "$month" ] && [ -n "${b_count:-}" ]; then
+      version="${year}.${month}.$((b_count + 1))"
+    else
+      version="${year}.${month}.0"
+    fi
     ;;
   tag)
     version="${2:-}"
     version="${version#v}"
     ;;
   *)
-    fail "usage: $0 current | $0 next [X.Y] | $0 tag vX.Y"
+    fail "usage: release-version.sh current | next [VERSION] | tag vVERSION"
     ;;
 esac
 

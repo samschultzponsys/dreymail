@@ -1,7 +1,7 @@
 # dreymail. Copyright (C) 2026 samschultzponsys.
 # Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
 #
-# How fast this version is next to the last release (DreyMail 14.5): scripts/bench/speed.mjs, every
+# How fast this version is next to the last release (the newest older tag): scripts/bench/speed.mjs, every
 # suite, against GreenMail behind a simulated Office 365 link. The tables go into the run's summary
 # (no files are uploaded). Runs beside the Release workflow and never holds it up.
 name: Speed
@@ -33,7 +33,7 @@ jobs:
       - name: The last release to compare with
         id: base
         run: |
-          current="v$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
+          current="v$(node -p "require('./package.json').version")"
           base=$(git tag --sort=-v:refname --list 'v*' | grep -vx "$current" | head -n 1)
           echo "tag=$base" >> "$GITHUB_OUTPUT"
           echo "Comparing with $base" >> "$GITHUB_STEP_SUMMARY"

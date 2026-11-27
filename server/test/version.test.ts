@@ -11,8 +11,14 @@ import { Store } from '../src/db.js';
 import { displayVersion, isNewer, serverVersion, UpdateChecker } from '../src/version.js';
 
 describe('version', () => {
-  it('reads the server version and compares two-part versions', () => {
-    expect(serverVersion()).toMatch(/^\d+\.\d$/);
+  it('reads the server version and compares versions, two-part ones and YY.M.N (since 26.11)', () => {
+    expect(serverVersion()).toMatch(/^\d{2}\.\d{1,2}\.\d+$/);
+    expect(displayVersion('26.11.0')).toBe('26.11.0');
+    expect(displayVersion('v26.12.3')).toBe('26.12.3');
+    expect(isNewer('v26.11.0', '14.7')).toBe(true);
+    expect(isNewer('v26.11.1', '26.11.0')).toBe(true);
+    expect(isNewer('v26.11.0', '26.11.1')).toBe(false);
+    expect(isNewer('v27.1.0', '26.12.4')).toBe(true);
     expect(displayVersion('2.0.0')).toBe('2.0');
     expect(isNewer('v2.1', '2.0')).toBe(true);
     expect(isNewer('v3.0', '2.9')).toBe(true);

@@ -6,18 +6,20 @@
 # Modified by samschultzponsys, 2026-11-15: runs queue per version (a newer push no longer drops an older version's
 # release); `latest` only for the version on main; a missed version can be released by hand with its commit.
 # Modified by samschultzponsys, 2026-11-15: Node 24 (image, CI and GitHub Actions on their Node 24 versions).
+# Modified by samschultzponsys, 2026-11-27: calendar versions YY.M.N; desktop files also under the two-part names apps before 26.11 look for.
 name: Release
 
 # Every push to main runs the tests. When package.json carries a version that has no tag yet
-# (package.json "1.3.0" -> release v1.3), it also publishes:
-#   - the image ghcr.io/<owner>/dreymail tagged 1.3 and latest
-#   - the tag v1.3 and a GitHub Release (no files attached; notes generated from commits)
+# (package.json "26.11.2" -> release v26.11.2), it also publishes:
+#   - the image ghcr.io/<owner>/dreymail tagged 26.11.2 and latest
+#   - the tag v26.11.2 and a GitHub Release, with the desktop apps and the Android app attached
 # To release: bump package.json to the next version (scripts/release-version.sh next) and push.
 # A version whose release never ran (e.g. pushed while another was building): push its tag
 # (git tag vX.Y <commit> && git push origin vX.Y), then run this workflow by hand (Actions → Release →
 # Run workflow) with that full commit SHA in "sha". GitHub doesn't let the workflow's token create a
 # tag on an older commit whose workflow files differ from main's, hence the tag by hand.
-# Versions are MAJOR.MINOR and roll over after .9 (1.9 -> 2.0).
+# Versions are YY.M.N since 26.11: year, month, and a count from 0 each month (26.11.0, 26.11.1, …
+# 26.12.0). Before that they were MAJOR.MINOR (… 14.7).
 #
 # Kept within GitHub's free tier: public repo (Actions minutes and public GHCR images are free),
 # one job, no artifacts uploaded, Docker layer cache in the free Actions cache.
@@ -124,7 +126,7 @@ jobs:
           VERSION: ${{ needs.version.outputs.value }}
         run: |
           git fetch -q origin main
-          main="$(git show origin/main:package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s).version.split(".");console.log(v[0]+"."+v[1])})')"
+          main="$(git show origin/main:package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
           if [ "$main" = "$VERSION" ]; then echo "value=true" >> "$GITHUB_OUTPUT"; else echo "value=false" >> "$GITHUB_OUTPUT"; fi
       - if: steps.again.outputs.publish == 'true'
         uses: docker/setup-buildx-action@v4
@@ -169,8 +171,11 @@ jobs:
           --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION\`. See CHANGES.md for the dated change log."
 
   # ---- desktop apps, attached to the GitHub Release just created ------------------------------
-  # File names carry the version: DreyMail-1.7-amd64.deb, DreyMail-1.7-x86_64.rpm,
-  # DreyMail-1.7-x86_64.flatpak, DreyMail-Setup-1.7-x64.exe. Release assets are free on GitHub.
+  # File names carry the version: DreyMail-26.11.2-amd64.deb, DreyMail-26.11.2-x86_64.rpm,
+  # DreyMail-26.11.2-x86_64.flatpak, DreyMail-Setup-26.11.2-x64.exe. Release assets are free on GitHub.
+  # Desktop apps from before 26.11 look for two-part names (DreyMail-26.11-amd64.deb): each file is
+  # attached under that name too, so they update themselves to the new versions. Drop the copies
+  # once every desktop app runs 26.11 or later.
   desktop-linux:
     needs: release
     if: needs.release.outputs.publish == 'true'
@@ -207,7 +212,11 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           npx electron-builder --linux flatpak --x64 --publish never "--config.artifactName=DreyMail-${VERSION}-\${arch}.\${ext}"
       - name: Attach to the release
-        run: gh release upload "v$VERSION" dist/*.deb dist/*.rpm $(ls dist/*.flatpak 2>/dev/null) --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          files="dist/*.deb dist/*.rpm $(ls dist/*.flatpak 2>/dev/null)"
+          # The same files under the two-part names apps before 26.11 look for (see above).
+          for f in $files; do cp "$f" "${f/-$VERSION-/-${VERSION%.*}-}"; done
+          gh release upload "v$VERSION" $files $(for f in $files; do echo "${f/-$VERSION-/-${VERSION%.*}-}"; done) --clobber --repo "$GITHUB_REPOSITORY"
 
   desktop-windows:
     needs: release
@@ -237,9 +246,12 @@ jobs:
       - name: Build the installer
         run: npx electron-builder --win nsis --x64 --publish never "--config.nsis.artifactName=DreyMail-Setup-${VERSION}-\${arch}.\${ext}"
       - name: Attach to the release
-        run: gh release upload "v$VERSION" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          # Also under the two-part name the desktop app before 26.11 looks for (see desktop-linux).
+          for f in dist/*.exe; do cp "$f" "${f/-$VERSION-/-${VERSION%.*}-}"; done
+          gh release upload "v$VERSION" dist/*.exe --clobber --repo "$GITHUB_REPOSITORY"
 
-  # Android app: DreyMail-X.Y.apk, signed with the key in the repository secrets
+  # Android app: DreyMail-26.11.2.apk, signed with the key in the repository secrets
   # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
   # Every release must use the same key, or phones can't update. Without the secrets the APK is
   # skipped with a warning (the rest of the release is unaffected).

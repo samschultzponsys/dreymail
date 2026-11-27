@@ -102,7 +102,8 @@
      Modified by samschultzponsys, 2026-11-25: v14.4 (starts faster).
      Modified by samschultzponsys, 2026-11-25: v14.5 (connections, searches, speed page).
      Modified by samschultzponsys, 2026-11-25: v14.6 (a refused search never empties the copy).
-     Modified by samschultzponsys, 2026-11-27: v14.7 (the reminder window fits a phone). -->
+     Modified by samschultzponsys, 2026-11-27: v14.7 (the reminder window fits a phone).
+     Modified by samschultzponsys, 2026-11-27: v26.11.0 (calendar versions YY.M.N; releases when ready). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -114,7 +115,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **14.7**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **26.11.0**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -480,7 +481,7 @@ A simple, good-looking, self-hosted webmail client for **any IMAP/SMTP account**
   the privacy policy link Google and Microsoft ask for. It's linked next to Source code.
 - **Your name** (Settings → General) is shown at the bottom left (first name only unless you tick
   "Show my full name"); typed in lower case it is capitalized for you.
-- **Version and what's new.** Under your name, the server's version (e.g. "10.0"); click it for
+- **Version and what's new.** Under your name, the server's version (e.g. "26.11.0"); click it for
   the changelog. When what you use is out of step with the server it turns red with a "!": the
   tooltip says which side to update (the server's image when an app is newer, the app when it is
   older, or the page when it was left open across a server update) and a click does what it can
@@ -731,7 +732,7 @@ Most settings can also be made in the app (Settings), and a value given in the c
 wins over the app and shows there as locked.
 
 Images are published to `ghcr.io/samschultzponsys/dreymail` for every release (see
-[Releasing](#releasing)), tagged with the version (`1.0`, `1.1`, …) and `latest`. You can also
+[Releasing](#releasing)), tagged with the version (`26.11.0`, `26.11.1`, …) and `latest`. You can also
 build it yourself with `docker build -t dreymail .`.
 
 The server runs as user and group `1000:1000` unless `PUID`/`PGID` say otherwise, and takes over
@@ -785,7 +786,7 @@ server…*) and then shows DreyMail in its own window:
 
 ## Android app
 
-Every release also has `DreyMail-X.Y.apk`. Download it on your phone and open it (allow your
+Every release also has `DreyMail-YY.M.N.apk` (e.g. `DreyMail-26.11.0.apk`). Download it on your phone and open it (allow your
 browser to install apps when Android asks). It asks for your DreyMail server's address once.
 
 - **Instant, per-account notifications.** Your server already watches every inbox with IMAP IDLE;
@@ -1275,15 +1276,20 @@ logins always return to that one host.
 
 ### Releasing
 
-Versions have two parts, `MAJOR.MINOR`, and roll over after `.9`: `1.0`, `1.1`, … `1.9`, `2.0`.
-`package.json` holds the version as `MAJOR.MINOR.0` because npm needs three parts.
+Since 26.11, versions are calendar versions `YY.M.N`: the year's last two digits, the month and a
+count that starts at 0 each month (`26.11.0`, `26.11.1`, … `26.12.0`, … `27.1.0`). `package.json`
+holds the version exactly so. Versions before that were two-part (`1.0` … `14.7`); the apps' update
+checks understand both.
+
+Not every change is a release: changes collect under "Unreleased" at the top of
+[`CHANGES.md`](CHANGES.md) and go out together when a release is made (or at once for an urgent fix).
 
 Every push to `main` runs the **Release** workflow. It always runs the tests. When the version in
 `package.json` has no `v` tag yet, it also pushes the image (tagged with the version, and `latest`
-if that version is still the one on `main`), then creates the `vX.Y` tag and a GitHub Release with
+if that version is still the one on `main`), then creates the `vYY.M.N` tag and a GitHub Release with
 generated notes. Runs queue per version, so pushing the next version quickly doesn't cancel the
-previous one's release. If a version's release never ran, push its tag (`git tag vX.Y <commit>`,
-`git push origin vX.Y`), then start the workflow by hand (Actions → Release → Run workflow) with
+previous one's release. If a version's release never ran, push its tag (`git tag vYY.M.N <commit>`,
+`git push origin vYY.M.N`), then start the workflow by hand (Actions → Release → Run workflow) with
 that version's full commit SHA in **sha**.
 
 Every push to `main` also runs the **Speed** workflow (since 14.5), beside the release and without
@@ -1291,8 +1297,8 @@ holding it up: `scripts/bench/speed.mjs`, every suite, this version against the 
 with the tables in the run's summary (nothing is uploaded). To release:
 
 ```sh
-scripts/release-version.sh next      # prints the next version, e.g. 1.1
-# set package.json and package-lock.json to 1.1.0, add the CHANGES.md entry, commit, push to main
+scripts/release-version.sh next      # prints the next version, e.g. 26.11.1 (or 26.12.0 in December)
+# set package.json and package-lock.json to it, date the CHANGES.md "Unreleased" entry, commit, push to main
 ```
 
 Pull requests and other branches run the **CI** workflow (tests only). Both stay within GitHub's
