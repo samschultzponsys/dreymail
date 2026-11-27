@@ -14,6 +14,7 @@
 // Modified by samschultzponsys, 2026-11-25: messages up to 25 MB kept by default (was 1 MB), so mail with photos opens from the copy.
 // Modified by samschultzponsys, 2026-11-25: up to 50 MB (the largest message shown), so the biggest photo mail is kept too.
 // Modified by samschultzponsys, 2026-11-25: DREYMAIL_IMAP_CONNECTIONS (connections per mailbox); DREYMAIL_CACHE_BACKGROUND_MBIT.
+// Modified by samschultzponsys, 2026-11-27: how often a folder is checked whole without CONDSTORE (tests).
 
 import path from 'node:path';
 import { parseHostSuffix } from '../../shared/devHosts.js';
@@ -126,6 +127,8 @@ export interface CacheConfig {
    * are never held back.
    */
   backgroundBytesPerSecond?: number;
+  /** Without CONDSTORE: how often a folder's whole cached range is checked, in ms (DreyMail 26.11; tests). Default 5 minutes. */
+  fullCheckMs?: number;
 }
 
 export type Registration = 'open' | 'first' | 'closed';

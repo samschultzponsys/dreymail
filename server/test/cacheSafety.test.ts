@@ -51,7 +51,8 @@ function setup(n: number) {
   const sync = new CacheSync({
     cache,
     pool,
-    config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes: 0, bodyBytesPerAccount: 0 },
+    // Every check also checks the whole folder (normally every few minutes, in the background).
+    config: { messagesPerFolder: 2000, messagesPerOtherFolder: 0, maxBodyBytes: 0, bodyBytesPerAccount: 0, fullCheckMs: 0 },
     sentFolder: async () => null,
     isWatched: () => false,
     onChanged: () => {},

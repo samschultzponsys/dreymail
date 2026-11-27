@@ -428,7 +428,10 @@ export async function buildApp(
     // Slow ones are logged with their route (DreyMail 26.11), so the logs say what was slow; an
     // open logs its own breakdown ("slow message"), and startup times are measured in the app.
     if (metric && metric !== 'open' && !metric.startsWith('startup') && reply.elapsedTime > 3000) {
-      req.log.warn({ metric, route: `${req.method} ${req.routeOptions.url}`, ms: Math.round(reply.elapsedTime) }, 'slow request');
+      // Which list it was (folder, unread only, a search, the refresh button), never what was searched for.
+      const q = (req.query ?? {}) as Record<string, unknown>;
+      const which = metric === 'list' || metric === 'search' ? { folder: q.folder ?? (q.accountId ? undefined : 'all inboxes'), unread: q.unread === '1', search: !!q.q || !!q.filter, fresh: q.fresh === '1', page: !!q.cursor } : {};
+      req.log.warn({ metric, route: `${req.method} ${req.routeOptions.url}`, ms: Math.round(reply.elapsedTime), ...which }, 'slow request');
     }
   });
   const indexFile = path.join(config.webDir, 'index.html');

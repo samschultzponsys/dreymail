@@ -15,6 +15,7 @@
 // Modified by samschultzponsys, 2026-11-25: background downloading paced per mailbox; checks nobody waits for on the background connection.
 // Modified by samschultzponsys, 2026-11-25: a refused search never empties the copy; a copy missing messages is filled again.
 // Modified by samschultzponsys, 2026-11-27: loading unread mail ahead and older messages on the background connection, never the main one.
+// Modified by samschultzponsys, 2026-11-27: without CONDSTORE, a check reads the newest messages' flags and skips the deletion search when nothing was deleted; the whole folder every few minutes.
 
 import type { FetchMessageObject, ImapFlow, MailboxObject } from 'imapflow';
 import type { MessageSummary } from '../../../shared/types.js';
@@ -26,6 +27,14 @@ import { CacheCorruptError, flagsOf, type CachedFolder, type CachedRole, type Ma
 
 /** Messages fetched per IMAP command while filling a folder, so other requests get their turn in between. */
 export const FILL_CHUNK = 200;
+/**
+ * Without CONDSTORE (Microsoft 365, many others) a check can't ask only for what changed: it reads
+ * the flags of the newest FLAG_WINDOW cached messages, and those of the whole cached range (and the
+ * full list of UIDs, for deletions) at most every FULL_CHECK_MS (DreyMail 26.11). Reading all of a
+ * big inbox on every check took seconds, and lists and actions waited behind it.
+ */
+export const FLAG_WINDOW = 500;
+export const FULL_CHECK_MS = 5 * 60_000;
 /** Unread messages (among the newest) whose content is loaded ahead after a sync of INBOX. */
 const PREFETCH_COUNT = 25;
 const PREFETCH_AMONG = 200;
@@ -145,6 +154,10 @@ export class CacheSync {
   private readonly indexing = new Map<string, { again: boolean }>();
   /** Content being downloaded right now, per folder key + UID: opening the message waits for it instead of fetching it twice. */
   private readonly downloading = new Map<string, Promise<Buffer | null>>();
+  /** Per folder: when its whole cached range was last checked (flags and deletions) without CONDSTORE (26.11). */
+  private readonly fullCheckAt = new Map<string, number>();
+  /** The first full check of a folder comes FULL_CHECK_MS after starting, never with the first lists. */
+  private readonly startedAt = Date.now();
   private stopped = false;
 
   constructor(private readonly deps: CacheSyncDeps) {}
@@ -411,6 +424,11 @@ export class CacheSync {
         try {
           if (role === 'inbox') await this.prefetch(userId, accountId, path, interrupted);
           await this.fill(userId, accountId, path, interrupted);
+          // Without CONDSTORE, the whole cached range is checked every few minutes, in the
+          // background (DreyMail 26.11): flags of older messages, and deletions the count missed.
+          if (!interrupted() && this.ready(userId, accountId, path) && this.fullCheckDue(userId, accountId, path)) {
+            if (await this.update(userId, accountId, path, role, 'sync', true)) this.deps.onChanged(userId, accountId, path);
+          }
           this.indexAccount(userId, accountId);
           const f = this.cache.folder(userId, accountId, path);
           if (f && f.syncedAt > 0 && (f.complete || this.cache.count(f) >= this.limit(f.role))) {
@@ -485,7 +503,12 @@ export class CacheSync {
    * Bring the folder up to date (or start it: the newest chunk). Returns whether a listing would
    * look different now.
    */
-  private async update(userId: string, accountId: string, path: string, role: CachedRole, lane: Lane = this.lane(role)): Promise<boolean> {
+  /** Without CONDSTORE: whether the folder's whole cached range is due for a check (see FULL_CHECK_MS). */
+  private fullCheckDue(userId: string, accountId: string, path: string): boolean {
+    return Date.now() - (this.fullCheckAt.get(this.key(userId, accountId, path)) ?? this.startedAt) >= (this.deps.config.fullCheckMs ?? FULL_CHECK_MS);
+  }
+
+  private async update(userId: string, accountId: string, path: string, role: CachedRole, lane: Lane = this.lane(role), deep = false): Promise<boolean> {
     const { cache, pool } = this.deps;
     const limit = this.limit(role);
     return pool.withMailbox(userId, accountId, path, async (client, selected) => {
@@ -551,16 +574,34 @@ export class CacheSync {
       }
       const uidNext = Math.max(f.uidNext, ...fresh.map((m) => m.uid + 1));
 
-      // Flag changes in the cached range: only what changed since the last sync if the server can tell.
+      // Flag changes in the cached range: only what changed since the last sync if the server can tell;
+      // else the newest messages' flags, and every cached message's now and then (DreyMail 26.11).
       const since = condstore && f.modseq ? BigInt(f.modseq) : undefined;
-      const flagged = await client.fetchAll(`${f.lowUid}:*`, { uid: true, flags: true }, { uid: true, changedSince: since });
+      const k = this.key(userId, accountId, path);
+      // The whole range: with CONDSTORE (only what changed comes), or a deep check (in the background).
+      const full = condstore || deep;
+      let from = f.lowUid;
+      if (!full) {
+        const cached = cache.uids(f);
+        if (cached.length > FLAG_WINDOW) from = Math.max(f.lowUid, cached[cached.length - FLAG_WINDOW]!);
+      }
+      const flagged = await client.fetchAll(`${from}:*`, { uid: true, flags: true }, { uid: true, changedSince: since });
       const updates = flagged.filter((m) => m.uid >= f!.lowUid && m.uid < f!.uidNext).map((m) => ({ uid: m.uid, flags: flagsOf(m.flags) }));
       if (cache.setFlags(f, updates) > 0) changed = true;
       for (const m of flagged) if (m.modseq !== undefined && (modseq === null || m.modseq > modseq)) modseq = m.modseq;
 
-      // Messages that are gone (deleted, or moved by another client). A refused search is an error,
-      // never "none left" (DreyMail 14.6: that emptied the cached inbox); nor is an empty answer
-      // for a folder the server says holds messages.
+      // Messages that are gone (deleted, or moved by another client). The number of messages only
+      // drops when some are deleted: if it grew by exactly the new ones, none were, and the list of
+      // every UID needn't be asked for (DreyMail 26.11; it was, on every check). Asked for anyway
+      // every few minutes. A refused search is an error, never "none left" (DreyMail 14.6: that
+      // emptied the cached inbox); nor is an empty answer for a folder the server says holds messages.
+      // A copy short of messages (see isIntact) is checked whole at once, to be filled again.
+      if (!full && f.exists > 0 && mailbox.exists === f.exists + fresh.length && this.isIntact(f)) {
+        cache.updateFolder(f, { uidNext, exists: mailbox.exists, modseq: null, syncedAt: now });
+        cache.trim(f, limit);
+        return changed;
+      }
+      this.fullCheckAt.set(k, now);
       const present = new Set(await searchOrThrow(client, { uid: `${f.lowUid}:*` }, { uid: true }));
       if (present.size === 0 && mailbox.exists > 0) throw new Error(`The mail server listed no messages in ${path}, which holds ${mailbox.exists}; trying again later`);
       const gone = cache.uids(f).filter((u) => !present.has(u));

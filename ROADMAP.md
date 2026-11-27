@@ -23,6 +23,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Done
 
 ### Accounts, look and layout
+- [x] Light checks without CONDSTORE (Microsoft 365): the newest 500 messages' flags, deletions from
+      the message count, the whole folder every 5 minutes in the background (26.11.3).
 - [x] Lists and actions never wait behind loading ahead or filling older mail (both on the background
       connection); an open waits for a background download at most 0.4 s; slow requests logged (26.11.2).
 - [x] Calendar versions `YY.M.N` (year, month, count from 0 each month), short in the app's footer;

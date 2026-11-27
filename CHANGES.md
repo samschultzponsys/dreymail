@@ -13,6 +13,23 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-27 (v26.11.3): checking a big inbox without reading all of it
+
+- **Faster checks on Microsoft 365 (and every server without CONDSTORE):** each check of a cached
+  folder read the flags of every cached message and the list of every UID in it (for deletions):
+  tens of thousands for a big inbox, on the main connection, on every check (new mail, starting,
+  before lists). Lists and actions waited behind it (the likely cause of lists taking 7 to 14
+  seconds right after the server started). Now a check reads the flags of the newest 500 messages, and asks for the list of UIDs
+  only when the folder's message count says something was deleted (it only drops then; messages
+  DreyMail itself moves or deletes are counted off). The whole folder (older messages' flags, and
+  deletions) is checked every 5 minutes in the background, never on the main connection and not
+  right after starting. A copy short of messages is still checked whole at once, to be refilled.
+- **Slow requests say which list:** the `slow request` log line has the folder (or all inboxes),
+  whether it was unread only, a search, the refresh button or a later page; never the search words.
+- **Files:** `server/src/cache/sync.ts`, `server/src/cache/store.ts`, `server/src/imap/mail.ts`,
+  `server/src/config.ts`, `server/src/app.ts`, `server/test/cacheChecks.test.ts` (new),
+  `server/test/cacheSafety.test.ts`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-27 (v26.11.2): lists and actions never wait behind background downloads
 
 - **Note:** desktop flatpak installs on 14.7 or older can't update to 26.11.x with their own

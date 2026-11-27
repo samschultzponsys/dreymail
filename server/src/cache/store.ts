@@ -8,6 +8,7 @@
 // Modified by samschultzponsys, 2026-11-23: a search index (keyed hashes of words) for searching the cached mail.
 // Modified by samschultzponsys, 2026-11-24: space per account remembered a little while; arrival times for keeping the newest content.
 // Modified by samschultzponsys, 2026-11-25: message sizes, for fetching in batches of bounded size.
+// Modified by samschultzponsys, 2026-11-27: messages DreyMail moved or deleted also lower the folder's message count.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -501,6 +502,19 @@ export class MailCache {
         removed += Number(this.db.prepare(`DELETE FROM messages WHERE folder_id = ? AND uid IN (${part.map(() => '?').join(',')})`).run(f.id, ...part).changes);
       }
     });
+    return removed;
+  }
+
+  /**
+   * Messages DreyMail itself moved or deleted out of the folder: gone from the copy, and from the
+   * folder's message count, so the next check can tell that nothing else was deleted (DreyMail 26.11).
+   */
+  removeExpunged(f: CachedFolder, uids: number[]): number {
+    const removed = this.removeMessages(f, uids);
+    if (removed > 0) {
+      const now = this.folder(f.userId, f.accountId, f.path);
+      if (now && now.id === f.id) this.updateFolder(now, { exists: Math.max(0, now.exists - removed) });
+    }
     return removed;
   }
 

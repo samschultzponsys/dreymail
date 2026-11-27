@@ -1325,7 +1325,7 @@ export class MailService {
       return { ...info, uid: (res ? res.uidMap?.get(ref.uid) : undefined) ?? null, uidValidity: (res ? res.uidValidity?.toString() : undefined) ?? null };
     });
     if (moved) {
-      this.updateCache(userId, ref.accountId, ref.folder, ref.uidValidity, (cache, f) => cache.removeMessages(f, [ref.uid]));
+      this.updateCache(userId, ref.accountId, ref.folder, ref.uidValidity, (cache, f) => cache.removeExpunged(f, [ref.uid]));
       this.folderChanged(userId, ref.accountId, 'INBOX');
     }
     if (!moved || (moved.uid && moved.uidValidity) || !moved.messageId) return moved;
@@ -1437,7 +1437,7 @@ export class MailService {
     if (action.type === 'seen' || action.type === 'flagged') {
       this.updateCache(userId, accountId, folder, uidValidity, (cache, f) => cache.changeFlag(f, uids, action.type as 'seen' | 'flagged', action.value));
     } else {
-      this.updateCache(userId, accountId, folder, uidValidity, (cache, f) => cache.removeMessages(f, uids));
+      this.updateCache(userId, accountId, folder, uidValidity, (cache, f) => cache.removeExpunged(f, uids));
       if (destination) this.folderChanged(userId, accountId, destination);
     }
     if (expunge) return { ...none, permanent: true };
@@ -1540,6 +1540,6 @@ export class MailService {
       if (mailbox.uidValidity.toString() !== ref.uidValidity) return;
       await client.messageDelete(String(ref.uid), { uid: true });
     });
-    this.updateCache(userId, ref.accountId, ref.folder, ref.uidValidity, (cache, f) => cache.removeMessages(f, [ref.uid]));
+    this.updateCache(userId, ref.accountId, ref.folder, ref.uidValidity, (cache, f) => cache.removeExpunged(f, [ref.uid]));
   }
 }

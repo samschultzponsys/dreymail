@@ -105,7 +105,8 @@
      Modified by samschultzponsys, 2026-11-27: v14.7 (the reminder window fits a phone).
      Modified by samschultzponsys, 2026-11-27: v26.11.0 (calendar versions YY.M.N; releases when ready).
      Modified by samschultzponsys, 2026-11-27: v26.11.1 (Linux desktop files attached again).
-     Modified by samschultzponsys, 2026-11-27: v26.11.2 (lists and actions never wait behind background downloads). -->
+     Modified by samschultzponsys, 2026-11-27: v26.11.2 (lists and actions never wait behind background downloads).
+     Modified by samschultzponsys, 2026-11-27: v26.11.3 (checks of a big inbox without reading all of it). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -117,7 +118,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **26.11.2**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **26.11.3**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1111,6 +1112,12 @@ messages and fetching the messages around the open one all run on the background
 never the main one that lists and actions use (on Microsoft 365 one of those requests took
 seconds, and a list or an archive waited behind it). An open joins a download of the same message
 already under way only for a moment; then it fetches the message itself.
+
+**Light checks (26.11.3).** On servers that can't say what changed since the last check (no
+CONDSTORE, e.g. Microsoft 365), a check reads only the newest 500 messages' flags, and the list of
+every message only when the folder's message count says something was deleted. The whole folder
+(older messages' flags, deletions) is checked every 5 minutes in the background. A flag changed by
+another mail client on an older message can take up to 5 minutes to show.
 
 **Showing your list at once (14.5, off unless chosen).** Settings → This device can keep the first
 page of the list you last saw on that device and show it the moment DreyMail opens, until the
