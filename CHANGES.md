@@ -13,6 +13,16 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## Unreleased
+
+- **Mailbox changes reach your other devices at once:** a mailbox's or group's icon, picture,
+  color or name changed on one device (or a mailbox added, removed, reordered) only showed on the
+  others after they reloaded, and the Android app's notifications kept the old icons. Now the
+  server tells every open DreyMail (browser, desktop and Android apps) to fetch them again, and an
+  app coming back (the Android app from the background) fetches them when it reconnects. The
+  Android app takes the new icons for its notifications from there.
+- **Files:** `server/src/routes/api.ts`, `shared/types.ts`, `web/src/hooks.ts`.
+
 ## 2026-11-27 (v26.11.4): lists don't hang on a slow mail server
 
 - **A list of a cached folder waits at most 2 s for the mail server:** when the copy can't answer

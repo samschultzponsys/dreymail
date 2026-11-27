@@ -33,6 +33,7 @@
 // Modified by samschultzponsys, 2026-11-25: senders looked up one at a time for images; warm-up of messages likely opened next.
 // Modified by samschultzponsys, 2026-11-25: the app reports how long it took to start.
 // Modified by samschultzponsys, 2026-11-27: where a list's time went (Server-Timing).
+// Modified by samschultzponsys, 2026-11-27: mailbox and group changes reach the user's other devices at once.
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -302,6 +303,15 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
   });
 
   const uid = (req: FastifyRequest) => req.user!.id;
+  // Mailboxes or groups changed (name, color, icon, picture, order, pinned folders, added or
+  // removed): the user's other devices fetch them again now (DreyMail 26.11). They kept the old ones
+  // until they reloaded, and the Android app's notifications kept the old icons.
+  app.addHook('onResponse', async (req, reply) => {
+    const url = req.routeOptions.url ?? '';
+    if (req.method === 'GET' || reply.statusCode >= 400 || !req.user) return;
+    if (!/^\/api\/(accounts|groups)(\/|$)/.test(url) || url === '/api/accounts/test') return;
+    pool.onEvent(req.user.id, { type: 'accounts' });
+  });
   /** Values for {username}, {email} and {name} in the admin's default account settings. */
   const templateValues = (u: User): TemplateValues => ({
     // OIDC providers don't always send a preferred_username; the email's local part is the next best thing.

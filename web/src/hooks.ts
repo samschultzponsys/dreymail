@@ -12,6 +12,7 @@
 // Modified by samschultzponsys, 2026-11-24: reconnecting checks the server's version again.
 // Modified by samschultzponsys, 2026-11-25: unused useMessageCache removed.
 // Modified by samschultzponsys, 2026-11-25: the list kept on this device shown at once (when switched on).
+// Modified by samschultzponsys, 2026-11-27: mailbox and group changes reach the user's other devices at once.
 
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -156,11 +157,22 @@ export function useLiveUpdates(enabled: boolean, onSnoozeEnded?: (ev: SnoozeEnde
       ws.onmessage = (e) => {
         const ev = JSON.parse(String(e.data)) as ServerEvent;
         // Reconnected (the server may have been updated): check its version again (DreyMail 13.8).
-        if (ev.type === 'hello') void qc.invalidateQueries({ queryKey: ['version'] });
+        if (ev.type === 'hello') {
+          void qc.invalidateQueries({ queryKey: ['version'] });
+          // Back after being away (the Android app in the background, a sleeping laptop): changes to
+          // mailboxes made on another device meanwhile came while it wasn't listening (DreyMail 26.11).
+          void qc.invalidateQueries({ queryKey: ['accounts'] });
+          void qc.invalidateQueries({ queryKey: ['groups'] });
+        }
         else if (ev.type === 'reset') void qc.resetQueries({ queryKey: ['messages'] });
         else if (ev.type === 'mailbox') refresh();
         else if (ev.type === 'snoozeEnded') snoozeEnded.current?.(ev);
         else if (ev.type === 'preferences') void qc.invalidateQueries({ queryKey: ['me'] });
+        else if (ev.type === 'accounts') {
+          // Changed on another device (DreyMail 26.11); the Android app's notifications take the new icons from these too.
+          void qc.invalidateQueries({ queryKey: ['accounts'] });
+          void qc.invalidateQueries({ queryKey: ['groups'] });
+        }
         else if (ev.type === 'notify') notify.current?.(ev);
         else if (ev.type === 'reminders') void qc.invalidateQueries({ queryKey: ['reminders'] });
         else if (ev.type === 'reminder') {

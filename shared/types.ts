@@ -31,6 +31,7 @@
 // Modified by samschultzponsys, 2026-11-17: reminder events over the WebSocket.
 // Modified by samschultzponsys, 2026-11-18: importance and read receipts; the plain slide transition; follow-up flags; directory suggestions; shared mailboxes; S/MIME.
 // Modified by samschultzponsys, 2026-11-24: the live connection's hello carries the server's version (13.8).
+// Modified by samschultzponsys, 2026-11-27: mailbox and group changes reach the user's other devices at once.
 
 // Types shared between the server API and the web client.
 
@@ -702,6 +703,8 @@ export type ServerEvent =
   | { type: 'hello'; version?: string }
   /** The user's preferences changed on some device: fetch them again (DreyMail). */
   | { type: 'preferences' }
+  /** The user's mailboxes or groups changed on some device (an icon, a color…): fetch them again (DreyMail 26.11). */
+  | { type: 'accounts' }
   /** An event reminder is due: the desktop app shows it as a notification, every app opens its reminder window (DreyMail). */
   | { type: 'reminder'; title: string; body: string; tag: string; url: string; joinUrl: string | null }
   /** Reminders were dismissed or snoozed on some device: fetch them again (DreyMail). */
