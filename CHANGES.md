@@ -13,7 +13,7 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
-## Unreleased
+## 2026-11-27 (v26.11.2): lists and actions never wait behind background downloads
 
 - **Note:** desktop flatpak installs on 14.7 or older can't update to 26.11.x with their own
   command: it downloads from a `v26.11` tag that doesn't exist (they shorten the version). Install
@@ -32,7 +32,8 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 - **Slow requests logged:** a listing, search or action over 3 seconds is logged (`slow request`,
   with its route), like slow message opens.
 - **Files:** `server/src/cache/sync.ts`, `server/src/imap/mail.ts`, `server/src/app.ts`,
-  `server/test/cacheWarm.test.ts`, `web/test/desktopUpdate.test.ts`, `README.md`, `ROADMAP.md`.
+  `server/test/cacheWarm.test.ts`, `web/test/desktopUpdate.test.ts`, `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
 
 ## 2026-11-27 (v26.11.1): the Linux desktop files are attached again
 
