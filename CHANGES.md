@@ -13,6 +13,13 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-27 (v26.11.1): the Linux desktop files are attached again
+
+- **Fix:** 26.11.0's release stopped while attaching the Linux desktop files (the flatpak was
+  missing), because each two-part copy (`DreyMail-26.11-…`) was uploaded twice. The file list is
+  now fixed before the copies are made.
+- **Files:** `.github/workflows/release.yml`, `README.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-27 (v26.11.0): calendar versions
 
 - **Versions are now `YY.M.N`:** the year's last two digits, the month and a count that starts at 0

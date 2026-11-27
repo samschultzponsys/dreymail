@@ -7,6 +7,7 @@
 # release); `latest` only for the version on main; a missed version can be released by hand with its commit.
 # Modified by samschultzponsys, 2026-11-15: Node 24 (image, CI and GitHub Actions on their Node 24 versions).
 # Modified by samschultzponsys, 2026-11-27: calendar versions YY.M.N; desktop files also under the two-part names apps before 26.11 look for.
+# Modified by samschultzponsys, 2026-11-27: the Linux file list is expanded before the two-part copies are made.
 name: Release
 
 # Every push to main runs the tests. When package.json carries a version that has no tag yet
@@ -213,7 +214,8 @@ jobs:
           npx electron-builder --linux flatpak --x64 --publish never "--config.artifactName=DreyMail-${VERSION}-\${arch}.\${ext}"
       - name: Attach to the release
         run: |
-          files="dist/*.deb dist/*.rpm $(ls dist/*.flatpak 2>/dev/null)"
+          # Expanded now, before the copies below exist (a glob left for later would pick them up too).
+          files="$(ls dist/*.deb dist/*.rpm dist/*.flatpak 2>/dev/null)"
           # The same files under the two-part names apps before 26.11 look for (see above).
           for f in $files; do cp "$f" "${f/-$VERSION-/-${VERSION%.*}-}"; done
           gh release upload "v$VERSION" $files $(for f in $files; do echo "${f/-$VERSION-/-${VERSION%.*}-}"; done) --clobber --repo "$GITHUB_REPOSITORY"

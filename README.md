@@ -103,7 +103,8 @@
      Modified by samschultzponsys, 2026-11-25: v14.5 (connections, searches, speed page).
      Modified by samschultzponsys, 2026-11-25: v14.6 (a refused search never empties the copy).
      Modified by samschultzponsys, 2026-11-27: v14.7 (the reminder window fits a phone).
-     Modified by samschultzponsys, 2026-11-27: v26.11.0 (calendar versions YY.M.N; releases when ready). -->
+     Modified by samschultzponsys, 2026-11-27: v26.11.0 (calendar versions YY.M.N; releases when ready).
+     Modified by samschultzponsys, 2026-11-27: v26.11.1 (Linux desktop files attached again). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -115,7 +116,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **26.11.0**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **26.11.1**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
