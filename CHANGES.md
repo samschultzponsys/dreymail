@@ -13,6 +13,15 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## Unreleased
+
+- **Note:** desktop flatpak installs on 14.7 or older can't update to 26.11.x with their own
+  command: it downloads from a `v26.11` tag that doesn't exist (they shorten the version). Install
+  26.11.1 once by hand (see the 26.11.1 release); from then on, updates work. deb, rpm and Windows
+  installs use the file links on the release and aren't affected.
+- **Test:** the flatpak update command downloads from the whole calendar tag.
+- **Files:** `web/test/desktopUpdate.test.ts`.
+
 ## 2026-11-27 (v26.11.1): the Linux desktop files are attached again
 
 - **Fix:** 26.11.0's release stopped while attaching the Linux desktop files (the flatpak was

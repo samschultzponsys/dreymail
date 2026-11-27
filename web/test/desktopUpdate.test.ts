@@ -1,5 +1,6 @@
 // DreyMail. Copyright (C) 2026 samschultzponsys.
 // Licensed under the GNU Affero General Public License v3.0 only; see LICENSE and NOTICE.
+// Modified by samschultzponsys, 2026-11-27: the flatpak download address uses the whole calendar tag.
 
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
@@ -78,5 +79,10 @@ describe('desktop app updates', () => {
     expect(await update.fetchLatest((() => Promise.reject(new Error('offline'))) as unknown as typeof fetch)).toBeNull();
     const ok = (async () => ({ ok: true, json: async () => ({ tag_name: 'v1.8', assets: [] }) })) as unknown as typeof fetch;
     expect(await update.fetchLatest(ok)).toMatchObject({ tag_name: 'v1.8' });
+  });
+
+  it('downloads a calendar release from its whole tag (14.7 asked for v26.11, which does not exist)', () => {
+    const flatpak = update.upgradeInstructions('flatpak', 'v26.11.1', 'x64') as { command: string };
+    expect(flatpak.command).toContain('/releases/download/v26.11.1/DreyMail-26.11.1-x86_64.flatpak');
   });
 });
