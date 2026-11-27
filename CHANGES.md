@@ -13,6 +13,14 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-27 (v14.7): the reminder window fits a phone
+
+- **Fix:** on a phone, especially with larger text, the reminder window's header didn't fit: "2
+  reminders" broke over two lines and "Dismiss all" ran off the screen. Now the title and Dismiss
+  all share the first line and Snooze has its own line below, and the window takes at most about
+  half the screen, so the list stays in view.
+- **Files:** `web/src/styles.css`, `README.md`, `ROADMAP.md`, `package.json`, `package-lock.json`.
+
 ## 2026-11-25 (v14.6): fix: an inbox showing only its newest few messages
 
 - **Fix:** when the mail server refused a search during a sync (Microsoft 365 does when it limits

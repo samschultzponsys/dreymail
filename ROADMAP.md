@@ -22,6 +22,8 @@ Everything planned so far is done (12.5). New ideas go here.
 ## Done
 
 ### Accounts, look and layout
+- [x] The reminder window fits a phone, also with larger text: Snooze on its own line, Dismiss all in
+      view, at most about half the screen tall (14.7).
 - [x] Fix: a search the mail server refused (Microsoft 365 limiting) emptied the cached inbox; damaged
       copies are filled again by themselves, and not trusted for listing meanwhile (14.6).
 - [x] Connections per mailbox kept within a limit (`DREYMAIL_IMAP_CONNECTIONS`, 6), extra ones closed
