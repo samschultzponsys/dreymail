@@ -32,6 +32,7 @@
 // Modified by samschultzponsys, 2026-11-22: inbox tabs off by default; folders pinned to the top bar (preference).
 // Modified by samschultzponsys, 2026-11-25: senders looked up one at a time for images; warm-up of messages likely opened next.
 // Modified by samschultzponsys, 2026-11-25: the app reports how long it took to start.
+// Modified by samschultzponsys, 2026-11-27: where a list's time went (Server-Timing).
 
 import type { Followups } from '../mail/followups.js';
 import type { Directory } from '../directory.js';
@@ -846,7 +847,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: ApiDeps) {
       reply.raw.on('close', () => {
         if (!reply.raw.writableFinished) gone.abort();
       });
-      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1', quick: q.quick === '1', signal: gone.signal });
+      const timing: Record<string, number | string> = {};
+      const list = await mail.listMessages(userId, sources, q.cursor ?? null, limit, { text: q.q ?? '', unread: q.unread === '1', filters }, { fresh: q.fresh === '1', quick: q.quick === '1', signal: gone.signal, timing });
+      // Where the time went (DreyMail 26.11), for the browser's developer tools and the slow-request log.
+      reply.header('server-timing', Object.entries(timing).map(([k, v]) => (typeof v === 'number' ? `${k};dur=${v}` : `${k};desc="${v}"`)).join(', '));
       const until = snoozedUntil(userId);
       const follow = deps.followups?.lookup(userId);
       for (const m of [...list.messages, ...list.related]) {

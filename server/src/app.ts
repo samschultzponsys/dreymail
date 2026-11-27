@@ -431,7 +431,8 @@ export async function buildApp(
       // Which list it was (folder, unread only, a search, the refresh button), never what was searched for.
       const q = (req.query ?? {}) as Record<string, unknown>;
       const which = metric === 'list' || metric === 'search' ? { folder: q.folder ?? (q.accountId ? undefined : 'all inboxes'), unread: q.unread === '1', search: !!q.q || !!q.filter, fresh: q.fresh === '1', page: !!q.cursor } : {};
-      req.log.warn({ metric, route: `${req.method} ${req.routeOptions.url}`, ms: Math.round(reply.elapsedTime), ...which }, 'slow request');
+      const steps = reply.getHeader('server-timing');
+      req.log.warn({ metric, route: `${req.method} ${req.routeOptions.url}`, ms: Math.round(reply.elapsedTime), ...which, ...(steps ? { steps: String(steps) } : {}) }, 'slow request');
     }
   });
   const indexFile = path.join(config.webDir, 'index.html');

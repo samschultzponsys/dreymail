@@ -19,6 +19,7 @@
 // Modified by samschultzponsys, 2026-11-23: quick searches from the index alone, shown while the full search runs.
 // Modified by samschultzponsys, 2026-11-25: messages opened on their own connection in one round trip, joining a download already under way; warm-up of likely next messages.
 // Modified by samschultzponsys, 2026-11-27: an open waits at most a moment for a background download; warm-ups on the background connection.
+// Modified by samschultzponsys, 2026-11-27: a cached folder's list waits at most 2 s for the mail server, then comes from the copy; where a list's time went.
 // Modified by samschultzponsys, 2026-11-25: the last messages opened kept decoded in memory, so their pictures and attachments open at once.
 // Modified by samschultzponsys, 2026-11-25: messages of one folder opened together fetched in one IMAP command.
 // Modified by samschultzponsys, 2026-11-25: lists answered from the copy at once and checked in the background; a folder being cached for the first time isn't searched on the mail server for conversations.
@@ -113,6 +114,12 @@ interface ReadQueue {
   running: boolean;
 }
 
+/**
+ * How long a list of a cached folder the copy can't answer alone (see cachedSourcePage) waits for
+ * the mail server before it comes from the copy anyway (DreyMail 26.11): right after the server
+ * started, signing in again and the first checks of a big mailbox made an inbox list wait 28 s.
+ */
+const LIVE_LIST_WAIT_MS = 2000;
 /** How long an open waits for a download of the same message already under way before fetching it itself (DreyMail 26.11). */
 const JOIN_WAIT_MS = 400;
 /** Most messages, and bytes, fetched for reading in one IMAP command. */
@@ -698,6 +705,22 @@ export class MailService {
    * cached (or not filled yet; it starts filling), there is a text search (always done by the IMAP
    * server), or the page reaches below the oldest cached message.
    */
+  /**
+   * A page from the copy as it is, for when the mail server is slow to answer (DreyMail 26.11):
+   * not marked as the last one, so a further page asks again. Null if the folder isn't cached.
+   */
+  private copyPage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
+    if (!this.cached || needsSearch(filter) || cursor?.done) return null;
+    const { accountId, folder } = source;
+    return this.fromCache(userId, accountId, folder, null, ({ cache, sync }) => {
+      const f = sync.ready(userId, accountId, folder);
+      if (!f || (cursor && cursor.uidValidity !== f.uidValidity)) return null;
+      const rows = cache.page(f, cursor?.beforeUid ?? null, limit, filter.unread);
+      if (!rows.length) return null;
+      return { source, uidValidity: f.uidValidity, items: rows.map((m) => cachedItem(source, f.uidValidity, m)), exhausted: false, reset: false };
+    });
+  }
+
   private cachedSourcePage(userId: string, source: ListSource, cursor: AccountCursor | undefined, limit: number, filter: ListFilter): SourcePage | null {
     if (!this.cached || needsSearch(filter)) return null;
     const { accountId, folder } = source;
@@ -918,20 +941,43 @@ export class MailService {
      * prepareCached). quick (DreyMail 12.8): a word search answered only from the search index, at
      * once, from whatever the cache holds (the client shows it while the full search runs).
      */
-    opts: { fresh?: boolean; quick?: boolean; signal?: AbortSignal } = {},
+    opts: { fresh?: boolean; quick?: boolean; signal?: AbortSignal; timing?: Record<string, number | string> } = {},
   ): Promise<MessageListResponse> {
     const previous = decodeCursor(rawCursor);
+    // Where the time went (DreyMail 26.11): logged with a slow list, and in Server-Timing.
+    const timing = opts.timing ?? {};
+    let t = performance.now();
+    const step = (name: string) => {
+      const now = performance.now();
+      timing[name] = Math.round(now - t);
+      t = now;
+    };
+    const from: string[] = [];
     const errors: MessageListResponse['errors'] = [];
     if (opts.quick) return this.quickSearch(userId, sources, previous, limit, filter);
     await this.prepareCached(userId, sources, filter, !!opts.fresh);
     const current = indexable(filter) ? await this.unchangedFolders(userId, sources) : new Set<string>();
+    step('prepare');
     const one = async (s: ListSource, lane: Lane): Promise<SourcePage | null> => {
       try {
-        return (
-          this.indexedSourcePage(userId, s, previous[sourceKey(s)], limit, filter, current) ??
-          this.cachedSourcePage(userId, s, previous[sourceKey(s)], limit, filter) ??
-          (await this.fetchSourcePage(userId, s, previous[sourceKey(s)], limit, filter, lane))
-        );
+        const cursor = previous[sourceKey(s)];
+        const indexed = this.indexedSourcePage(userId, s, cursor, limit, filter, current);
+        if (indexed) return from.push('index'), indexed;
+        const cached = this.cachedSourcePage(userId, s, cursor, limit, filter);
+        if (cached) return from.push('copy'), cached;
+        const live = this.fetchSourcePage(userId, s, cursor, limit, filter, lane);
+        // A cached folder the copy couldn't answer alone: the mail server has a moment, then the
+        // copy answers after all (DreyMail 26.11). The list comes again by itself once the copy is
+        // brought up to date.
+        const copy = this.copyPage(userId, s, cursor, limit, filter);
+        if (copy) {
+          const first = await Promise.race([live, sleep(LIVE_LIST_WAIT_MS).then(() => null)]);
+          if (first) return from.push('server'), first;
+          live.catch(() => undefined);
+          return from.push('copy (server slow)'), copy;
+        }
+        const page = await live;
+        return from.push('server'), page;
       } catch (err) {
         errors.push({ accountId: s.accountId, folder: s.folder, error: describeError(err, 'IMAP').message });
         return null;
@@ -961,6 +1007,8 @@ export class MailService {
       .flat()
       .filter((p): p is SourcePage => p !== null);
 
+    step('pages');
+    timing.from = [...new Set(from)].join('+');
     const reset = pages.some((p) => p.reset) && rawCursor !== null;
     const { picked, cursor, more } = mergePages(pages, limit, previous);
     // Sources that failed keep their previous cursor so a later page can retry them.
@@ -969,7 +1017,9 @@ export class MailService {
       if (!cursor[k] && previous[k]) cursor[k] = previous[k];
     }
     const related = await this.relatedItems(userId, picked);
+    step('related');
     const snippets = await this.snippets(userId, [...picked, ...related]);
+    step('snippets');
     return {
       messages: picked.map((it) => this.toSummary(it, snippets.get(it) ?? '')),
       related: related.map((it) => this.toSummary(it, snippets.get(it) ?? '')),

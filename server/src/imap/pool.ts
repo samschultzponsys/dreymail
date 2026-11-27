@@ -10,6 +10,7 @@
 // Modified by samschultzponsys, 2026-11-25: a connection of its own for opening messages, so reading never waits behind syncing.
 // Modified by samschultzponsys, 2026-11-25: an older folder list is used at once while a fresh one is fetched.
 // Modified by samschultzponsys, 2026-11-25: at most so many connections per mailbox; extra ones close after a minute unused.
+// Modified by samschultzponsys, 2026-11-27: slow sign-ins and waits for a connection logged.
 
 import type { ImapFlow, ListResponse, MailboxObject } from 'imapflow';
 import type { ServerEvent } from '../../../shared/types.js';
@@ -20,6 +21,9 @@ import { fetchSnippets } from './summary.js';
 
 /** How much of a new message's text a notification preview shows (the payload has room for it). */
 const NOTIFICATION_PREVIEW_CHARS = 1000;
+
+/** Signing in, or waiting for a connection and folder, longer than this is logged (DreyMail 26.11). */
+const SLOW_MS = 2000;
 
 export interface PoolOptions {
   idleTimeoutMs: number;
@@ -214,8 +218,12 @@ export class ImapPool {
     if (!conn.connecting) {
       const acc = this.account(userId, accountId);
       const c = conn;
+      const started = Date.now();
       c.connecting = connectImap(acc.imap, { blockPrivateHosts: this.opts.blockPrivateHosts, autoIdle: false })
         .then((client) => {
+          // Signing in to the mail server can take long (DreyMail 26.11: logged, to tell from other waits).
+          const ms = Date.now() - started;
+          if (ms > SLOW_MS) this.opts.log?.('slow IMAP connect', { accountId, lane, ms });
           client.on('close', () => {
             if (c.client === client) c.client = null;
           });
@@ -249,10 +257,14 @@ export class ImapPool {
     fn: (client: ImapFlow, mailbox: MailboxObject) => Promise<T>,
     lane: Lane = 'main',
   ): Promise<T> {
+    const asked = Date.now();
     return this.withClient(userId, accountId, async (client) => {
       let lock;
       try {
         lock = await client.getMailboxLock(path, { acquireTimeout: 60_000 });
+        // Waiting for the connection (signing in, or other requests on it) and for the folder (DreyMail 26.11).
+        const waited = Date.now() - asked;
+        if (waited > SLOW_MS) this.opts.log?.('slow IMAP wait', { accountId, lane, folder: path, ms: waited });
       } catch (err) {
         const e = err as { responseText?: string; message?: string };
         throw new MailServerError(`Cannot open folder "${path}": ${e.responseText || e.message}`, 'protocol');

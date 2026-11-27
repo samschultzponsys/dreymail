@@ -23,6 +23,8 @@ iOS requirement. Mail stays on the providers; at most a minimal encrypted cache.
 ## Done
 
 ### Accounts, look and layout
+- [x] A cached folder's list waits at most 2 s for the mail server, then comes from the copy; slow
+      lists, sign-ins and connection waits logged with where the time went (26.11.4).
 - [x] Light checks without CONDSTORE (Microsoft 365): the newest 500 messages' flags, deletions from
       the message count, the whole folder every 5 minutes in the background (26.11.3).
 - [x] Lists and actions never wait behind loading ahead or filling older mail (both on the background

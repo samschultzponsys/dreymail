@@ -13,6 +13,21 @@ Upstream merges are recorded here too, with the upstream commit they brought in.
 
 ---
 
+## 2026-11-27 (v26.11.4): lists don't hang on a slow mail server
+
+- **A list of a cached folder waits at most 2 s for the mail server:** when the copy can't answer
+  alone (it is short of messages, or "unread only" finds fewer than a page in a folder only partly
+  copied), the list asks the mail server; right after the server started (signing in again, first
+  checks of a big mailbox) that took 28 s for an inbox. Now after 2 s the copy answers, and the
+  list comes again by itself once the copy is up to date.
+- **Where a slow list's time went:** the `slow request` line of a list has its steps (preparing,
+  the pages and where they came from, conversations, previews), also sent as Server-Timing.
+  Signing in to the mail server, or waiting for a connection and folder, longer than 2 s is logged
+  too (`slow IMAP connect`, `slow IMAP wait`, with the connection).
+- **Files:** `server/src/imap/mail.ts`, `server/src/imap/pool.ts`, `server/src/routes/api.ts`,
+  `server/src/app.ts`, `server/test/listFallback.test.ts` (new), `README.md`, `ROADMAP.md`,
+  `package.json`, `package-lock.json`.
+
 ## 2026-11-27 (v26.11.3): checking a big inbox without reading all of it
 
 - **Faster checks on Microsoft 365 (and every server without CONDSTORE):** each check of a cached

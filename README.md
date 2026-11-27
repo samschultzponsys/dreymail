@@ -106,7 +106,8 @@
      Modified by samschultzponsys, 2026-11-27: v26.11.0 (calendar versions YY.M.N; releases when ready).
      Modified by samschultzponsys, 2026-11-27: v26.11.1 (Linux desktop files attached again).
      Modified by samschultzponsys, 2026-11-27: v26.11.2 (lists and actions never wait behind background downloads).
-     Modified by samschultzponsys, 2026-11-27: v26.11.3 (checks of a big inbox without reading all of it). -->
+     Modified by samschultzponsys, 2026-11-27: v26.11.3 (checks of a big inbox without reading all of it).
+     Modified by samschultzponsys, 2026-11-27: v26.11.4 (lists never hang on a slow mail server). -->
 <p align="center"><img src="branding/dreymail-icon.svg" alt="DreyMail icon" width="128" height="128"></p>
 
 # DreyMail
@@ -118,7 +119,7 @@ account, in the browser, as desktop apps for Linux and Windows, and as an Androi
 
 ## Status
 
-Current version: **26.11.3**. A fast three-pane mail client with its own look (a cyan envelope in an
+Current version: **26.11.4**. A fast three-pane mail client with its own look (a cyan envelope in an
 indigo drey), a loading screen while it opens, banners when the app or a page is older than the server, per-account colors that recolor the whole app, an on/off switch for "All
 inboxes", signatures per account or shared, administration (users, OIDC sign-in) in the app, and desktop
 apps for Linux (flatpak, deb, rpm) and Windows, and an Android app with instant, end-to-end
@@ -1118,6 +1119,16 @@ CONDSTORE, e.g. Microsoft 365), a check reads only the newest 500 messages' flag
 every message only when the folder's message count says something was deleted. The whole folder
 (older messages' flags, deletions) is checked every 5 minutes in the background. A flag changed by
 another mail client on an older message can take up to 5 minutes to show.
+
+**Never hanging on the mail server (26.11.4).** A list of a cached folder waits at most 2 seconds
+for the mail server when the copy can't answer alone; then the copy answers, and the list comes
+again by itself once the copy is up to date. Slow lists are logged with where their time went,
+and so are slow sign-ins to the mail server (`slow IMAP connect`) and waits for a connection
+(`slow IMAP wait`):
+
+```sh
+docker logs dreymail 2>&1 | grep -E "slow (request|message|IMAP)" | tail -20
+```
 
 **Showing your list at once (14.5, off unless chosen).** Settings → This device can keep the first
 page of the list you last saw on that device and show it the moment DreyMail opens, until the
